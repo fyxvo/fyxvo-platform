@@ -475,6 +475,49 @@ export interface OperatorSummary {
   }>;
 }
 
+export interface Notification {
+  readonly id: string;
+  readonly type: "funding_confirmed" | "api_key_created" | "api_key_revoked" | "project_activated" | "error_spike";
+  readonly title: string;
+  readonly message: string;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly createdAt: string;
+}
+
+export interface ApiKeyAnalytics {
+  readonly apiKeyId: string;
+  readonly totalRequests: number;
+  readonly successRequests: number;
+  readonly errorRequests: number;
+  readonly errorRate: number;
+  readonly averageLatencyMs: number;
+  readonly p95LatencyMs: number;
+  readonly dailyBuckets: ReadonlyArray<{ readonly date: string; readonly count: number; readonly errors: number }>;
+}
+
+export interface MethodBreakdown {
+  readonly route: string;
+  readonly service: string;
+  readonly count: number;
+  readonly averageLatencyMs: number;
+  readonly errorRate: number;
+  readonly errorCount: number;
+}
+
+export interface ErrorLogEntry {
+  readonly id: string;
+  readonly route: string;
+  readonly method: string;
+  readonly service: string;
+  readonly statusCode: number;
+  readonly durationMs: number;
+  readonly createdAt: string;
+  readonly apiKeyPrefix: string | null;
+}
+
+export type AnalyticsRange = "1h" | "6h" | "24h" | "7d" | "30d";
+
 export interface SampleTrendPoint {
   readonly label: string;
   readonly value: number;

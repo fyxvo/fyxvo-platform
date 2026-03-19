@@ -20,6 +20,7 @@ import {
   SettingsIcon,
 } from "./icons";
 import { usePortal } from "./portal-provider";
+import { NotificationBell } from "./notification-bell";
 import { shortenAddress } from "../lib/format";
 
 const navItems = [
@@ -88,8 +89,11 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 shrink-0 items-center border-b border-[var(--fyxvo-border)] px-4">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--fyxvo-border)] px-4">
         <BrandLogo priority />
+        {portal.walletPhase === "authenticated" && portal.token ? (
+          <NotificationBell token={portal.token} />
+        ) : null}
       </div>
 
       {portal.walletPhase === "authenticated" && portal.selectedProject ? (
@@ -149,6 +153,7 @@ function SidebarContent({
 
 export function DashShell({ children }: { readonly children: React.ReactNode }) {
   const pathname = usePathname();
+  const portal = usePortal();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -180,8 +185,15 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
             <MenuIcon className="h-4 w-4" />
           </button>
           <BrandLogo />
-          <div className="w-9" />
+          <div className="flex items-center gap-2">
+            {portal.walletPhase === "authenticated" && portal.token ? (
+              <NotificationBell token={portal.token} />
+            ) : <div className="w-9" />}
+          </div>
         </header>
+
+        {/* Desktop notification bell in sidebar header */}
+
 
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">

@@ -2,6 +2,9 @@ import type {
   AdminOverview,
   AdminStats,
   AnalyticsOverview,
+  AnalyticsRange,
+  ApiKeyAnalytics,
+  ErrorLogEntry,
   FeedbackSubmissionInput,
   FeedbackSubmissionReceipt,
   FundingPreparation,
@@ -9,6 +12,8 @@ import type {
   InterestSubmissionInput,
   InterestSubmissionReceipt,
   LaunchEventName,
+  MethodBreakdown,
+  Notification,
   OnChainProjectSnapshot,
   OperatorSummary,
   PortalApiKey,
@@ -270,13 +275,54 @@ export async function getAnalyticsOverview(token: string) {
   return response.item;
 }
 
-export async function getProjectAnalytics(projectId: string, token: string) {
-  const response = await requestApi<{ item: ProjectAnalytics }>(
-    `/v1/analytics/projects/${projectId}`,
+export async function getProjectAnalytics(projectId: string, token: string, range?: AnalyticsRange) {
+  const path = range
+    ? `/v1/analytics/projects/${projectId}?range=${range}`
+    : `/v1/analytics/projects/${projectId}`;
+  const response = await requestApi<{ item: ProjectAnalytics }>(path, undefined, token);
+  return response.item;
+}
+
+export async function getNotifications(token: string) {
+  const response = await requestApi<{ items: Notification[] }>("/v1/notifications", undefined, token);
+  return response.items;
+}
+
+export async function getApiKeyAnalytics(projectId: string, apiKeyId: string, token: string, range?: AnalyticsRange) {
+  const path = range
+    ? `/v1/projects/${projectId}/api-keys/${apiKeyId}/analytics?range=${range}`
+    : `/v1/projects/${projectId}/api-keys/${apiKeyId}/analytics`;
+  const response = await requestApi<{ item: ApiKeyAnalytics }>(path, undefined, token);
+  return response.item;
+}
+
+export async function getMethodBreakdown(projectId: string, token: string, range?: AnalyticsRange) {
+  const path = range
+    ? `/v1/projects/${projectId}/analytics/methods?range=${range}`
+    : `/v1/projects/${projectId}/analytics/methods`;
+  const response = await requestApi<{ items: MethodBreakdown[] }>(path, undefined, token);
+  return response.items;
+}
+
+export async function getErrorLog(projectId: string, token: string) {
+  const response = await requestApi<{ items: ErrorLogEntry[] }>(
+    `/v1/projects/${projectId}/analytics/errors`,
     undefined,
     token
   );
-  return response.item;
+  return response.items;
+}
+
+export async function downloadAnalyticsExport(projectId: string, range: AnalyticsRange, token: string): Promise<Blob> {
+  const url = new URL(`/v1/projects/${projectId}/analytics/export?range=${range}`, webEnv.apiBaseUrl);
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.status}`);
+  }
+  return response.blob();
 }
 
 export async function getOnchainSnapshot(projectId: string, token: string) {

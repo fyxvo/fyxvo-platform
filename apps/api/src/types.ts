@@ -213,6 +213,47 @@ export interface AdminStats {
   };
 }
 
+export interface NotificationItem {
+  readonly id: string;
+  readonly type: "funding_confirmed" | "api_key_created" | "api_key_revoked" | "project_activated" | "error_spike";
+  readonly title: string;
+  readonly message: string;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly createdAt: string;
+}
+
+export interface ApiKeyAnalyticsItem {
+  readonly apiKeyId: string;
+  readonly totalRequests: number;
+  readonly successRequests: number;
+  readonly errorRequests: number;
+  readonly errorRate: number;
+  readonly averageLatencyMs: number;
+  readonly p95LatencyMs: number;
+  readonly dailyBuckets: Array<{ readonly date: string; readonly count: number; readonly errors: number }>;
+}
+
+export interface MethodBreakdownItem {
+  readonly route: string;
+  readonly service: string;
+  readonly count: number;
+  readonly averageLatencyMs: number;
+  readonly errorRate: number;
+  readonly errorCount: number;
+}
+
+export interface ErrorLogItem {
+  readonly id: string;
+  readonly route: string;
+  readonly method: string;
+  readonly service: string;
+  readonly statusCode: number;
+  readonly durationMs: number;
+  readonly createdAt: string;
+  readonly apiKeyPrefix: string | null;
+}
+
 export interface AdminProtocolOverview {
   readonly readiness: FyxvoProtocolReadiness | null;
   readonly authorityPlan: {
@@ -404,7 +445,12 @@ export interface ApiRepository {
     readonly confirmedAt: Date;
   }): Promise<FundingCoordinate>;
   getAnalyticsOverview(projectIds?: readonly string[]): Promise<AnalyticsOverview>;
-  getProjectAnalytics(projectId: string): Promise<ProjectAnalytics>;
+  getProjectAnalytics(projectId: string, since?: Date): Promise<ProjectAnalytics>;
+  getNotifications(userId: string, projectIds: readonly string[]): Promise<NotificationItem[]>;
+  getApiKeyAnalytics(projectId: string, apiKeyId: string, since: Date): Promise<ApiKeyAnalyticsItem>;
+  getMethodBreakdown(projectId: string, since: Date): Promise<MethodBreakdownItem[]>;
+  getErrorLog(projectId: string, limit: number): Promise<ErrorLogItem[]>;
+  getExportRows(projectId: string, since: Date): Promise<Array<Record<string, string | number>>>;
   getAdminStats(): Promise<AdminStats>;
   getAdminOverview(): Promise<AdminOverviewBase>;
   listOperators(): Promise<OperatorSummary[]>;

@@ -8,6 +8,7 @@ import type {
   AdminOverviewBase,
   AdminStats,
   AnalyticsOverview,
+  ApiKeyAnalyticsItem,
   ApiKeyRecord,
   ApiRepository,
   AuthenticatedUser,
@@ -15,8 +16,11 @@ import type {
   CreateInterestSubmissionInput,
   CreateApiKeyInput,
   CreateProjectInput,
+  ErrorLogItem,
   FundingRecordInput,
   IdempotencyLookup,
+  MethodBreakdownItem,
+  NotificationItem,
   OperatorSummary,
   ProjectAnalytics,
   ProjectWithOwner,
@@ -425,57 +429,6 @@ export class PrismaApiRepository implements ApiRepository {
     };
   }
 
-  async getProjectAnalytics(projectId: string): Promise<ProjectAnalytics> {
-    const [project, requestSummary, statusCodes, recentRequests] = await Promise.all([
-      this.prisma.project.findUniqueOrThrow({
-        where: { id: projectId },
-        include: {
-          owner: true,
-          _count: {
-            select: {
-              apiKeys: true,
-              requestLogs: true,
-              fundingRequests: true
-            }
-          }
-        }
-      }),
-      this.prisma.requestLog.aggregate({
-        where: { projectId },
-        _avg: { durationMs: true },
-        _max: { durationMs: true }
-      }),
-      this.prisma.requestLog.groupBy({
-        by: ["statusCode"],
-        where: { projectId },
-        _count: { statusCode: true }
-      }),
-      this.prisma.requestLog.findMany({
-        where: { projectId },
-        orderBy: { createdAt: "desc" },
-        take: 10
-      })
-    ]);
-
-    return {
-      project: mapProject(project),
-      totals: {
-        requestLogs: project._count.requestLogs,
-        apiKeys: project._count.apiKeys,
-        fundingRequests: project._count.fundingRequests
-      },
-      latency: {
-        averageMs: Math.round(requestSummary._avg.durationMs ?? 0),
-        maxMs: requestSummary._max.durationMs ?? 0
-      },
-      statusCodes: statusCodes.map((entry: { statusCode: number; _count: { statusCode: number } }) => ({
-        statusCode: entry.statusCode,
-        count: entry._count.statusCode
-      })),
-      recentRequests
-    };
-  }
-
   async getAdminStats(): Promise<AdminStats> {
     const [users, projects, apiKeys, nodes, nodeOperators, fundingRequests, requestLogs] =
       await Promise.all([
@@ -863,6 +816,264 @@ export class PrismaApiRepository implements ApiRepository {
         expiresAt: input.expiresAt
       }
     });
+  }
+
+  async getNotifications(userId: string, projectIds: readonly string[]): Promise<NotificationItem[]> {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const projectFilter = projectIds.length > 0 ? { in: projectIds as string[] } : undefined;
+
+    const [recentFunding, recentKeys, recentRevocations] = await Promise.all([
+      this.prisma.fundingCoordinate.findMany({
+        where: {
+          requestedById: userId,
+          confirmedAt: { not: null, gte: since }
+        },
+        orderBy: { confirmedAt: "desc" },
+        take: 10,
+        include: { project: { select: { id: true, name: true } } }
+      }),
+      this.prisma.apiKey.findMany({
+        where: {
+          createdById: userId,
+          createdAt: { gte: since },
+          ...(projectFilter ? { projectId: { in: projectFilter.in } } : {})
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: { project: { select: { id: true, name: true } } }
+      }),
+      this.prisma.apiKey.findMany({
+        where: {
+          createdById: userId,
+          status: "REVOKED",
+          revokedAt: { gte: since },
+          ...(projectFilter ? { projectId: { in: projectFilter.in } } : {})
+        },
+        orderBy: { revokedAt: "desc" },
+        take: 5,
+        include: { project: { select: { id: true, name: true } } }
+      })
+    ]);
+
+    const notifications: NotificationItem[] = [];
+
+    for (const fc of recentFunding) {
+      notifications.push({
+        id: `funding-${fc.id}`,
+        type: "funding_confirmed",
+        title: "SOL deposit confirmed",
+        message: `${(Number(fc.amount) / 1e9).toFixed(4)} SOL funded to ${fc.project.name}`,
+        projectId: fc.projectId,
+        projectName: fc.project.name,
+        createdAt: (fc.confirmedAt ?? fc.createdAt).toISOString()
+      });
+    }
+
+    for (const key of recentKeys) {
+      notifications.push({
+        id: `apikey-created-${key.id}`,
+        type: "api_key_created",
+        title: "API key created",
+        message: `Key "${key.label}" (${key.prefix}…) created for ${key.project.name}`,
+        projectId: key.projectId,
+        projectName: key.project.name,
+        createdAt: key.createdAt.toISOString()
+      });
+    }
+
+    for (const key of recentRevocations) {
+      notifications.push({
+        id: `apikey-revoked-${key.id}`,
+        type: "api_key_revoked",
+        title: "API key revoked",
+        message: `Key "${key.label}" (${key.prefix}…) was revoked from ${key.project.name}`,
+        projectId: key.projectId,
+        projectName: key.project.name,
+        createdAt: (key.revokedAt ?? key.updatedAt).toISOString()
+      });
+    }
+
+    return notifications.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ).slice(0, 20);
+  }
+
+  async getProjectAnalytics(projectId: string, since?: Date): Promise<ProjectAnalytics> {
+    const where = since ? { projectId, createdAt: { gte: since } } : { projectId };
+
+    const [project, requestSummary, statusCodes, recentRequests] = await Promise.all([
+      this.prisma.project.findUniqueOrThrow({
+        where: { id: projectId },
+        include: {
+          owner: true,
+          _count: {
+            select: {
+              apiKeys: true,
+              requestLogs: true,
+              fundingRequests: true
+            }
+          }
+        }
+      }),
+      this.prisma.requestLog.aggregate({
+        where,
+        _avg: { durationMs: true },
+        _max: { durationMs: true }
+      }),
+      this.prisma.requestLog.groupBy({
+        by: ["statusCode"],
+        where,
+        _count: { statusCode: true }
+      }),
+      this.prisma.requestLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: 10
+      })
+    ]);
+
+    return {
+      project: mapProject(project),
+      totals: {
+        requestLogs: project._count.requestLogs,
+        apiKeys: project._count.apiKeys,
+        fundingRequests: project._count.fundingRequests
+      },
+      latency: {
+        averageMs: Math.round(requestSummary._avg.durationMs ?? 0),
+        maxMs: requestSummary._max.durationMs ?? 0
+      },
+      statusCodes: statusCodes.map((entry: { statusCode: number; _count: { statusCode: number } }) => ({
+        statusCode: entry.statusCode,
+        count: entry._count.statusCode
+      })),
+      recentRequests
+    };
+  }
+
+  async getApiKeyAnalytics(projectId: string, apiKeyId: string, since: Date): Promise<ApiKeyAnalyticsItem> {
+    const where = { projectId, apiKeyId, createdAt: { gte: since } };
+
+    const [summary, errorCount, dailyData] = await Promise.all([
+      this.prisma.requestLog.aggregate({
+        where,
+        _count: { id: true },
+        _avg: { durationMs: true }
+      }),
+      this.prisma.requestLog.count({ where: { ...where, statusCode: { gte: 400 } } }),
+      this.prisma.$queryRaw<Array<{ date: string; count: bigint; errors: bigint }>>`
+        SELECT DATE("createdAt")::text AS date,
+               COUNT(*) AS count,
+               COUNT(*) FILTER (WHERE "statusCode" >= 400) AS errors
+        FROM "RequestLog"
+        WHERE "projectId" = ${projectId}
+          AND "apiKeyId" = ${apiKeyId}
+          AND "createdAt" >= ${since}
+        GROUP BY DATE("createdAt")
+        ORDER BY date DESC
+        LIMIT 7
+      `
+    ]);
+
+    const total = summary._count.id ?? 0;
+    const allLatencies = await this.prisma.requestLog.findMany({
+      where,
+      select: { durationMs: true },
+      orderBy: { durationMs: "asc" }
+    });
+    const p95Index = Math.ceil(allLatencies.length * 0.95) - 1;
+    const p95 = allLatencies[Math.max(0, p95Index)]?.durationMs ?? 0;
+
+    return {
+      apiKeyId,
+      totalRequests: total,
+      successRequests: total - errorCount,
+      errorRequests: errorCount,
+      errorRate: total > 0 ? errorCount / total : 0,
+      averageLatencyMs: Math.round(summary._avg.durationMs ?? 0),
+      p95LatencyMs: p95,
+      dailyBuckets: dailyData.map((row) => ({
+        date: row.date,
+        count: Number(row.count),
+        errors: Number(row.errors)
+      }))
+    };
+  }
+
+  async getMethodBreakdown(projectId: string, since: Date): Promise<MethodBreakdownItem[]> {
+    const grouped = await this.prisma.requestLog.groupBy({
+      by: ["route", "service"],
+      where: { projectId, createdAt: { gte: since } },
+      _count: { id: true },
+      _avg: { durationMs: true },
+      orderBy: { _count: { id: "desc" } },
+      take: 10
+    });
+
+    const results: MethodBreakdownItem[] = [];
+    for (const row of grouped) {
+      const errorCount = await this.prisma.requestLog.count({
+        where: { projectId, route: row.route, service: row.service, createdAt: { gte: since }, statusCode: { gte: 400 } }
+      });
+      const total = row._count.id;
+      results.push({
+        route: row.route,
+        service: row.service,
+        count: total,
+        averageLatencyMs: Math.round(row._avg.durationMs ?? 0),
+        errorRate: total > 0 ? errorCount / total : 0,
+        errorCount
+      });
+    }
+
+    return results;
+  }
+
+  async getErrorLog(projectId: string, limit: number): Promise<ErrorLogItem[]> {
+    const errors = await this.prisma.requestLog.findMany({
+      where: { projectId, statusCode: { gte: 400 } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { apiKey: { select: { prefix: true } } }
+    });
+
+    return errors.map((entry) => ({
+      id: entry.id,
+      route: entry.route,
+      method: entry.method,
+      service: entry.service,
+      statusCode: entry.statusCode,
+      durationMs: entry.durationMs,
+      createdAt: entry.createdAt.toISOString(),
+      apiKeyPrefix: entry.apiKey?.prefix ?? null
+    }));
+  }
+
+  async getExportRows(projectId: string, since: Date): Promise<Array<Record<string, string | number>>> {
+    const rows = await this.prisma.requestLog.findMany({
+      where: { projectId, createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+      take: 10000,
+      select: {
+        id: true,
+        service: true,
+        route: true,
+        method: true,
+        statusCode: true,
+        durationMs: true,
+        createdAt: true
+      }
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      service: row.service,
+      route: row.route,
+      method: row.method,
+      statusCode: row.statusCode,
+      durationMs: row.durationMs,
+      createdAt: row.createdAt.toISOString()
+    }));
   }
 
   async recordRequestLog(input: RequestLogInput) {

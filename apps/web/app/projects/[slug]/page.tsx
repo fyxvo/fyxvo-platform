@@ -16,6 +16,8 @@ import {
 } from "@fyxvo/ui";
 import { BarChartCard } from "../../../components/charts";
 import { CopyButton } from "../../../components/copy-button";
+import { GatewayHealthCard } from "../../../components/gateway-health";
+import { OnboardingChecklist } from "../../../components/onboarding-checklist";
 import { PageHeader } from "../../../components/page-header";
 import { AuthGate } from "../../../components/state-panels";
 import { usePortal } from "../../../components/portal-provider";
@@ -145,6 +147,15 @@ export default function ProjectPage({
 
       {portal.walletPhase !== "authenticated" ? (
         <AuthGate body="Connect a wallet to load real API keys, analytics, and on-chain balances for this project." />
+      ) : null}
+
+      {portal.walletPhase === "authenticated" ? (
+        <OnboardingChecklist
+          projectId={project.id}
+          projectSlug={project.slug}
+          onchain={portal.onchainSnapshot}
+          apiKeys={portal.apiKeys}
+        />
       ) : null}
 
       <section className="grid gap-4">
@@ -304,6 +315,7 @@ export default function ProjectPage({
                 <CopyButton value={rpcEndpoint} className="shrink-0" />
               </div>
             </div>
+            <GatewayHealthCard />
             <Notice tone="neutral" title="Current access model">
               The owner wallet is the live control point today. Admin sessions can review broader
               platform state, but collaborator roles are a prepared next step, not a shipped claim.

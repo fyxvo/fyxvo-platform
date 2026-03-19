@@ -1203,14 +1203,84 @@ export async function buildApiApp(input: {
   app.get("/v1/analytics/projects/:projectId", async (request) => {
     const user = requireUser(request);
     const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ range: z.enum(["1h", "6h", "24h", "7d", "30d"]).optional() }).parse(request.query);
     const project = await input.repository.findProjectById(params.projectId);
     if (!project || !canAccessProject(user, project)) {
       throw new HttpError(404, "project_not_found", "The requested project could not be found.");
     }
-
+    const since = query.range ? new Date(Date.now() - rangeToMs(query.range)) : undefined;
     return {
-      item: await input.repository.getProjectAnalytics(project.id)
+      item: await input.repository.getProjectAnalytics(project.id, since)
     };
+  });
+
+  app.get("/v1/notifications", async (request) => {
+    const user = requireUser(request);
+    const projects = await input.repository.listProjects(user);
+    const projectIds = projects.map((p) => p.id);
+    return {
+      items: await input.repository.getNotifications(user.id, projectIds)
+    };
+  });
+
+  app.get("/v1/projects/:projectId/api-keys/:apiKeyId/analytics", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid(), apiKeyId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ range: z.enum(["1h", "6h", "24h", "7d", "30d"]).optional() }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    const since = new Date(Date.now() - rangeToMs(query.range ?? "7d"));
+    return {
+      item: await input.repository.getApiKeyAnalytics(params.projectId, params.apiKeyId, since)
+    };
+  });
+
+  app.get("/v1/projects/:projectId/analytics/methods", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ range: z.enum(["1h", "6h", "24h", "7d", "30d"]).optional() }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    const since = new Date(Date.now() - rangeToMs(query.range ?? "24h"));
+    return {
+      items: await input.repository.getMethodBreakdown(params.projectId, since)
+    };
+  });
+
+  app.get("/v1/projects/:projectId/analytics/errors", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ limit: z.coerce.number().min(1).max(100).optional() }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    return {
+      items: await input.repository.getErrorLog(params.projectId, query.limit ?? 20)
+    };
+  });
+
+  app.get("/v1/projects/:projectId/analytics/export", async (request, reply) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ range: z.enum(["1h", "6h", "24h", "7d", "30d"]).optional() }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    const since = new Date(Date.now() - rangeToMs(query.range ?? "7d"));
+    const rows = await input.repository.getExportRows(params.projectId, since);
+    const header = "id,service,route,method,statusCode,durationMs,createdAt\n";
+    const csv = header + rows.map((row) =>
+      [row["id"], row["service"], row["route"], row["method"], row["statusCode"], row["durationMs"], row["createdAt"]].join(",")
+    ).join("\n");
+    reply.header("content-type", "text/csv");
+    reply.header("content-disposition", `attachment; filename="analytics-${project.slug}-${query.range ?? "7d"}.csv"`);
+    return reply.send(csv);
   });
 
   app.get("/v1/admin/stats", async (request) => {
@@ -1248,6 +1318,17 @@ export async function buildApiApp(input: {
   });
 
   return app;
+}
+
+function rangeToMs(range: "1h" | "6h" | "24h" | "7d" | "30d"): number {
+  const map: Record<string, number> = {
+    "1h": 60 * 60 * 1000,
+    "6h": 6 * 60 * 60 * 1000,
+    "24h": 24 * 60 * 60 * 1000,
+    "7d": 7 * 24 * 60 * 60 * 1000,
+    "30d": 30 * 24 * 60 * 60 * 1000
+  };
+  return map[range] ?? map["7d"]!;
 }
 
 function requestLogger(app: FastifyInstance, error: unknown) {

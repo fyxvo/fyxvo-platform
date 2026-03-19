@@ -12,69 +12,15 @@ import {
   Input,
   Modal,
   Notice,
-  Table,
-  type TableColumn,
 } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
+import { ApiKeyDetail } from "../../components/api-key-detail";
 import { PageHeader } from "../../components/page-header";
 import { AuthGate } from "../../components/state-panels";
 import { usePortal } from "../../components/portal-provider";
 import { webEnv } from "../../lib/env";
 import { formatRelativeDate } from "../../lib/format";
 import type { PortalApiKey } from "../../lib/types";
-
-const columns: readonly TableColumn<PortalApiKey>[] = [
-  {
-    key: "label",
-    header: "Key",
-    cell: (apiKey) => (
-      <div>
-        <div className="font-medium text-[var(--fyxvo-text)]">{apiKey.label}</div>
-        <div className="font-mono text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
-          {apiKey.prefix}
-        </div>
-      </div>
-    ),
-  },
-  {
-    key: "scopes",
-    header: "Scopes",
-    cell: (apiKey) => (
-      <div className="flex flex-wrap gap-1.5">
-        {apiKey.scopes.map((scope) => (
-          <Badge key={scope} tone="neutral">
-            {scope}
-          </Badge>
-        ))}
-      </div>
-    ),
-  },
-  {
-    key: "lastUsed",
-    header: "Last used",
-    cell: (apiKey) => (
-      <span className="text-[var(--fyxvo-text-muted)]">
-        {apiKey.lastUsedAt ? formatRelativeDate(apiKey.lastUsedAt) : "Never"}
-      </span>
-    ),
-  },
-  {
-    key: "created",
-    header: "Created",
-    cell: (apiKey) => (
-      <span className="text-[var(--fyxvo-text-muted)]">
-        {formatRelativeDate(apiKey.createdAt)}
-      </span>
-    ),
-  },
-  {
-    key: "status",
-    header: "Status",
-    cell: (apiKey) => (
-      <Badge tone={apiKey.status === "ACTIVE" ? "success" : "danger"}>{apiKey.status}</Badge>
-    ),
-  },
-];
 
 export default function ApiKeysPage() {
   const portal = usePortal();
@@ -83,6 +29,9 @@ export default function ApiKeysPage() {
   const [expiresAt, setExpiresAt] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [revokeKey, setRevokeKey] = useState<PortalApiKey | null>(null);
+  const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null);
+
+  const expandedKey = portal.apiKeys.find((k) => k.id === expandedKeyId) ?? null;
 
   const exampleApiKey = portal.lastGeneratedApiKey ?? "YOUR_API_KEY";
   const standardRequest = `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
@@ -163,7 +112,77 @@ export default function ApiKeysPage() {
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Table columns={columns} rows={portal.apiKeys} getRowKey={(item) => item.id} />
+        <div className="overflow-hidden rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-[var(--fyxvo-border)] text-left text-sm">
+              <thead className="bg-[var(--fyxvo-panel-soft)]">
+                <tr>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Key</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Scopes</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Last used</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Created</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Status</th>
+                  <th className="px-4 py-3" scope="col"><span className="sr-only">Expand</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--fyxvo-border)] text-[var(--fyxvo-text-soft)]">
+                {portal.apiKeys.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-8 text-center text-[var(--fyxvo-text-muted)]" colSpan={6}>
+                      No API keys yet.
+                    </td>
+                  </tr>
+                ) : (
+                  portal.apiKeys.map((apiKey) => {
+                    const isExpanded = expandedKeyId === apiKey.id;
+                    return (
+                      <tr
+                        key={apiKey.id}
+                        className={`cursor-pointer transition-colors hover:bg-[var(--fyxvo-panel-soft)] ${isExpanded ? "bg-[var(--fyxvo-panel-soft)]" : ""}`}
+                        onClick={() => setExpandedKeyId(isExpanded ? null : apiKey.id)}
+                      >
+                        <td className="px-4 py-4 align-middle">
+                          <div className="font-medium text-[var(--fyxvo-text)]">{apiKey.label}</div>
+                          <div className="font-mono text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">{apiKey.prefix}</div>
+                        </td>
+                        <td className="px-4 py-4 align-middle">
+                          <div className="flex flex-wrap gap-1.5">
+                            {apiKey.scopes.map((scope) => (
+                              <Badge key={scope} tone="neutral">{scope}</Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 align-middle">
+                          <span className="text-[var(--fyxvo-text-muted)]">
+                            {apiKey.lastUsedAt ? formatRelativeDate(apiKey.lastUsedAt) : "Never"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 align-middle">
+                          <span className="text-[var(--fyxvo-text-muted)]">{formatRelativeDate(apiKey.createdAt)}</span>
+                        </td>
+                        <td className="px-4 py-4 align-middle">
+                          <Badge tone={apiKey.status === "ACTIVE" ? "success" : "danger"}>{apiKey.status}</Badge>
+                        </td>
+                        <td className="px-4 py-4 align-middle text-right">
+                          <svg
+                            viewBox="0 0 12 12"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            className={`ml-auto h-3 w-3 text-[var(--fyxvo-text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                            aria-hidden="true"
+                          >
+                            <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
@@ -213,6 +232,42 @@ export default function ApiKeysPage() {
           </CardContent>
         </Card>
       </section>
+
+      {expandedKey && portal.token && portal.selectedProject ? (
+        <section>
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle>{expandedKey.label}</CardTitle>
+                  <CardDescription className="mt-1 font-mono">{expandedKey.prefix}…</CardDescription>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedKeyId(null)}
+                  className="rounded-md p-1 text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                  aria-label="Close detail"
+                >
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
+                    <path d="M2 2l8 8M10 2l-8 8" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ApiKeyDetail
+                apiKey={expandedKey}
+                projectId={portal.selectedProject.id}
+                token={portal.token}
+                onRevoke={(id) => {
+                  void portal.revokeApiKey(id);
+                  setExpandedKeyId(null);
+                }}
+              />
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-2">
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
