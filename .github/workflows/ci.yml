@@ -34,6 +34,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Bootstrap workspace toolchain
+        env:
+          FYXVO_BOOTSTRAP_SKIP_WORKSPACE_INSTALL: "1"
         run: bash ./scripts/bootstrap.sh
 
       - name: Persist Solana and Rust paths
@@ -48,7 +50,7 @@ jobs:
           solana-keygen new --no-bip39-passphrase --force -o "$HOME/.config/solana/id.json"
 
       - name: Verify lockfile install
-        run: pnpm install --frozen-lockfile
+        run: pnpm ci:install
 
       - name: Lint
         run: pnpm lint

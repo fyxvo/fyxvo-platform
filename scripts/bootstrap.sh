@@ -138,6 +138,11 @@ install_anchor() {
 }
 
 install_workspace_dependencies() {
+  if [[ "${FYXVO_BOOTSTRAP_SKIP_WORKSPACE_INSTALL:-0}" == "1" ]]; then
+    log "Skipping workspace dependency install because FYXVO_BOOTSTRAP_SKIP_WORKSPACE_INSTALL=1"
+    return
+  fi
+
   log "Installing pnpm workspace dependencies"
   cd "$ROOT_DIR"
 

@@ -1,5 +1,7 @@
 # Fyxvo
 
+Current milestone: `0.1.0` devnet private alpha.
+
 ## 1. What Fyxvo Is
 
 Fyxvo is a Solana infrastructure control plane for funded JSON RPC access, project treasury management, operator rewards, and developer self-service.
@@ -54,12 +56,12 @@ This split is the core Fyxvo model: money and claims are on chain, operations an
 The repository is designed to boot inside GitHub Codespaces without a manual toolchain hunt.
 
 1. Open the repository in Codespaces.
-2. Let the devcontainer finish its `postCreateCommand`. The devcontainer runs `bash ./scripts/bootstrap.sh`.
+2. Let the devcontainer finish its `postCreateCommand`. The devcontainer runs `bash ./.devcontainer/post-create.sh`, which loads the Node feature environment before calling `scripts/bootstrap.sh`.
 3. The bootstrap script installs Node LTS, pnpm `10.23.0`, Rust stable, Solana CLI `2.3.0`, Anchor CLI `0.32.1`, PostgreSQL client tools, Redis tools, and workspace dependencies.
 4. The devcontainer forwards ports `3000`, `4000`, `4100`, `5432`, and `6379`.
 5. The resulting workspace already contains the PATH wiring for Cargo, Solana, and Anchor binaries.
 
-The devcontainer file is [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) and the bootstrap script is [`scripts/bootstrap.sh`](scripts/bootstrap.sh).
+The devcontainer file is [`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json), the post-create wrapper is [`.devcontainer/post-create.sh`](.devcontainer/post-create.sh), and the bootstrap script is [`scripts/bootstrap.sh`](scripts/bootstrap.sh).
 
 ## 5. Devnet Setup
 
@@ -180,7 +182,7 @@ docker run --name fyxvo-redis -p 6379:6379 -d redis:7
 3. Install dependencies if bootstrap has not already done it.
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
 4. Generate Prisma artifacts, apply migrations, and seed the database.
