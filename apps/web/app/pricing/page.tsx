@@ -21,24 +21,24 @@ export default async function PricingPage() {
     <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Pricing"
-        title="Devnet launch pricing for funded Solana RPC and priority relay."
-        description="The pricing model is intentionally simple and current-state. It explains what is live in the private alpha, how SOL funding translates into spendable relay capacity, and where the priority path differs from the standard path."
+        title="Devnet launch pricing for early teams running real Solana traffic."
+        description="This pricing page is for serious early teams that want to understand what is live today, how SOL-funded usage works, and when it is worth talking directly with Fyxvo about rollout or priority-path needs."
         actions={
           <>
+            <TrackedLinkButton
+              href="/docs"
+              eventName="landing_cta_clicked"
+              eventSource="pricing-header-docs"
+            >
+              Open quickstart
+            </TrackedLinkButton>
             <TrackedLinkButton
               href="/contact"
               eventName="landing_cta_clicked"
               eventSource="pricing-header-contact"
-            >
-              Request access
-            </TrackedLinkButton>
-            <TrackedLinkButton
-              href="/status"
-              eventName="landing_cta_clicked"
-              eventSource="pricing-header-status"
               variant="secondary"
             >
-              View live status
+              Request founder follow-up
             </TrackedLinkButton>
           </>
         }
@@ -161,8 +161,8 @@ export default async function PricingPage() {
 
         <InterestCaptureForm
           source="pricing-page"
-          title="Request devnet launch access"
-          description="Use this form for early access, higher-volume traffic planning, priority relay interest, analytics interest, or managed operator conversations."
+          title="Plan rollout, volume, or founder review"
+          description="Use this form when the team wants higher-volume devnet planning, priority relay review, analytics visibility, or a managed rollout conversation."
         />
       </section>
 
@@ -225,6 +225,14 @@ export default async function PricingPage() {
               variant="secondary"
             >
               View status
+            </TrackedLinkButton>
+            <TrackedLinkButton
+              href="/contact"
+              eventName="landing_cta_clicked"
+              eventSource="pricing-links-contact"
+              variant="secondary"
+            >
+              Contact Fyxvo
             </TrackedLinkButton>
           </CardContent>
         </Card>

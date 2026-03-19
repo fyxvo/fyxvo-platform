@@ -189,6 +189,50 @@ function buildOpsItems(overview: AdminOverview | null) {
     };
   }
 
+  const formatInterestAreas = (areas: readonly string[]) =>
+    areas
+      .map((area) =>
+        area === "rpc"
+          ? "standard RPC"
+          : area === "priority-relay"
+          ? "priority relay"
+          : area === "operator-participation"
+            ? "operator participation"
+            : area
+      )
+      .join(", ");
+
+  const interestFollowUpCue = (
+    entry: AdminOverview["interestSubmissions"]["recent"][number]
+  ) => {
+    if (entry.operatorInterest) {
+      return "Operator conversation";
+    }
+    if (
+      entry.interestAreas.includes("priority-relay") ||
+      entry.expectedRequestVolume.includes("1M") ||
+      entry.expectedRequestVolume.includes("10M")
+    ) {
+      return "Founder review";
+    }
+    return "Quickstart follow-up";
+  };
+
+  const feedbackFollowUpCue = (
+    entry: AdminOverview["feedbackSubmissions"]["recent"][number]
+  ) => {
+    if (entry.category === "SUPPORT_REQUEST") {
+      return "Direct support";
+    }
+    if (entry.category === "ONBOARDING_FRICTION") {
+      return "Onboarding review";
+    }
+    if (entry.category === "BUG_REPORT") {
+      return "Product fix";
+    }
+    return "Product review";
+  };
+
   return {
     errors: overview.recentErrors.map((entry) => ({
       id: entry.id,
@@ -222,10 +266,13 @@ function buildOpsItems(overview: AdminOverview | null) {
     })),
     interest: overview.interestSubmissions.recent.map((entry) => ({
       id: entry.id,
-      title: `${entry.name} · ${entry.role}`,
-      meta: `${formatRelativeDate(entry.createdAt)} · ${entry.expectedRequestVolume}`,
-      body: `${entry.email}${entry.team ? ` from ${entry.team}` : ""} is interested in ${entry.interestAreas.join(", ")}${entry.operatorInterest ? " and operator participation" : ""}.`,
-      tone: "neutral" as const,
+      title: `${entry.name} · ${interestFollowUpCue(entry)}`,
+      meta: `${entry.status} · ${entry.expectedRequestVolume} · ${entry.source} · ${formatRelativeDate(entry.createdAt)}`,
+      body: `${entry.email}${entry.team ? ` from ${entry.team}` : ""} wants ${formatInterestAreas(entry.interestAreas)}. Use case: ${entry.useCase}${entry.operatorInterest ? " Operator participation is also in scope." : ""}`,
+      tone:
+        entry.status === "QUALIFIED" || entry.status === "CONTACTED"
+          ? ("success" as const)
+          : ("neutral" as const),
     })),
     apiKeys: overview.recentApiKeyActivity.map((entry) => ({
       id: entry.id,
@@ -237,7 +284,7 @@ function buildOpsItems(overview: AdminOverview | null) {
     feedback: overview.feedbackSubmissions.recent.map((entry) => ({
       id: entry.id,
       title: `${entry.category.replaceAll("_", " ")} · ${entry.name}`,
-      meta: `${formatRelativeDate(entry.createdAt)} · ${entry.source}${entry.page ? ` · ${entry.page}` : ""}`,
+      meta: `${feedbackFollowUpCue(entry)} · ${entry.status} · ${entry.source}${entry.page ? ` · ${entry.page}` : ""} · ${formatRelativeDate(entry.createdAt)}`,
       body: `${entry.message}${entry.project ? ` Project context: ${entry.project.name}.` : ""}`,
       tone:
         entry.category === "BUG_REPORT" || entry.category === "ONBOARDING_FRICTION"
@@ -949,24 +996,26 @@ export default function DashboardPage() {
 
             <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
               <CardHeader>
-                <CardTitle>Private alpha checklist</CardTitle>
+                <CardTitle>Founder follow-up rhythm</CardTitle>
                 <CardDescription>
-                  This is the internal support rhythm for onboarding a new team without
-                  overpromising what is live.
+                  This is the lightweight founder workflow for reviewing new teams without
+                  pretending there is a full CRM behind the product.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
                 <p>
-                  Confirm the team understands this is a hosted devnet alpha with SOL funding live
-                  and USDC still gated.
+                  Start with the interest queue when the question is fit, traffic shape, founder
+                  review, or rollout planning. Use the feedback queue when the question is bug
+                  reproduction, onboarding friction, or direct support.
                 </p>
                 <p>
-                  Make sure one wallet can sign, one project can activate, one SOL funding
-                  transaction can confirm, and one key can send one real request.
+                  For each serious early team, capture the concrete use case, expected request
+                  volume, whether priority relay matters, whether operator participation came up,
+                  the first blocker, and the next committed action.
                 </p>
                 <p>
-                  Use the contact and feedback queue if the first request path stalls, rather than
-                  asking teams to debug internal service boundaries on their own.
+                  Keep the success bar honest: one wallet can sign, one project can activate, one
+                  SOL funding transaction can confirm, and one key can send one real request.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Button asChild size="sm" variant="secondary">
@@ -979,6 +1028,11 @@ export default function DashboardPage() {
                     <Link href="/status">Check status</Link>
                   </Button>
                 </div>
+                <Notice tone="neutral" title="Lightweight notes, not a fake CRM">
+                  The current product supports queue status and context, not account-planning
+                  automation. Follow-up notes should stay simple: owner, date, use case, blocker,
+                  and next action.
+                </Notice>
               </CardContent>
             </Card>
           </section>
@@ -1004,7 +1058,7 @@ export default function DashboardPage() {
             />
             <OpsTimeline
               title="Recent launch interest"
-              description="Public request-access submissions captured by the launch forms."
+              description="Public launch-interest submissions with use-case, volume, and follow-up cues."
               items={opsItems.interest}
               emptyLabel="New pricing and contact submissions will appear here."
             />
@@ -1016,7 +1070,7 @@ export default function DashboardPage() {
             />
             <OpsTimeline
               title="Recent feedback and support"
-              description="Alpha issue submissions and onboarding friction reports captured by the product."
+              description="Alpha issue submissions and support reports with routing cues from the product."
               items={opsItems.feedback}
               emptyLabel="Support submissions will appear here when teams report friction from the product surfaces."
             />

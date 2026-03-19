@@ -296,9 +296,11 @@ export interface AdminOverviewBase {
       readonly email: string;
       readonly role: string;
       readonly team: string | null;
+      readonly useCase: string;
       readonly expectedRequestVolume: string;
       readonly interestAreas: readonly string[];
       readonly operatorInterest: boolean;
+      readonly source: string;
       readonly status: InterestSubmission["status"];
       readonly createdAt: Date;
     }>;

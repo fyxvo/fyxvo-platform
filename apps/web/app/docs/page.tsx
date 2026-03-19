@@ -61,8 +61,8 @@ console.log(response);`;
     <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Docs"
-        title="Quickstart, funding, relay usage, and troubleshooting in one place."
-        description="This guide is tuned for the first real private-alpha session. It shows what is live today, what is still gated, and how to move from wallet auth to the first successful request without guessing."
+        title="Start from wallet auth to first request in minutes."
+        description="This guide is tuned for serious early teams evaluating the live devnet path. It shows who Fyxvo is for, what is actually live today, and how to reach first value without guessing."
       />
 
       <Notice tone="neutral" title="Devnet only">
@@ -84,6 +84,48 @@ console.log(response);`;
         <code>docs/team-operations.md</code> and <code>docs/private-alpha.md</code> inside the
         repository.
       </Notice>
+
+      <section className="grid gap-6 lg:grid-cols-3">
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Who this is for</CardTitle>
+            <CardDescription>
+              Solana teams that want a real devnet relay path, not a fake onboarding shell.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+            Use Fyxvo if you want to validate funded RPC, project activation, analytics visibility,
+            and a managed launch path before widening traffic.
+          </CardContent>
+        </Card>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>What is live today</CardTitle>
+            <CardDescription>
+              The live path is wallet auth, project activation, SOL funding, standard relay,
+              priority relay, analytics, and public status.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+            USDC remains gated and the current operator topology is still managed infrastructure.
+            Those limits stay explicit throughout the product and docs.
+          </CardContent>
+        </Card>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Best next links</CardTitle>
+            <CardDescription>
+              Share these with a teammate when you want one tight evaluation path.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+            <p>
+              Start with <code>/docs</code>, confirm live condition on <code>/status</code>, then
+              use <code>/contact</code> for founder follow-up or support.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
         {docsSections.map((section, index) => (

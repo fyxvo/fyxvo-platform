@@ -258,7 +258,9 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
                 <p className="max-w-2xl text-sm leading-6 text-[var(--fyxvo-text-muted)]">
                   Fyxvo keeps the devnet alpha explicit. SOL is live, USDC stays gated until you
                   intentionally enable it, and the current launch topology is managed infrastructure
-                  rather than a fake open marketplace.
+                  rather than a fake open marketplace. Use docs for the quickest start, status for
+                  the live truth surface, and contact when the next step needs founder follow-up or
+                  support.
                 </p>
                 <div className="flex flex-wrap gap-5 text-sm text-[var(--fyxvo-text-muted)]">
                   <Link href="/" className="hover:text-[var(--fyxvo-text)]">
@@ -298,8 +300,12 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
 
               <div className="space-y-4 lg:justify-self-end">
                 <div className="text-xs uppercase tracking-[0.2em] text-[var(--fyxvo-text-muted)]">
-                  Follow Fyxvo
+                  Join launch channels
                 </div>
+                <p className="max-w-sm text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+                  X is for launch updates, Discord is for product questions, and Telegram is for
+                  quick coordination during devnet rollout.
+                </p>
                 <SocialLinks />
               </div>
             </div>

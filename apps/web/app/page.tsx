@@ -44,14 +44,14 @@ export default async function HomePage() {
               <BrandLogo iconClassName="h-14 w-14" className="gap-4" />
               <div className="space-y-4">
                 <h1 className="max-w-3xl font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl md:text-6xl">
-                  Fund a Solana project on devnet, issue a key, and send the first real request
-                  without losing the thread.
+                  Fund a Solana project on devnet, issue a key, and reach the first real request in
+                  one working path.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-[var(--fyxvo-text-muted)]">
-                  Fyxvo keeps the alpha surface calm and explicit: SOL funding is live today, USDC
-                  stays gated until enabled, the current operator path is managed infrastructure,
-                  and early teams can get from wallet auth to a first real request in minutes on
-                  devnet.
+                  Fyxvo is for early Solana teams that want a real devnet path for funded RPC,
+                  project activation, analytics visibility, and honest public status. SOL is live,
+                  USDC stays gated until enabled, and the current operator path is managed
+                  infrastructure rather than a fake open marketplace.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -65,24 +65,24 @@ export default async function HomePage() {
                   Start quickstart
                 </TrackedLinkButton>
                 <TrackedLinkButton
-                  href="/dashboard"
+                  href="/pricing"
                   eventName="landing_cta_clicked"
-                  eventSource="home-hero-dashboard"
+                  eventSource="home-hero-pricing"
                   size="lg"
                   variant="secondary"
                   className="w-full justify-center sm:w-auto"
                 >
-                  Open dashboard
+                  Review pricing
                 </TrackedLinkButton>
                 <TrackedLinkButton
-                  href="/status"
+                  href="/dashboard"
                   eventName="landing_cta_clicked"
-                  eventSource="home-hero-status"
+                  eventSource="home-hero-dashboard"
                   size="lg"
                   variant="ghost"
                   className="w-full justify-center sm:w-auto"
                 >
-                  Check live status
+                  Open dashboard
                 </TrackedLinkButton>
                 <TrackedLinkButton
                   href="/contact"
@@ -92,20 +92,36 @@ export default async function HomePage() {
                   variant="ghost"
                   className="w-full justify-center sm:w-auto"
                 >
-                  Talk to the team
+                  Request founder follow-up
                 </TrackedLinkButton>
               </div>
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {[
-                  "Wallet-authenticated API access",
-                  "Funded gateway routing",
-                  "Managed operator launch mode",
+                  {
+                    title: "Who this is for",
+                    body: "Teams validating real devnet RPC usage, priority-path behavior, and project funding flow before a broader rollout.",
+                  },
+                  {
+                    title: "Why use Fyxvo now",
+                    body: "It keeps the live path explicit: what works today, what is managed, and what is still gated are all visible from the product.",
+                  },
+                  {
+                    title: "How to start in minutes",
+                    body: "Connect a wallet, activate one project, fund it with SOL, issue one key, and send one request to the hosted relay.",
+                  },
+                  {
+                    title: "Where to go next",
+                    body: "Docs for the quickstart, pricing for usage context, dashboard for the live flow, and contact for founder follow-up.",
+                  },
                 ].map((item) => (
                   <div
-                    key={item}
+                    key={item.title}
                     className="rounded-[1.4rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-4 text-sm text-[var(--fyxvo-text-soft)]"
                   >
-                    {item}
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      {item.title}
+                    </div>
+                    <div className="mt-2 leading-6">{item.body}</div>
                   </div>
                 ))}
               </div>
@@ -256,6 +272,12 @@ export default async function HomePage() {
             <div className="flex flex-wrap gap-3">
               <CopyButton value={quickstartCurl} label="Copy curl example" />
               <CopyButton value={`${webEnv.gatewayBaseUrl}/rpc`} label="Copy standard endpoint" />
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/docs">Open quickstart</Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/contact">Get founder help</Link>
+              </Button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-[1.4rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
@@ -311,7 +333,7 @@ export default async function HomePage() {
       >
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Launch with direct lines to the team</CardTitle>
+            <CardTitle>Launch with a direct founder path</CardTitle>
             <CardDescription>
               Fyxvo is live on devnet today. Community paths are open for launch questions,
               integration feedback, and managed operator conversations. Private alpha support is
@@ -378,7 +400,7 @@ export default async function HomePage() {
                 eventSource="home-community-contact"
                 variant="secondary"
               >
-                Request access
+                Request founder follow-up
               </TrackedLinkButton>
             </div>
           </CardContent>

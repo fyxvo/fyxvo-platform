@@ -38,7 +38,17 @@ The best alpha teams are:
 2. Teams that can work with a calm but still evolving launch surface.
 3. Teams that can give specific feedback about onboarding, funding, RPC behavior, or analytics.
 
-## 5. Recommended onboarding checklist
+## 5. How founder follow-up should work
+
+Keep the founder loop lightweight and specific.
+
+1. Review the actual use case first, not just the company name.
+2. Check expected request volume and whether priority relay is part of the workload.
+3. Decide whether the next step is quickstart, rollout planning, or direct support.
+4. Keep follow-up notes simple: owner, date, use case, first blocker, and next action.
+5. Do not promise mainnet posture, fake SLAs, or open-operator supply that the product does not support today.
+
+## 6. Recommended onboarding checklist
 
 1. Confirm the team understands that Fyxvo is a devnet alpha.
 2. Confirm the team has a supported Solana wallet on devnet.
@@ -49,7 +59,7 @@ The best alpha teams are:
 7. Confirm that analytics and status update.
 8. Capture any friction through the feedback or support path.
 
-## 6. What feedback is most useful
+## 7. What feedback is most useful
 
 The best alpha feedback includes:
 

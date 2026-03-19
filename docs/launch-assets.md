@@ -1,14 +1,14 @@
 # Fyxvo Launch Assets
 
-## 1. Launch Announcement
+## 1. Short Announcement
 
 Fyxvo is live on Solana devnet. Teams can connect a wallet, activate a project on chain, fund it with SOL, generate an API key, and send real JSON-RPC traffic through the hosted relay while watching analytics and status surfaces react in real time.
 
-## 2. Product Summary
+## 2. One-Paragraph Product Intro
 
-Fyxvo is a funded Solana RPC control plane built around a clean first-user path. It combines wallet-authenticated project control, on-chain project activation, SOL treasury funding, standard and priority relay routing, request logging, worker rollups, and honest public status surfaces in one product.
+Fyxvo is a funded Solana RPC control plane for teams that want a real devnet path from wallet auth to project activation, SOL funding, API-key issuance, and relay traffic. It keeps the launch state honest: standard and priority relay are separate, analytics and status are visible, USDC remains gated until intentionally enabled, and the current operator topology is described plainly as managed infrastructure.
 
-## 3. Feature Summary
+## 3. What Is Live Today Summary
 
 1. Wallet-authenticated project control with no private key storage.
 2. On-chain project activation and SOL funding on Solana devnet.
@@ -16,13 +16,22 @@ Fyxvo is a funded Solana RPC control plane built around a clean first-user path.
 4. Gateway balance enforcement, request logging, and worker-driven analytics.
 5. Public status surfaces that state what is live, what is gated, and what is managed.
 
-## 4. Community Links
+## 4. How To Start Summary
+
+1. Connect a supported Solana wallet.
+2. Create and activate one project.
+3. Fund it with a small SOL devnet transaction.
+4. Generate one API key.
+5. Send one request to the hosted relay.
+6. Watch analytics and status update from the real request flow.
+
+## 5. Community And Join Links
 
 1. X: https://x.com/fyxvo
 2. Discord: https://discord.gg/Uggu236Jgj
 3. Telegram: https://t.me/fyxvo
 
-## 5. Getting Started Links
+## 6. Getting Started Links
 
 1. Product: https://www.fyxvo.com
 2. Pricing: https://www.fyxvo.com/pricing
@@ -32,7 +41,7 @@ Fyxvo is a funded Solana RPC control plane built around a clean first-user path.
 6. API health: https://api.fyxvo.com/health
 7. RPC status: https://rpc.fyxvo.com/v1/status
 
-## 6. X Launch Post Draft
+## 7. X Launch Post Draft
 
 Fyxvo is live on Solana devnet.
 
@@ -47,7 +56,7 @@ You can go from wallet connect to the first real request in minutes.
 Docs: https://www.fyxvo.com/docs
 Status: https://status.fyxvo.com
 
-## 7. X Thread Draft
+## 8. X Thread Draft
 
 1. Fyxvo is live on Solana devnet. The goal is simple: make the first real RPC session feel structured instead of fragmented.
 
@@ -65,7 +74,7 @@ Status: https://status.fyxvo.com
 
 8. If you want launch access, pricing context, or a managed rollout conversation, use: https://www.fyxvo.com/contact
 
-## 8. Discord Announcement Draft
+## 9. Discord Announcement Draft
 
 Fyxvo is live on Solana devnet.
 
@@ -90,6 +99,6 @@ Docs: https://www.fyxvo.com/docs
 Status: https://status.fyxvo.com
 Contact: https://www.fyxvo.com/contact
 
-## 9. Website Meta Description
+## 10. Website Meta Description
 
 Fund a Solana devnet project on chain, issue an API key, and send the first real request with honest status surfaces and a clear launch path.

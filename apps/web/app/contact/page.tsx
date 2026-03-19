@@ -10,24 +10,24 @@ export default function ContactPage() {
     <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Contact"
-        title="Talk to Fyxvo about private alpha fit, support, or managed rollout."
-        description="Use this path when you want a direct product conversation, need help during the alpha flow, or want to report friction without losing the current project context."
+        title="Talk to Fyxvo about alpha fit, rollout planning, or support without losing context."
+        description="Use the interest path for founder follow-up and workload planning. Use the feedback path for bugs, onboarding friction, or support. Both routes land in the real product review flow."
         actions={
           <>
-            <TrackedLinkButton
-              href="/pricing"
-              eventName="landing_cta_clicked"
-              eventSource="contact-header-pricing"
-            >
-              View pricing
-            </TrackedLinkButton>
             <TrackedLinkButton
               href="/docs"
               eventName="landing_cta_clicked"
               eventSource="contact-header-docs"
+            >
+              Open quickstart
+            </TrackedLinkButton>
+            <TrackedLinkButton
+              href="/pricing"
+              eventName="landing_cta_clicked"
+              eventSource="contact-header-pricing"
               variant="secondary"
             >
-              Read quickstart
+              Review pricing
             </TrackedLinkButton>
           </>
         }
@@ -43,16 +43,18 @@ export default function ContactPage() {
         <div className="space-y-6">
           <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
             <CardHeader>
-              <CardTitle>What to include</CardTitle>
+              <CardTitle>Best first outreach</CardTitle>
               <CardDescription>
-                The clearest launch conversations start with concrete workload detail.
+                The clearest founder follow-up starts with concrete workload detail and a clear next
+                question.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-              <p>The workload you want to run on devnet.</p>
-              <p>Your expected request volume and whether you need the priority path.</p>
+              <p>The workload you want to validate on devnet and why now is the right timing.</p>
+              <p>Your expected request volume and whether standard RPC or priority relay matters.</p>
               <p>
-                Whether analytics visibility or managed operator participation matters to your team.
+                Whether analytics visibility, managed rollout help, or operator participation
+                matters to your team.
               </p>
             </CardContent>
           </Card>
@@ -71,9 +73,10 @@ export default function ContactPage() {
             </CardContent>
           </Card>
 
-          <Notice tone="neutral" title="Real follow-up path">
-            This form persists directly into the Fyxvo backend so launch interest, expected traffic,
-            and product fit notes stay attached to a real review queue.
+          <Notice tone="neutral" title="Two distinct queues">
+            Interest submissions are for fit, rollout, and founder follow-up. Feedback submissions
+            are for bugs, support, and onboarding friction. Both persist directly into the Fyxvo
+            backend review flow.
           </Notice>
         </div>
       </section>
@@ -89,7 +92,7 @@ export default function ContactPage() {
 
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>What helps the alpha queue most</CardTitle>
+            <CardTitle>What helps the support queue most</CardTitle>
             <CardDescription>
               The best support reports are easy to replay and easy to route to the right part of the
               stack.
@@ -104,6 +107,10 @@ export default function ContactPage() {
             <p>
               Say whether the project is already activated and funded so support can separate
               onboarding friction from funded relay behavior.
+            </p>
+            <p>
+              Use the interest form above instead when the main question is fit, rollout planning,
+              pricing context, or a founder review of the workload.
             </p>
             <Notice tone="neutral" title="Private alpha support posture">
               Fyxvo is open to a small number of external teams on devnet. Access is not

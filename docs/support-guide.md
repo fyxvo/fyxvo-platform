@@ -4,7 +4,7 @@
 
 Fyxvo uses product-owned support paths during the private alpha.
 
-1. The contact page is for rollout fit, access conversations, and product follow-up.
+1. The interest form on the contact and pricing pages is for rollout fit, founder follow-up, expected traffic, and use-case review.
 2. The feedback form is for bugs, onboarding friction, and support requests.
 3. Discord and Telegram are useful for lightweight coordination, but product issues should still be captured through the form so they land in the admin review queue.
 
@@ -31,12 +31,26 @@ The secure admin overview exposes:
 
 That gives the alpha team one place to review both direct user feedback and the surrounding operational context.
 
+The practical review split is:
+
+1. Interest queue: use case, expected volume, priority-path need, operator interest, source, and current status.
+2. Feedback queue: category, page, project context, and whether the issue is support, onboarding, or product quality.
+
 ## 4. Suggested response discipline
 
 1. Acknowledge whether the issue is product friction, operator health, funding state, or key-scope misuse.
 2. Check status surfaces before asking the user to retry.
 3. Check project activation and funding state before debugging relay traffic.
 4. Keep responses honest about what is live, what is managed, and what is still gated.
+
+Useful founder follow-up notes are:
+
+1. Review owner.
+2. Team and workload summary.
+3. Expected request volume.
+4. Whether standard RPC, priority relay, analytics, or operator conversation is the main ask.
+5. First blocker.
+6. Next action and follow-up date.
 
 ## 5. Escalation guidance
 

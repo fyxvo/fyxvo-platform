@@ -21,8 +21,8 @@ const requestVolumeOptions = [
 
 export function InterestCaptureForm({
   source,
-  title = "Request private alpha access",
-  description = "Tell Fyxvo what you want to build, how much traffic you expect, and whether you care about standard RPC, priority relay, analytics, or operator participation."
+  title = "Request founder follow-up",
+  description = "Use this for launch fit, rollout planning, or higher-signal alpha interest. It captures the concrete workload, expected traffic, and the path you want to validate first."
 }: {
   readonly source: string;
   readonly title?: string;
@@ -100,6 +100,10 @@ export function InterestCaptureForm({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Notice tone="neutral" title="Use this for launch planning">
+          This queue is for rollout fit, expected volume, priority-path interest, and managed
+          operator conversations. Bugs or support issues belong in the feedback form instead.
+        </Notice>
         {successMessage ? (
           <Notice tone="success" title="Request received">
             {successMessage}
@@ -152,7 +156,7 @@ export function InterestCaptureForm({
               className="min-h-32 rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-3 text-[var(--fyxvo-text)] outline-none transition focus:border-brand-400"
               value={useCase}
               onChange={(event) => setUseCase(event.target.value)}
-              placeholder="Describe the workload, expected traffic pattern, and what you need from Fyxvo."
+              placeholder="Describe the workload you want to run, what success looks like, and whether you are testing standard RPC, priority relay, analytics visibility, or launch operations."
               required
             />
           </label>
@@ -206,7 +210,7 @@ export function InterestCaptureForm({
           </label>
 
           <Button type="submit" loading={submitting}>
-            Request access
+            Request founder follow-up
           </Button>
         </form>
       </CardContent>

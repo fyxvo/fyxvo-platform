@@ -84,8 +84,14 @@ export default async function StatusPage() {
       <PageHeader
         eyebrow="Status"
         title="Live condition across the hosted control plane, relay, and protocol."
-        description="This surface is the public truth layer for the private alpha. It shows what is live on devnet, what is still managed by Fyxvo, and what remains intentionally gated."
+        description="This surface is the public truth layer for the current devnet launch. It shows what is live today, what is still managed by Fyxvo, and what remains intentionally gated so early teams can evaluate the product honestly."
       />
+
+      <Notice tone="neutral" title="Share this during evaluation">
+        Use this page with <Link href="/docs">the quickstart</Link> when a teammate needs the live
+        condition, and use <Link href="/contact">contact</Link> when the next step is founder
+        follow-up or support instead of more self-serve debugging.
+      </Notice>
 
       <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">

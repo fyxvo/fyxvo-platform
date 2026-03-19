@@ -674,9 +674,11 @@ class MemoryApiRepository implements ApiRepository {
           email: entry.email,
           role: entry.role,
           team: entry.team,
+          useCase: entry.useCase,
           expectedRequestVolume: entry.expectedRequestVolume,
           interestAreas: entry.interestAreas as string[],
           operatorInterest: entry.operatorInterest,
+          source: entry.source,
           status: entry.status,
           createdAt: entry.createdAt
         }))

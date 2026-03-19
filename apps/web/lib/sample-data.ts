@@ -328,9 +328,12 @@ export const previewAdminOverview: AdminOverview = {
         email: "jordan@northwind.dev",
         role: "Developer",
         team: "Northwind",
+        useCase:
+          "Validating wallet-triggered treasury automation and webhook relay traffic on devnet before widening internal usage.",
         expectedRequestVolume: "100k to 1M/day",
         interestAreas: ["rpc", "priority-relay", "analytics"],
         operatorInterest: false,
+        source: "contact-page",
         status: "NEW",
         createdAt: "2026-03-19T06:18:00.000Z"
       },
@@ -340,9 +343,12 @@ export const previewAdminOverview: AdminOverview = {
         email: "mina@relayworks.io",
         role: "Platform lead",
         team: "RelayWorks",
+        useCase:
+          "Testing latency-sensitive settlement traffic that needs a separate priority path, clear rate behavior, and founder support during rollout.",
         expectedRequestVolume: "More than 10M/day",
         interestAreas: ["priority-relay", "operator-participation"],
         operatorInterest: true,
+        source: "pricing-page",
         status: "CONTACTED",
         createdAt: "2026-03-19T05:42:00.000Z"
       }
@@ -537,18 +543,18 @@ export const statusNarrative: SampleStatusNarrative[] = [
 
 export const docsSections = [
   {
-    title: "Authenticate with a wallet",
+    title: "Who Fyxvo fits today",
     body:
-      "Fyxvo never asks for or stores a private key. The frontend requests a challenge from the API, prompts the connected wallet to sign a plain-text message, then exchanges that signature for a short-lived JWT session."
+      "Fyxvo is for Solana teams that want a real devnet path for funded RPC, project activation, analytics visibility, and honest status instead of a mock control panel."
   },
   {
-    title: "Prepare funding transactions",
+    title: "What is live right now",
     body:
-      "Funding requests are built server-side against the Anchor program and returned unsigned. The browser can hand the transaction directly to the connected wallet for signing on Solana devnet, or keep the payload for review first."
+      "SOL funding, wallet auth, standard relay, priority relay, request logging, and analytics are live on devnet. USDC stays gated until it is explicitly enabled."
   },
   {
-    title: "Route RPC traffic intentionally",
+    title: "How to reach first value",
     body:
-      "Standard relay traffic prioritizes funded availability and fallback behavior. Priority relay traffic uses a faster pricing profile, tighter node selection, and separate rate windows so latency-sensitive workloads stay deliberate."
+      "Connect a wallet, activate one project, fund it with a small SOL transaction, issue one key, and send one request to the hosted relay. The docs below are organized around that exact path."
   }
 ] as const;
