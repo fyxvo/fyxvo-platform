@@ -18,7 +18,7 @@ import {
   KeyIcon,
   MenuIcon,
   PulseIcon,
-  ServerIcon
+  ServerIcon,
 } from "./icons";
 import { BrandLogo } from "./brand-logo";
 import { ThemeToggle } from "./theme-toggle";
@@ -37,7 +37,7 @@ const navigation = [
   { href: "/analytics", label: "Analytics", icon: ChartIcon },
   { href: "/operators", label: "Operators", icon: ServerIcon },
   { href: "/docs", label: "Docs", icon: BookIcon },
-  { href: "/status", label: "Status", icon: PulseIcon }
+  { href: "/status", label: "Status", icon: PulseIcon },
 ] as const;
 
 const primaryLinks = [
@@ -45,7 +45,7 @@ const primaryLinks = [
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" },
   { href: "/docs", label: "Docs" },
-  { href: "/status", label: "Status" }
+  { href: "/status", label: "Status" },
 ] as const;
 
 const homeAnchors = [
@@ -54,16 +54,18 @@ const homeAnchors = [
   { href: "/#developer-flow", label: "Developer flow" },
   { href: "/#community", label: "Community" },
   { href: "/#operators", label: "Operators" },
-  { href: "/#status-preview", label: "Status" }
+  { href: "/#status-preview", label: "Status" },
 ] as const;
 
 function isActivePath(pathname: string, href: string) {
-  return pathname === href || (href !== "/" && pathname.startsWith(href.replace("/solstice-labs", "")));
+  return (
+    pathname === href || (href !== "/" && pathname.startsWith(href.replace("/solstice-labs", "")))
+  );
 }
 
 function NavigationList({
   pathname,
-  onNavigate
+  onNavigate,
 }: {
   readonly pathname: string;
   readonly onNavigate?: () => void;
@@ -118,7 +120,8 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
             <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] p-5">
               <BrandLogo priority />
               <p className="mt-5 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                Funded Solana RPC, wallet-authenticated control surfaces, and devnet protocol state in one calm private-alpha shell.
+                Funded Solana RPC, wallet-authenticated control surfaces, and devnet protocol state
+                in one calm private-alpha shell.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Badge tone="brand">{webEnv.solanaCluster}</Badge>
@@ -133,87 +136,116 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
 
         <div className="min-w-0">
           <header className="sticky top-4 z-40 mb-6 rounded-[2rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel)] px-4 py-4 shadow-[0_24px_72px_rgba(6,10,18,0.26)] backdrop-blur-2xl md:px-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <button
-                  type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)] xl:hidden"
-                  onClick={() => setMobileMenuOpen(true)}
-                  aria-label="Open navigation"
-                >
-                  <MenuIcon className="h-5 w-5" />
-                </button>
-                <BrandLogo priority />
-              </div>
-
-              <div className="hidden items-center gap-2 lg:flex">
-                {primaryLinks.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      isActivePath(pathname, item.href)
-                        ? "bg-brand-500/12 text-brand-300"
-                        : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-                    }`}
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <button
+                    type="button"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)] xl:hidden"
+                    onClick={() => setMobileMenuOpen(true)}
+                    aria-label="Open navigation"
                   >
-                    {item.label}
-                  </Link>
-                ))}
-                {onHome
-                  ? homeAnchors.map((item) => (
+                    <MenuIcon className="h-5 w-5" />
+                  </button>
+                  <BrandLogo priority />
+                </div>
+
+                <div className="hidden min-w-0 flex-1 items-center justify-center gap-2 xl:flex">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {primaryLinks.map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className="rounded-full px-4 py-2 text-sm text-[var(--fyxvo-text-muted)] transition hover:text-[var(--fyxvo-text)]"
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                          isActivePath(pathname, item.href)
+                            ? "bg-brand-500/12 text-brand-300"
+                            : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                        }`}
                       >
                         {item.label}
                       </Link>
-                    ))
-                  : null}
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <ThemeToggle />
+                  {portal.walletPhase === "authenticated" ? (
+                    <>
+                      <div className="hidden rounded-full border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-2 text-right md:block">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)]">
+                          {portal.walletName ?? portal.user?.role ?? "session"}
+                        </div>
+                        <div className="text-sm font-medium text-[var(--fyxvo-text)]">
+                          {portal.user?.displayName ?? "Connected"} ·{" "}
+                          {shortenAddress(portal.walletAddress ?? "", 4, 4)}
+                        </div>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => void portal.refresh()}
+                        loading={portal.loading}
+                        className="hidden md:inline-flex"
+                      >
+                        Refresh
+                      </Button>
+                    </>
+                  ) : (
+                    <WalletConnectButton compact className="rounded-full" />
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-                {portal.walletPhase === "authenticated" ? (
-                  <>
-                    <div className="hidden rounded-full border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-2 text-right md:block">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)]">
-                        {portal.walletName ?? portal.user?.role ?? "session"}
-                      </div>
-                      <div className="text-sm font-medium text-[var(--fyxvo-text)]">
-                        {portal.user?.displayName ?? "Connected"} · {shortenAddress(portal.walletAddress ?? "", 4, 4)}
-                      </div>
-                    </div>
-                    <Button variant="secondary" onClick={() => void portal.refresh()} loading={portal.loading} className="hidden md:inline-flex">
-                      Refresh
-                    </Button>
-                  </>
-                ) : (
-                  <WalletConnectButton compact className="rounded-full" />
-                )}
+              <div className="flex flex-wrap items-center gap-3 border-t border-[color:var(--fyxvo-border)] pt-4">
+                <Badge tone="neutral">{webEnv.solanaCluster}</Badge>
+                <Badge tone={portal.networkMismatch ? "warning" : "success"}>
+                  {portal.networkMismatch ? "wallet mismatch" : "wallet aligned"}
+                </Badge>
+                {portal.selectedProject ? (
+                  <Badge tone="brand">{portal.selectedProject.name}</Badge>
+                ) : null}
+                <Link
+                  href={webEnv.apiBaseUrl}
+                  target="_blank"
+                  className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                >
+                  API
+                </Link>
+                <Link
+                  href={webEnv.gatewayBaseUrl}
+                  target="_blank"
+                  className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                >
+                  RPC
+                </Link>
+                <Link
+                  href={webEnv.statusPageUrl}
+                  className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                >
+                  Status surface
+                </Link>
+                <Link
+                  href="/contact"
+                  className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                >
+                  Support path
+                </Link>
+                <SocialLinks className="ml-auto hidden md:flex" />
               </div>
-            </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[color:var(--fyxvo-border)] pt-4">
-              <Badge tone="neutral">{webEnv.solanaCluster}</Badge>
-              <Badge tone={portal.networkMismatch ? "warning" : "success"}>
-                {portal.networkMismatch ? "wallet mismatch" : "wallet aligned"}
-              </Badge>
-              {portal.selectedProject ? <Badge tone="brand">{portal.selectedProject.name}</Badge> : null}
-              <Link href={webEnv.apiBaseUrl} target="_blank" className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]">
-                API
-              </Link>
-              <Link href={webEnv.gatewayBaseUrl} target="_blank" className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]">
-                RPC
-              </Link>
-              <Link href={webEnv.statusPageUrl} className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]">
-                Status surface
-              </Link>
-              <Link href="/contact" className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]">
-                Support path
-              </Link>
-              <SocialLinks className="ml-auto hidden md:flex" />
+              {onHome ? (
+                <div className="flex flex-wrap items-center gap-2 border-t border-[color:var(--fyxvo-border)] pt-4">
+                  {homeAnchors.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="rounded-full border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-2 text-sm text-[var(--fyxvo-text-muted)] transition hover:text-[var(--fyxvo-text)]"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </header>
 
@@ -224,7 +256,9 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
               <div className="space-y-4">
                 <BrandLogo />
                 <p className="max-w-2xl text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                  Fyxvo keeps the devnet alpha explicit. SOL is live, USDC stays gated until you intentionally enable it, and the current launch topology is managed infrastructure rather than a fake open marketplace.
+                  Fyxvo keeps the devnet alpha explicit. SOL is live, USDC stays gated until you
+                  intentionally enable it, and the current launch topology is managed infrastructure
+                  rather than a fake open marketplace.
                 </p>
                 <div className="flex flex-wrap gap-5 text-sm text-[var(--fyxvo-text-muted)]">
                   <Link href="/" className="hover:text-[var(--fyxvo-text)]">
@@ -245,10 +279,18 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
                   <Link href="/status" className="hover:text-[var(--fyxvo-text)]">
                     Status
                   </Link>
-                  <Link href={webEnv.apiBaseUrl} target="_blank" className="hover:text-[var(--fyxvo-text)]">
+                  <Link
+                    href={webEnv.apiBaseUrl}
+                    target="_blank"
+                    className="hover:text-[var(--fyxvo-text)]"
+                  >
                     API
                   </Link>
-                  <Link href={webEnv.gatewayBaseUrl} target="_blank" className="hover:text-[var(--fyxvo-text)]">
+                  <Link
+                    href={webEnv.gatewayBaseUrl}
+                    target="_blank"
+                    className="hover:text-[var(--fyxvo-text)]"
+                  >
                     RPC
                   </Link>
                 </div>
@@ -282,7 +324,11 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
             <div className="mt-6 flex flex-wrap gap-2">
               <ThemeToggle />
               {portal.walletPhase === "authenticated" ? (
-                <Button variant="secondary" onClick={() => void portal.refresh()} loading={portal.loading}>
+                <Button
+                  variant="secondary"
+                  onClick={() => void portal.refresh()}
+                  loading={portal.loading}
+                >
                   Refresh
                 </Button>
               ) : (

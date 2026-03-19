@@ -18,17 +18,26 @@ export default async function PricingPage() {
   const writeMultiplier = pricing?.writeMultiplier ?? 1;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Pricing"
         title="Devnet launch pricing for funded Solana RPC and priority relay."
         description="The pricing model is intentionally simple and current-state. It explains what is live in the private alpha, how SOL funding translates into spendable relay capacity, and where the priority path differs from the standard path."
         actions={
           <>
-            <TrackedLinkButton href="/contact" eventName="landing_cta_clicked" eventSource="pricing-header-contact">
+            <TrackedLinkButton
+              href="/contact"
+              eventName="landing_cta_clicked"
+              eventSource="pricing-header-contact"
+            >
               Request access
             </TrackedLinkButton>
-            <TrackedLinkButton href="/status" eventName="landing_cta_clicked" eventSource="pricing-header-status" variant="secondary">
+            <TrackedLinkButton
+              href="/status"
+              eventName="landing_cta_clicked"
+              eventSource="pricing-header-status"
+              variant="secondary"
+            >
               View live status
             </TrackedLinkButton>
           </>
@@ -36,7 +45,9 @@ export default async function PricingPage() {
       />
 
       <Notice tone="neutral" title="Launch pricing, not a fake enterprise sheet">
-        Fyxvo is live on Solana devnet. These prices are for the current private alpha and are meant to help early teams understand the standard path, the priority path, and how SOL funding maps to request capacity.
+        Fyxvo is live on Solana devnet. These prices are for the current private alpha and are meant
+        to help early teams understand the standard path, the priority path, and how SOL funding
+        maps to request capacity.
       </Notice>
 
       <section className="grid gap-6 xl:grid-cols-2">
@@ -44,21 +55,26 @@ export default async function PricingPage() {
           <CardHeader>
             <CardTitle>Standard RPC</CardTitle>
             <CardDescription>
-              For normal JSON-RPC traffic where funded availability, upstream fallback, and clear operational posture matter more than shaving every last millisecond.
+              For normal JSON-RPC traffic where funded availability, upstream fallback, and clear
+              operational posture matter more than shaving every last millisecond.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Base price</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Base price
+              </div>
               <div className="mt-2 text-3xl font-semibold text-[var(--fyxvo-text)]">
                 {formatInteger(standardPrice)} lamports
               </div>
               <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                About {lamportsToSol(standardPrice)} SOL per request before method-specific multipliers apply.
+                About {lamportsToSol(standardPrice)} SOL per request before method-specific
+                multipliers apply.
               </p>
             </div>
             <Notice tone="neutral" title="What this includes">
-              API-key validation, funded balance enforcement, Redis-backed rate limiting, multi-node routing with fallback, request logging, and analytics rollups.
+              API-key validation, funded balance enforcement, Redis-backed rate limiting, multi-node
+              routing with fallback, request logging, and analytics rollups.
             </Notice>
           </CardContent>
         </Card>
@@ -67,21 +83,26 @@ export default async function PricingPage() {
           <CardHeader>
             <CardTitle>Priority relay</CardTitle>
             <CardDescription>
-              For latency-sensitive devnet traffic where teams want a separate routing mode, separate rate window, and distinct pricing from the standard path.
+              For latency-sensitive devnet traffic where teams want a separate routing mode,
+              separate rate window, and distinct pricing from the standard path.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Base price</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Base price
+              </div>
               <div className="mt-2 text-3xl font-semibold text-[var(--fyxvo-text)]">
                 {formatInteger(priorityPrice)} lamports
               </div>
               <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                About {lamportsToSol(priorityPrice)} SOL per request before method-specific multipliers apply.
+                About {lamportsToSol(priorityPrice)} SOL per request before method-specific
+                multipliers apply.
               </p>
             </div>
             <Notice tone="neutral" title="What changes">
-              Priority mode keeps faster routing and separate rate behavior explicit. It is not a hidden feature of the standard path.
+              Priority mode keeps faster routing and separate rate behavior explicit. It is not a
+              hidden feature of the standard path.
             </Notice>
           </CardContent>
         </Card>
@@ -100,23 +121,27 @@ export default async function PricingPage() {
               {[
                 {
                   title: "1. Activate project",
-                  body: "Create the project and confirm the activation transaction so the on-chain project account exists."
+                  body: "Create the project and confirm the activation transaction so the on-chain project account exists.",
                 },
                 {
                   title: "2. Fund with SOL",
-                  body: "Prepare and sign a SOL funding transaction. The API verifies the signature and refreshes spendable balance."
+                  body: "Prepare and sign a SOL funding transaction. The API verifies the signature and refreshes spendable balance.",
                 },
                 {
                   title: "3. Spend through the gateway",
-                  body: "Requests are priced by routing mode and method profile, then deducted against the on-chain-backed project balance."
-                }
+                  body: "Requests are priced by routing mode and method profile, then deducted against the on-chain-backed project balance.",
+                },
               ].map((item) => (
                 <div
                   key={item.title}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">{item.title}</div>
-                  <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                    {item.title}
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                    {item.body}
+                  </p>
                 </div>
               ))}
             </div>
@@ -124,10 +149,12 @@ export default async function PricingPage() {
               SOL funding is live on devnet today.
             </Notice>
             <Notice tone="neutral" title="USDC stays gated">
-              USDC remains configuration-gated until the deployment explicitly enables it. The pricing surface does not pretend otherwise.
+              USDC remains configuration-gated until the deployment explicitly enables it. The
+              pricing surface does not pretend otherwise.
             </Notice>
             <Notice tone="neutral" title="Write method multiplier">
-              Methods that are treated as write-heavy are multiplied by {writeMultiplier}x relative to the base price so higher-cost routing stays visible.
+              Methods that are treated as write-heavy are multiplied by {writeMultiplier}x relative
+              to the base price so higher-cost routing stays visible.
             </Notice>
           </CardContent>
         </Card>
@@ -148,39 +175,59 @@ export default async function PricingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            This is a good fit for teams validating wallet-authenticated project control, funded JSON-RPC, priority relay behavior, analytics visibility, and managed launch operations before broader rollout.
+            This is a good fit for teams validating wallet-authenticated project control, funded
+            JSON-RPC, priority relay behavior, analytics visibility, and managed launch operations
+            before broader rollout.
           </CardContent>
         </Card>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>What you can expect</CardTitle>
             <CardDescription>
-              Clean project activation, SOL funding, API keys, relay access, and honest status surfaces.
+              Clean project activation, SOL funding, API keys, relay access, and honest status
+              surfaces.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            The product does not claim fake production adoption or a finished mainnet commercial model. It gives early users a credible devnet path and enough visibility to evaluate fit.
+            The product does not claim fake production adoption or a finished mainnet commercial
+            model. It gives early users a credible devnet path and enough visibility to evaluate
+            fit.
           </CardContent>
         </Card>
-          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-            <CardHeader>
-              <CardTitle>Useful next links</CardTitle>
-              <CardDescription>
-                Pick the path that matches how far you want to go today.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-3">
-              <TrackedLinkButton href="/docs" eventName="landing_cta_clicked" eventSource="pricing-links-docs" variant="secondary">
-                Open quickstart
-              </TrackedLinkButton>
-              <TrackedLinkButton href="/dashboard" eventName="landing_cta_clicked" eventSource="pricing-links-dashboard" variant="secondary">
-                Open dashboard
-              </TrackedLinkButton>
-              <TrackedLinkButton href={webEnv.statusPageUrl} eventName="landing_cta_clicked" eventSource="pricing-links-status" variant="secondary">
-                View status
-              </TrackedLinkButton>
-            </CardContent>
-          </Card>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Useful next links</CardTitle>
+            <CardDescription>
+              Pick the path that matches how far you want to go today.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <TrackedLinkButton
+              href="/docs"
+              eventName="landing_cta_clicked"
+              eventSource="pricing-links-docs"
+              variant="secondary"
+            >
+              Open quickstart
+            </TrackedLinkButton>
+            <TrackedLinkButton
+              href="/dashboard"
+              eventName="landing_cta_clicked"
+              eventSource="pricing-links-dashboard"
+              variant="secondary"
+            >
+              Open dashboard
+            </TrackedLinkButton>
+            <TrackedLinkButton
+              href={webEnv.statusPageUrl}
+              eventName="landing_cta_clicked"
+              eventSource="pricing-links-status"
+              variant="secondary"
+            >
+              View status
+            </TrackedLinkButton>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

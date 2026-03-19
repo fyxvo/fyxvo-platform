@@ -8,7 +8,7 @@ const noticeToneClasses: Record<NoticeTone, string> = {
   success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-100",
   warning: "border-amber-500/25 bg-amber-500/10 text-amber-100",
   danger: "border-rose-500/25 bg-rose-500/10 text-rose-100",
-  neutral: "border-slate-800 bg-slate-950/80 text-slate-200"
+  neutral: "border-slate-800 bg-slate-950/80 text-slate-200",
 };
 
 export interface NoticeProps extends HTMLAttributes<HTMLDivElement> {
@@ -40,7 +40,7 @@ export function Notice({
             {icon}
           </div>
         ) : null}
-        <div className="min-w-0 space-y-1">
+        <div className="min-w-0 break-words space-y-1">
           {title ? <p className="font-semibold text-white">{title}</p> : null}
           <div className="text-sm leading-6 text-current/90">{children}</div>
         </div>

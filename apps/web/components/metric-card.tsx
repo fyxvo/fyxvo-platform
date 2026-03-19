@@ -6,7 +6,7 @@ export function MetricCard({
   value,
   detail,
   accent,
-  footer
+  footer,
 }: {
   readonly label: string;
   readonly value: string;
@@ -17,12 +17,14 @@ export function MetricCard({
   return (
     <Card className="fyxvo-surface border-white/5">
       <CardHeader className="mb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)]">{label}</p>
-            <CardTitle className="mt-3 text-3xl">{value}</CardTitle>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)]">
+              {label}
+            </p>
+            <CardTitle className="mt-3 break-words text-3xl">{value}</CardTitle>
           </div>
-          {accent}
+          {accent ? <div className="shrink-0 self-start">{accent}</div> : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -35,7 +37,7 @@ export function MetricCard({
 
 export function DeltaBadge({
   value,
-  positive = true
+  positive = true,
 }: {
   readonly value: string;
   readonly positive?: boolean;

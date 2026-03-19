@@ -9,7 +9,7 @@ export function BrandLogo({
   href = "/",
   iconClassName,
   className,
-  priority = false
+  priority = false,
 }: {
   readonly withWordmark?: boolean;
   readonly href?: string;
@@ -30,11 +30,11 @@ export function BrandLogo({
         />
       </span>
       {withWordmark ? (
-        <span className="flex flex-col">
-          <span className="font-display text-xl font-semibold tracking-[0.02em] text-[var(--fyxvo-text)]">
+        <span className="flex min-w-0 flex-col">
+          <span className="font-display text-xl font-semibold leading-none tracking-[0.02em] text-[var(--fyxvo-text)]">
             Fyxvo
           </span>
-          <span className="text-[11px] uppercase tracking-[0.22em] text-[var(--fyxvo-text-muted)]">
+          <span className="mt-1 hidden text-[11px] uppercase leading-none tracking-[0.18em] text-[var(--fyxvo-text-muted)] min-[420px]:block sm:tracking-[0.22em]">
             Solana infrastructure
           </span>
         </span>

@@ -9,6 +9,7 @@ on:
 env:
   NEXT_TELEMETRY_DISABLED: "1"
   CI: "true"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   validate:
@@ -17,19 +18,20 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
+        uses: actions/checkout@v5
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.23.0
           run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Bootstrap workspace toolchain
         run: bash ./scripts/bootstrap.sh

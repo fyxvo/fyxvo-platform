@@ -14,7 +14,7 @@ import {
   Modal,
   Notice,
   Table,
-  type TableColumn
+  type TableColumn,
 } from "@fyxvo/ui";
 import { LineChartCard } from "../../components/charts";
 import { CopyButton } from "../../components/copy-button";
@@ -29,7 +29,7 @@ import {
   formatInteger,
   formatRelativeDate,
   formatSol,
-  shortenAddress
+  shortenAddress,
 } from "../../lib/format";
 import type { AdminOverview, PortalProject } from "../../lib/types";
 import { webEnv } from "../../lib/env";
@@ -41,58 +41,60 @@ const projectColumns: readonly TableColumn<PortalProject>[] = [
     cell: (project) => (
       <div>
         <div className="font-medium text-[var(--fyxvo-text)]">{project.name}</div>
-        <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">{project.slug}</div>
+        <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
+          {project.slug}
+        </div>
       </div>
-    )
+    ),
   },
   {
     key: "requests",
     header: "Request logs",
-    cell: (project) => formatInteger(project._count?.requestLogs ?? 0)
+    cell: (project) => formatInteger(project._count?.requestLogs ?? 0),
   },
   {
     key: "apiKeys",
     header: "API keys",
-    cell: (project) => String(project._count?.apiKeys ?? 0)
+    cell: (project) => String(project._count?.apiKeys ?? 0),
   },
   {
     key: "pda",
     header: "Project PDA",
-    cell: (project) => shortenAddress(project.onChainProjectPda, 6, 6)
-  }
+    cell: (project) => shortenAddress(project.onChainProjectPda, 6, 6),
+  },
 ];
 
 const workspaceSections = [
   {
     title: "Projects",
     body: "Keep project activation, on-chain identity, and ownership close together.",
-    href: "/projects/solstice-labs"
+    href: "/projects/solstice-labs",
   },
   {
     title: "API keys",
     body: "Generate scoped credentials, then copy a ready-to-run request example.",
-    href: "/api-keys"
+    href: "/api-keys",
   },
   {
     title: "Funding",
     body: "Prepare and confirm SOL funding without losing the wallet session context.",
-    href: "/funding"
+    href: "/funding",
   },
   {
     title: "Analytics",
     body: "Watch request logs and latency once the first relay call lands.",
-    href: "/analytics"
+    href: "/analytics",
   },
   {
     title: "Docs",
     body: "Keep quickstart, endpoints, and funding instructions close to the product.",
-    href: "/docs"
+    href: "/docs",
   },
   {
     title: "Status",
     body: "Check hosted service condition, protocol readiness, and managed infrastructure posture.",
-    href: "/status"
-  }
+    href: "/status",
+  },
 ] as const;
 
 function hasSpendableSolCredits(value: string | undefined) {
@@ -127,7 +129,7 @@ function OpsTimeline({
   title,
   description,
   items,
-  emptyLabel
+  emptyLabel,
 }: {
   readonly title: string;
   readonly description: string;
@@ -183,7 +185,7 @@ function buildOpsItems(overview: AdminOverview | null) {
       activity: [],
       interest: [],
       apiKeys: [],
-      feedback: []
+      feedback: [],
     };
   }
 
@@ -200,7 +202,7 @@ function buildOpsItems(overview: AdminOverview | null) {
           ? ("danger" as const)
           : entry.statusCode >= 429
             ? ("warning" as const)
-            : ("neutral" as const)
+            : ("neutral" as const),
     })),
     funding: overview.recentFundingEvents.map((entry) => ({
       id: entry.id,
@@ -209,28 +211,28 @@ function buildOpsItems(overview: AdminOverview | null) {
       body: entry.confirmedAt
         ? `Confirmed by ${entry.requestedBy.displayName} at ${formatRelativeDate(entry.confirmedAt)}.`
         : `Prepared by ${entry.requestedBy.displayName}. Confirmation is still pending.`,
-      tone: entry.confirmedAt ? ("success" as const) : ("warning" as const)
+      tone: entry.confirmedAt ? ("success" as const) : ("warning" as const),
     })),
     activity: overview.recentProjectActivity.map((entry) => ({
       id: entry.id,
       title: `${entry.project?.name ?? "Platform"} ${entry.method} ${entry.route}`,
       meta: `${entry.service.toUpperCase()} · ${formatRelativeDate(entry.createdAt)}`,
       body: `Returned ${entry.statusCode} in ${formatDuration(entry.durationMs)}.`,
-      tone: entry.statusCode >= 500 ? ("danger" as const) : ("neutral" as const)
+      tone: entry.statusCode >= 500 ? ("danger" as const) : ("neutral" as const),
     })),
     interest: overview.interestSubmissions.recent.map((entry) => ({
       id: entry.id,
       title: `${entry.name} · ${entry.role}`,
       meta: `${formatRelativeDate(entry.createdAt)} · ${entry.expectedRequestVolume}`,
       body: `${entry.email}${entry.team ? ` from ${entry.team}` : ""} is interested in ${entry.interestAreas.join(", ")}${entry.operatorInterest ? " and operator participation" : ""}.`,
-      tone: "neutral" as const
+      tone: "neutral" as const,
     })),
     apiKeys: overview.recentApiKeyActivity.map((entry) => ({
       id: entry.id,
       title: `${entry.project.name} · ${entry.label}`,
       meta: `${entry.prefix} · ${entry.lastUsedAt ? `used ${formatRelativeDate(entry.lastUsedAt)}` : `created ${formatRelativeDate(entry.createdAt)}`}`,
       body: `Issued by ${entry.createdBy.displayName}. Current status is ${entry.status}.`,
-      tone: entry.status === "ACTIVE" ? ("success" as const) : ("warning" as const)
+      tone: entry.status === "ACTIVE" ? ("success" as const) : ("warning" as const),
     })),
     feedback: overview.feedbackSubmissions.recent.map((entry) => ({
       id: entry.id,
@@ -240,8 +242,8 @@ function buildOpsItems(overview: AdminOverview | null) {
       tone:
         entry.category === "BUG_REPORT" || entry.category === "ONBOARDING_FRICTION"
           ? ("warning" as const)
-          : ("neutral" as const)
-    }))
+          : ("neutral" as const),
+    })),
   };
 }
 
@@ -270,9 +272,12 @@ export default function DashboardPage() {
       title: "Connect wallet",
       body: "Use a supported Solana wallet to open a signed session. Fyxvo never stores a private key.",
       complete: portal.walletPhase === "authenticated",
-      action: portal.walletPhase === "authenticated"
-        ? <Badge tone="success">{portal.walletName ?? "wallet connected"}</Badge>
-        : <Badge tone="warning">Waiting on wallet auth</Badge>
+      action:
+        portal.walletPhase === "authenticated" ? (
+          <Badge tone="success">{portal.walletName ?? "wallet connected"}</Badge>
+        ) : (
+          <Badge tone="warning">Waiting on wallet auth</Badge>
+        ),
     },
     {
       title: "Create project",
@@ -280,13 +285,19 @@ export default function DashboardPage() {
       complete: hasProjects,
       action: hasProjects ? (
         <Button asChild size="sm" variant="secondary">
-          <Link href={`/projects/${portal.selectedProject?.slug ?? "solstice-labs"}`}>Open project</Link>
+          <Link href={`/projects/${portal.selectedProject?.slug ?? "solstice-labs"}`}>
+            Open project
+          </Link>
         </Button>
       ) : (
-        <Button size="sm" onClick={() => setCreateOpen(true)} disabled={portal.walletPhase !== "authenticated"}>
+        <Button
+          size="sm"
+          onClick={() => setCreateOpen(true)}
+          disabled={portal.walletPhase !== "authenticated"}
+        >
           Create project
         </Button>
-      )
+      ),
     },
     {
       title: "Fund with SOL",
@@ -296,7 +307,7 @@ export default function DashboardPage() {
         <Button asChild size="sm" variant="secondary">
           <Link href="/funding">{hasFunding ? "Review funding" : "Fund project"}</Link>
         </Button>
-      )
+      ),
     },
     {
       title: "Generate API key",
@@ -306,7 +317,7 @@ export default function DashboardPage() {
         <Button asChild size="sm" variant="secondary">
           <Link href="/api-keys">{hasApiKeys ? "Manage keys" : "Create key"}</Link>
         </Button>
-      )
+      ),
     },
     {
       title: "Make first request",
@@ -317,7 +328,7 @@ export default function DashboardPage() {
           <CopyButton value={endpointExample} label="Copy endpoint" />
           <CopyButton value={firstRequestSnippet} label="Copy request" />
         </div>
-      )
+      ),
     },
     {
       title: "View analytics",
@@ -327,12 +338,12 @@ export default function DashboardPage() {
         <Button asChild size="sm" variant="secondary">
           <Link href="/analytics">Open analytics</Link>
         </Button>
-      )
-    }
+      ),
+    },
   ] as const;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Dashboard"
         title="Move from wallet auth to funded relay traffic without guessing the next step."
@@ -363,9 +374,11 @@ export default function DashboardPage() {
         title="Create a devnet project"
         description="Project creation prepares the real activation transaction right away, so funding and relay usage can begin immediately after confirmation."
         footer={
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="text-sm text-[var(--fyxvo-text-muted)]">{portal.projectCreationState.message}</div>
-            <div className="flex items-center gap-3">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-[var(--fyxvo-text-muted)]">
+              {portal.projectCreationState.message}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
               <Button variant="ghost" onClick={() => setCreateOpen(false)}>
                 Close
               </Button>
@@ -375,7 +388,7 @@ export default function DashboardPage() {
                     .createProject({
                       slug,
                       name,
-                      ...(description ? { description } : {})
+                      ...(description ? { description } : {}),
                     })
                     .then(() => {
                       setCreateOpen(false);
@@ -407,7 +420,9 @@ export default function DashboardPage() {
           <Input
             label="Project slug"
             value={slug}
-            onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+            onChange={(event) =>
+              setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))
+            }
             placeholder="northwind-relay"
             hint="Lowercase letters, numbers, and single hyphens only."
           />
@@ -421,7 +436,10 @@ export default function DashboardPage() {
             />
           </label>
           {portal.projectCreationState.signature ? (
-            <Notice tone={portal.projectCreationState.phase === "error" ? "warning" : "success"} title="Latest activation signature">
+            <Notice
+              tone={portal.projectCreationState.phase === "error" ? "warning" : "success"}
+              title="Latest activation signature"
+            >
               <div className="break-all">{portal.projectCreationState.signature}</div>
             </Notice>
           ) : null}
@@ -435,20 +453,23 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Get started in one path</CardTitle>
               <CardDescription>
-                Your first successful outcome is simple: activate a project, fund it with SOL, generate a key, then send one relay request.
+                Your first successful outcome is simple: activate a project, fund it with SOL,
+                generate a key, then send one relay request.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
               {[
                 "Create the first project from this dashboard.",
                 "Open funding and send a small SOL devnet transaction.",
-                "Generate an API key and copy the request example from the API keys page."
+                "Generate an API key and copy the request example from the API keys page.",
               ].map((item, index) => (
                 <div
                   key={item}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">Step {index + 1}</div>
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                    Step {index + 1}
+                  </div>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item}</p>
                 </div>
               ))}
@@ -471,10 +492,14 @@ export default function DashboardPage() {
                 key={step.title}
                 className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.16em] text-brand-300">Step {index + 1}</div>
-                    <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{step.title}</div>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                      Step {index + 1}
+                    </div>
+                    <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
+                      {step.title}
+                    </div>
                   </div>
                   <Badge tone={statusTone(step.complete)}>{step.complete ? "done" : "next"}</Badge>
                 </div>
@@ -489,43 +514,57 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>First request kit</CardTitle>
             <CardDescription>
-              The key, endpoint, and sample request stay close together so the first relay call does not depend on guesswork.
+              The key, endpoint, and sample request stay close together so the first relay call does
+              not depend on guesswork.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Selected project</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Selected project
+              </div>
               <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
                 {portal.selectedProject?.name ?? "Create a project first"}
               </div>
             </div>
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">RPC endpoint</div>
-                  <div className="mt-2 break-all text-sm font-medium text-[var(--fyxvo-text)]">{endpointExample}</div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                    RPC endpoint
+                  </div>
+                  <div className="mt-2 break-all text-sm font-medium text-[var(--fyxvo-text)]">
+                    {endpointExample}
+                  </div>
                 </div>
-                <CopyButton value={endpointExample} />
+                <CopyButton value={endpointExample} className="self-start sm:shrink-0" />
               </div>
             </div>
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">First request</div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                    First request
+                  </div>
                   <pre className="mt-3 overflow-x-auto text-xs leading-6 text-[var(--fyxvo-text-soft)]">
                     <code>{firstRequestSnippet}</code>
                   </pre>
                 </div>
-                <CopyButton value={firstRequestSnippet} />
+                <CopyButton value={firstRequestSnippet} className="self-start sm:shrink-0" />
               </div>
             </div>
-            <Notice tone={hasRelayTraffic ? "success" : "neutral"} title={hasRelayTraffic ? "Traffic detected" : "Waiting for first relay call"}>
+            <Notice
+              tone={hasRelayTraffic ? "success" : "neutral"}
+              title={hasRelayTraffic ? "Traffic detected" : "Waiting for first relay call"}
+            >
               {hasRelayTraffic
                 ? "Request logs are already flowing into analytics for the selected project."
                 : "Once this request lands, analytics and status pages will start reflecting the live project path."}
             </Notice>
             <Notice tone="neutral" title="Team-readiness note">
-              The current launch flow is owner-admin driven. Collaborator roles and shared project access are the next honest step, but they are not claimed as live until the auth model supports them end to end.
+              The current launch flow is owner-admin driven. Collaborator roles and shared project
+              access are the next honest step, but they are not claimed as live until the auth model
+              supports them end to end.
             </Notice>
           </CardContent>
         </Card>
@@ -585,21 +624,31 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Selected project posture</CardTitle>
             <CardDescription>
-              Keep the current project state visible while you move from activation into funding and traffic.
+              Keep the current project state visible while you move from activation into funding and
+              traffic.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Project PDA</div>
-              <div className="mt-2 break-all font-medium text-[var(--fyxvo-text)]">{portal.onchainSnapshot.projectPda}</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Project PDA
+              </div>
+              <div className="mt-2 break-all font-medium text-[var(--fyxvo-text)]">
+                {portal.onchainSnapshot.projectPda}
+              </div>
             </div>
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Available SOL credits</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Available SOL credits
+              </div>
               <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">
                 {portal.onchainSnapshot.balances?.availableSolCredits ?? "0"}
               </div>
             </div>
-            <Notice tone={hasFunding ? "success" : "neutral"} title={hasFunding ? "Funding detected" : "Funding still needed"}>
+            <Notice
+              tone={hasFunding ? "success" : "neutral"}
+              title={hasFunding ? "Funding detected" : "Funding still needed"}
+            >
               {hasFunding
                 ? "The project has passed the first funding step, so API keys can start driving real relay traffic."
                 : "Funding is the next meaningful action after project activation. Use the funding page to prepare and confirm a SOL transaction."}
@@ -615,13 +664,15 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Recent project activity</CardTitle>
             <CardDescription>
-              The most recent project requests stay visible so new teams can confirm the system is reacting after their first call.
+              The most recent project requests stay visible so new teams can confirm the system is
+              reacting after their first call.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {portal.projectAnalytics.recentRequests.length === 0 ? (
               <Notice tone="neutral" title="No project requests yet">
-                Send the first relay request after generating an API key. Analytics will start filling in from the live request log stream.
+                Send the first relay request after generating an API key. Analytics will start
+                filling in from the live request log stream.
               </Notice>
             ) : (
               portal.projectAnalytics.recentRequests.slice(0, 5).map((request) => (
@@ -638,7 +689,9 @@ export default function DashboardPage() {
                         {request.service.toUpperCase()} · {formatRelativeDate(request.createdAt)}
                       </div>
                     </div>
-                    <Badge tone={request.statusCode >= 400 ? "warning" : "success"}>{request.statusCode}</Badge>
+                    <Badge tone={request.statusCode >= 400 ? "warning" : "success"}>
+                      {request.statusCode}
+                    </Badge>
                   </div>
                   <div className="mt-3 text-sm text-[var(--fyxvo-text-soft)]">
                     Completed in {formatDuration(request.durationMs)}.
@@ -663,17 +716,35 @@ export default function DashboardPage() {
               label="Protocol readiness"
               value={portal.adminOverview.protocol.readiness?.ready ? "ready" : "attention"}
               detail="Read directly from the chain-backed readiness report used by the hosted API."
-              accent={<Badge tone={portal.adminOverview.protocol.readiness?.ready ? "success" : "warning"}>{portal.adminOverview.protocol.readiness?.ready ? "green" : "check"}</Badge>}
+              accent={
+                <Badge
+                  tone={portal.adminOverview.protocol.readiness?.ready ? "success" : "warning"}
+                >
+                  {portal.adminOverview.protocol.readiness?.ready ? "green" : "check"}
+                </Badge>
+              }
             />
             <MetricCard
               label="Authority mode"
               value={portal.adminOverview.protocol.authorityPlan.mode}
               detail="Mainnet beta should not ship while protocol control remains single-signer."
-              accent={<Badge tone={portal.adminOverview.protocol.authorityPlan.mode === "single-signer" ? "warning" : "success"}>{portal.adminOverview.protocol.authorityPlan.mode}</Badge>}
+              accent={
+                <Badge
+                  tone={
+                    portal.adminOverview.protocol.authorityPlan.mode === "single-signer"
+                      ? "warning"
+                      : "success"
+                  }
+                >
+                  {portal.adminOverview.protocol.authorityPlan.mode}
+                </Badge>
+              }
             />
             <MetricCard
               label="SOL fees owed"
-              value={formatLamportStringAsSol(portal.adminOverview.protocol.treasury.protocolSolFeesOwed)}
+              value={formatLamportStringAsSol(
+                portal.adminOverview.protocol.treasury.protocolSolFeesOwed
+              )}
               detail="Tracked fee liability on chain. This is not withdrawable revenue until a reviewed withdrawal path exists."
               accent={<DeltaBadge value="treasury liability" />}
             />
@@ -685,7 +756,13 @@ export default function DashboardPage() {
                   ? `Last rollup ${formatRelativeDate(portal.adminOverview.worker.lastRollupAt)}`
                   : "No worker rollup recorded yet."
               }
-              accent={<Badge tone={portal.adminOverview.worker.status === "healthy" ? "success" : "warning"}>{portal.adminOverview.worker.status}</Badge>}
+              accent={
+                <Badge
+                  tone={portal.adminOverview.worker.status === "healthy" ? "success" : "warning"}
+                >
+                  {portal.adminOverview.worker.status}
+                </Badge>
+              }
             />
             <MetricCard
               label="Worker cursor"
@@ -695,7 +772,11 @@ export default function DashboardPage() {
                   ? `Updated ${formatRelativeDate(portal.adminOverview.worker.lastCursorAt)}`
                   : "No worker cursor has been written yet."
               }
-              accent={<Badge tone="neutral">{portal.adminOverview.worker.staleThresholdMinutes}m window</Badge>}
+              accent={
+                <Badge tone="neutral">
+                  {portal.adminOverview.worker.staleThresholdMinutes}m window
+                </Badge>
+              }
             />
             <MetricCard
               label="Recent errors"
@@ -734,26 +815,35 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Authority migration posture</CardTitle>
                 <CardDescription>
-                  Governance preparation is explicit here so mainnet work does not depend on remembering which signer still controls what.
+                  Governance preparation is explicit here so mainnet work does not depend on
+                  remembering which signer still controls what.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Protocol authority</div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      Protocol authority
+                    </div>
                     <div className="mt-2 break-all text-sm font-medium text-[var(--fyxvo-text)]">
                       {portal.adminOverview.protocol.authorityPlan.protocolAuthority}
                     </div>
                   </div>
                   <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Pause authority</div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      Pause authority
+                    </div>
                     <div className="mt-2 break-all text-sm font-medium text-[var(--fyxvo-text)]">
                       {portal.adminOverview.protocol.authorityPlan.pauseAuthority}
                     </div>
                   </div>
                 </div>
                 <Notice
-                  tone={portal.adminOverview.protocol.authorityPlan.mode === "single-signer" ? "warning" : "success"}
+                  tone={
+                    portal.adminOverview.protocol.authorityPlan.mode === "single-signer"
+                      ? "warning"
+                      : "success"
+                  }
                   title="Current governance mode"
                 >
                   {portal.adminOverview.protocol.authorityPlan.mode === "single-signer"
@@ -772,26 +862,34 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Treasury and fee posture</CardTitle>
                 <CardDescription>
-                  These balances come from chain-backed protocol state and help operations distinguish funded inventory from reserved rewards and accrued fees.
+                  These balances come from chain-backed protocol state and help operations
+                  distinguish funded inventory from reserved rewards and accrued fees.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Treasury SOL</div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      Treasury SOL
+                    </div>
                     <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
                       {formatLamportStringAsSol(portal.adminOverview.protocol.treasury.solBalance)}
                     </div>
                   </div>
                   <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Reserved SOL rewards</div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      Reserved SOL rewards
+                    </div>
                     <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
-                      {formatLamportStringAsSol(portal.adminOverview.protocol.treasury.reservedSolRewards)}
+                      {formatLamportStringAsSol(
+                        portal.adminOverview.protocol.treasury.reservedSolRewards
+                      )}
                     </div>
                   </div>
                 </div>
                 <Notice tone="warning" title="Fee withdrawal is still intentionally blocked">
-                  Protocol fees owed are visible here for reconciliation, but the withdrawal path is not implemented and should not be treated as launch-ready revenue handling.
+                  Protocol fees owed are visible here for reconciliation, but the withdrawal path is
+                  not implemented and should not be treated as launch-ready revenue handling.
                 </Notice>
                 {portal.adminOverview.protocol.treasury.reconciliationWarnings.map((warning) => (
                   <Notice key={warning} tone="warning" title="Reconciliation warning">
@@ -853,13 +951,23 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Private alpha checklist</CardTitle>
                 <CardDescription>
-                  This is the internal support rhythm for onboarding a new team without overpromising what is live.
+                  This is the internal support rhythm for onboarding a new team without
+                  overpromising what is live.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                <p>Confirm the team understands this is a hosted devnet alpha with SOL funding live and USDC still gated.</p>
-                <p>Make sure one wallet can sign, one project can activate, one SOL funding transaction can confirm, and one key can send one real request.</p>
-                <p>Use the contact and feedback queue if the first request path stalls, rather than asking teams to debug internal service boundaries on their own.</p>
+                <p>
+                  Confirm the team understands this is a hosted devnet alpha with SOL funding live
+                  and USDC still gated.
+                </p>
+                <p>
+                  Make sure one wallet can sign, one project can activate, one SOL funding
+                  transaction can confirm, and one key can send one real request.
+                </p>
+                <p>
+                  Use the contact and feedback queue if the first request path stalls, rather than
+                  asking teams to debug internal service boundaries on their own.
+                </p>
                 <div className="flex flex-wrap gap-3">
                   <Button asChild size="sm" variant="secondary">
                     <Link href="/docs">Open quickstart</Link>

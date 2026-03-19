@@ -8,23 +8,23 @@ const socialLinks = [
   {
     href: "https://x.com/fyxvo",
     label: "X",
-    icon: XSocialIcon
+    icon: XSocialIcon,
   },
   {
     href: "https://discord.gg/Uggu236Jgj",
     label: "Discord",
-    icon: DiscordIcon
+    icon: DiscordIcon,
   },
   {
     href: "https://t.me/fyxvo",
     label: "Telegram",
-    icon: TelegramIcon
-  }
+    icon: TelegramIcon,
+  },
 ] as const;
 
 export function SocialLinks({ className }: { readonly className?: string }) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex flex-wrap items-center gap-3", className)}>
       {socialLinks.map((item) => {
         const Icon = item.icon;
 
