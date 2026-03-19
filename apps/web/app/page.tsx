@@ -26,7 +26,7 @@ export default async function HomePage() {
       <section className="border-b border-[var(--fyxvo-border)] py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-brand-500/25 bg-brand-500/10 px-3 py-1.5 text-sm text-brand-300">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-brand-500/25 bg-brand-500/10 px-3 py-1.5 text-sm text-brand-700 dark:text-brand-300">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
               Solana devnet · Private alpha
             </div>
@@ -88,7 +88,7 @@ export default async function HomePage() {
                 API{" "}
                 <span
                   className={
-                    apiOk ? "text-emerald-400" : "text-amber-400"
+                    apiOk ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
                   }
                 >
                   {apiOk ? "operational" : "degraded"}
@@ -103,7 +103,7 @@ export default async function HomePage() {
                 Gateway{" "}
                 <span
                   className={
-                    gatewayOk ? "text-emerald-400" : "text-amber-400"
+                    gatewayOk ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
                   }
                 >
                   {gatewayOk ? "operational" : "degraded"}
@@ -118,7 +118,7 @@ export default async function HomePage() {
                 Protocol{" "}
                 <span
                   className={
-                    protocolReady ? "text-emerald-400" : "text-amber-400"
+                    protocolReady ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
                   }
                 >
                   {protocolReady ? "ready" : "attention"}
@@ -137,7 +137,7 @@ export default async function HomePage() {
             ) : null}
             <Link
               href="/status"
-              className="ml-auto text-xs text-brand-400 transition-colors hover:text-brand-300"
+              className="ml-auto text-xs text-[var(--fyxvo-brand)] dark:text-brand-400 transition-colors hover:text-brand-600 dark:hover:text-brand-300"
             >
               Full status
             </Link>
@@ -203,6 +203,20 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Built for developers */}
+      <section className="border-t border-[var(--fyxvo-border)] py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              Built for Solana teams moving fast on devnet
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+              If your team is integrating Solana, testing transaction flows, or validating on-chain mechanics before mainnet — Fyxvo gives you a funded RPC path with real request logging and analytics from day one.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section id="how-it-works" className="border-t border-[var(--fyxvo-border)] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -224,7 +238,7 @@ export default async function HomePage() {
                   "Watch request logs, latency, and balance update in analytics.",
                 ].map((step, i) => (
                   <div key={step} className="flex gap-4">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/10 font-display text-sm font-semibold text-brand-300">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/10 font-display text-sm font-semibold text-brand-700 dark:text-brand-300">
                       {i + 1}
                     </div>
                     <p className="pt-1 text-sm leading-7 text-[var(--fyxvo-text-soft)]">{step}</p>

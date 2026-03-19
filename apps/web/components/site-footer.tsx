@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand-logo";
 import { SocialLinks } from "./social-links";
-import { webEnv } from "../lib/env";
 
 const productLinks = [
   { href: "/", label: "Home" },
@@ -10,13 +9,15 @@ const productLinks = [
   { href: "/pricing", label: "Pricing" },
   { href: "/status", label: "Status" },
   { href: "/contact", label: "Contact" },
+  { href: "/docs", label: "Changelog" },
 ];
 
-const infraLinks = [
-  { href: webEnv.apiBaseUrl, label: "API", external: true },
-  { href: `${webEnv.gatewayBaseUrl}/rpc`, label: "RPC gateway", external: true },
-  { href: `${webEnv.gatewayBaseUrl}/priority`, label: "Priority relay", external: true },
-  { href: "/operators", label: "Operators" },
+const communityLinks = [
+  { href: "https://x.com/fyxvo", label: "X", external: true },
+  { href: "https://discord.gg/Uggu236Jgj", label: "Discord", external: true },
+  { href: "https://t.me/fyxvo", label: "Telegram", external: true },
+  { href: "/docs", label: "Docs" },
+  { href: "/status", label: "Status" },
 ];
 
 const legalLinks = [
@@ -40,6 +41,9 @@ export function SiteFooter() {
               <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
               Solana devnet · Private alpha
             </div>
+            <div className="pt-1">
+              <SocialLinks />
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -49,7 +53,7 @@ export function SiteFooter() {
             <div className="space-y-2">
               {productLinks.map((link) => (
                 <Link
-                  key={link.href}
+                  key={link.label}
                   href={link.href}
                   className="block text-sm text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]"
                 >
@@ -61,10 +65,10 @@ export function SiteFooter() {
 
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-              Infrastructure
+              Community
             </p>
             <div className="space-y-2">
-              {infraLinks.map((link) => (
+              {communityLinks.map((link) => (
                 <Link
                   key={link.label}
                   href={link.href}
@@ -75,9 +79,6 @@ export function SiteFooter() {
                   {link.label}
                 </Link>
               ))}
-            </div>
-            <div className="pt-2">
-              <SocialLinks />
             </div>
           </div>
 

@@ -151,7 +151,7 @@ export default function SettingsPage() {
         >
           <SettingRow
             label="Display name"
-            description="Derived from your wallet address. Custom display names are not yet supported."
+            description="Short identifier derived from your wallet address."
           >
             <p className="text-sm font-medium text-[var(--fyxvo-text)]">
               {portal.user?.displayName ?? (

@@ -216,6 +216,14 @@ export function TelegramIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function TransactionsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" {...props}>
+      <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

@@ -7,6 +7,7 @@ import type {
   ErrorLogEntry,
   FeedbackSubmissionInput,
   FeedbackSubmissionReceipt,
+  FundingHistoryItem,
   FundingPreparation,
   FundingVerification,
   InterestSubmissionInput,
@@ -421,6 +422,15 @@ export async function getAdminOverview(token: string) {
 
 export async function getOperators(token: string) {
   const response = await requestApi<{ items: OperatorSummary[] }>("/v1/admin/operators", undefined, token);
+  return response.items;
+}
+
+export async function getMe(token: string) {
+  return requestApi<{ user: PortalUser; projectCount: number }>("/v1/me", undefined, token);
+}
+
+export async function getFundingHistory(token: string) {
+  const response = await requestApi<{ items: FundingHistoryItem[] }>("/v1/transactions", undefined, token);
   return response.items;
 }
 

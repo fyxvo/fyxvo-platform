@@ -9,20 +9,20 @@ function typeIcon(type: Notification["type"]) {
   switch (type) {
     case "funding_confirmed":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-emerald-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-emerald-700 dark:text-emerald-400" aria-hidden="true">
           <path d="M10 3v14M14 6.5c0-1.5-1.8-2.5-4-2.5S6 5 6 6.5 7.8 9.5 10 9.5s4 1 4 2.5S12.2 14 10 14s-4-1-4-2.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "api_key_created":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-brand-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-[var(--fyxvo-brand)] dark:text-brand-400" aria-hidden="true">
           <circle cx="7" cy="13" r="3" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M9.5 11.5L18 3M16 3h2v2M14 5l2 2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "api_key_revoked":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-rose-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-rose-700 dark:text-rose-400" aria-hidden="true">
           <circle cx="7" cy="13" r="3" />
           <path d="M9.5 11.5L18 3" strokeLinecap="round" />
           <path d="M15 5l2 2M17 5l-2 2" strokeLinecap="round" strokeLinejoin="round" />
@@ -30,7 +30,7 @@ function typeIcon(type: Notification["type"]) {
       );
     case "error_spike":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-amber-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-amber-700 dark:text-amber-400" aria-hidden="true">
           <path d="M10 4l8 13H2z" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M10 9v3M10 14.5h.01" strokeLinecap="round" />
         </svg>

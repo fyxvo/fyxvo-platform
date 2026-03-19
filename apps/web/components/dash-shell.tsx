@@ -18,6 +18,7 @@ import {
   PulseIcon,
   MenuIcon,
   SettingsIcon,
+  TransactionsIcon,
 } from "./icons";
 import { usePortal } from "./portal-provider";
 import { NotificationBell } from "./notification-bell";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/projects", label: "Projects", icon: FolderIcon },
   { href: "/api-keys", label: "API Keys", icon: KeyIcon },
   { href: "/funding", label: "Funding", icon: FundingIcon },
+  { href: "/transactions", label: "Transactions", icon: TransactionsIcon },
   { href: "/analytics", label: "Analytics", icon: ChartIcon },
   { href: "/operators", label: "Operators", icon: ServerIcon },
   { href: "/docs", label: "Docs", icon: BookIcon },
@@ -69,7 +71,7 @@ function NavItem({
       <Icon
         className={cn(
           "h-4 w-4 shrink-0",
-          active ? "text-brand-400" : "text-[var(--fyxvo-text-muted)]"
+          active ? "text-[var(--fyxvo-brand)] dark:text-brand-400" : "text-[var(--fyxvo-text-muted)]"
         )}
       />
       {label}

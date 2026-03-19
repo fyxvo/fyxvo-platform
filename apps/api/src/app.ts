@@ -687,6 +687,21 @@ export async function buildApiApp(input: {
     };
   });
 
+  app.get("/v1/me", async (request) => {
+    const user = requireUser(request);
+    const projects = await input.repository.listProjects(user);
+    return {
+      user: {
+        id: user.id,
+        walletAddress: user.walletAddress,
+        displayName: user.displayName,
+        role: user.role,
+        status: user.status
+      },
+      projectCount: projects.length
+    };
+  });
+
   app.post("/v1/auth/challenge", async (request, reply) => {
     const body = challengeSchema.parse(request.body);
     const walletAddress = ensureWalletAddress(body.walletAddress).toBase58();
@@ -923,16 +938,24 @@ export async function buildApiApp(input: {
       throw new HttpError(404, "project_not_found", "The requested project could not be found.");
     }
 
-    return {
-      item: await withBlockchainErrors(() =>
-        input.blockchain.waitForConfirmedProjectActivation({
-          ownerWalletAddress: project.owner.walletAddress,
-          chainProjectId: project.chainProjectId,
-          storedProjectPda: project.onChainProjectPda,
-          signature: body.signature
-        })
-      )
-    };
+    const result = await withBlockchainErrors(() =>
+      input.blockchain.waitForConfirmedProjectActivation({
+        ownerWalletAddress: project.owner.walletAddress,
+        chainProjectId: project.chainProjectId,
+        storedProjectPda: project.onChainProjectPda,
+        signature: body.signature
+      })
+    );
+
+    void input.repository.createNotification({
+      userId: user.id,
+      type: "project_activated",
+      title: "Project activated",
+      message: `${project.name} has been activated on Solana devnet.`,
+      projectId: project.id
+    }).catch(() => undefined);
+
+    return { item: result };
   });
 
   app.get("/v1/projects/:projectId", async (request) => {
@@ -1264,6 +1287,15 @@ export async function buildApiApp(input: {
     const user = requireUser(request);
     await input.repository.markAllNotificationsRead(user.id);
     return { ok: true };
+  });
+
+  app.get("/v1/transactions", async (request) => {
+    const user = requireUser(request);
+    const projects = await input.repository.listProjects(user);
+    const projectIds = projects.map((p) => p.id);
+    return {
+      items: await input.repository.getFundingHistory(user.id, projectIds)
+    };
   });
 
   app.get("/v1/projects/:projectId/api-keys/:apiKeyId/analytics", async (request) => {

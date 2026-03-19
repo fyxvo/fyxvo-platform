@@ -212,6 +212,11 @@ export default function FundingPage() {
                 </div>
               </div>
             </div>
+            <div className="mt-2">
+              <Link href="/transactions" className="text-sm text-[var(--fyxvo-brand)] hover:underline">
+                View transaction history →
+              </Link>
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               {[
@@ -232,7 +237,7 @@ export default function FundingPage() {
                   key={item.step}
                   className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-wider text-brand-300">
+                  <div className="text-xs uppercase tracking-wider text-brand-600 dark:text-brand-300">
                     {item.step}
                   </div>
                   <div className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">

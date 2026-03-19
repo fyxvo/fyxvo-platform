@@ -522,6 +522,18 @@ export interface ErrorLogEntry {
 
 export type AnalyticsRange = "1h" | "6h" | "24h" | "7d" | "30d";
 
+export interface FundingHistoryItem {
+  readonly id: string;
+  readonly projectId: string;
+  readonly projectName: string;
+  readonly asset: string;
+  readonly amount: string;
+  readonly status: string;
+  readonly transactionSignature: string | null;
+  readonly createdAt: string;
+  readonly confirmedAt: string | null;
+}
+
 export interface SampleTrendPoint {
   readonly label: string;
   readonly value: number;

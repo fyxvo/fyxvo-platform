@@ -147,7 +147,7 @@ export function ApiKeyDetail({
               </div>
               <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Error rate</p>
-                <p className={`mt-1 text-xl font-semibold ${analytics.errorRate > 0.05 ? "text-rose-400" : "text-emerald-400"}`}>
+                <p className={`mt-1 text-xl font-semibold ${analytics.errorRate > 0.05 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
                   {(analytics.errorRate * 100).toFixed(1)}%
                 </p>
               </div>

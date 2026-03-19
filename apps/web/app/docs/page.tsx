@@ -58,7 +58,7 @@ function SectionHeading({
   return (
     <div className="mb-6">
       {eyebrow ? (
-        <div className="mb-2 text-xs uppercase tracking-[0.18em] text-brand-300">{eyebrow}</div>
+        <div className="mb-2 text-xs uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">{eyebrow}</div>
       ) : null}
       <h2
         id={id}
@@ -411,7 +411,7 @@ open ${webEnv.statusPageUrl}`;
                   key={item.step}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
                     {item.step}
                   </div>
                   <div className="mt-2 text-base font-semibold text-[var(--fyxvo-text)]">
@@ -446,10 +446,10 @@ open ${webEnv.statusPageUrl}`;
                   Step 2 — Sign in the browser
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Use <code className="text-brand-300">wallet.signMessage(Buffer.from(challenge))</code> from{" "}
-                  <code className="text-brand-300">@solana/wallet-adapter-base</code>. Convert the
+                  Use <code className="text-brand-600 dark:text-brand-300">wallet.signMessage(Buffer.from(challenge))</code> from{" "}
+                  <code className="text-brand-600 dark:text-brand-300">@solana/wallet-adapter-base</code>. Convert the
                   resulting{" "}
-                  <code className="text-brand-300">Uint8Array</code> signature to base58 before
+                  <code className="text-brand-600 dark:text-brand-300">Uint8Array</code> signature to base58 before
                   sending.
                 </p>
               </div>
@@ -508,7 +508,7 @@ open ${webEnv.statusPageUrl}`;
             <div className="space-y-5">
               <Notice tone="neutral" title="Required scope">
                 Keys used on the standard path must carry the{" "}
-                <code className="text-brand-300">rpc:request</code> scope. Under-scoped keys receive
+                <code className="text-brand-600 dark:text-brand-300">rpc:request</code> scope. Under-scoped keys receive
                 a 403, not silent broad access.
               </Notice>
               <CodeBlock code={standardRpcCode} label="Standard relay request" />
@@ -525,7 +525,7 @@ open ${webEnv.statusPageUrl}`;
                 </ul>
               </div>
               <Notice tone="neutral" title="Endpoint">
-                Standard path: <code className="text-brand-300">{webEnv.gatewayBaseUrl}/rpc</code>
+                Standard path: <code className="text-brand-600 dark:text-brand-300">{webEnv.gatewayBaseUrl}/rpc</code>
               </Notice>
             </div>
           </section>
@@ -540,9 +540,9 @@ open ${webEnv.statusPageUrl}`;
             />
             <div className="space-y-5">
               <Notice tone="neutral" title="Required scope">
-                Priority keys must carry both <code className="text-brand-300">rpc:request</code>{" "}
-                and <code className="text-brand-300">priority:relay</code> scopes. Sending a standard
-                key to <code className="text-brand-300">/priority</code> returns 403.
+                Priority keys must carry both <code className="text-brand-600 dark:text-brand-300">rpc:request</code>{" "}
+                and <code className="text-brand-600 dark:text-brand-300">priority:relay</code> scopes. Sending a standard
+                key to <code className="text-brand-600 dark:text-brand-300">/priority</code> returns 403.
               </Notice>
               <CodeBlock code={priorityRelayCode} label="Priority relay request" />
               <div className="grid gap-4 sm:grid-cols-2">
@@ -678,7 +678,7 @@ open ${webEnv.statusPageUrl}`;
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
                     Standard path
                   </div>
                   <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
@@ -697,7 +697,7 @@ open ${webEnv.statusPageUrl}`;
                   </div>
                 </div>
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
                     Priority path
                   </div>
                   <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
@@ -718,9 +718,9 @@ open ${webEnv.statusPageUrl}`;
               </div>
               <CodeBlock code={rateLimitCode} label="429 handling with exponential backoff" />
               <Notice tone="neutral" title="Rate limit headers">
-                Every response includes <code className="text-brand-300">x-ratelimit-limit</code>,{" "}
-                <code className="text-brand-300">x-ratelimit-remaining</code>, and{" "}
-                <code className="text-brand-300">x-ratelimit-reset</code> headers. Use these to
+                Every response includes <code className="text-brand-600 dark:text-brand-300">x-ratelimit-limit</code>,{" "}
+                <code className="text-brand-600 dark:text-brand-300">x-ratelimit-remaining</code>, and{" "}
+                <code className="text-brand-600 dark:text-brand-300">x-ratelimit-reset</code> headers. Use these to
                 implement adaptive backoff without waiting for a 429.
               </Notice>
             </div>
@@ -819,7 +819,7 @@ open ${webEnv.statusPageUrl}`;
                       {item.label}
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <code className="break-all text-xs text-brand-300">{item.url}</code>
+                      <code className="break-all text-xs text-brand-600 dark:text-brand-300">{item.url}</code>
                       <CopyButton value={item.url} className="shrink-0" />
                     </div>
                     <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
@@ -900,7 +900,7 @@ open ${webEnv.statusPageUrl}`;
                       key={item.title}
                       className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                     >
-                      <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                      <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
                         {item.title}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">

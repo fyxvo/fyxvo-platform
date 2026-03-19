@@ -157,6 +157,7 @@ export default function ProjectPage({
           projectSlug={project.slug}
           onchain={portal.onchainSnapshot}
           apiKeys={portal.apiKeys}
+          requestCount={portal.projectAnalytics.totals.requestLogs}
         />
       ) : null}
 

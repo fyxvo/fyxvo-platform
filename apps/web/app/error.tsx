@@ -22,7 +22,7 @@ export default function Error({
   const fallbackId = useId().replace(/:/g, "").toUpperCase().slice(0, 8);
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="mb-4 text-4xl font-bold text-rose-400">Error</div>
+      <div className="mb-4 text-4xl font-bold text-rose-700 dark:text-rose-400">Error</div>
       <h1 className="text-xl font-semibold text-[var(--fyxvo-text)]">Something went wrong</h1>
       <p className="mt-3 max-w-md text-sm leading-6 text-[var(--fyxvo-text-soft)]">
         {getSafeMessage(error)}

@@ -7,20 +7,23 @@ import { usePortal } from "./portal-provider";
 interface NavEntry {
   label: string;
   href: string;
+  description?: string;
   group?: string;
 }
 
 function buildNavEntries(selectedProjectSlug?: string | null): NavEntry[] {
   const entries: NavEntry[] = [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Projects", href: "/projects" },
-    { label: "API Keys", href: "/api-keys" },
-    { label: "Funding", href: "/funding" },
-    { label: "Analytics", href: "/analytics" },
-    { label: "Settings", href: "/settings" },
-    { label: "Docs", href: "/docs" },
-    { label: "Status", href: "/status" },
-    { label: "Operators", href: "/operators" },
+    { label: "Dashboard", href: "/dashboard", description: "Overview, projects, and operational timelines" },
+    { label: "Projects", href: "/projects", description: "Manage and create projects" },
+    { label: "API Keys", href: "/api-keys", description: "Issue and revoke scoped credentials" },
+    { label: "Funding", href: "/funding", description: "Fund project treasury with SOL" },
+    { label: "Analytics", href: "/analytics", description: "Request volume, latency, and error rates" },
+    { label: "Operators", href: "/operators", description: "Node operator details and infrastructure" },
+    { label: "Settings", href: "/settings", description: "Wallet, appearance, and security settings" },
+    { label: "Docs", href: "/docs", description: "Quickstart, API reference, and integration guides" },
+    { label: "Status", href: "/status", description: "Live service health and protocol readiness" },
+    { label: "Pricing", href: "/pricing", description: "Request pricing and SOL funding mechanics" },
+    { label: "Contact", href: "/contact", description: "Talk to the founder or submit feedback" },
   ];
 
   if (selectedProjectSlug) {
@@ -40,6 +43,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
+  const [recentPages, setRecentPages] = useState<{ label: string; href: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +102,10 @@ export function CommandPalette() {
         e.preventDefault();
         const item = filtered[highlighted];
         if (item) {
+          setRecentPages((prev) => {
+            const next = [{ label: item.label, href: item.href }, ...prev.filter((p) => p.href !== item.href)].slice(0, 3);
+            return next;
+          });
           router.push(item.href);
           setOpen(false);
         }
@@ -172,33 +180,69 @@ export function CommandPalette() {
               <p className="text-sm text-[var(--fyxvo-text-muted)]">No results for &ldquo;{query}&rdquo;</p>
             </div>
           ) : (
-            <ul role="listbox" aria-label="Navigation results">
-              {filtered.map((item, idx) => {
-                const isHighlighted = idx === highlighted;
-                return (
-                  <li key={item.href} role="option" aria-selected={isHighlighted}>
-                    <button
-                      type="button"
-                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                        isHighlighted
-                          ? "bg-[var(--fyxvo-brand,#7c3aed)]/10 text-[var(--fyxvo-text)]"
-                          : "text-[var(--fyxvo-text-soft)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
-                      }`}
-                      onMouseEnter={() => setHighlighted(idx)}
-                      onClick={() => {
-                        router.push(item.href);
-                        setOpen(false);
-                      }}
-                    >
-                      <span className="flex-1 font-medium">{item.label}</span>
-                      <span className="shrink-0 font-mono text-[11px] text-[var(--fyxvo-text-muted)]">
-                        {item.href}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              {!query.trim() && recentPages.length > 0 && (
+                <div>
+                  <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+                    Recent
+                  </p>
+                  <ul role="listbox" aria-label="Recent pages">
+                    {recentPages.map((item) => (
+                      <li key={`recent-${item.href}`} role="option" aria-selected={false}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors text-[var(--fyxvo-text-soft)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+                          onClick={() => {
+                            setRecentPages((prev) => [{ label: item.label, href: item.href }, ...prev.filter((p) => p.href !== item.href)].slice(0, 3));
+                            router.push(item.href);
+                            setOpen(false);
+                          }}
+                        >
+                          <span className="flex-1">
+                            <span className="block font-medium">{item.label}</span>
+                          </span>
+                          <span className="shrink-0 font-mono text-[11px] text-[var(--fyxvo-text-muted)]">
+                            {item.href}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mx-4 my-1 border-t border-[var(--fyxvo-border)]" />
+                </div>
+              )}
+              <ul role="listbox" aria-label="Navigation results">
+                {filtered.map((item, idx) => {
+                  const isHighlighted = idx === highlighted;
+                  return (
+                    <li key={item.href} role="option" aria-selected={isHighlighted}>
+                      <button
+                        type="button"
+                        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                          isHighlighted
+                            ? "bg-[var(--fyxvo-brand,#7c3aed)]/10 text-[var(--fyxvo-text)]"
+                            : "text-[var(--fyxvo-text-soft)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+                        }`}
+                        onMouseEnter={() => setHighlighted(idx)}
+                        onClick={() => {
+                          setRecentPages((prev) => [{ label: item.label, href: item.href }, ...prev.filter((p) => p.href !== item.href)].slice(0, 3));
+                          router.push(item.href);
+                          setOpen(false);
+                        }}
+                      >
+                        <span className="flex-1">
+                          <span className="block font-medium">{item.label}</span>
+                          {item.description && <span className="block text-[11px] text-[var(--fyxvo-text-muted)]">{item.description}</span>}
+                        </span>
+                        <span className="shrink-0 font-mono text-[11px] text-[var(--fyxvo-text-muted)]">
+                          {item.href}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
 

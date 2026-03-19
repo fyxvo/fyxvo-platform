@@ -44,6 +44,7 @@ import type {
   CreateApiKeyInput,
   CreateNotificationInput,
   CreateProjectInput,
+  FundingHistoryItem,
   FundingRecordInput,
   IdempotencyLookup,
   NotificationItem,
@@ -822,6 +823,28 @@ class MemoryApiRepository implements ApiRepository {
   async markNotificationRead(_userId: string, _notificationId: string): Promise<void> {}
 
   async markAllNotificationsRead(_userId: string): Promise<void> {}
+
+  async getFundingHistory(_userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]> {
+    const projectIdSet = new Set(projectIds);
+    return [...this.fundingCoordinates.values()]
+      .filter((entry) => projectIdSet.has(entry.projectId))
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .slice(0, 100)
+      .map((entry) => {
+        const project = this.projects.get(entry.projectId);
+        return {
+          id: entry.id,
+          projectId: entry.projectId,
+          projectName: project?.name ?? "",
+          asset: entry.asset,
+          amount: entry.amount.toString(),
+          status: entry.confirmedAt ? "confirmed" : "pending",
+          transactionSignature: entry.transactionSignature ?? null,
+          createdAt: entry.createdAt.toISOString(),
+          confirmedAt: entry.confirmedAt ? entry.confirmedAt.toISOString() : null
+        };
+      });
+  }
 
   async recordRequestLog(input: RequestLogInput) {
     const requestLog: RequestLog = {

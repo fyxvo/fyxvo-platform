@@ -609,7 +609,7 @@ export default function DashboardPage() {
                   key={item}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
                     Step {index + 1}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item}</p>
@@ -636,7 +636,7 @@ export default function DashboardPage() {
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                    <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
                       Step {index + 1}
                     </div>
                     <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">

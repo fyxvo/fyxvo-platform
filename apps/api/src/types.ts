@@ -431,6 +431,18 @@ export interface OperatorSummary {
   >;
 }
 
+export interface FundingHistoryItem {
+  readonly id: string;
+  readonly projectId: string;
+  readonly projectName: string;
+  readonly asset: string;
+  readonly amount: string;
+  readonly status: string;
+  readonly transactionSignature: string | null;
+  readonly createdAt: string;
+  readonly confirmedAt: string | null;
+}
+
 export interface ApiRepository {
   findUserByWallet(walletAddress: string): Promise<AuthenticatedUser & { authNonce: string } | null>;
   findUserById(userId: string): Promise<AuthenticatedUser & { authNonce: string } | null>;
@@ -473,6 +485,7 @@ export interface ApiRepository {
   getIdempotencyRecord(input: IdempotencyLookup): Promise<IdempotencyRecord | null>;
   saveIdempotencyRecord(input: SaveIdempotencyInput): Promise<IdempotencyRecord>;
   recordRequestLog(input: RequestLogInput): Promise<void>;
+  getFundingHistory(userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]>;
 }
 
 export interface ProjectCreationPreparation {

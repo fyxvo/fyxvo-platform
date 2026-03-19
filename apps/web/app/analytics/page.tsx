@@ -18,10 +18,10 @@ import { MetricCard, DeltaBadge } from "../../components/metric-card";
 import { PageHeader } from "../../components/page-header";
 import { AuthGate } from "../../components/state-panels";
 import { usePortal } from "../../components/portal-provider";
-import { downloadAnalyticsExport, getErrorLog, getMethodBreakdown } from "../../lib/api";
+import { getProjectAnalytics, downloadAnalyticsExport, getErrorLog, getMethodBreakdown } from "../../lib/api";
 import { dashboardTrend } from "../../lib/sample-data";
 import { formatDuration, formatInteger, formatPercent, formatRelativeDate } from "../../lib/format";
-import type { AnalyticsRange, ErrorLogEntry, MethodBreakdown } from "../../lib/types";
+import type { AnalyticsRange, ErrorLogEntry, MethodBreakdown, ProjectAnalytics } from "../../lib/types";
 
 const RANGE_OPTIONS: { label: string; value: AnalyticsRange }[] = [
   { label: "1h", value: "1h" },
@@ -61,8 +61,30 @@ export default function AnalyticsPage() {
   const [errors, setErrors] = useState<ErrorLogEntry[]>([]);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [localAnalytics, setLocalAnalytics] = useState<ProjectAnalytics | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const selectedProject = portal.selectedProject;
+
+  useEffect(() => {
+    if (!selectedProject || !portal.token) {
+      setLocalAnalytics(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingAnalytics(true);
+    getProjectAnalytics(selectedProject.id, portal.token, range)
+      .then((data) => {
+        if (!cancelled) setLocalAnalytics(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLocalAnalytics(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAnalytics(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedProject, portal.token, range]);
 
   useEffect(() => {
     if (!selectedProject || !portal.token) return;
@@ -90,16 +112,18 @@ export default function AnalyticsPage() {
     return () => { cancelled = true; };
   }, [selectedProject, portal.token, range]);
 
+  const displayAnalytics = localAnalytics ?? portal.projectAnalytics;
+
   const servicePoints = portal.analyticsOverview.requestsByService.map((entry) => ({
     label: entry.service,
     value: entry.count,
   }));
-  const statusPoints = portal.projectAnalytics.statusCodes.map((entry) => ({
+  const statusPoints = displayAnalytics.statusCodes.map((entry) => ({
     label: String(entry.statusCode),
     value: entry.count,
   }));
 
-  const hasData = portal.projectAnalytics.totals.requestLogs > 0;
+  const hasData = displayAnalytics.totals.requestLogs > 0;
   const isAuthenticated = portal.walletPhase === "authenticated";
 
   async function handleExport() {
@@ -153,32 +177,40 @@ export default function AnalyticsPage() {
         </Notice>
       ) : null}
 
-      <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Requests"
-          value={formatInteger(portal.projectAnalytics.totals.requestLogs)}
-          detail="Request volume attributed to the selected project."
-          accent={<DeltaBadge value="project scope" />}
-        />
-        <MetricCard
-          label="Average latency"
-          value={formatDuration(portal.projectAnalytics.latency.averageMs)}
-          detail="Useful for spotting throughput issues before users report them."
-          accent={<DeltaBadge value="observed" />}
-        />
-        <MetricCard
-          label="Funding requests"
-          value={String(portal.projectAnalytics.totals.fundingRequests)}
-          detail="Treasury prep requests made through the authenticated API workflow."
-          accent={<Badge tone="brand">project scope</Badge>}
-        />
-        <MetricCard
-          label="API keys"
-          value={String(portal.projectAnalytics.totals.apiKeys)}
-          detail="Credential surface currently mapped to this project."
-          accent={<Badge tone="neutral">active</Badge>}
-        />
-      </section>
+      {loadingAnalytics ? (
+        <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-2xl bg-[var(--fyxvo-panel-soft)]" />
+          ))}
+        </section>
+      ) : (
+        <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Requests"
+            value={formatInteger(displayAnalytics.totals.requestLogs)}
+            detail="Request volume attributed to the selected project."
+            accent={<DeltaBadge value="project scope" />}
+          />
+          <MetricCard
+            label="Average latency"
+            value={formatDuration(displayAnalytics.latency.averageMs)}
+            detail="Useful for spotting throughput issues before users report them."
+            accent={<DeltaBadge value="observed" />}
+          />
+          <MetricCard
+            label="Funding requests"
+            value={String(displayAnalytics.totals.fundingRequests)}
+            detail="Treasury prep requests made through the authenticated API workflow."
+            accent={<Badge tone="brand">project scope</Badge>}
+          />
+          <MetricCard
+            label="API keys"
+            value={String(displayAnalytics.totals.apiKeys)}
+            detail="Credential surface currently mapped to this project."
+            accent={<Badge tone="neutral">active</Badge>}
+          />
+        </section>
+      )}
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <LineChartCard
@@ -270,7 +302,7 @@ export default function AnalyticsPage() {
                           <td className="py-3 text-right text-xs">{m.count.toLocaleString()}</td>
                           <td className="py-3 text-right text-xs">{formatDuration(m.averageLatencyMs)}</td>
                           <td className="py-3 text-right text-xs">
-                            <span className={m.errorRate > 0.05 ? "text-rose-400" : "text-emerald-400"}>
+                            <span className={m.errorRate > 0.05 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}>
                               {formatPercent(m.errorRate * 100)}
                             </span>
                           </td>

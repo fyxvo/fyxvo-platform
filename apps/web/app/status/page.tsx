@@ -12,8 +12,9 @@ import {
 import { PageHeader } from "../../components/page-header";
 import { getStatusSnapshot } from "../../lib/server-status";
 import { webEnv } from "../../lib/env";
-import { formatDuration, formatRelativeDate } from "../../lib/format";
+import { formatDuration } from "../../lib/format";
 import { liveDevnetState } from "../../lib/live-state";
+import { StatusRefreshIndicator } from "../../components/status-refresh-indicator";
 
 export const dynamic = "force-dynamic";
 
@@ -102,9 +103,7 @@ export default async function StatusPage() {
             <Badge tone={healthy ? "success" : "warning"}>
               {healthy ? "healthy" : "attention needed"}
             </Badge>
-            <p className="text-sm text-[var(--fyxvo-text-muted)]">
-              Updated {formatRelativeDate(status.apiHealth.timestamp)}
-            </p>
+            <StatusRefreshIndicator />
           </CardContent>
         </Card>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
@@ -177,7 +176,7 @@ export default async function StatusPage() {
               <div className="mt-3 text-xs uppercase tracking-[0.16em]">
                 <Link
                   href={new URL("/health", webEnv.apiBaseUrl).toString()}
-                  className="text-brand-300 hover:text-brand-200"
+                  className="text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
                 >
                   API health endpoint
                 </Link>
@@ -216,7 +215,7 @@ export default async function StatusPage() {
               <div className="mt-3 text-xs uppercase tracking-[0.16em]">
                 <Link
                   href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
-                  className="text-brand-300 hover:text-brand-200"
+                  className="text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
                 >
                   Gateway status endpoint
                 </Link>
@@ -254,21 +253,21 @@ export default async function StatusPage() {
               <Link
                 href={new URL("/health", webEnv.apiBaseUrl).toString()}
                 target="_blank"
-                className="text-sm text-brand-300 hover:text-brand-200"
+                className="text-sm text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
               >
                 Open API health
               </Link>
               <Link
                 href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
                 target="_blank"
-                className="text-sm text-brand-300 hover:text-brand-200"
+                className="text-sm text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
               >
                 Open RPC status
               </Link>
               <Link
                 href={new URL("/v1/metrics", webEnv.gatewayBaseUrl).toString()}
                 target="_blank"
-                className="text-sm text-brand-300 hover:text-brand-200"
+                className="text-sm text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
               >
                 Open RPC metrics
               </Link>

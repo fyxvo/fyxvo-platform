@@ -18,6 +18,7 @@ import type {
   CreateNotificationInput,
   CreateProjectInput,
   ErrorLogItem,
+  FundingHistoryItem,
   FundingRecordInput,
   IdempotencyLookup,
   MethodBreakdownItem,
@@ -1082,6 +1083,33 @@ export class PrismaApiRepository implements ApiRepository {
     await this.prisma.requestLog.create({
       data: input
     });
+  }
+
+  async getFundingHistory(_userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]> {
+    const rows = await this.prisma.fundingCoordinate.findMany({
+      where: {
+        projectId: { in: [...projectIds] }
+      },
+      include: {
+        project: {
+          select: { id: true, name: true }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      projectName: row.project.name,
+      asset: row.asset,
+      amount: row.amount.toString(),
+      status: row.confirmedAt ? "confirmed" : "pending",
+      transactionSignature: row.transactionSignature ?? null,
+      createdAt: row.createdAt.toISOString(),
+      confirmedAt: row.confirmedAt ? row.confirmedAt.toISOString() : null
+    }));
   }
 }
 

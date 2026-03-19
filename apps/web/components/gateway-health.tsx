@@ -91,7 +91,7 @@ export function GatewayHealthBadge() {
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2">
       <div className="flex items-center gap-2">
         <StatusDot status={snapshot.status} />
-        <span className={`text-xs font-medium ${snapshot.status === "healthy" ? "text-emerald-400" : snapshot.status === "degraded" ? "text-amber-400" : "text-[var(--fyxvo-text-muted)]"}`}>
+        <span className={`text-xs font-medium ${snapshot.status === "healthy" ? "text-emerald-700 dark:text-emerald-400" : snapshot.status === "degraded" ? "text-amber-700 dark:text-amber-400" : "text-[var(--fyxvo-text-muted)]"}`}>
           {snapshot.status === "healthy" ? "Gateway healthy" : snapshot.status === "degraded" ? "Gateway degraded" : "Gateway unknown"}
         </span>
       </div>
@@ -161,7 +161,7 @@ export function GatewayHealthCard() {
         <div className="mt-3 space-y-2.5">
           <div className="flex items-center gap-2">
             <StatusDot status={snapshot.status} />
-            <span className={`text-sm font-semibold ${snapshot.status === "healthy" ? "text-emerald-400" : snapshot.status === "degraded" ? "text-amber-400" : "text-[var(--fyxvo-text-muted)]"}`}>
+            <span className={`text-sm font-semibold ${snapshot.status === "healthy" ? "text-emerald-700 dark:text-emerald-400" : snapshot.status === "degraded" ? "text-amber-700 dark:text-amber-400" : "text-[var(--fyxvo-text-muted)]"}`}>
               {snapshot.status === "healthy" ? "Healthy" : snapshot.status === "degraded" ? "Degraded" : "Unknown"}
             </span>
           </div>

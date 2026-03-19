@@ -153,7 +153,7 @@ export default async function PricingPage() {
                   key={item.title}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-300">
+                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
                     {item.title}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">

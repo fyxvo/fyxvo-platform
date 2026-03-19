@@ -25,7 +25,7 @@ export function WalletPanel({ compact = false }: { readonly compact?: boolean })
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <WalletIcon className="h-5 w-5 text-brand-400" />
+              <WalletIcon className="h-5 w-5 text-[var(--fyxvo-brand)] dark:text-brand-400" />
               Wallet session
             </CardTitle>
             <CardDescription>

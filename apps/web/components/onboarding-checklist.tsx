@@ -24,7 +24,7 @@ function StepRow({ step }: { readonly step: ChecklistStep }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm font-medium ${step.done ? "text-emerald-400" : "text-[var(--fyxvo-text)]"}`}>
+        <p className={`text-sm font-medium ${step.done ? "text-emerald-700 dark:text-emerald-400" : "text-[var(--fyxvo-text)]"}`}>
           {step.label}
         </p>
         <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)]">{step.description}</p>
@@ -42,12 +42,14 @@ export function OnboardingChecklist({
   projectId: _projectId,
   projectSlug,
   onchain,
-  apiKeys
+  apiKeys,
+  requestCount = 0
 }: {
   readonly projectId: string;
   readonly projectSlug: string;
   readonly onchain: OnChainProjectSnapshot | null;
   readonly apiKeys: PortalApiKey[];
+  readonly requestCount?: number;
 }) {
   const isActivated = onchain?.projectAccountExists ?? false;
   const hasFunding = onchain?.balances
@@ -55,7 +57,7 @@ export function OnboardingChecklist({
       parseFloat(onchain.balances.totalSolFunded) > 0
     : (onchain?.treasurySolBalance ?? 0) > 0;
   const hasKey = apiKeys.length > 0;
-  const hasTraffic = false; // Would need request log count — start as false
+  const hasTraffic = requestCount > 0;
 
   const steps: ChecklistStep[] = [
     {
