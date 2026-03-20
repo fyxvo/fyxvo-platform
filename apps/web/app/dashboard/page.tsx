@@ -309,6 +309,7 @@ export default function DashboardPage() {
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [projectTemplate, setProjectTemplate] = useState<"blank" | "defi" | "indexing">("blank");
 
   function handleCreateClose() {
     setCreateOpen(false);
@@ -316,6 +317,7 @@ export default function DashboardPage() {
     setSlug("");
     setName("");
     setDescription("");
+    setProjectTemplate("blank");
   }
 
   // Navigate to project page after successful creation
@@ -502,12 +504,12 @@ export default function DashboardPage() {
         onClose={handleCreateClose}
         title={
           createStep === 1 ? "Name your project" :
-          createStep === 2 ? "Confirm network" :
+          createStep === 2 ? "Choose a template" :
           "Review and activate"
         }
         description={
           createStep === 1 ? "Give your project a name. The slug is generated automatically and can be adjusted." :
-          createStep === 2 ? "Fyxvo operates on Solana devnet. Mainnet support is on the roadmap." :
+          createStep === 2 ? "Select a starting template for your project configuration." :
           "Confirm the details below. Activation creates the on-chain project account."
         }
         footer={
@@ -525,11 +527,15 @@ export default function DashboardPage() {
                   Cancel
                 </Button>
               )}
-              {createStep < 3 ? (
+              {createStep === 1 ? (
                 <Button
-                  onClick={() => setCreateStep((s) => (s + 1) as 1 | 2 | 3)}
-                  disabled={createStep === 1 && (!name || name.trim().length < 2)}
+                  onClick={() => setCreateStep(2)}
+                  disabled={!name || name.trim().length < 2}
                 >
+                  Next
+                </Button>
+              ) : createStep === 2 ? (
+                <Button onClick={() => setCreateStep(3)}>
                   Continue
                 </Button>
               ) : (
@@ -588,31 +594,22 @@ export default function DashboardPage() {
           </div>
         )}
         {createStep === 2 && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Network</p>
-                  <p className="mt-1 font-display text-lg font-semibold text-[var(--fyxvo-text)]">Solana Devnet</p>
-                </div>
-                <Badge tone="success">Selected</Badge>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                All relay traffic, funding flows, and analytics run on devnet. No real SOL is at risk.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 opacity-50">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Network</p>
-                  <p className="mt-1 font-display text-lg font-semibold text-[var(--fyxvo-text)]">Solana Mainnet</p>
-                </div>
-                <Badge tone="neutral">Coming soon</Badge>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                Mainnet support is on the roadmap. Devnet-graduated projects will have a clear migration path.
-              </p>
-            </div>
+          <div className="space-y-3">
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">Choose a starting template for your project:</p>
+            {[
+              { id: "blank" as const, name: "Blank project", desc: "No configuration. Configure everything yourself." },
+              { id: "defi" as const, name: "DeFi trading", desc: "Optimized for sendTransaction and priority relay. Suggested funding: 0.1 SOL." },
+              { id: "indexing" as const, name: "Data indexing", desc: "Optimized for high-volume reads. Ideal for getProgramAccounts workflows." },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setProjectTemplate(t.id)}
+                className={`w-full rounded-xl border p-4 text-left transition-colors ${projectTemplate === t.id ? "border-brand-500/50 bg-brand-500/10" : "border-[var(--fyxvo-border)] hover:border-brand-500/30"}`}
+              >
+                <p className="font-medium text-[var(--fyxvo-text)]">{t.name}</p>
+                <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{t.desc}</p>
+              </button>
+            ))}
           </div>
         )}
         {createStep === 3 && (
@@ -629,6 +626,10 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-[var(--fyxvo-text-muted)]">Network</span>
                 <Badge tone="success">Solana Devnet</Badge>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-[var(--fyxvo-text-muted)]">Template</span>
+                <span className="text-sm font-medium text-[var(--fyxvo-text)] capitalize">{projectTemplate === "blank" ? "Blank project" : projectTemplate === "defi" ? "DeFi trading" : "Data indexing"}</span>
               </div>
               {description ? (
                 <div className="border-t border-[var(--fyxvo-border)] pt-3">

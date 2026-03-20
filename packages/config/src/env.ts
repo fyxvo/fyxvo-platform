@@ -69,7 +69,8 @@ export const apiEnvSchema = sharedEnvSchema.extend({
     .string()
     .trim()
     .min(32)
-    .default(solanaDevnetConfig.usdcMintAddress)
+    .default(solanaDevnetConfig.usdcMintAddress),
+  ANTHROPIC_API_KEY: z.string().optional()
 });
 
 export const gatewayEnvSchema = sharedEnvSchema.extend({

@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppFrame } from "../components/app-frame";
 import { CookieNotice } from "../components/cookie-notice";
 import { PortalProvider } from "../components/portal-provider";
+import { ServiceWorkerRegistration } from "../components/service-worker-registration";
 import { SolanaProvider } from "../components/solana-provider";
 import { ThemeProvider } from "../components/theme-provider";
 import { webEnv } from "../lib/env";
@@ -83,6 +84,7 @@ export default function RootLayout({
             <PortalProvider>
               <AppFrame>{children}</AppFrame>
               <CookieNotice />
+              <ServiceWorkerRegistration />
             </PortalProvider>
           </SolanaProvider>
         </ThemeProvider>

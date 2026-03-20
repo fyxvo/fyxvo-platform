@@ -456,3 +456,15 @@ export async function getServiceHealthHistory() {
 export function isPortalApiError(error: unknown): error is PortalApiError {
   return error instanceof PortalApiError;
 }
+
+export async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 500): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries > 0 && (err instanceof PortalApiError ? (err.status ?? 0) >= 500 : err instanceof TypeError)) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return withRetry(fn, retries - 1, delayMs * 2);
+    }
+    throw err;
+  }
+}

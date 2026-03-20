@@ -581,7 +581,7 @@ export async function buildApiApp(input: {
       if (error instanceof HttpError) {
         throw error;
       }
-      throw new HttpError(401, "invalid_token", "The provided JWT is invalid.");
+      throw new HttpError(401, "invalid_token", "The provided JWT is invalid or expired. Re-authenticate via /v1/auth/challenge and /v1/auth/verify to get a fresh token.");
     }
   });
 
@@ -769,7 +769,7 @@ export async function buildApiApp(input: {
     );
 
     if (!verified) {
-      throw new HttpError(401, "invalid_signature", "Wallet signature verification failed.");
+      throw new HttpError(401, "invalid_signature", "Invalid signature. Ensure you are signing with the correct wallet and the message has not been modified.");
     }
 
     const nextNonce = randomUUID();
@@ -1478,6 +1478,161 @@ export async function buildApiApp(input: {
         })
       })
     };
+  });
+
+  // POST /v1/assistant/chat — AI developer assistant (streaming SSE)
+  const assistantChatSchema = z.object({
+    messages: z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string().min(1).max(8000),
+    })).min(1).max(50),
+    projectContext: z.object({
+      projectName: z.string().optional(),
+      balance: z.string().optional(),
+      requestCount: z.number().optional(),
+    }).optional(),
+  });
+
+  app.post("/v1/assistant/chat", async (request, reply) => {
+    const user = requireUser(request);
+
+    const parsed = assistantChatSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "Invalid request", details: parsed.error.issues });
+    }
+
+    const { messages, projectContext } = parsed.data;
+
+    const anthropicKey = input.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) {
+      return reply.status(503).send({ error: "AI assistant is not configured" });
+    }
+
+    const systemPrompt = `You are the Fyxvo Developer Assistant — an expert on Solana development and the Fyxvo RPC gateway platform.
+
+ABOUT FYXVO:
+- Fyxvo is a Solana RPC gateway on devnet that routes requests to high-performance nodes
+- Gateway endpoint: https://rpc.fyxvo.com (standard) — add /priority for priority relay
+- Authentication: API keys issued per project (prefix: fyxvo_live_)
+- Pricing: 1,000 lamports/standard request, 3,000 lamports/compute-heavy, 5,000 lamports/priority
+- Compute-heavy methods: getProgramAccounts, getLargestAccounts, getSignaturesForAddress, etc.
+- Priority relay: always uses highest-performance nodes, for latency-sensitive transactions
+- Free tier: 10,000 standard requests per new project on devnet
+- Volume discounts: ≥1M req/month → 20% off; ≥10M req/month → 40% off
+- Revenue split: 80% node operators, 10% protocol treasury, 10% infra fund
+
+HOW TO USE FYXVO:
+\`\`\`javascript
+// Replace any Solana RPC URL with your Fyxvo endpoint
+const connection = new Connection("https://rpc.fyxvo.com", {
+  httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" }
+});
+\`\`\`
+
+\`\`\`python
+# Python with solana-py
+from solana.rpc.api import Client
+client = Client("https://rpc.fyxvo.com", extra_headers={"X-Api-Key": "fyxvo_live_YOUR_KEY"})
+\`\`\`
+
+CURRENT USER CONTEXT:
+${projectContext?.projectName ? `- Active project: ${projectContext.projectName}` : "- No active project context provided"}
+${projectContext?.balance ? `- Current balance: ${projectContext.balance}` : ""}
+${projectContext?.requestCount !== undefined ? `- Recent requests: ${projectContext.requestCount.toLocaleString()}` : ""}
+
+GUIDELINES:
+- Be concise and practical — developers want working code, not essays
+- Always show complete, runnable code examples
+- When you don't know something specific to Fyxvo, say so honestly
+- Do not promise features or performance characteristics that aren't documented
+- Fyxvo is currently in devnet private alpha — some features are still being built
+- For general Solana questions, give accurate answers based on official Solana documentation`;
+
+    reply.raw.setHeader("Content-Type", "text/event-stream");
+    reply.raw.setHeader("Cache-Control", "no-cache");
+    reply.raw.setHeader("Connection", "keep-alive");
+    reply.raw.setHeader("X-Accel-Buffering", "no");
+
+    // Suppress Fastify's default response handling
+    void user;
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4096,
+          stream: true,
+          system: systemPrompt,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        reply.raw.write(`data: ${JSON.stringify({ error: "AI service unavailable" })}\n\n`);
+        reply.raw.end();
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (data === "[DONE]") continue;
+          try {
+            const event = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string }; error?: unknown };
+            if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
+              reply.raw.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+            }
+          } catch {
+            // skip malformed lines
+          }
+        }
+      }
+
+      reply.raw.write("data: [DONE]\n\n");
+      reply.raw.end();
+    } catch {
+      reply.raw.write(`data: ${JSON.stringify({ error: "Failed to contact AI service" })}\n\n`);
+      reply.raw.end();
+    }
+  });
+
+  // GET /v1/projects/:projectId/widget — public widget data
+  app.get("/v1/projects/:projectId/widget", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+
+    try {
+      const project = await input.repository.findProjectById(projectId);
+      if (!project) return reply.status(404).send({ error: "Project not found" });
+
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const analytics = await input.repository.getProjectAnalytics(projectId, since24h).catch(() => null);
+      const requestsToday = analytics?.totals?.requestLogs ?? 0;
+      const avgLatencyMs = Math.round(analytics?.latency?.averageMs ?? 0);
+
+      return reply.send({
+        projectName: project.displayName ?? project.name,
+        requestsToday,
+        gatewayStatus: "healthy",
+        avgLatencyMs,
+        isPublic: true,
+      });
+    } catch {
+      return reply.status(500).send({ error: "Failed to fetch widget data" });
+    }
   });
 
   return app;

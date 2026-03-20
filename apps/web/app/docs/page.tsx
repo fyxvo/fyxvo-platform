@@ -21,6 +21,10 @@ const NAV_SECTIONS = [
   { id: "troubleshooting", label: "Troubleshooting", keywords: "error debug fix 401 403 402 500 403 common issues" },
   { id: "network-status", label: "Network Status", keywords: "status health uptime live devnet solana network" },
   { id: "changelog", label: "Changelog", keywords: "release updates version changes new features" },
+  { id: "migration", label: "Migration Guide", keywords: "migrate helius quicknode alchemy switch rpc provider 2-line change" },
+  { id: "rate-limits-reference", label: "Rate Limits Reference", keywords: "rate limit table devnet requests per second 429" },
+  { id: "error-codes", label: "Error Codes", keywords: "error codes 401 403 402 429 503 gateway api errors reference" },
+  { id: "faq", label: "FAQ", keywords: "frequently asked questions faq devnet solana rpc gateway" },
 ] as const;
 
 function CodeBlock({ code, label }: { readonly code: string; readonly label?: string }) {
@@ -1004,6 +1008,195 @@ curl -s -X POST ${webEnv.gatewayBaseUrl}/priority \\
               View the full changelog →
             </a>
           </div>
+
+          {/* ── Migration Guide ──────────────────────────────────────── */}
+          <section id="migration">
+            <SectionHeading
+              id="migration"
+              eyebrow="Migration"
+              title="Migrating from Helius or QuickNode"
+              description="Switch to Fyxvo in two lines of code. No SDK changes required."
+            />
+            <div className="space-y-4">
+              <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                Fyxvo is a drop-in Solana RPC provider. Replace the endpoint URL and add your API key header. Everything else stays the same.
+              </p>
+              <CodeBlock
+                label="Before (Helius / QuickNode / any provider)"
+                code={`const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=YOUR_KEY");
+// or
+const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/");`}
+              />
+              <CodeBlock
+                label="After (Fyxvo)"
+                code={`const connection = new Connection("${webEnv.gatewayBaseUrl}/rpc", {
+  httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" }
+});`}
+              />
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">
+                <p className="text-sm font-medium text-[var(--fyxvo-text)]">What stays the same</p>
+                <ul className="text-sm leading-6 text-[var(--fyxvo-text-soft)] space-y-1 list-disc list-inside">
+                  <li>All Solana JSON-RPC methods work identically</li>
+                  <li>@solana/web3.js, solana-py, and all standard clients</li>
+                  <li>Transaction signing and submission flows</li>
+                  <li>WebSocket subscriptions (coming soon)</li>
+                </ul>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">
+                <p className="text-sm font-medium text-[var(--fyxvo-text)]">What is different</p>
+                <ul className="text-sm leading-6 text-[var(--fyxvo-text-soft)] space-y-1 list-disc list-inside">
+                  <li>Authentication uses a per-project API key in the <code className="font-mono text-xs">X-Api-Key</code> header (not a URL query param)</li>
+                  <li>Billing is on-chain: SOL credits are funded directly to your project treasury</li>
+                  <li>Currently devnet only — mainnet is on the roadmap</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Rate Limits Reference ──────────────────────────────── */}
+          <section id="rate-limits-reference">
+            <SectionHeading
+              id="rate-limits-reference"
+              eyebrow="Reference"
+              title="Rate limits reference"
+              description="Per-key rate limits on devnet. Limits will increase as the network scales."
+            />
+            <div className="overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Path</th>
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Scope required</th>
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Limit</th>
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Window</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--fyxvo-border)]">
+                  {[
+                    { path: "/rpc (standard)", scope: "rpc:request", limit: "300 req", window: "60 s" },
+                    { path: "/priority (priority)", scope: "priority:relay", limit: "60 req", window: "60 s" },
+                    { path: "API (auth, projects)", scope: "n/a (JWT)", limit: "120 req", window: "60 s" },
+                    { path: "API (analytics)", scope: "n/a (JWT)", limit: "120 req", window: "60 s" },
+                  ].map((row) => (
+                    <tr key={row.path} className="bg-[var(--fyxvo-bg)] hover:bg-[var(--fyxvo-panel-soft)] transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text)]">{row.path}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text-muted)]">{row.scope}</td>
+                      <td className="px-4 py-3 text-sm text-[var(--fyxvo-text)]">{row.limit}</td>
+                      <td className="px-4 py-3 text-sm text-[var(--fyxvo-text-muted)]">{row.window}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-[var(--fyxvo-text-muted)]">
+              Rate limit headers: <code className="font-mono">x-ratelimit-limit</code>, <code className="font-mono">x-ratelimit-remaining</code>, <code className="font-mono">x-ratelimit-reset</code>. On 429, wait for the reset timestamp before retrying.
+            </p>
+          </section>
+
+          {/* ── Error Codes ──────────────────────────────────────────── */}
+          <section id="error-codes">
+            <SectionHeading
+              id="error-codes"
+              eyebrow="Reference"
+              title="Error codes reference"
+              description="Common error codes returned by the API and gateway."
+            />
+            <div className="overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">HTTP</th>
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Code</th>
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Meaning</th>
+                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Resolution</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--fyxvo-border)]">
+                  {[
+                    { http: "400", code: "validation_error", meaning: "Request body failed schema validation", fix: "Check the details field for which fields are invalid" },
+                    { http: "400", code: "invalid_message", meaning: "Auth challenge message does not match", fix: "Request a new challenge and sign the exact returned message" },
+                    { http: "401", code: "unauthorized", meaning: "No JWT token provided", fix: "Include Authorization: Bearer <token> header" },
+                    { http: "401", code: "invalid_token", meaning: "JWT is malformed or expired", fix: "Re-authenticate via /v1/auth/challenge + /v1/auth/verify" },
+                    { http: "401", code: "invalid_signature", meaning: "Wallet signature verification failed", fix: "Sign with the correct wallet and the exact challenge message" },
+                    { http: "401", code: "session_expired", meaning: "Session version has been rotated", fix: "Re-authenticate to get a fresh JWT" },
+                    { http: "402", code: "insufficient_balance", meaning: "Project has no spendable SOL credits", fix: "Fund the project treasury and wait for confirmation" },
+                    { http: "403", code: "forbidden", meaning: "Action requires elevated privileges", fix: "Check your account role in Settings" },
+                    { http: "403", code: "scope_missing", meaning: "API key lacks the required scope", fix: "Revoke the key and create a new one with the correct scopes" },
+                    { http: "404", code: "not_found", meaning: "Project, key, or resource not found", fix: "Verify the ID is correct and belongs to your account" },
+                    { http: "409", code: "project_already_activated", meaning: "Activation transaction already confirmed", fix: "The project is already active — no action needed" },
+                    { http: "429", code: "rate_limited", meaning: "Rate limit exceeded for this window", fix: "Back off and retry after x-ratelimit-reset timestamp" },
+                    { http: "503", code: "protocol_not_ready", meaning: "Fyxvo program not ready on chain", fix: "Check /status for protocol readiness details" },
+                  ].map((row) => (
+                    <tr key={row.code} className="bg-[var(--fyxvo-bg)] hover:bg-[var(--fyxvo-panel-soft)] transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text)]">{row.http}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-brand)]">{row.code}</td>
+                      <td className="px-4 py-3 text-xs text-[var(--fyxvo-text-soft)]">{row.meaning}</td>
+                      <td className="px-4 py-3 text-xs text-[var(--fyxvo-text-muted)]">{row.fix}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* ── FAQ ──────────────────────────────────────────────────── */}
+          <section id="faq">
+            <SectionHeading
+              id="faq"
+              eyebrow="FAQ"
+              title="Frequently asked questions"
+              description="Real questions from developers integrating with Fyxvo."
+            />
+            <div className="space-y-4">
+              {[
+                {
+                  q: "Is Fyxvo production-ready for mainnet?",
+                  a: "Not yet. Fyxvo is currently a private devnet alpha. Mainnet support is on the roadmap. Devnet-graduated projects will have a clear migration path when mainnet launches.",
+                },
+                {
+                  q: "What happens if my SOL balance runs out?",
+                  a: "Gateway requests will return a 402 Insufficient Balance error until you fund the project treasury. Your project data, API keys, and analytics are preserved — only relay access is paused.",
+                },
+                {
+                  q: "Can I use Fyxvo without a wallet?",
+                  a: "No. Wallet ownership is the authentication anchor. You need a Solana wallet (Phantom, Backpack, etc.) to create a project, fund the treasury, and receive a session JWT.",
+                },
+                {
+                  q: "How do I get more devnet SOL for testing?",
+                  a: "Use the Solana devnet faucet: `solana airdrop 2 YOUR_WALLET --url devnet`. You can also use https://faucet.solana.com. Note: devnet SOL has no real value.",
+                },
+                {
+                  q: "What RPC methods are compute-heavy and cost more?",
+                  a: "The following methods cost 3,000 lamports instead of 1,000: getProgramAccounts, getLargestAccounts, getSignaturesForAddress, getSignaturesForAddress2, getTokenLargestAccounts. These are expensive upstream queries that require heavier node compute.",
+                },
+                {
+                  q: "Can I have multiple projects?",
+                  a: "Yes. Each project is an independent on-chain account with its own treasury, API keys, and analytics. Create additional projects from the Dashboard.",
+                },
+                {
+                  q: "How do volume discounts work?",
+                  a: "Discounts apply to your billing rate: ≥1M requests/month → 20% off standard rate; ≥10M requests/month → 40% off. During devnet alpha, contact the team to apply volume pricing manually.",
+                },
+                {
+                  q: "Why does the gateway return a 401 even with a valid API key?",
+                  a: "The most common causes: (1) the key was revoked, (2) the key lacks the required scope (rpc:request for standard, priority:relay for priority), or (3) the X-Api-Key header is missing or misspelled.",
+                },
+                {
+                  q: "Can I use Fyxvo with languages other than JavaScript?",
+                  a: "Yes. Any HTTP client works. Use the X-Api-Key header and POST JSON-RPC to the gateway endpoint. Python, Rust, Go, and curl all work identically.",
+                },
+                {
+                  q: "How do I withdraw unused SOL from my project treasury?",
+                  a: "Treasury withdrawal is not yet available via the dashboard UI. During the devnet alpha, contact the team to initiate a withdrawal. Mainnet will have a self-serve withdrawal flow.",
+                },
+              ].map((item) => (
+                <div key={item.q} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+                  <p className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.q}</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
           {/* Footer notice */}
           <Notice tone="neutral" title="Still have questions?">

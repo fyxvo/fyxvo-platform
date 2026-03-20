@@ -7,9 +7,6 @@ const workspaceRoot = path.join(currentDirectory, "../..");
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  experimental: {
-    externalDir: true
-  },
   outputFileTracingRoot: workspaceRoot,
   turbopack: {
     root: workspaceRoot

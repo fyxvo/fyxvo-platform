@@ -19,10 +19,12 @@ import {
   MenuIcon,
   SettingsIcon,
   TransactionsIcon,
+  SparklesIcon,
 } from "./icons";
 import { usePortal } from "./portal-provider";
 import { NotificationBell } from "./notification-bell";
 import { CommandPalette } from "./command-palette";
+import { ConnectionQualityIndicator } from "./connection-quality";
 import { shortenAddress } from "../lib/format";
 
 const navItems = [
@@ -36,6 +38,7 @@ const navItems = [
   { href: "/docs", label: "Docs", icon: BookIcon },
   { href: "/status", label: "Status", icon: PulseIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/assistant", label: "Assistant", icon: SparklesIcon },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -126,9 +129,12 @@ function SidebarContent({
       <div className="shrink-0 space-y-3 border-t border-[var(--fyxvo-border)] px-4 py-4">
         {portal.walletPhase === "authenticated" && portal.walletAddress ? (
           <div className="rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2.5">
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">
-              {portal.walletName ?? "Wallet"}
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                {portal.walletName ?? "Wallet"}
+              </p>
+              <ConnectionQualityIndicator />
+            </div>
             <p className="mt-0.5 font-mono text-sm font-medium text-[var(--fyxvo-text)]">
               {shortenAddress(portal.walletAddress, 4, 4)}
             </p>
@@ -216,6 +222,13 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
             {children}
           </div>
         </main>
+      </div>
+
+      {/* Floating Assistant Button — mobile only */}
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
+        <Link href="/assistant" className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-500 shadow-lg shadow-brand-500/25 text-white hover:bg-brand-400 transition-colors" aria-label="Open AI Assistant">
+          <SparklesIcon className="h-5 w-5" />
+        </Link>
       </div>
 
       {/* Command palette — fixed position, renders on top of everything */}

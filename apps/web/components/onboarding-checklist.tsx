@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Button } from "@fyxvo/ui";
 import type { OnChainProjectSnapshot, PortalApiKey } from "../lib/types";
+import { WelcomeModal } from "./welcome-modal";
 
 interface ChecklistStep {
   readonly id: string;
@@ -103,9 +105,22 @@ export function OnboardingChecklist({
   const completedCount = steps.filter((s) => s.done).length;
   const allDone = completedCount === steps.length;
 
+  const [showWelcome, setShowWelcome] = useState(() => {
+    // Show welcome modal once for new users who have completed 0 steps (checked on mount)
+    if (typeof window === "undefined") return false;
+    return !localStorage.getItem("fyxvo-welcome-seen");
+  });
+
+  function dismissWelcome() {
+    localStorage.setItem("fyxvo-welcome-seen", "1");
+    setShowWelcome(false);
+  }
+
   if (allDone) return null;
 
   return (
+    <>
+      {showWelcome && <WelcomeModal onDismiss={dismissWelcome} />}
     <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5">
       <div className="mb-4 flex items-center justify-between">
         <div>
@@ -129,5 +144,6 @@ export function OnboardingChecklist({
         ))}
       </div>
     </div>
+    </>
   );
 }
