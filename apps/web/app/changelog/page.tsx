@@ -26,6 +26,63 @@ interface Release {
 
 const releases: Release[] = [
   {
+    version: "v0.3.0",
+    date: "March 2026",
+    title: "Webhooks, Team Collaboration, Public Profiles & Platform Infrastructure",
+    description:
+      "A major platform expansion: HTTP webhooks with HMAC signatures, team member invitations, public project pages with embeddable README badges, enterprise waitlist, interactive API Explorer, developer playground enhancements, notification preferences, activity log, system announcements, and an improved health endpoint.",
+    changes: [
+      {
+        type: "added",
+        text: "Webhooks: POST /v1/projects/:id/webhooks — create HTTP callbacks for funding.confirmed, apikey.created, apikey.revoked, balance.low, and project.activated events. HMAC-SHA256 signatures on every payload. Test endpoint included.",
+      },
+      {
+        type: "added",
+        text: "Team collaboration: invite team members by Solana wallet address, view pending invitations, accept or remove members from project settings.",
+      },
+      {
+        type: "added",
+        text: "Public project pages: enable a public URL at /p/[slug] showing aggregate request volume and latency. No authentication required. Badge generator for GitHub READMEs.",
+      },
+      {
+        type: "added",
+        text: "Enterprise waitlist: /enterprise page with contact form for dedicated capacity inquiries. Form submissions stored in database.",
+      },
+      {
+        type: "added",
+        text: "API Explorer in docs: interactive try-it panel embedded in the documentation page. Live requests against the real API with JWT auto-injection.",
+      },
+      {
+        type: "added",
+        text: "Developer playground: schema panel showing response structure per RPC method, compare mode for standard vs priority side-by-side latency comparison, shareable URLs with method and params encoded in query string, and one-click example fill.",
+      },
+      {
+        type: "added",
+        text: "Notification preferences: per-user toggles for all seven notification types. Email address storage (delivery coming soon).",
+      },
+      {
+        type: "added",
+        text: "Assistant rate limit display: progress bar showing hourly message usage in the AI assistant.",
+      },
+      {
+        type: "added",
+        text: "Activity log: timeline of key actions per project — API key events, webhook changes, member activity.",
+      },
+      {
+        type: "added",
+        text: "README badge: embeddable SVG badge from /badge/project/[slug] showing live gateway latency. 5-minute CDN cache for GitHub's image proxy.",
+      },
+      {
+        type: "added",
+        text: "System announcements: admin-configurable banner that appears on the dashboard for all authenticated users.",
+      },
+      {
+        type: "added",
+        text: "Health endpoint: improved /health with per-dependency response times for database, Redis, and Solana RPC.",
+      },
+    ],
+  },
+  {
     version: "v0.2.0",
     date: "March 2026",
     title: "Developer Experience & Platform Features",

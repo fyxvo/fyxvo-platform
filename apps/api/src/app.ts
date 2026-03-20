@@ -652,18 +652,61 @@ export async function buildApiApp(input: {
   }));
 
   app.get("/health", async () => {
-    const [database, readiness] = await Promise.all([
-      (input.healthcheck ?? (() => Promise.resolve(true)))(),
-      input.blockchain.getProtocolReadiness().catch(() => null)
-    ]);
+    const startTime = process.hrtime.bigint();
+    const uptime = process.uptime();
+
+    // Check database
+    const dbStart = Date.now();
+    let dbOk = false;
+    let dbMs = 0;
+    try {
+      dbOk = await (input.healthcheck ?? (() => Promise.resolve(true)))();
+      dbMs = Date.now() - dbStart;
+    } catch {
+      dbMs = Date.now() - dbStart;
+    }
+
+    // Check Redis
+    const redisStart = Date.now();
+    let redisOk = false;
+    let redisMs = 0;
+    try {
+      const redisClient = (await import("redis")).createClient({ url: input.env.REDIS_URL });
+      await redisClient.connect();
+      await redisClient.ping();
+      await redisClient.quit();
+      redisOk = true;
+      redisMs = Date.now() - redisStart;
+    } catch {
+      redisMs = Date.now() - redisStart;
+    }
+
+    // Check Solana RPC
+    const chainStart = Date.now();
+    let chainOk = false;
+    let chainMs = 0;
+    let chainReadiness: { ready: boolean } | null = null;
+    try {
+      chainReadiness = await input.blockchain.getProtocolReadiness();
+      chainOk = chainReadiness?.ready ?? false;
+      chainMs = Date.now() - chainStart;
+    } catch {
+      chainMs = Date.now() - chainStart;
+    }
+
+    const overallOk = dbOk; // Database is the critical dependency; Redis/chain degradation is reported but doesn't fail health
+    void startTime; // suppress unused warning
 
     return {
-      status: database && readiness?.ready ? "ok" : "degraded",
+      status: overallOk ? "ok" : "degraded",
       service: "api",
-      database,
-      chain: readiness?.ready ?? false,
-      protocolReady: readiness?.ready ?? false,
-      timestamp: new Date().toISOString()
+      uptime: Math.round(uptime),
+      dependencies: {
+        database: { ok: dbOk, responseTimeMs: dbMs },
+        redis: { ok: redisOk, responseTimeMs: redisMs },
+        solana: { ok: chainOk, responseTimeMs: chainMs, protocolReady: chainReadiness?.ready ?? false },
+      },
+      timestamp: new Date().toISOString(),
     };
   });
 
@@ -1160,6 +1203,8 @@ export async function buildApiApp(input: {
         projectId: project.id
       }).catch(() => undefined);
 
+      void input.repository.logActivity({ projectId: project.id, userId: user.id, action: "apikey.created", details: { label: body.label } }).catch(() => undefined);
+
       return {
         statusCode: 201,
         body: {
@@ -1197,6 +1242,8 @@ export async function buildApiApp(input: {
       message: `Key "${apiKey.label}" (${apiKey.prefix}…) was revoked from "${project.name}"`,
       projectId: project.id
     }).catch(() => undefined);
+
+    void input.repository.logActivity({ projectId: project.id, userId: user.id, action: "apikey.revoked", details: { keyId: params.apiKeyId } }).catch(() => undefined);
 
     return { item: apiKey };
   });
@@ -2031,8 +2078,27 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
 
   // ── Webhooks ──────────────────────────────────────────────────────────────
 
+  function validateWebhookUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:") return false;
+      const hostname = parsed.hostname.toLowerCase();
+      // Block localhost and private IP ranges (SSRF prevention)
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return false;
+      if (/^10\./.test(hostname)) return false;
+      if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return false;
+      if (/^192\.168\./.test(hostname)) return false;
+      if (hostname.endsWith(".internal") || hostname.endsWith(".local")) return false;
+      // Block Railway and Vercel internal domains
+      if (hostname.endsWith(".railway.internal") || hostname.endsWith(".vercel-internal.com")) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const webhookSchema = z.object({
-    url: z.string().url().max(512),
+    url: z.string().url().max(512).refine(validateWebhookUrl, { message: "Webhook URL must be HTTPS and must not point to private or internal addresses." }),
     events: z.array(z.enum(["funding.confirmed","apikey.created","apikey.revoked","balance.low","project.activated"])).min(1),
   });
 
@@ -2052,6 +2118,7 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     if (!project || !canAccessProject(user, project)) throw new HttpError(404, "project_not_found", "Project not found.");
     const secret = randomBytes(32).toString("hex");
     const webhook = await input.repository.createWebhook({ projectId, url: body.url, events: body.events, secret });
+    void input.repository.logActivity({ projectId, userId: user.id, action: "webhook.created", details: { url: body.url, events: body.events } }).catch(() => undefined);
     return reply.status(201).send({ item: webhook });
   });
 
@@ -2061,6 +2128,7 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     const project = await input.repository.findProjectById(projectId);
     if (!project || !canAccessProject(user, project)) throw new HttpError(404, "project_not_found", "Project not found.");
     await input.repository.deleteWebhook(webhookId, projectId);
+    void input.repository.logActivity({ projectId, userId: user.id, action: "webhook.deleted", details: { webhookId } }).catch(() => undefined);
     return reply.status(204).send();
   });
 
@@ -2108,6 +2176,7 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     const existing = await input.repository.findProjectMember(projectId, invitee.id);
     if (existing) return reply.status(409).send({ error: "User is already a member or has a pending invitation." });
     const member = await input.repository.createProjectMember({ projectId, userId: invitee.id, invitedBy: user.id });
+    void input.repository.logActivity({ projectId, userId: user.id, action: "member.invited", details: { walletAddress: body.walletAddress } }).catch(() => undefined);
     return reply.status(201).send({ item: member });
   });
 
@@ -2127,6 +2196,7 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     const project = await input.repository.findProjectById(projectId);
     if (!project || project.ownerId !== user.id) throw new HttpError(403, "forbidden", "Only the owner can remove members.");
     await input.repository.deleteProjectMember(memberId, projectId);
+    void input.repository.logActivity({ projectId, userId: user.id, action: "member.removed", details: { memberId } }).catch(() => undefined);
     return reply.status(204).send();
   });
 
@@ -2150,6 +2220,41 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     });
   });
 
+  // ── Activity log ──────────────────────────────────────────────────────────
+
+  app.get("/v1/projects/:projectId/activity", async (request) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) throw new HttpError(404, "project_not_found", "Project not found.");
+    return { items: await input.repository.listActivityLog(projectId) };
+  });
+
+  // ── System announcements ──────────────────────────────────────────────────
+
+  app.get("/v1/announcements/active", async () => {
+    const ann = await input.repository.getActiveAnnouncement();
+    return { announcement: ann };
+  });
+
+  app.post("/v1/admin/announcements", async (request, reply) => {
+    const user = requireUser(request);
+    if (user.role !== "ADMIN" && user.role !== "OWNER") throw new HttpError(403, "forbidden", "Admin access required.");
+    const body = z.object({ message: z.string().min(1).max(500), severity: z.enum(["info", "warning", "critical"]).default("info") }).parse(request.body);
+    await input.repository.upsertAnnouncement({ message: body.message, severity: body.severity });
+    return reply.status(201).send({ success: true });
+  });
+
+  app.delete("/v1/admin/announcements/active", async (request, reply) => {
+    const user = requireUser(request);
+    if (user.role !== "ADMIN" && user.role !== "OWNER") throw new HttpError(403, "forbidden", "Admin access required.");
+    // Delegate to repository: deactivate all active announcements via any cast
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = (input.repository as any).prisma as any;
+    await db.systemAnnouncement.updateMany({ where: { active: true }, data: { active: false } });
+    return reply.status(204).send();
+  });
+
   // ── Enterprise interest ───────────────────────────────────────────────────
 
   const enterpriseInterestSchema = z.object({
@@ -2163,6 +2268,56 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     const body = enterpriseInterestSchema.parse(request.body);
     await input.repository.createEnterpriseInterest(body);
     return reply.status(201).send({ success: true });
+  });
+
+  // ── SVG Badge ─────────────────────────────────────────────────────────────
+
+  app.get("/badge/project/:publicSlug", async (request, reply) => {
+    const { publicSlug } = z.object({ publicSlug: z.string() }).parse(request.params);
+    const project = await input.repository.findPublicProject(publicSlug);
+
+    let label = "fyxvo";
+    let status = "offline";
+    let color = "#ef4444";
+
+    if (project) {
+      const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const analytics = await input.repository.getProjectAnalytics(project.id, since7d).catch(() => null);
+      const avgLatency = Math.round(analytics?.latency?.averageMs ?? 0);
+
+      if (avgLatency < 200) { status = `${avgLatency}ms`; color = "#22c55e"; }
+      else if (avgLatency < 500) { status = `${avgLatency}ms`; color = "#f59e0b"; }
+      else if (avgLatency > 0) { status = `${avgLatency}ms`; color = "#ef4444"; }
+      else { status = "operational"; color = "#22c55e"; }
+      label = project.name.slice(0, 20);
+    }
+
+    const labelWidth = Math.max(60, label.length * 7 + 10);
+    const statusWidth = Math.max(70, status.length * 7 + 10);
+    const totalWidth = labelWidth + statusWidth;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${totalWidth}" height="20" role="img" aria-label="${label}: ${status}">
+  <title>${label}: ${status}</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="${totalWidth}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelWidth}" height="20" fill="#555"/>
+    <rect x="${labelWidth}" width="${statusWidth}" height="20" fill="${color}"/>
+    <rect width="${totalWidth}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110">
+    <text x="${Math.round(labelWidth / 2 + 1)}0" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(labelWidth - 10) * 10}" lengthAdjust="spacing">${label}</text>
+    <text x="${Math.round(labelWidth / 2 + 1)}0" y="140" transform="scale(.1)" textLength="${(labelWidth - 10) * 10}" lengthAdjust="spacing">${label}</text>
+    <text x="${Math.round(labelWidth + statusWidth / 2 + 1)}0" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(statusWidth - 10) * 10}" lengthAdjust="spacing">${status}</text>
+    <text x="${Math.round(labelWidth + statusWidth / 2 + 1)}0" y="140" transform="scale(.1)" textLength="${(statusWidth - 10) * 10}" lengthAdjust="spacing">${status}</text>
+  </g>
+</svg>`;
+
+    void reply.header("content-type", "image/svg+xml").header("cache-control", "max-age=300, s-maxage=300").header("access-control-allow-origin", "*");
+    return reply.send(svg);
   });
 
   return app;

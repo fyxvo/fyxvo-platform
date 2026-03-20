@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
   ApiKeyStatus,
+  Prisma,
   type PrismaClientType,
   type PrismaNamespace
 } from "@fyxvo/database";
 import type {
+  ActivityLogItem,
   AdminOverviewBase,
   AdminStats,
   AnalyticsOverview,
@@ -33,6 +35,7 @@ import type {
   RequestLogInput,
   SaveIdempotencyInput,
   ServiceHealthHistory,
+  SystemAnnouncementItem,
   UpdateProjectInput,
   WebhookItem,
   IncidentItem,
@@ -1440,6 +1443,62 @@ export class PrismaApiRepository implements ApiRepository {
 
   async createEnterpriseInterest(input: { companyName: string; contactEmail: string; estimatedMonthlyReqs: string; useCase: string }): Promise<void> {
     await this.prisma.enterpriseInterest.create({ data: input });
+  }
+
+  async logActivity(input: { projectId: string; userId?: string | null; action: string; details?: Record<string, unknown> | null }): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.activityLog.create({
+      data: {
+        projectId: input.projectId,
+        userId: input.userId ?? null,
+        action: input.action,
+        details: input.details ? (input.details as PrismaNamespace.InputJsonValue) : Prisma.JsonNull,
+      },
+    });
+  }
+
+  async listActivityLog(projectId: string, limit = 50): Promise<ActivityLogItem[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logs: any[] = await db.activityLog.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { user: { select: { walletAddress: true } } },
+    });
+    return logs.map((log) => ({
+      id: log.id as string,
+      projectId: log.projectId as string,
+      userId: log.userId as string | null,
+      action: log.action as string,
+      details: log.details as Record<string, unknown> | null,
+      createdAt: (log.createdAt as Date).toISOString(),
+      actorWallet: (log.user?.walletAddress as string | undefined)
+        ? `${(log.user.walletAddress as string).slice(0, 4)}…${(log.user.walletAddress as string).slice(-4)}`
+        : null,
+    }));
+  }
+
+  async getActiveAnnouncement(): Promise<SystemAnnouncementItem | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ann: any = await db.systemAnnouncement.findFirst({
+      where: { active: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!ann) return null;
+    return { id: ann.id as string, message: ann.message as string, severity: ann.severity as string, active: ann.active as boolean, createdAt: (ann.createdAt as Date).toISOString() };
+  }
+
+  async upsertAnnouncement(input: { message: string; severity: string }): Promise<void> {
+    // Deactivate existing announcements and create a new one
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.systemAnnouncement.updateMany({ where: { active: true }, data: { active: false } });
+    await db.systemAnnouncement.create({ data: { message: input.message, severity: input.severity, active: true } });
   }
 }
 

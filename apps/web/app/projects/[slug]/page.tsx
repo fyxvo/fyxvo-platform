@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Badge,
@@ -26,6 +27,7 @@ import { usePortal } from "../../../components/portal-provider";
 import { fundingTrend } from "../../../lib/sample-data";
 import { formatDuration, formatInteger, shortenAddress } from "../../../lib/format";
 import { webEnv } from "../../../lib/env";
+import { getProjectActivity } from "../../../lib/api";
 import type { ProjectAnalytics } from "../../../lib/types";
 
 const requestColumns: readonly TableColumn<ProjectAnalytics["recentRequests"][number]>[] = [
@@ -66,11 +68,27 @@ export default function ProjectPage({
   readonly params: { slug: string };
 }) {
   const portal = usePortal();
+  const [activeTab, setActiveTab] = useState<"overview" | "activity">("overview");
+  const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; details: Record<string, unknown> | null; actorWallet: string | null; createdAt: string }>>([]);
+  const [activityLoaded, setActivityLoaded] = useState(false);
+
   const project =
     portal.projects.find((item) => item.slug === params.slug) ??
     portal.selectedProject ??
     portal.projects[0] ??
     null;
+
+  useEffect(() => {
+    if (!portal.token || !project) return;
+    getProjectActivity(project.id, portal.token)
+      .then((data) => {
+        setActivityLog(data.items);
+        setActivityLoaded(true);
+      })
+      .catch(() => {
+        setActivityLoaded(true);
+      });
+  }, [portal.token, project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!project) {
     return (
@@ -210,7 +228,62 @@ export default function ProjectPage({
         />
       ) : null}
 
-      <section className="grid gap-4">
+      <div className="flex gap-1 border-b border-[var(--fyxvo-border)]">
+        {(["overview", "activity"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${
+              activeTab === tab
+                ? "border-b-2 border-brand-500 text-[var(--fyxvo-text)]"
+                : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "activity" && (
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Activity Log</CardTitle>
+            <CardDescription>Recent actions across this project</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!activityLoaded ? (
+              <p className="text-sm text-[var(--fyxvo-text-muted)]">Loading…</p>
+            ) : activityLog.length === 0 ? (
+              <p className="text-sm text-[var(--fyxvo-text-muted)]">No activity yet.</p>
+            ) : (
+              <div className="relative pl-6">
+                <div className="absolute left-2 top-0 bottom-0 w-px bg-[var(--fyxvo-border)]" />
+                <div className="space-y-4">
+                  {activityLog.map((entry) => (
+                    <div key={entry.id} className="relative">
+                      <div className="absolute -left-4 top-1 h-2 w-2 rounded-full bg-brand-500" />
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-[var(--fyxvo-text)]">{entry.action.replace(/\./g, " ")}</span>
+                          {entry.actorWallet && (
+                            <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">{entry.actorWallet}</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                          {new Date(entry.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === "overview" && (
+      <><section className="grid gap-4">
         {availableSolCredits === 0n ? (
           <Notice tone="warning" title="No spendable project balance">
             The gateway will reject funded relay usage until this project has confirmed SOL credits
@@ -514,6 +587,8 @@ export default function ProjectPage({
           getRowKey={(request) => request.id}
         />
       </section>
+      </>
+      )}
     </div>
   );
 }

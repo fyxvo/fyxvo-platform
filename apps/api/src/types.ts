@@ -497,6 +497,24 @@ export interface WebhookItem {
   readonly createdAt: string;
 }
 
+export interface ActivityLogItem {
+  readonly id: string;
+  readonly projectId: string;
+  readonly userId: string | null;
+  readonly action: string;
+  readonly details: Record<string, unknown> | null;
+  readonly createdAt: string;
+  readonly actorWallet: string | null;
+}
+
+export interface SystemAnnouncementItem {
+  readonly id: string;
+  readonly message: string;
+  readonly severity: string;
+  readonly active: boolean;
+  readonly createdAt: string;
+}
+
 export interface ProjectMemberItem {
   readonly id: string;
   readonly projectId: string;
@@ -587,6 +605,10 @@ export interface ApiRepository {
   deleteProjectMember(memberId: string, projectId: string): Promise<void>;
   findPublicProject(publicSlug: string): Promise<ProjectWithOwner | null>;
   createEnterpriseInterest(input: { companyName: string; contactEmail: string; estimatedMonthlyReqs: string; useCase: string }): Promise<void>;
+  logActivity(input: { projectId: string; userId?: string | null; action: string; details?: Record<string, unknown> | null }): Promise<void>;
+  listActivityLog(projectId: string, limit?: number): Promise<ActivityLogItem[]>;
+  getActiveAnnouncement(): Promise<SystemAnnouncementItem | null>;
+  upsertAnnouncement(input: { message: string; severity: string }): Promise<void>;
 }
 
 export interface ProjectCreationPreparation {

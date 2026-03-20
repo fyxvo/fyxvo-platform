@@ -770,6 +770,26 @@ export default function SettingsPage() {
               )}
             </div>
           </SettingRow>
+          {projectIsPublic && projectPublicSlug && (
+            <SettingRow label="README badge" description="Embed this in your GitHub README to show live gateway status.">
+              <div className="space-y-2">
+                <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
+                  <code className="block text-xs text-[var(--fyxvo-text-muted)] font-mono break-all">
+                    {`[![Fyxvo Status](https://api.fyxvo.com/badge/project/${projectPublicSlug})](https://www.fyxvo.com/p/${projectPublicSlug})`}
+                  </code>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(`[![Fyxvo Status](https://api.fyxvo.com/badge/project/${projectPublicSlug})](https://www.fyxvo.com/p/${projectPublicSlug})`);
+                  }}
+                >
+                  Copy markdown
+                </Button>
+              </div>
+            </SettingRow>
+          )}
           <SettingRow label="" description="">
             <Button variant="secondary" size="sm" onClick={() => void saveProjectFields()} disabled={projectFieldsSaving || !portal.selectedProject || !portal.token}>
               {projectFieldsSaving ? "Saving…" : "Save project fields"}

@@ -563,6 +563,14 @@ export async function submitEnterpriseInterest(input: { companyName: string; con
   return requestApi<{ success: boolean }>("/v1/enterprise/interest", { method: "POST", body: JSON.stringify(input) });
 }
 
+export async function getProjectActivity(projectId: string, token: string) {
+  return requestApi<{ items: Array<{ id: string; action: string; details: Record<string, unknown> | null; actorWallet: string | null; createdAt: string }> }>(`/v1/projects/${projectId}/activity`, undefined, token);
+}
+
+export async function getActiveAnnouncement() {
+  return requestApi<{ announcement: { id: string; message: string; severity: string; active: boolean; createdAt: string } | null }>("/v1/announcements/active");
+}
+
 export function isPortalApiError(error: unknown): error is PortalApiError {
   return error instanceof PortalApiError;
 }

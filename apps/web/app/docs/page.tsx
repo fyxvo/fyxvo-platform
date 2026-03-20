@@ -18,6 +18,9 @@ const NAV_SECTIONS = [
   { id: "priority-relay", label: "Priority Relay", keywords: "priority relay high throughput fast latency /priority scope" },
   { id: "analytics-api", label: "Analytics API", keywords: "analytics stats requests latency error rate monitoring project" },
   { id: "api-explorer", label: "API Explorer", keywords: "try it interactive request curl live test endpoint" },
+  { id: "webhooks", label: "Webhooks", keywords: "webhook http callback post event funding apikey hmac signature" },
+  { id: "team-collaboration", label: "Team Collaboration", keywords: "team member invite wallet collaboration owner role" },
+  { id: "public-profiles", label: "Public Project Pages", keywords: "public profile page slug badge readme status latency" },
   { id: "sdk-reference", label: "SDK Reference", keywords: "sdk library reference types api endpoint paths" },
   { id: "rate-limits", label: "Rate Limits", keywords: "rate limit 429 throttle bandwidth quota scope" },
   { id: "troubleshooting", label: "Troubleshooting", keywords: "error debug fix 401 403 402 500 403 common issues" },
@@ -750,6 +753,113 @@ curl -s -X POST ${webEnv.gatewayBaseUrl}/priority \\
               description="Try live API endpoints directly from the docs. Paste your JWT token to test authenticated routes."
             />
             <ApiExplorer />
+          </section>
+
+          {/* ── Webhooks ────────────────────────────────────── */}
+          <section id="webhooks">
+            <SectionHeading
+              id="webhooks"
+              eyebrow="Platform"
+              title="Webhooks"
+              description="Receive HTTP POST callbacks when events happen in your project."
+            />
+            <div className="space-y-5">
+              <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+                Webhooks let you integrate Fyxvo events into your own systems. Every delivery includes an{" "}
+                <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">x-fyxvo-signature</code> header
+                with format <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">sha256={"<hex>"}</code>.
+              </p>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">
+                <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Supported events</p>
+                <div className="flex flex-wrap gap-2">
+                  {["funding.confirmed", "apikey.created", "apikey.revoked", "balance.low", "project.activated"].map((e) => (
+                    <code key={e} className="rounded border border-[var(--fyxvo-border)] px-2 py-0.5 text-xs text-[var(--fyxvo-text-soft)] font-mono">{e}</code>
+                  ))}
+                </div>
+              </div>
+              <CodeBlock
+                label="Create a webhook"
+                code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/webhooks \\
+  -H "authorization: Bearer YOUR_JWT" \\
+  -H "content-type: application/json" \\
+  -d '{"url":"https://your-server.example.com/webhook","events":["funding.confirmed","balance.low"]}'`}
+              />
+              <CodeBlock
+                label="Test a webhook"
+                code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/webhooks/WEBHOOK_ID/test \\
+  -H "authorization: Bearer YOUR_JWT"`}
+              />
+              <CodeBlock
+                label="Signature verification (Node.js)"
+                code={`const crypto = require('crypto');
+const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+if (req.headers['x-fyxvo-signature'] !== expected) return res.status(401).end();`}
+              />
+              <Notice tone="neutral" title="Retry behavior">
+                If your endpoint is unreachable, Fyxvo retries once after 30 seconds. After two failures the webhook remains active but{" "}
+                <code className="font-mono text-xs">lastTriggeredAt</code> is not updated. URLs must be HTTPS — localhost and private IP ranges are blocked.
+              </Notice>
+            </div>
+          </section>
+
+          {/* ── Team Collaboration ────────────────────────────────────── */}
+          <section id="team-collaboration">
+            <SectionHeading
+              id="team-collaboration"
+              eyebrow="Platform"
+              title="Team Collaboration"
+              description="Invite team members to your project by Solana wallet address."
+            />
+            <div className="space-y-5">
+              <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+                Project owners can invite other Fyxvo users by wallet address. Invitations are pending until the invitee accepts via{" "}
+                <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">PATCH /v1/projects/:id/members/:memberId/accept</code>.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Notice tone="neutral" title="Member permissions">
+                  Members can view analytics and API keys but cannot delete the project or change ownership. Only the project owner can invite or remove members.
+                </Notice>
+                <Notice tone="neutral" title="Team management">
+                  Team management is in Settings → Team on the project page. Pending invitations are shown until accepted or removed.
+                </Notice>
+              </div>
+              <CodeBlock
+                label="Invite a member"
+                code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/members/invite \\
+  -H "authorization: Bearer YOUR_JWT" \\
+  -H "content-type: application/json" \\
+  -d '{"walletAddress":"MEMBER_WALLET_ADDRESS"}'`}
+              />
+              <CodeBlock
+                label="List members"
+                code={`curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/members \\
+  -H "authorization: Bearer YOUR_JWT"`}
+              />
+            </div>
+          </section>
+
+          {/* ── Public Project Pages ────────────────────────────────────── */}
+          <section id="public-profiles">
+            <SectionHeading
+              id="public-profiles"
+              eyebrow="Platform"
+              title="Public Project Pages"
+              description="Share your project's aggregate stats publicly — no API key required."
+            />
+            <div className="space-y-5">
+              <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+                Enable a public URL for your project from Settings → Project settings → Public profile. The public page at{" "}
+                <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">/p/[your-slug]</code>{" "}
+                shows total requests and average latency. No API keys or balances are shown.
+              </p>
+              <Notice tone="neutral" title="README badge">
+                Add a live status badge to your GitHub README. The badge shows latency and updates every 5 minutes via CDN cache.
+              </Notice>
+              <CodeBlock
+                label="README badge markdown"
+                code={`[![Fyxvo Status](https://api.fyxvo.com/badge/project/YOUR_SLUG)](https://www.fyxvo.com/p/YOUR_SLUG)`}
+              />
+            </div>
           </section>
 
           {/* ── SDK Reference ────────────────────────────────────── */}

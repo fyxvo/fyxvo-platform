@@ -38,7 +38,7 @@ import { GatewayHealthCard } from "../../components/gateway-health";
 import { OnboardingChecklist } from "../../components/onboarding-checklist";
 import type { AdminOverview, NetworkStats, PortalProject } from "../../lib/types";
 import { webEnv } from "../../lib/env";
-import { getNetworkStats } from "../../lib/api";
+import { getNetworkStats, getActiveAnnouncement } from "../../lib/api";
 
 const projectColumns: readonly TableColumn<PortalProject>[] = [
   {
@@ -322,9 +322,17 @@ export default function DashboardPage() {
   const [description, setDescription] = useState("");
   const [projectTemplate, setProjectTemplate] = useState<"blank" | "defi" | "indexing">("blank");
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
+  const [announcement, setAnnouncement] = useState<{ id: string; message: string; severity: string } | null>(null);
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
 
   useEffect(() => {
     void getNetworkStats().then(setNetworkStats).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getActiveAnnouncement().then((data) => {
+      if (data.announcement) setAnnouncement(data.announcement);
+    }).catch(() => undefined);
   }, []);
 
   function handleCreateClose() {
@@ -446,8 +454,29 @@ export default function DashboardPage() {
   const successRateDisplay =
     totalRequests > 0 ? formatPercent((successCount / totalRequests) * 100) : "–";
 
+  const activeProjects = portal.projects.filter((p) => !p.archivedAt);
+
   return (
     <div className="space-y-10 lg:space-y-12">
+      {announcement && !announcementDismissed && (
+        <div className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 ${
+          announcement.severity === "critical"
+            ? "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+            : announcement.severity === "warning"
+            ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            : "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-text)]"
+        }`}>
+          <p className="text-sm">{announcement.message}</p>
+          <button
+            onClick={() => setAnnouncementDismissed(true)}
+            className="shrink-0 text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {portal.walletPhase === "authenticated" && portal.selectedProject ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -511,6 +540,23 @@ export default function DashboardPage() {
           </>
         }
       />
+
+      {portal.walletPhase === "authenticated" ? (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Active projects</p>
+            <p className="mt-1 font-display text-2xl font-semibold text-[var(--fyxvo-text)]">{activeProjects.length}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Active API keys</p>
+            <p className="mt-1 font-display text-2xl font-semibold text-[var(--fyxvo-text)]">{portal.apiKeys.filter((k) => k.status === "ACTIVE").length}</p>
+          </div>
+          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Total requests</p>
+            <p className="mt-1 font-display text-2xl font-semibold text-[var(--fyxvo-text)]">{portal.projects.reduce((s, p) => s + (p._count?.requestLogs ?? 0), 0).toLocaleString()}</p>
+          </div>
+        </div>
+      ) : null}
 
       {portal.walletPhase !== "authenticated" ? <AuthGate /> : null}
       {portal.loading ? <LoadingGrid /> : null}
