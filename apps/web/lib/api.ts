@@ -205,6 +205,9 @@ export async function updateProject(input: {
   readonly dailyRequestAlertThreshold?: number | null;
   readonly name?: string;
   readonly description?: string | null;
+  readonly environment?: "development" | "staging" | "production";
+  readonly starred?: boolean;
+  readonly notes?: string | null;
 }) {
   const { projectId, token, ...body } = input;
   return requestApi<{ item: PortalProject }>(
@@ -288,6 +291,18 @@ export async function revokeApiKey(input: {
     {
       method: "DELETE"
     },
+    input.token
+  );
+}
+
+export async function rotateApiKey(input: {
+  readonly projectId: string;
+  readonly apiKeyId: string;
+  readonly token: string;
+}) {
+  return requestApi<{ item: PortalApiKey; plainTextKey: string }>(
+    `/v1/projects/${input.projectId}/api-keys/${input.apiKeyId}/rotate`,
+    { method: "POST" },
     input.token
   );
 }

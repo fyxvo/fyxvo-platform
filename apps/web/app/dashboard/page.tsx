@@ -46,7 +46,17 @@ const projectColumns: readonly TableColumn<PortalProject>[] = [
     header: "Project",
     cell: (project) => (
       <div>
-        <div className="font-medium text-[var(--fyxvo-text)]">{project.name}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-[var(--fyxvo-text)]">{project.name}</span>
+          {project.starred ? (
+            <span className="text-xs text-[var(--fyxvo-accent)]" title="Starred">★</span>
+          ) : null}
+          {project.environment && project.environment !== "development" ? (
+            <Badge tone={project.environment === "production" ? "danger" : "warning"} className="text-[10px]">
+              {project.environment}
+            </Badge>
+          ) : null}
+        </div>
         <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
           {project.slug}
         </div>

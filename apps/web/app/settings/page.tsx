@@ -108,6 +108,14 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteRequested, setDeleteRequested] = useState(false);
 
+  // Project new fields
+  const [projectEnvironment, setProjectEnvironment] = useState<"development" | "staging" | "production">(
+    (portal.selectedProject?.environment as "development" | "staging" | "production" | undefined) ?? "development"
+  );
+  const [projectNotes, setProjectNotes] = useState(portal.selectedProject?.notes ?? "");
+  const [projectStarred, setProjectStarred] = useState(portal.selectedProject?.starred ?? false);
+  const [projectFieldsSaving, setProjectFieldsSaving] = useState(false);
+
   // Rename project
   const [renamingProject, setRenamingProject] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -131,6 +139,19 @@ export default function SettingsPage() {
     if (!portal.selectedProject) return;
     setDisplayNameSaving(true);
     try { await patchProject(portal.selectedProject.id, { displayName }); } finally { setDisplayNameSaving(false); }
+  }
+
+  async function saveProjectFields() {
+    if (!portal.selectedProject) return;
+    setProjectFieldsSaving(true);
+    try {
+      await patchProject(portal.selectedProject.id, {
+        environment: projectEnvironment,
+        notes: projectNotes || null,
+        starred: projectStarred,
+      });
+      await portal.refresh();
+    } finally { setProjectFieldsSaving(false); }
   }
 
   async function saveLowBalanceSol() {
@@ -380,6 +401,54 @@ export default function SettingsPage() {
                 {displayNameSaving ? "Saving…" : "Save"}
               </Button>
             </div>
+          </SettingRow>
+          <SettingRow label="Environment" description="Label this project as development, staging, or production.">
+            <div className="flex flex-wrap gap-2">
+              {(["development", "staging", "production"] as const).map((env) => (
+                <button
+                  key={env}
+                  type="button"
+                  onClick={() => setProjectEnvironment(env)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                    projectEnvironment === env
+                      ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                  }`}
+                >
+                  {env}
+                </button>
+              ))}
+            </div>
+          </SettingRow>
+          <SettingRow label="Star project" description="Starred projects appear at the top of the project list.">
+            <button
+              type="button"
+              onClick={() => setProjectStarred(!projectStarred)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                projectStarred
+                  ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                  : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+              }`}
+            >
+              {projectStarred ? "★ Starred" : "☆ Star this project"}
+            </button>
+          </SettingRow>
+          <SettingRow label="Project notes" description="Internal documentation for your team. Not exposed publicly.">
+            <div className="flex flex-col gap-2 w-full max-w-xs">
+              <textarea
+                value={projectNotes}
+                onChange={(e) => setProjectNotes(e.target.value)}
+                placeholder="Internal notes about this project…"
+                rows={3}
+                maxLength={2000}
+                className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)] resize-none"
+              />
+            </div>
+          </SettingRow>
+          <SettingRow label="" description="">
+            <Button variant="secondary" size="sm" onClick={() => void saveProjectFields()} disabled={projectFieldsSaving || !portal.selectedProject || !portal.token}>
+              {projectFieldsSaving ? "Saving…" : "Save project fields"}
+            </Button>
           </SettingRow>
           <SettingRow label="Project owner" description="The wallet that owns the selected project.">
             {portal.selectedProject ? (

@@ -640,12 +640,24 @@ export function PortalProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    await revokeApiKeyRequest({
-      projectId: selectedProject.id,
-      apiKeyId,
-      token
+    // Optimistic: remove immediately
+    let previousKeys: PortalApiKey[] = [];
+    setApiKeys((current) => {
+      previousKeys = current;
+      return current.filter((item) => item.id !== apiKeyId);
     });
-    setApiKeys((current) => current.filter((item) => item.id !== apiKeyId));
+
+    try {
+      await revokeApiKeyRequest({
+        projectId: selectedProject.id,
+        apiKeyId,
+        token
+      });
+    } catch (err) {
+      // Restore on failure
+      setApiKeys(previousKeys);
+      throw err;
+    }
   }
 
   async function prepareFunding(input: {

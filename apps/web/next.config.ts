@@ -12,10 +12,31 @@ const nextConfig: NextConfig = {
     root: workspaceRoot
   },
   async headers() {
+    // Content Security Policy allows Fyxvo domains and blocks unauthorized external requests.
+    // 'unsafe-inline' for styles is required by Tailwind CSS class injection at runtime.
+    // 'unsafe-eval' is excluded — we rely on Next.js bundling, not eval-based code.
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://api.fyxvo.com https://rpc.fyxvo.com https://status.fyxvo.com https://api.coingecko.com wss:",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests"
+    ].join("; ");
+
     return [
       {
         source: "/:path*",
         headers: [
+          {
+            key: "Content-Security-Policy",
+            value: csp
+          },
           {
             key: "X-Content-Type-Options",
             value: "nosniff"

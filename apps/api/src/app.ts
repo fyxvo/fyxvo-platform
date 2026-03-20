@@ -89,6 +89,9 @@ const updateProjectSchema = z.object({
   lowBalanceThresholdSol: z.number().min(0).max(1000).nullable().optional(),
   dailyRequestAlertThreshold: z.number().int().min(0).max(10_000_000).nullable().optional(),
   archivedAt: z.string().datetime().optional().nullable(),
+  environment: z.enum(["development", "staging", "production"]).optional(),
+  starred: z.boolean().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
 });
 
 const createApiKeySchema = z.object({
@@ -1044,7 +1047,10 @@ export async function buildApiApp(input: {
       ...(body.displayName !== undefined ? { displayName: body.displayName } : {}),
       ...(body.lowBalanceThresholdSol !== undefined ? { lowBalanceThresholdSol: body.lowBalanceThresholdSol } : {}),
       ...(body.dailyRequestAlertThreshold !== undefined ? { dailyRequestAlertThreshold: body.dailyRequestAlertThreshold } : {}),
-      ...(body.archivedAt !== undefined ? { archivedAt: body.archivedAt !== null ? new Date(body.archivedAt) : null } : {})
+      ...(body.archivedAt !== undefined ? { archivedAt: body.archivedAt !== null ? new Date(body.archivedAt) : null } : {}),
+      ...(body.environment !== undefined ? { environment: body.environment } : {}),
+      ...(body.starred !== undefined ? { starred: body.starred } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {})
     };
 
     return {
@@ -1148,6 +1154,54 @@ export async function buildApiApp(input: {
     }).catch(() => undefined);
 
     return { item: apiKey };
+  });
+
+  // POST /v1/projects/:projectId/api-keys/:apiKeyId/rotate — revoke old key and create a new one with same label and scopes
+  app.post("/v1/projects/:projectId/api-keys/:apiKeyId/rotate", async (request, reply) => {
+    const user = requireUser(request);
+    const params = z
+      .object({ projectId: z.string().uuid(), apiKeyId: z.string().uuid() })
+      .parse(request.params);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const keys = await input.repository.listApiKeys(project.id);
+    const existing = keys.find((k) => k.id === params.apiKeyId);
+    if (!existing) {
+      throw new HttpError(404, "api_key_not_found", "The requested API key could not be found.");
+    }
+    if (existing.status !== "ACTIVE") {
+      throw new HttpError(409, "api_key_not_active", "Only active API keys can be rotated.");
+    }
+
+    // Revoke the old key
+    await input.repository.revokeApiKey(project.id, params.apiKeyId);
+
+    // Create replacement key with same label and scopes
+    const scopes = Array.isArray(existing.scopes) ? existing.scopes as string[] : [];
+    const plainTextKey = `fyxvo_live_${randomBytes(24).toString("hex")}`;
+    const prefix = plainTextKey.slice(0, 18);
+    const newKey = await input.repository.createApiKey({
+      projectId: project.id,
+      createdById: user.id,
+      label: existing.label,
+      prefix,
+      keyHash: sha256(plainTextKey),
+      scopes,
+      expiresAt: null
+    });
+
+    void input.repository.createNotification({
+      userId: user.id,
+      type: "api_key_rotated",
+      title: "API key rotated",
+      message: `Key "${existing.label}" was rotated — old key revoked, new key issued for project "${project.name}"`,
+      projectId: project.id
+    }).catch(() => undefined);
+
+    reply.status(201).send({ item: newKey, plainTextKey });
   });
 
   app.post("/v1/projects/:projectId/funding/prepare", async (request, reply) => {
@@ -1508,7 +1562,34 @@ export async function buildApiApp(input: {
     };
   });
 
+  // GET /v1/admin/assistant/stats — assistant usage metrics (admin only)
+  app.get("/v1/admin/assistant/stats", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    return { item: await input.repository.getAssistantStats() };
+  });
+
   // POST /v1/assistant/chat — AI developer assistant (streaming SSE)
+  // Per-user rate limit: 20 messages per hour (rolling window in-memory)
+  const assistantUserWindows = new Map<string, number[]>();
+
+  const ASSISTANT_RATE_LIMIT = 20;
+  const ASSISTANT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+  function checkAssistantRateLimit(userId: string): { allowed: boolean; retryAfterMs: number } {
+    const now = Date.now();
+    const windowStart = now - ASSISTANT_WINDOW_MS;
+    const timestamps = (assistantUserWindows.get(userId) ?? []).filter((t) => t > windowStart);
+    assistantUserWindows.set(userId, timestamps);
+    if (timestamps.length >= ASSISTANT_RATE_LIMIT) {
+      const oldest = timestamps[0]!;
+      return { allowed: false, retryAfterMs: oldest + ASSISTANT_WINDOW_MS - now };
+    }
+    timestamps.push(now);
+    assistantUserWindows.set(userId, timestamps);
+    return { allowed: true, retryAfterMs: 0 };
+  }
+
   const assistantChatSchema = z.object({
     messages: z.array(z.object({
       role: z.enum(["user", "assistant"]),
@@ -1524,47 +1605,91 @@ export async function buildApiApp(input: {
   app.post("/v1/assistant/chat", async (request, reply) => {
     const user = requireUser(request);
 
+    const rateCheck = checkAssistantRateLimit(user.id);
+    if (!rateCheck.allowed) {
+      const retryAfterSec = Math.ceil(rateCheck.retryAfterMs / 1000);
+      return reply.status(429).send({
+        code: "assistant_rate_limited",
+        error: "You have reached the assistant limit of 20 messages per hour.",
+        message: `Assistant rate limit exceeded. Try again in ${Math.ceil(retryAfterSec / 60)} minutes.`,
+        retryAfterMs: rateCheck.retryAfterMs
+      });
+    }
+
     const parsed = assistantChatSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: "Invalid request", details: parsed.error.issues });
     }
 
     const { messages, projectContext } = parsed.data;
+    const requestStart = Date.now();
+    const hashedUserId = sha256(user.id).slice(0, 16);
 
     const anthropicKey = input.env.ANTHROPIC_API_KEY;
     if (!anthropicKey) {
       return reply.status(503).send({ error: "AI assistant is not configured" });
     }
 
-    const systemPrompt = `You are the Fyxvo Developer Assistant — a knowledgeable, honest, and practical guide for developers building on Solana using the Fyxvo RPC gateway.
+    const systemPrompt = `You are the Fyxvo Developer Assistant — a knowledgeable, honest, and practical AI guide for developers building on Solana using the Fyxvo RPC gateway platform. You are an AI and may make mistakes; always recommend testing code before production use. For critical infrastructure questions, also consult the official Solana documentation at docs.solana.com.
 
-## ABOUT FYXVO
-Fyxvo is a Solana RPC gateway on devnet (private alpha). It routes requests to high-performance nodes, provides API key management, usage analytics, and on-chain billing.
+## WHAT FYXVO IS
+Fyxvo is a hybrid-first decentralized Solana infrastructure network currently in private alpha on devnet. It provides:
+- **Managed RPC gateway**: Route Solana JSON-RPC calls through high-performance managed nodes
+- **Priority relay**: Low-latency transaction submission for time-sensitive operations
+- **Project-based API key authentication**: Separate credentials per project with explicit scopes
+- **SOL funding via Phantom wallet**: Pre-deposit SOL to your project's on-chain treasury
+- **Per-project analytics**: Request counts, latency, error rates, method breakdown, CSV export
+- **Real-time gateway health monitoring**: Live status at status.fyxvo.com
+- **Notification system**: Low-balance, rate-limit, and key activity alerts
+- **Command palette**: Ctrl+K global navigation
+- **Multi-wallet support**: Phantom, Solflare, Backpack, and Coinbase Wallet
 
-- Live frontend: https://www.fyxvo.com
-- RPC gateway endpoint: https://rpc.fyxvo.com
-- Priority relay endpoint: https://rpc.fyxvo.com/priority
+## LIVE ENDPOINTS
+- Frontend: https://www.fyxvo.com
+- Standard RPC gateway: https://rpc.fyxvo.com/rpc
+- Priority relay: https://rpc.fyxvo.com/priority
 - API: https://api.fyxvo.com
-- Status page: https://status.fyxvo.com
+- Status: https://status.fyxvo.com
 - Docs: https://www.fyxvo.com/docs
 
-## AUTHENTICATION
-1. Connect your Solana wallet (Phantom, Backpack, etc.)
-2. Sign a message with your wallet to get a JWT session token
-3. Use the JWT to create projects and API keys
-4. Use API keys in the X-Api-Key header for gateway requests
+## PLATFORM STATUS
+Fyxvo is currently in devnet private alpha. Mainnet is not yet available. All SOL costs and features described are for devnet only.
+
+## AUTHENTICATION FLOW
+Fyxvo uses wallet-based auth with a challenge-verify pattern:
+\`\`\`typescript
+// Step 1: Get a nonce for your wallet
+const { message } = await fetch("https://api.fyxvo.com/v1/auth/challenge", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ walletAddress: "YOUR_WALLET_ADDRESS" })
+}).then(r => r.json());
+
+// Step 2: Sign the message with Phantom
+const encodedMessage = new TextEncoder().encode(message);
+const signedMessage = await window.solana.signMessage(encodedMessage, "utf8");
+const signature = btoa(String.fromCharCode(...signedMessage.signature));
+
+// Step 3: Verify and receive JWT
+const { token } = await fetch("https://api.fyxvo.com/v1/auth/verify", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ walletAddress, message, signature })
+}).then(r => r.json());
+
+// Use token for authenticated API calls
+// Use X-Api-Key header for gateway requests
+\`\`\`
 
 ## PRICING MODEL (devnet)
-- Standard reads: 1,000 lamports per request (0.000001 SOL)
-- Compute-heavy methods: 3,000 lamports per request (0.000003 SOL)
-- Priority relay: 5,000 lamports per request (0.000005 SOL)
-- Free tier: 10,000 standard requests per new project
-- Volume discounts: ≥1M requests/month → 20% off; ≥10M requests/month → 40% off
-- Revenue split: 80% node operators / 10% protocol treasury / 10% infra fund
-- Funding: pre-deposit SOL to your project's on-chain treasury
-
-## COMPUTE-HEAVY METHODS (charged at 3,000 lamports)
-getProgramAccounts, getLargestAccounts, getTokenLargestAccounts, getTokenAccountsByOwner, getTokenAccountsByDelegate, getParsedTokenAccountsByOwner, getSignaturesForAddress, getConfirmedSignaturesForAddress2, getMultipleAccounts, getBlockProduction
+- **Standard reads**: 1,000 lamports per request (0.000001 SOL)
+- **Compute-heavy methods**: 3,000 lamports per request (0.000003 SOL) — includes getProgramAccounts, getTokenAccountsByOwner, getSignaturesForAddress, getMultipleAccounts, and similar
+- **Priority relay**: 5,000 lamports per request (0.000005 SOL)
+- **Free tier**: 10,000 standard requests for every new project
+- **Volume discount tier 1**: ≥1M requests/month → 20% off
+- **Volume discount tier 2**: ≥10M requests/month → 40% off
+- **Revenue split**: 80% to node operators / 10% protocol treasury / 10% infra fund
+- **Funding**: Pre-deposit SOL to your project's on-chain treasury via Phantom wallet
 
 ## HOW TO USE THE GATEWAY
 
@@ -1572,7 +1697,7 @@ getProgramAccounts, getLargestAccounts, getTokenLargestAccounts, getTokenAccount
 \`\`\`typescript
 import { Connection } from "@solana/web3.js";
 
-const connection = new Connection("https://rpc.fyxvo.com", {
+const connection = new Connection("https://rpc.fyxvo.com/rpc", {
   httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" },
 });
 
@@ -1588,78 +1713,87 @@ import { createSolanaRpcFromTransport, createDefaultRpcTransport } from "@solana
 
 const rpc = createSolanaRpcFromTransport(
   createDefaultRpcTransport({
-    url: "https://rpc.fyxvo.com",
+    url: "https://rpc.fyxvo.com/rpc",
     headers: { "X-Api-Key": "fyxvo_live_YOUR_KEY" },
   })
 );
+\`\`\`
+
+### Fyxvo SDK
+\`\`\`typescript
+import FyxvoClient from "@fyxvo/sdk";
+
+const client = new FyxvoClient({
+  apiKey: "fyxvo_live_YOUR_KEY",
+  baseUrl: "https://rpc.fyxvo.com",
+});
 \`\`\`
 
 ### Python
 \`\`\`python
 from solana.rpc.api import Client
 client = Client(
-    "https://rpc.fyxvo.com",
+    "https://rpc.fyxvo.com/rpc",
     extra_headers={"X-Api-Key": "fyxvo_live_YOUR_KEY"}
 )
-# Check balance
 balance = client.get_balance(pubkey)
-print(balance)
-\`\`\`
-
-### Rust (solana-client)
-\`\`\`rust
-use solana_client::rpc_client::RpcClient;
-use solana_client::rpc_config::RpcSendTransactionConfig;
-
-let rpc_url = "https://rpc.fyxvo.com";
-// Set custom headers via a custom RPC sender
-// Use reqwest with X-Api-Key header for authenticated requests
 \`\`\`
 
 ### Direct JSON-RPC (curl)
 \`\`\`bash
-curl https://rpc.fyxvo.com \\
+curl https://rpc.fyxvo.com/rpc \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: fyxvo_live_YOUR_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'
 
-# Priority relay for sendTransaction:
+# Priority relay:
 curl https://rpc.fyxvo.com/priority \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: fyxvo_live_YOUR_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["BASE64_ENCODED_TX"]}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["BASE64_TX"]}'
 \`\`\`
 
 ## MIGRATING FROM OTHER PROVIDERS
-Replace your RPC URL — that's it:
+Replace your RPC URL — everything else stays the same:
 \`\`\`typescript
 // Before (Helius, QuickNode, Alchemy, etc.):
 const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=xxx");
 
 // After (Fyxvo):
-const connection = new Connection("https://rpc.fyxvo.com", {
+const connection = new Connection("https://rpc.fyxvo.com/rpc", {
   httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" },
 });
 \`\`\`
 
 ## COMMON SOLANA CONCEPTS
-- **Lamports**: smallest unit of SOL. 1 SOL = 1,000,000,000 lamports
-- **Account**: on-chain storage unit with an owner, data, and lamport balance
+- **Lamports**: smallest SOL unit. 1 SOL = 1,000,000,000 lamports
+- **Account**: on-chain storage unit with owner, data, lamport balance, and rent exemption threshold
 - **Program**: executable account (smart contract) — stateless, processes instructions
-- **PDA**: Program Derived Address — deterministic address derived from seeds + program ID
-- **Transaction**: atomic set of instructions, must be signed by all required signers
-- **Blockhash**: expires after ~150 blocks (~60 seconds) — always use fresh blockhash for transactions
-- **Commitment levels**: processed < confirmed < finalized. Use "confirmed" for most reads, "finalized" for critical state
-- **Priority fees**: compute unit price to get transactions processed faster during congestion
+- **PDA (Program Derived Address)**: deterministic address derived from seeds + program ID, has no private key
+- **Transaction**: atomic set of instructions with a blockhash, must be signed by all required signers
+- **Instruction**: call to a specific program with accounts and data
+- **Signer**: account that must sign the transaction; most actions require at least the fee payer
+- **Blockhash**: expires after ~150 blocks (~60 seconds) — always fetch a fresh one before sending transactions
+- **Commitment levels**: processed < confirmed < finalized. Use "confirmed" for most reads; "finalized" for critical state
+- **Token account**: holds SPL token balance for a specific mint and owner
+- **Associated Token Account (ATA)**: canonical token account for an owner+mint pair, derived deterministically
+- **SPL tokens**: Solana's fungible and non-fungible token standard (mint, freeze authority, token accounts)
+- **Anchor**: framework for Solana programs — provides IDL, macro-based instruction dispatch, and account validation
+- **Priority fees**: compute unit price set via ComputeBudgetProgram instructions to get faster inclusion
+- **Common errors**:
+  - "AccountNotFound": account doesn't exist yet on-chain
+  - "InsufficientFunds": wallet doesn't have enough SOL for fees + transfer
+  - "Blockhash not found": blockhash expired — fetch a fresh one and retry
+  - "custom program error": program-specific error, check the program's error codes or IDL
 
 ## WHEN TO USE PRIORITY RELAY
-Use the /priority endpoint when:
+Use /priority endpoint when:
 - Submitting time-sensitive transactions (arbitrage, liquidations, NFT mints)
 - Network is congested and standard submission is slow
 - You need fastest possible inclusion
 
-Standard endpoint is fine for:
-- Read operations (getBalance, getAccountInfo, etc.)
+Standard /rpc endpoint is fine for:
+- All read operations (getBalance, getAccountInfo, getProgramAccounts, etc.)
 - Non-time-sensitive transactions
 - Development and testing
 
@@ -1669,14 +1803,15 @@ ${projectContext?.balance ? `- Current balance: ${projectContext.balance}` : ""}
 ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectContext.requestCount.toLocaleString()}` : ""}
 
 ## GUIDELINES
-1. Be concise. Developers want working code, not long explanations.
-2. Always show complete, copy-pasteable code examples.
-3. Be honest: if you don't know something specific to Fyxvo, say so.
-4. Fyxvo is devnet-only in private alpha. Mainnet features are not yet available.
+1. You are an AI. Be honest about uncertainty — if you don't know something specific to Fyxvo, say so.
+2. All code should be tested before production use. Fyxvo is devnet private alpha.
+3. Be concise. Developers want working code, not long explanations.
+4. Always show complete, copy-pasteable code examples.
 5. Do not promise specific performance numbers (latency, uptime SLAs, etc.)
-6. For Solana questions not specific to Fyxvo, give accurate answers based on Solana docs.
-7. When generating code, use TypeScript unless the user specifies otherwise.
-8. Keep responses focused — answer the question asked, don't pad with extras.`;
+6. For Solana questions not specific to Fyxvo, give accurate answers and suggest the official Solana docs.
+7. When generating code, default to TypeScript unless the user specifies otherwise.
+8. Keep responses focused — answer the question asked, don't pad with extras.
+9. When a developer is stuck, ask one clarifying question to narrow down the problem.`;
 
     reply.raw.setHeader("Content-Type", "text/event-stream");
     reply.raw.setHeader("Cache-Control", "no-cache");
@@ -1695,7 +1830,7 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-5-20251001",
           max_tokens: 4096,
           stream: true,
           system: systemPrompt,
@@ -1704,6 +1839,15 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
       });
 
       if (!response.ok || !response.body) {
+        const durationMs = Date.now() - requestStart;
+        app.log.warn({
+          event: "assistant.chat.upstream_error",
+          hashedUserId,
+          model: "claude-sonnet-4-5-20251001",
+          messageCount: messages.length,
+          durationMs,
+          statusCode: response.status
+        }, "Anthropic API returned non-OK status");
         reply.raw.write(`data: ${JSON.stringify({ error: "AI service unavailable" })}\n\n`);
         reply.raw.end();
         return;
@@ -1711,6 +1855,7 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let outputTokenEstimate = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1722,8 +1867,9 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
           const data = line.slice(6);
           if (data === "[DONE]") continue;
           try {
-            const event = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string }; error?: unknown };
+            const event = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string }; usage?: { output_tokens?: number }; error?: unknown };
             if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
+              outputTokenEstimate += Math.ceil(event.delta.text.length / 4);
               reply.raw.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
             }
           } catch {
@@ -1732,9 +1878,29 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
         }
       }
 
+      const durationMs = Date.now() - requestStart;
+      const inputTokenEstimate = messages.reduce((acc, m) => acc + Math.ceil(m.content.length / 4), 0);
+      app.log.info({
+        event: "assistant.chat.success",
+        hashedUserId,
+        model: "claude-sonnet-4-5-20251001",
+        messageCount: messages.length,
+        inputTokenEstimate,
+        outputTokenEstimate,
+        durationMs,
+        timestamp: new Date().toISOString()
+      }, "Assistant chat completed");
+
       reply.raw.write("data: [DONE]\n\n");
       reply.raw.end();
-    } catch {
+    } catch (err) {
+      const durationMs = Date.now() - requestStart;
+      app.log.error({
+        event: "assistant.chat.error",
+        hashedUserId,
+        durationMs,
+        error: sanitizeErrorForLogs(err)
+      }, "Assistant chat failed");
       reply.raw.write(`data: ${JSON.stringify({ error: "Failed to contact AI service" })}\n\n`);
       reply.raw.end();
     }

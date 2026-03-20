@@ -33,6 +33,11 @@ export const previewProjects: PortalProject[] = [
     ownerId: owner.id,
     lowBalanceThresholdSol: null,
     dailyRequestAlertThreshold: null,
+    templateType: null,
+    environment: "production",
+    starred: true,
+    notes: null,
+    archivedAt: null,
     owner,
     _count: {
       apiKeys: 4,
@@ -52,6 +57,11 @@ export const previewProjects: PortalProject[] = [
     ownerId: owner.id,
     lowBalanceThresholdSol: null,
     dailyRequestAlertThreshold: null,
+    templateType: null,
+    environment: "development",
+    starred: false,
+    notes: null,
+    archivedAt: null,
     owner,
     _count: {
       apiKeys: 2,

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { AppFrame } from "../components/app-frame";
 import { CookieNotice } from "../components/cookie-notice";
+import { NavProgress } from "../components/nav-progress";
 import { PortalProvider } from "../components/portal-provider";
 import { ServiceWorkerRegistration } from "../components/service-worker-registration";
 import { SolanaProvider } from "../components/solana-provider";
@@ -82,6 +84,9 @@ export default function RootLayout({
         <ThemeProvider>
           <SolanaProvider>
             <PortalProvider>
+              <Suspense fallback={null}>
+                <NavProgress />
+              </Suspense>
               <AppFrame>{children}</AppFrame>
               <CookieNotice />
               <ServiceWorkerRegistration />

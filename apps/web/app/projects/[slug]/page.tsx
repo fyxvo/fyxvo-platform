@@ -140,12 +140,37 @@ export default function ProjectPage({
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="brand">{project.slug}</Badge>
+            {project.environment && project.environment !== "development" ? (
+              <Badge tone={project.environment === "production" ? "danger" : "warning"}>
+                {project.environment}
+              </Badge>
+            ) : (
+              <Badge tone="neutral">development</Badge>
+            )}
+            {project.starred ? (
+              <Badge tone="brand">★ starred</Badge>
+            ) : null}
             <Badge tone={project.ownerId === portal.user?.id ? "success" : "neutral"}>
               {project.ownerId === portal.user?.id ? "owner session" : "workspace view"}
             </Badge>
           </div>
         }
       />
+
+      {project.notes ? (
+        <section>
+          <details className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+            <summary className="cursor-pointer select-none px-5 py-4 text-sm font-medium text-[var(--fyxvo-text)]">
+              Project notes
+            </summary>
+            <div className="border-t border-[var(--fyxvo-border)] px-5 py-4">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                {project.notes}
+              </p>
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       {portal.walletPhase !== "authenticated" ? (
         <AuthGate body="Connect a wallet to load real API keys, analytics, and on-chain balances for this project." />

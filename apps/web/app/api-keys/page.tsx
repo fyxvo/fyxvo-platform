@@ -20,6 +20,7 @@ import { AuthGate } from "../../components/state-panels";
 import { usePortal } from "../../components/portal-provider";
 import { webEnv } from "../../lib/env";
 import { formatRelativeDate } from "../../lib/format";
+import { rotateApiKey } from "../../lib/api";
 import type { PortalApiKey } from "../../lib/types";
 
 export default function ApiKeysPage() {
@@ -30,6 +31,9 @@ export default function ApiKeysPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [revokeKey, setRevokeKey] = useState<PortalApiKey | null>(null);
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null);
+  const [selectedKeyIds, setSelectedKeyIds] = useState<Set<string>>(new Set());
+  const [rotatingKeyId, setRotatingKeyId] = useState<string | null>(null);
+  const [bulkRevokeOpen, setBulkRevokeOpen] = useState(false);
 
   const expandedKey = portal.apiKeys.find((k) => k.id === expandedKeyId) ?? null;
 
@@ -57,6 +61,34 @@ export default function ApiKeysPage() {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [portal.lastGeneratedApiKey]);
+
+  const handleRotateKey = async (key: PortalApiKey) => {
+    if (!portal.token) return;
+    if (!portal.selectedProject) return;
+    setRotatingKeyId(key.id);
+    try {
+      await rotateApiKey({
+        projectId: portal.selectedProject.id,
+        apiKeyId: key.id,
+        token: portal.token,
+      });
+      await portal.refresh();
+    } catch (err) {
+      console.error("Rotate failed", err);
+    } finally {
+      setRotatingKeyId(null);
+    }
+  };
+
+  const handleBulkRevoke = async () => {
+    if (!portal.token || !portal.selectedProject) return;
+    const keyIds = Array.from(selectedKeyIds);
+    for (const keyId of keyIds) {
+      await portal.revokeApiKey(keyId).catch(() => {});
+    }
+    setSelectedKeyIds(new Set());
+    setBulkRevokeOpen(false);
+  };
 
   const exampleApiKey = portal.lastGeneratedApiKey ?? "YOUR_API_KEY";
   const standardRequest = `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
@@ -143,10 +175,32 @@ export default function ApiKeysPage() {
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="overflow-hidden rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+          {selectedKeyIds.size > 0 && (
+            <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2">
+              <span className="text-sm text-[var(--fyxvo-text-soft)]">{selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""} selected</span>
+              <button
+                type="button"
+                className="rounded px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition-colors"
+                onClick={() => setBulkRevokeOpen(true)}
+              >
+                Bulk revoke ({selectedKeyIds.size})
+              </button>
+              <button
+                type="button"
+                className="rounded px-2 py-1 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                onClick={() => setSelectedKeyIds(new Set())}
+              >
+                Clear
+              </button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--fyxvo-border)] text-left text-sm">
               <thead className="bg-[var(--fyxvo-panel-soft)]">
                 <tr>
+                  <th className="px-4 py-3" scope="col">
+                    <span className="sr-only">Select</span>
+                  </th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Key</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Scopes</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Last used</th>
@@ -158,19 +212,40 @@ export default function ApiKeysPage() {
               <tbody className="divide-y divide-[var(--fyxvo-border)] text-[var(--fyxvo-text-soft)]">
                 {portal.apiKeys.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-[var(--fyxvo-text-muted)]" colSpan={6}>
+                    <td className="px-4 py-8 text-center text-[var(--fyxvo-text-muted)]" colSpan={7}>
                       No API keys yet.
                     </td>
                   </tr>
                 ) : (
                   portal.apiKeys.map((apiKey) => {
                     const isExpanded = expandedKeyId === apiKey.id;
+                    const isSelected = selectedKeyIds.has(apiKey.id);
+                    const isRotating = rotatingKeyId === apiKey.id;
                     return (
                       <tr
                         key={apiKey.id}
                         className={`cursor-pointer transition-colors hover:bg-[var(--fyxvo-panel-soft)] ${isExpanded ? "bg-[var(--fyxvo-panel-soft)]" : ""}`}
                         onClick={() => setExpandedKeyId(isExpanded ? null : apiKey.id)}
                       >
+                        <td className="px-4 py-4 align-middle" onClick={(e) => e.stopPropagation()}>
+                          {apiKey.status === "ACTIVE" && (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${apiKey.label}`}
+                              checked={isSelected}
+                              onChange={(e) => {
+                                const next = new Set(selectedKeyIds);
+                                if (e.target.checked) {
+                                  next.add(apiKey.id);
+                                } else {
+                                  next.delete(apiKey.id);
+                                }
+                                setSelectedKeyIds(next);
+                              }}
+                              className="h-4 w-4 rounded border-[var(--fyxvo-border)] accent-[var(--fyxvo-accent)]"
+                            />
+                          )}
+                        </td>
                         <td className="px-4 py-4 align-middle">
                           <div className="font-medium text-[var(--fyxvo-text)]">{apiKey.label}</div>
                           <div className="font-mono text-xs text-[var(--fyxvo-text-muted)]">
@@ -196,18 +271,27 @@ export default function ApiKeysPage() {
                           <Badge tone={apiKey.status === "ACTIVE" ? "success" : "danger"}>{apiKey.status}</Badge>
                         </td>
                         <td className="px-4 py-4 align-middle text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                             {apiKey.status === "ACTIVE" && (
-                              <button
-                                type="button"
-                                className="rounded px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition-colors"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRevokeKey(apiKey);
-                                }}
-                              >
-                                Revoke
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isRotating}
+                                  className="rounded px-2 py-1 text-xs text-[var(--fyxvo-accent)] hover:bg-[var(--fyxvo-panel-soft)] transition-colors disabled:opacity-50"
+                                  onClick={() => { void handleRotateKey(apiKey); }}
+                                >
+                                  {isRotating ? "Rotating…" : "Rotate"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition-colors"
+                                  onClick={() => {
+                                    setRevokeKey(apiKey);
+                                  }}
+                                >
+                                  Revoke
+                                </button>
+                              </>
                             )}
                             <svg
                               viewBox="0 0 12 12"
@@ -438,6 +522,31 @@ export default function ApiKeysPage() {
             </p>
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={bulkRevokeOpen}
+        onClose={() => setBulkRevokeOpen(false)}
+        title={`Revoke ${selectedKeyIds.size} API key${selectedKeyIds.size !== 1 ? "s" : ""}`}
+        description="This action cannot be undone. All selected keys will stop working immediately."
+        footer={
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => setBulkRevokeOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => { void handleBulkRevoke(); }}
+            >
+              Revoke {selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        }
+      >
+        <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+          <p className="text-sm text-[var(--fyxvo-text-soft)]">
+            {selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""} will be permanently revoked. Any requests using these keys will fail immediately.
+          </p>
+        </div>
       </Modal>
     </div>
   );

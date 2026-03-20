@@ -18,6 +18,11 @@ export interface PortalProject {
   readonly ownerId: string;
   readonly lowBalanceThresholdSol: number | null;
   readonly dailyRequestAlertThreshold: number | null;
+  readonly templateType: string | null;
+  readonly environment: "development" | "staging" | "production";
+  readonly starred: boolean;
+  readonly notes: string | null;
+  readonly archivedAt: string | null;
   readonly owner: PortalUser;
   readonly _count?: {
     readonly apiKeys: number;

@@ -11,6 +11,7 @@ import type {
   ApiKeyAnalyticsItem,
   ApiKeyRecord,
   ApiRepository,
+  AssistantStats,
   AuthenticatedUser,
   CreateFeedbackSubmissionInput,
   CreateInterestSubmissionInput,
@@ -166,9 +167,10 @@ export class PrismaApiRepository implements ApiRepository {
           }
         }
       },
-      orderBy: {
-        createdAt: "asc"
-      }
+      orderBy: [
+        { starred: "desc" },
+        { createdAt: "asc" }
+      ]
     });
 
     return projects.map(mapProject);
@@ -228,7 +230,10 @@ export class PrismaApiRepository implements ApiRepository {
         ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
         ...(input.lowBalanceThresholdSol !== undefined ? { lowBalanceThresholdSol: input.lowBalanceThresholdSol } : {}),
         ...(input.dailyRequestAlertThreshold !== undefined ? { dailyRequestAlertThreshold: input.dailyRequestAlertThreshold } : {}),
-        ...(input.archivedAt !== undefined ? { archivedAt: input.archivedAt } : {})
+        ...(input.archivedAt !== undefined ? { archivedAt: input.archivedAt } : {}),
+        ...(input.environment !== undefined ? { environment: input.environment } : {}),
+        ...(input.starred !== undefined ? { starred: input.starred } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {})
       },
       include: {
         owner: true,
@@ -1172,6 +1177,15 @@ export class PrismaApiRepository implements ApiRepository {
       createdAt: row.createdAt.toISOString(),
       confirmedAt: row.confirmedAt ? row.confirmedAt.toISOString() : null
     }));
+  }
+
+  async getAssistantStats(): Promise<AssistantStats> {
+    return {
+      requestsToday: 0,
+      requestsThisWeek: 0,
+      averageResponseTimeMs: 0,
+      rateLimitHitsToday: 0,
+    };
   }
 }
 

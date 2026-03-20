@@ -65,6 +65,9 @@ export interface UpdateProjectInput {
   readonly lowBalanceThresholdSol?: number | null;
   readonly dailyRequestAlertThreshold?: number | null;
   readonly archivedAt?: Date | null;
+  readonly environment?: "development" | "staging" | "production";
+  readonly starred?: boolean;
+  readonly notes?: string | null;
 }
 
 export interface CreateNotificationInput {
@@ -511,6 +514,7 @@ export interface ApiRepository {
   getFundingHistory(userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]>;
   getNetworkStats(): Promise<NetworkStats>;
   getServiceHealthHistory(limitPerService: number): Promise<ServiceHealthHistory>;
+  getAssistantStats(): Promise<AssistantStats>;
 }
 
 export interface ProjectCreationPreparation {
@@ -554,6 +558,13 @@ export interface OnChainProjectSnapshot {
     readonly address: string;
     readonly amount: string;
   };
+}
+
+export interface AssistantStats {
+  readonly requestsToday: number;
+  readonly requestsThisWeek: number;
+  readonly averageResponseTimeMs: number;
+  readonly rateLimitHitsToday: number;
 }
 
 export interface BlockchainClient {
