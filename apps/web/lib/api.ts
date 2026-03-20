@@ -494,6 +494,7 @@ export async function generateReferralCode(token: string) {
 
 export async function getNotificationPreferences(token: string) {
   return requestApi<{
+    email: string | null;
     notifyProjectActivation: boolean;
     notifyApiKeyEvents: boolean;
     notifyFundingConfirmed: boolean;
@@ -506,6 +507,7 @@ export async function getNotificationPreferences(token: string) {
 
 export async function updateNotificationPreferences(
   prefs: Partial<{
+    email: string | null;
     notifyProjectActivation: boolean;
     notifyApiKeyEvents: boolean;
     notifyFundingConfirmed: boolean;

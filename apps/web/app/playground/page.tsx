@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { PageHeader } from "../../components/page-header";
 import { usePortal } from "../../components/portal-provider";
@@ -16,37 +17,184 @@ type MethodParam = {
   required: boolean;
 };
 
+type MethodExample = {
+  label: string;
+  params: Record<string, string>;
+};
+
+type ResponseSchemaField = {
+  key: string;
+  type: string;
+  description: string;
+};
+
 type RpcMethod = {
   method: string;
   category: string;
   description: string;
   params: MethodParam[];
+  examples?: MethodExample[];
+  responseSchema?: ResponseSchemaField[];
 };
 
 const RPC_METHODS: RpcMethod[] = [
   // Network
-  { method: "getHealth", category: "Network", description: "Returns the current health of the node.", params: [] },
-  { method: "getVersion", category: "Network", description: "Returns the current Solana version running on the node.", params: [] },
-  { method: "getSlot", category: "Network", description: "Returns the slot that has reached the given or default commitment level.", params: [] },
-  { method: "getBlockHeight", category: "Network", description: "Returns the current block height of the node.", params: [] },
-  { method: "getEpochInfo", category: "Network", description: "Returns information about the current epoch.", params: [] },
+  {
+    method: "getHealth",
+    category: "Network",
+    description: "Returns the current health of the node.",
+    params: [],
+    responseSchema: [{ key: "result", type: "string", description: '"ok" if healthy' }],
+  },
+  {
+    method: "getVersion",
+    category: "Network",
+    description: "Returns the current Solana version running on the node.",
+    params: [],
+    responseSchema: [
+      { key: "solana-core", type: "string", description: "Software version of solana-core" },
+      { key: "feature-set", type: "number", description: "Unique identifier of the current software's feature set" },
+    ],
+  },
+  {
+    method: "getSlot",
+    category: "Network",
+    description: "Returns the slot that has reached the given or default commitment level.",
+    params: [],
+    responseSchema: [{ key: "result", type: "number", description: "Current slot number" }],
+  },
+  {
+    method: "getBlockHeight",
+    category: "Network",
+    description: "Returns the current block height of the node.",
+    params: [],
+    responseSchema: [{ key: "result", type: "number", description: "Current block height" }],
+  },
+  {
+    method: "getEpochInfo",
+    category: "Network",
+    description: "Returns information about the current epoch.",
+    params: [],
+    responseSchema: [
+      { key: "absoluteSlot", type: "number", description: "Current slot" },
+      { key: "blockHeight", type: "number", description: "Current block height" },
+      { key: "epoch", type: "number", description: "Current epoch" },
+      { key: "slotIndex", type: "number", description: "Current slot relative to epoch start" },
+      { key: "slotsInEpoch", type: "number", description: "Number of slots in epoch" },
+    ],
+  },
   // Account
-  { method: "getBalance", category: "Account", description: "Returns the lamport balance of the account.", params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }] },
-  { method: "getAccountInfo", category: "Account", description: "Returns all information associated with the account.", params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }] },
-  { method: "getTokenAccountBalance", category: "Account", description: "Returns the token balance of an SPL Token account.", params: [{ name: "pubkey", placeholder: "SPL Token account public key", required: true }] },
+  {
+    method: "getBalance",
+    category: "Account",
+    description: "Returns the lamport balance of the account.",
+    params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }],
+    examples: [
+      { label: "Devnet faucet", params: { pubkey: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa" } },
+    ],
+    responseSchema: [
+      { key: "value", type: "number", description: "Balance in lamports (divide by 1e9 for SOL)" },
+      { key: "context.slot", type: "number", description: "Slot at which balance was retrieved" },
+    ],
+  },
+  {
+    method: "getAccountInfo",
+    category: "Account",
+    description: "Returns all information associated with the account.",
+    params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }],
+    examples: [
+      { label: "Devnet faucet", params: { pubkey: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa" } },
+    ],
+    responseSchema: [
+      { key: "value.lamports", type: "number", description: "Lamports assigned to account" },
+      { key: "value.owner", type: "string", description: "Base58 pubkey of owning program" },
+      { key: "value.executable", type: "boolean", description: "Whether account is executable" },
+      { key: "value.rentEpoch", type: "number", description: "Epoch at which account will owe rent" },
+    ],
+  },
+  {
+    method: "getTokenAccountBalance",
+    category: "Account",
+    description: "Returns the token balance of an SPL Token account.",
+    params: [{ name: "pubkey", placeholder: "SPL Token account public key", required: true }],
+    responseSchema: [
+      { key: "value.amount", type: "string", description: "Raw token amount as string" },
+      { key: "value.decimals", type: "number", description: "Number of decimals in token amount" },
+      { key: "value.uiAmount", type: "number | null", description: "Token amount as float (null if too large)" },
+    ],
+  },
   {
     method: "getProgramAccounts",
     category: "Account",
     description: "Returns all accounts owned by the provided program. Compute-heavy.",
     params: [{ name: "programId", placeholder: "Program public key", required: true }],
+    examples: [
+      { label: "Token program", params: { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" } },
+    ],
+    responseSchema: [
+      { key: "[].pubkey", type: "string", description: "Account pubkey" },
+      { key: "[].account.lamports", type: "number", description: "Lamports in account" },
+      { key: "[].account.data", type: "object", description: "Account data (may be large)" },
+    ],
   },
   // Transaction
-  { method: "getTransaction", category: "Transaction", description: "Returns transaction details.", params: [{ name: "signature", placeholder: "Transaction signature (base58)", required: true }] },
-  { method: "getSignaturesForAddress", category: "Transaction", description: "Returns confirmed signatures for transactions involving an address.", params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }] },
+  {
+    method: "getTransaction",
+    category: "Transaction",
+    description: "Returns transaction details.",
+    params: [{ name: "signature", placeholder: "Transaction signature (base58)", required: true }],
+    responseSchema: [
+      { key: "slot", type: "number", description: "Slot the transaction was processed in" },
+      { key: "meta.fee", type: "number", description: "Fee in lamports" },
+      { key: "meta.err", type: "object | null", description: "Error if transaction failed" },
+      { key: "blockTime", type: "number | null", description: "Unix timestamp of block" },
+    ],
+  },
+  {
+    method: "getSignaturesForAddress",
+    category: "Transaction",
+    description: "Returns confirmed signatures for transactions involving an address.",
+    params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }],
+    examples: [
+      { label: "Devnet faucet", params: { pubkey: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa" } },
+    ],
+    responseSchema: [
+      { key: "[].signature", type: "string", description: "Transaction signature" },
+      { key: "[].slot", type: "number", description: "Slot containing the transaction" },
+      { key: "[].err", type: "object | null", description: "Transaction error, if any" },
+      { key: "[].blockTime", type: "number | null", description: "Unix timestamp estimate" },
+    ],
+  },
   // Block
-  { method: "getBlock", category: "Block", description: "Returns identity and transaction information about a confirmed block.", params: [{ name: "slot", placeholder: "Slot number (integer)", required: true }] },
-  { method: "getLatestBlockhash", category: "Block", description: "Returns the latest blockhash.", params: [] },
-  { method: "isBlockhashValid", category: "Block", description: "Returns whether a given blockhash is still valid.", params: [{ name: "blockhash", placeholder: "Blockhash string", required: true }] },
+  {
+    method: "getBlock",
+    category: "Block",
+    description: "Returns identity and transaction information about a confirmed block.",
+    params: [{ name: "slot", placeholder: "Slot number (integer)", required: true }],
+    responseSchema: [
+      { key: "blockhash", type: "string", description: "Blockhash of this block" },
+      { key: "previousBlockhash", type: "string", description: "Blockhash of parent block" },
+      { key: "parentSlot", type: "number", description: "Parent slot" },
+      { key: "transactions", type: "array", description: "List of transactions in block" },
+    ],
+  },
+  {
+    method: "getLatestBlockhash",
+    category: "Block",
+    description: "Returns the latest blockhash.",
+    params: [],
+    responseSchema: [
+      { key: "value.blockhash", type: "string", description: "Latest blockhash" },
+      { key: "value.lastValidBlockHeight", type: "number", description: "Last block height at which blockhash is valid" },
+    ],
+  },
+  {
+    method: "isBlockhashValid",
+    category: "Block",
+    description: "Returns whether a given blockhash is still valid.",
+    params: [{ name: "blockhash", placeholder: "Blockhash string", required: true }],
+    responseSchema: [{ key: "value", type: "boolean", description: "Whether the blockhash is still valid" }],
+  },
 ];
 
 const CATEGORIES = [...new Set(RPC_METHODS.map((m) => m.category))];
@@ -64,12 +212,47 @@ interface HistoryItem {
   requestedAt: string;
 }
 
+function buildRpcBody(method: string, params: MethodParam[], paramValues: Record<string, string>) {
+  const rpcParams: unknown[] = params.map((p) => {
+    const v = paramValues[p.name] ?? "";
+    if (p.name === "slot") return isNaN(Number(v)) ? v : Number(v);
+    return v || undefined;
+  }).filter((v) => v !== undefined);
+  return JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: rpcParams.length > 0 ? rpcParams : undefined });
+}
+
+async function sendRpcRequest(
+  gatewayBase: string,
+  mode: "standard" | "priority",
+  body: string,
+  apiKeyPrefix?: string
+): Promise<{ text: string; status: number; durationMs: number }> {
+  const endpoint = mode === "priority" ? `${gatewayBase}/priority` : `${gatewayBase}/rpc`;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKeyPrefix) headers["x-api-key"] = `${apiKeyPrefix}...`;
+  const start = Date.now();
+  const res = await fetch(endpoint, { method: "POST", headers, body });
+  const elapsed = Date.now() - start;
+  const text = await res.text();
+  return { text, status: res.status, durationMs: elapsed };
+}
+
+function formatResponse(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw) as unknown, null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export default function PlaygroundPage() {
   const portal = usePortal();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const isAuthenticated = portal.walletPhase === "authenticated";
 
   const [selectedCategory, setSelectedCategory] = useState("Network");
@@ -83,75 +266,123 @@ export default function PlaygroundPage() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
+  // Compare mode
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareResponse, setCompareResponse] = useState<string | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [compareDurationMs, setCompareDurationMs] = useState<number | null>(null);
+
+  // Schema panel
+  const [schemaOpen, setSchemaOpen] = useState(false);
+
+  // Share copied
+  const [shareCopied, setShareCopied] = useState(false);
+  const initializedFromUrl = useRef(false);
+
+  // On mount, restore state from URL search params
+  useEffect(() => {
+    if (initializedFromUrl.current) return;
+    initializedFromUrl.current = true;
+    const methodName = searchParams.get("method");
+    if (!methodName) return;
+    const found = RPC_METHODS.find((m) => m.method === methodName);
+    if (!found) return;
+    setSelectedMethod(found);
+    setSelectedCategory(found.category);
+    const params: Record<string, string> = {};
+    for (const p of found.params) {
+      const val = searchParams.get(p.name);
+      if (val) params[p.name] = val;
+    }
+    setParamValues(params);
+  }, [searchParams]);
+
   const selectMethod = useCallback((m: RpcMethod) => {
     setSelectedMethod(m);
     setParamValues({});
     setResponse(null);
+    setCompareResponse(null);
     setError(null);
+    setCompareError(null);
     setDurationMs(null);
+    setCompareDurationMs(null);
+    setSchemaOpen(false);
   }, []);
 
   const activeApiKey = portal.apiKeys.find((k) => k.id === selectedKeyId && k.status === "ACTIVE") ??
     portal.apiKeys.find((k) => k.status === "ACTIVE");
 
+  const gatewayBase = webEnv.apiBaseUrl.replace("/api", "").replace(":3001", ":3002");
+
+  function copyShareLink() {
+    const params = new URLSearchParams({ method: selectedMethod.method });
+    for (const [k, v] of Object.entries(paramValues)) {
+      if (v) params.set(k, v);
+    }
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    void navigator.clipboard.writeText(url);
+    // Update URL without navigation
+    router.replace(`${window.location.pathname}?${params.toString()}`, { scroll: false });
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  }
+
   async function sendRequest() {
     if (!isAuthenticated) return;
-
-    // Build JSON-RPC params array
-    const methodDef = selectedMethod;
-    const rpcParams: unknown[] = methodDef.params.map((p) => {
-      const v = paramValues[p.name] ?? "";
-      // Try to parse numbers for slot fields
-      if (p.name === "slot") return isNaN(Number(v)) ? v : Number(v);
-      return v || undefined;
-    }).filter((v) => v !== undefined);
-
-    const body = JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: methodDef.method,
-      params: rpcParams.length > 0 ? rpcParams : undefined,
-    });
-
-    const gatewayBase = webEnv.apiBaseUrl.replace("/api", "").replace(":3001", ":3002");
-    const endpoint = mode === "priority" ? `${gatewayBase}/priority` : `${gatewayBase}/rpc`;
-
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (activeApiKey) headers["x-api-key"] = `${activeApiKey.prefix}...`;
-
+    const body = buildRpcBody(selectedMethod.method, selectedMethod.params, paramValues);
     setLoading(true);
     setError(null);
     setResponse(null);
+    setCompareResponse(null);
+    setCompareError(null);
     setDurationMs(null);
-    const start = Date.now();
+    setCompareDurationMs(null);
 
     try {
-      const res = await fetch(endpoint, { method: "POST", headers, body });
-      const elapsed = Date.now() - start;
-      setDurationMs(elapsed);
-      const text = await res.text();
-      try {
-        const json = JSON.parse(text) as unknown;
-        setResponse(JSON.stringify(json, null, 2));
-      } catch {
-        setResponse(text);
+      if (compareMode) {
+        const [standardResult, priorityResult] = await Promise.allSettled([
+          sendRpcRequest(gatewayBase, "standard", body, activeApiKey?.prefix),
+          sendRpcRequest(gatewayBase, "priority", body, activeApiKey?.prefix),
+        ]);
+        if (standardResult.status === "fulfilled") {
+          setResponse(formatResponse(standardResult.value.text));
+          setDurationMs(standardResult.value.durationMs);
+          addHistory(selectedMethod.method, "standard", standardResult.value.durationMs, standardResult.value.status);
+        } else {
+          setError(standardResult.reason instanceof Error ? standardResult.reason.message : "Network error");
+        }
+        if (priorityResult.status === "fulfilled") {
+          setCompareResponse(formatResponse(priorityResult.value.text));
+          setCompareDurationMs(priorityResult.value.durationMs);
+          addHistory(selectedMethod.method, "priority", priorityResult.value.durationMs, priorityResult.value.status);
+        } else {
+          setCompareError(priorityResult.reason instanceof Error ? priorityResult.reason.message : "Network error");
+        }
+      } else {
+        const result = await sendRpcRequest(gatewayBase, mode, body, activeApiKey?.prefix);
+        setDurationMs(result.durationMs);
+        setResponse(formatResponse(result.text));
+        addHistory(selectedMethod.method, mode, result.durationMs, result.status);
       }
-      setHistory((prev) => [
-        {
-          id: crypto.randomUUID(),
-          method: methodDef.method,
-          mode,
-          durationMs: elapsed,
-          statusCode: res.status,
-          requestedAt: new Date().toLocaleTimeString(),
-        },
-        ...prev.slice(0, 19),
-      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
     } finally {
       setLoading(false);
     }
+  }
+
+  function addHistory(method: string, m: "standard" | "priority", dMs: number, statusCode: number) {
+    setHistory((prev) => [
+      {
+        id: crypto.randomUUID(),
+        method,
+        mode: m,
+        durationMs: dMs,
+        statusCode,
+        requestedAt: new Date().toLocaleTimeString(),
+      },
+      ...prev.slice(0, 19),
+    ]);
   }
 
   return (
@@ -168,7 +399,7 @@ export default function PlaygroundPage() {
         </Notice>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[320px_1fr_280px]">
+      <div className="grid gap-6 xl:grid-cols-[300px_1fr_260px]">
         {/* Left: Method selector */}
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] xl:self-start">
           <CardHeader>
@@ -213,31 +444,92 @@ export default function PlaygroundPage() {
           <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="font-mono text-base">{selectedMethod.method}</CardTitle>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CardTitle className="font-mono text-base">{selectedMethod.method}</CardTitle>
+                    <Badge tone="neutral">{selectedMethod.category}</Badge>
+                  </div>
                   <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{selectedMethod.description}</p>
                 </div>
-                <Badge tone="neutral">{selectedMethod.category}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Mode selector */}
-              <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Mode</p>
-                <div className="flex gap-2">
-                  {(["standard", "priority"] as const).map((m) => (
+                <div className="flex shrink-0 items-center gap-2">
+                  {/* Share URL */}
+                  <button
+                    onClick={copyShareLink}
+                    title="Copy shareable link"
+                    className="rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2 py-1 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                  >
+                    {shareCopied ? "Copied!" : "Share"}
+                  </button>
+                  {/* Schema toggle */}
+                  {selectedMethod.responseSchema && selectedMethod.responseSchema.length > 0 && (
                     <button
-                      key={m}
-                      onClick={() => setMode(m)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                        mode === m
+                      onClick={() => setSchemaOpen((v) => !v)}
+                      className={`rounded border px-2 py-1 text-xs font-medium transition-colors ${
+                        schemaOpen
                           ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
-                          : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                       }`}
                     >
-                      {m}
+                      Schema
                     </button>
-                  ))}
+                  )}
+                </div>
+              </div>
+              {/* Schema panel */}
+              {schemaOpen && selectedMethod.responseSchema && (
+                <div className="mt-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Response shape</p>
+                  <div className="space-y-1.5">
+                    {selectedMethod.responseSchema.map((field) => (
+                      <div key={field.key} className="flex flex-wrap items-baseline gap-2">
+                        <code className="font-mono text-xs text-brand-400">{field.key}</code>
+                        <span className="rounded bg-[var(--fyxvo-panel-soft)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--fyxvo-text-muted)]">{field.type}</span>
+                        <span className="text-xs text-[var(--fyxvo-text-muted)]">{field.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Compare mode toggle */}
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Mode</p>
+                  <div className="flex gap-2">
+                    {!compareMode && (["standard", "priority"] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMode(m)}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                          mode === m
+                            ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                            : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                    {compareMode && (
+                      <span className="rounded-lg border border-brand-500/50 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-[var(--fyxvo-text)]">
+                        Standard vs Priority
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-4">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={compareMode}
+                    onClick={() => { setCompareMode((v) => !v); setResponse(null); setCompareResponse(null); }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                      compareMode ? "bg-brand-500" : "bg-[var(--fyxvo-border-strong)]"
+                    }`}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${compareMode ? "translate-x-4" : "translate-x-0"}`} />
+                  </button>
+                  <span className="text-xs text-[var(--fyxvo-text-muted)]">Compare</span>
                 </div>
               </div>
 
@@ -260,10 +552,27 @@ export default function PlaygroundPage() {
                 </div>
               )}
 
-              {/* Params */}
+              {/* Params + Examples */}
               {selectedMethod.params.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Parameters</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Parameters</p>
+                    {selectedMethod.examples && selectedMethod.examples.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-[var(--fyxvo-text-muted)]">Examples:</span>
+                        {selectedMethod.examples.map((ex) => (
+                          <button
+                            key={ex.label}
+                            type="button"
+                            onClick={() => setParamValues(ex.params)}
+                            className="rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2 py-0.5 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                          >
+                            {ex.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   {selectedMethod.params.map((param) => (
                     <div key={param.name}>
                       <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
@@ -295,42 +604,105 @@ export default function PlaygroundPage() {
                     </svg>
                     Sending…
                   </span>
-                ) : "Send Request"}
+                ) : compareMode ? "Send (Standard + Priority)" : "Send Request"}
               </Button>
             </CardContent>
           </Card>
 
-          {/* Response */}
-          {(response !== null || error !== null) && (
-            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Response</CardTitle>
-                  <div className="flex items-center gap-2">
-                    {durationMs !== null && (
-                      <Badge tone="neutral">{durationMs}ms</Badge>
+          {/* Response(s) */}
+          {(response !== null || error !== null || compareResponse !== null || compareError !== null) && (
+            compareMode ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Standard response */}
+                <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm">Standard</CardTitle>
+                      <div className="flex items-center gap-2">
+                        {durationMs !== null && <Badge tone="neutral">{durationMs}ms</Badge>}
+                        {response !== null && (
+                          <button
+                            onClick={() => void navigator.clipboard.writeText(response)}
+                            className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                          >
+                            Copy
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {error ? (
+                      <Notice tone="warning" title="Request failed">{error}</Notice>
+                    ) : (
+                      <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-80">
+                        <code>{response}</code>
+                      </pre>
                     )}
-                    {response !== null && (
-                      <button
-                        onClick={() => void navigator.clipboard.writeText(response)}
-                        className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-                      >
-                        Copy
-                      </button>
+                  </CardContent>
+                </Card>
+                {/* Priority response */}
+                <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm">Priority</CardTitle>
+                      <div className="flex items-center gap-2">
+                        {compareDurationMs !== null && (
+                          <Badge tone={compareDurationMs < (durationMs ?? Infinity) ? "success" : "neutral"}>
+                            {compareDurationMs}ms
+                          </Badge>
+                        )}
+                        {compareResponse !== null && (
+                          <button
+                            onClick={() => void navigator.clipboard.writeText(compareResponse)}
+                            className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                          >
+                            Copy
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {compareError ? (
+                      <Notice tone="warning" title="Request failed">{compareError}</Notice>
+                    ) : (
+                      <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-80">
+                        <code>{compareResponse}</code>
+                      </pre>
                     )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Response</CardTitle>
+                    <div className="flex items-center gap-2">
+                      {durationMs !== null && <Badge tone="neutral">{durationMs}ms</Badge>}
+                      {response !== null && (
+                        <button
+                          onClick={() => void navigator.clipboard.writeText(response)}
+                          className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                        >
+                          Copy
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {error ? (
-                  <Notice tone="warning" title="Request failed">{error}</Notice>
-                ) : (
-                  <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-96">
-                    <code>{response}</code>
-                  </pre>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {error ? (
+                    <Notice tone="warning" title="Request failed">{error}</Notice>
+                  ) : (
+                    <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-96">
+                      <code>{response}</code>
+                    </pre>
+                  )}
+                </CardContent>
+              </Card>
+            )
           )}
         </div>
 

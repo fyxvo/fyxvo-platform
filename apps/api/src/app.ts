@@ -1994,7 +1994,8 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
   // ── Notification preferences ──────────────────────────────────────────────
 
   const notifPrefsSchema = z.object({
-    notifyProjectActivation:  z.boolean().optional(),
+    email:                     z.string().email().nullable().optional(),
+    notifyProjectActivation:   z.boolean().optional(),
     notifyApiKeyEvents:        z.boolean().optional(),
     notifyFundingConfirmed:    z.boolean().optional(),
     notifyLowBalance:          z.boolean().optional(),
@@ -2007,14 +2008,16 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     const user = requireUser(request);
     const fullUser = await input.repository.findUserById(user.id);
     if (!fullUser) throw new HttpError(404, "user_not_found", "User not found.");
+    const u = fullUser as Record<string, unknown>;
     return {
-      notifyProjectActivation:  (fullUser as Record<string, unknown>).notifyProjectActivation ?? true,
-      notifyApiKeyEvents:        (fullUser as Record<string, unknown>).notifyApiKeyEvents ?? true,
-      notifyFundingConfirmed:    (fullUser as Record<string, unknown>).notifyFundingConfirmed ?? true,
-      notifyLowBalance:          (fullUser as Record<string, unknown>).notifyLowBalance ?? true,
-      notifyDailyAlert:          (fullUser as Record<string, unknown>).notifyDailyAlert ?? true,
-      notifyWeeklySummary:       (fullUser as Record<string, unknown>).notifyWeeklySummary ?? false,
-      notifyReferralConversion:  (fullUser as Record<string, unknown>).notifyReferralConversion ?? true,
+      email:                     (u.email as string | null) ?? null,
+      notifyProjectActivation:   u.notifyProjectActivation ?? true,
+      notifyApiKeyEvents:        u.notifyApiKeyEvents ?? true,
+      notifyFundingConfirmed:    u.notifyFundingConfirmed ?? true,
+      notifyLowBalance:          u.notifyLowBalance ?? true,
+      notifyDailyAlert:          u.notifyDailyAlert ?? true,
+      notifyWeeklySummary:       u.notifyWeeklySummary ?? false,
+      notifyReferralConversion:  u.notifyReferralConversion ?? true,
     };
   });
 

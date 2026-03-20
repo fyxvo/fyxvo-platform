@@ -131,6 +131,11 @@ export default function SettingsPage() {
   // Archived projects
   const [restoringProjectId, setRestoringProjectId] = useState<string | null>(null);
 
+  // Email
+  const [emailValue, setEmailValue] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
+
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState<{
     notifyProjectActivation: boolean;
@@ -202,6 +207,18 @@ export default function SettingsPage() {
     } finally { setProjectFieldsSaving(false); }
   }
 
+  async function saveEmail() {
+    if (!portal.token) return;
+    setEmailSaving(true);
+    try {
+      await updateNotificationPreferences({ email: emailValue || null }, portal.token);
+      setEmailSaved(true);
+      setTimeout(() => setEmailSaved(false), 2500);
+    } finally {
+      setEmailSaving(false);
+    }
+  }
+
   async function saveLowBalanceSol() {
     if (!portal.selectedProject) return;
     setLowBalanceSolSaving(true);
@@ -235,7 +252,10 @@ export default function SettingsPage() {
       })
       .catch(() => undefined);
     getNotificationPreferences(portal.token)
-      .then((prefs) => setNotifPrefs(prefs))
+      .then((prefs) => {
+        setEmailValue(prefs.email ?? "");
+        setNotifPrefs(prefs);
+      })
       .catch(() => undefined);
   }, [portal.token, isAuthenticated]);
 
@@ -420,6 +440,35 @@ export default function SettingsPage() {
             ) : (
               <span className="text-sm text-[var(--fyxvo-text-muted)]">Not connected</span>
             )}
+          </SettingRow>
+          <SettingRow label="Email address" description="Used for alerts and digest emails. Coming soon — stored but not yet delivered.">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="email"
+                  value={emailValue}
+                  onChange={(e) => setEmailValue(e.target.value)}
+                  placeholder="you@example.com"
+                  className="h-9 text-sm w-full max-w-xs"
+                  disabled={!isAuthenticated}
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void saveEmail()}
+                  disabled={emailSaving || !isAuthenticated || !portal.token}
+                >
+                  {emailSaving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+              {emailSaved ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Email saved.</p>
+              ) : null}
+              <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-amber-600 dark:text-amber-400">Coming soon</span>
+                {" "}Email delivery is not yet active.
+              </p>
+            </div>
           </SettingRow>
           <SettingRow label="Display name" description="Auto-generated from your wallet address.">
             <p className="text-sm font-medium text-[var(--fyxvo-text)]">
