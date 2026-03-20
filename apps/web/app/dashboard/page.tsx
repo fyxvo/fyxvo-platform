@@ -36,8 +36,9 @@ import {
 } from "../../lib/format";
 import { GatewayHealthCard } from "../../components/gateway-health";
 import { OnboardingChecklist } from "../../components/onboarding-checklist";
-import type { AdminOverview, PortalProject } from "../../lib/types";
+import type { AdminOverview, NetworkStats, PortalProject } from "../../lib/types";
 import { webEnv } from "../../lib/env";
+import { getNetworkStats } from "../../lib/api";
 
 const projectColumns: readonly TableColumn<PortalProject>[] = [
   {
@@ -310,6 +311,11 @@ export default function DashboardPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [projectTemplate, setProjectTemplate] = useState<"blank" | "defi" | "indexing">("blank");
+  const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
+
+  useEffect(() => {
+    void getNetworkStats().then(setNetworkStats).catch(() => {});
+  }, []);
 
   function handleCreateClose() {
     setCreateOpen(false);
@@ -991,6 +997,14 @@ export default function DashboardPage() {
               detail="Tracked fee liability on chain. This is not withdrawable revenue until a reviewed withdrawal path exists."
               accent={<DeltaBadge value="treasury liability" />}
             />
+            {networkStats?.totalSolFees !== undefined && (
+              <MetricCard
+                label="Total SOL collected"
+                value={networkStats.totalSolFees ? formatSol(Number(BigInt(networkStats.totalSolFees)) / 1_000_000_000) : "0 SOL"}
+                detail="Total lamports from confirmed funding transactions across all projects."
+                accent={<DeltaBadge value="all-time" />}
+              />
+            )}
             <MetricCard
               label="Worker health"
               value={portal.adminOverview.worker.status}

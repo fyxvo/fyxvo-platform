@@ -55,6 +55,7 @@ function mapUser(user: {
   email: string | null;
   role: AuthenticatedUser["role"];
   status: AuthenticatedUser["status"];
+  onboardingDismissed?: boolean;
 }) {
   return {
     id: user.id,
@@ -64,7 +65,8 @@ function mapUser(user: {
     displayName: user.displayName,
     email: user.email,
     role: user.role,
-    status: user.status
+    status: user.status,
+    onboardingDismissed: user.onboardingDismissed ?? false,
   };
 }
 
@@ -134,6 +136,13 @@ export class PrismaApiRepository implements ApiRepository {
     });
   }
 
+  async updateUser(userId: string, data: { onboardingDismissed?: boolean }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data,
+    });
+  }
+
   async getNextChainProjectId() {
     const aggregate = await this.prisma.project.aggregate({
       _max: {
@@ -191,7 +200,8 @@ export class PrismaApiRepository implements ApiRepository {
         name: input.name,
         chainProjectId: input.chainProjectId,
         onChainProjectPda: input.onChainProjectPda,
-        ...(input.description !== undefined ? { description: input.description } : {})
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.templateType !== undefined ? { templateType: input.templateType } : {})
       },
       include: {
         owner: true,
@@ -217,7 +227,8 @@ export class PrismaApiRepository implements ApiRepository {
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
         ...(input.lowBalanceThresholdSol !== undefined ? { lowBalanceThresholdSol: input.lowBalanceThresholdSol } : {}),
-        ...(input.dailyRequestAlertThreshold !== undefined ? { dailyRequestAlertThreshold: input.dailyRequestAlertThreshold } : {})
+        ...(input.dailyRequestAlertThreshold !== undefined ? { dailyRequestAlertThreshold: input.dailyRequestAlertThreshold } : {}),
+        ...(input.archivedAt !== undefined ? { archivedAt: input.archivedAt } : {})
       },
       include: {
         owner: true,
@@ -1123,18 +1134,17 @@ export class PrismaApiRepository implements ApiRepository {
   }
 
   async getNetworkStats(): Promise<NetworkStats> {
-    const [totalRequests, totalProjects, totalApiKeys] = await Promise.all([
+    const [totalRequests, totalProjects, totalApiKeys, feeResult] = await Promise.all([
       this.prisma.requestLog.count(),
       this.prisma.project.count(),
-      this.prisma.apiKey.count()
+      this.prisma.apiKey.count(),
+      this.prisma.fundingCoordinate.aggregate({
+        where: { confirmedAt: { not: null } },
+        _sum: { amount: true },
+      }),
     ]);
-
-    return {
-      totalRequests,
-      totalProjects,
-      totalApiKeys,
-      updatedAt: new Date().toISOString()
-    };
+    const totalSolFees = (feeResult._sum.amount ?? 0n).toString();
+    return { totalRequests, totalProjects, totalApiKeys, totalSolFees, updatedAt: new Date().toISOString() };
   }
 
   async getFundingHistory(_userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]> {

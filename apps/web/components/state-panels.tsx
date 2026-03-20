@@ -17,16 +17,31 @@ export function AuthGate({
 }
 
 export function ErrorPanel({
-  title,
-  body
+  title = "Something went wrong",
+  message,
+  details,
+  retry,
 }: {
-  readonly title: string;
-  readonly body: string;
+  title?: string;
+  message?: string;
+  details?: string;
+  retry?: () => void;
 }) {
   return (
-    <Notice tone="danger" title={title} icon={<AlertIcon className="h-4 w-4" />}>
-      {body}
-    </Notice>
+    <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6 text-center">
+      <AlertIcon className="mx-auto mb-3 h-8 w-8 text-rose-400" />
+      <h3 className="font-medium text-[var(--fyxvo-text)]">{title}</h3>
+      {message && <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{message}</p>}
+      {details && <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)] italic">{details}</p>}
+      {retry && (
+        <button
+          onClick={retry}
+          className="mt-4 rounded-lg border border-[var(--fyxvo-border)] px-4 py-2 text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+        >
+          Try again
+        </button>
+      )}
+    </div>
   );
 }
 

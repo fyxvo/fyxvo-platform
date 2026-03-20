@@ -26,6 +26,55 @@ interface Release {
 
 const releases: Release[] = [
   {
+    version: "v0.2.0",
+    date: "March 2026",
+    title: "Developer Experience & Platform Features",
+    description:
+      "A broad set of developer experience improvements: AI assistant, project templates, embeddable widgets, onboarding flow, analytics cost breakdown, pricing overhaul, service health timeline, connection quality indicator, offline support, and network stats API.",
+    changes: [
+      {
+        type: "added",
+        text: "AI Developer Assistant: streaming chat assistant powered by Claude claude-sonnet-4-20250514 at /assistant. Answers Solana development questions, generates code examples in JS/TS/Python/Rust, explains Fyxvo pricing and architecture, and uses project context for personalized answers.",
+      },
+      {
+        type: "added",
+        text: "Project Templates: three project creation templates — blank, DeFi trading, and data indexing. Templates pre-configure suggested funding amounts and show template-specific getting-started guides.",
+      },
+      {
+        type: "added",
+        text: "Usage Widget: public embeddable widget at /widget/project/[id]. Shows requests today, average latency, and gateway status. Supports light and dark themes via ?theme=. Auto-refreshes with ?live=true.",
+      },
+      {
+        type: "added",
+        text: "Onboarding Flow: five-step welcome modal for new users explains the full setup flow. Dismissal state persists to the database.",
+      },
+      {
+        type: "added",
+        text: "Analytics Cost Breakdown: analytics page shows estimated SOL spend for the selected time range, classified by method tier (standard vs compute-heavy).",
+      },
+      {
+        type: "added",
+        text: "Pricing Page Overhaul: live SOL/USD pricing from CoinGecko with interactive cost estimator, volume discount tiers, and revenue split display.",
+      },
+      {
+        type: "added",
+        text: "Service Health Timeline: status page shows 48-entry uptime history per service as color-coded timeline blocks.",
+      },
+      {
+        type: "added",
+        text: "Connection Quality Indicator: sidebar indicator polls API health every 30 seconds and shows fast/normal/slow/offline status with tooltip showing exact response time.",
+      },
+      {
+        type: "added",
+        text: "Service Worker: offline support via service worker. Serves cached pages when the user is offline and auto-restores when connection returns.",
+      },
+      {
+        type: "added",
+        text: "Network Stats API: public GET /v1/network/stats returns total requests served, projects, API keys, and SOL fees collected. Powers the live stats strip on the landing page.",
+      },
+    ],
+  },
+  {
     version: "v0.1.0",
     date: "March 2026",
     title: "Devnet Private Alpha",

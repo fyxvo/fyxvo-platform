@@ -77,6 +77,7 @@ model User {
   displayName        String
   role               UserRole            @default(MEMBER)
   status             UserStatus          @default(INVITED)
+  onboardingDismissed Boolean            @default(false)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   projects           Project[]
@@ -139,6 +140,8 @@ model Project {
   ownerId                    String              @db.Uuid
   lowBalanceThresholdSol     Float?
   dailyRequestAlertThreshold Int?
+  templateType               String?
+  archivedAt                 DateTime?
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
   owner                      User                @relation(fields: [ownerId], references: [id], onDelete: Restrict)

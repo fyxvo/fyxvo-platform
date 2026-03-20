@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Button } from "@fyxvo/ui";
 import type { OnChainProjectSnapshot, PortalApiKey } from "../lib/types";
 import { WelcomeModal } from "./welcome-modal";
+import { updateMe } from "../lib/api";
+import { usePortal } from "./portal-provider";
 
 interface ChecklistStep {
   readonly id: string;
@@ -53,6 +55,7 @@ export function OnboardingChecklist({
   readonly apiKeys: PortalApiKey[];
   readonly requestCount?: number;
 }) {
+  const { user, token } = usePortal();
   const isActivated = onchain?.projectAccountExists ?? false;
   const hasFunding = onchain?.balances
     ? parseFloat(onchain.balances.availableSolCredits) > 0 ||
@@ -106,7 +109,9 @@ export function OnboardingChecklist({
   const allDone = completedCount === steps.length;
 
   const [showWelcome, setShowWelcome] = useState(() => {
-    // Show welcome modal once for new users who have completed 0 steps (checked on mount)
+    // If already dismissed server-side, never show
+    if (user?.onboardingDismissed) return false;
+    // Show welcome modal once for new users (checked on mount via localStorage)
     if (typeof window === "undefined") return false;
     return !localStorage.getItem("fyxvo-welcome-seen");
   });
@@ -114,6 +119,10 @@ export function OnboardingChecklist({
   function dismissWelcome() {
     localStorage.setItem("fyxvo-welcome-seen", "1");
     setShowWelcome(false);
+    // Sync dismissed state to server
+    if (token) {
+      void updateMe({ onboardingDismissed: true, token });
+    }
   }
 
   if (allDone) return null;

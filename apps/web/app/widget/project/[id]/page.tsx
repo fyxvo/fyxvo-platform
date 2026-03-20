@@ -1,49 +1,51 @@
-async function getWidgetData(id: string) {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.fyxvo.com"}/v1/projects/${id}/widget`, {
-      next: { revalidate: 30 },
-    });
-    if (!res.ok) return null;
-    return res.json() as Promise<{ projectName: string; requestsToday: number; gatewayStatus: string; avgLatencyMs: number; isPublic: boolean }>;
-  } catch {
-    return null;
-  }
-}
+import { WidgetCard } from "./widget-card";
 
-export default async function WidgetPage({ params }: { params: Promise<{ id: string }> }) {
+type WidgetSearchParams = {
+  theme?: string;
+  live?: string;
+};
+
+export default async function WidgetPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<WidgetSearchParams>;
+}) {
   const { id } = await params;
-  const data = await getWidgetData(id);
+  const { theme, live } = await searchParams;
+  const isDark = theme !== "light";
+  const isLive = live === "true";
 
+  const data = await getWidgetData(id);
   if (!data || !data.isPublic) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f] p-4">
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-center">
-          <p className="text-sm text-white/50">Analytics set to private</p>
+      <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? "bg-[#0a0a0f]" : "bg-gray-50"}`}>
+        <div className={`rounded-2xl border px-6 py-5 text-center ${isDark ? "border-white/10 bg-white/5" : "border-gray-200 bg-white"}`}>
+          <p className={`text-sm ${isDark ? "text-white/50" : "text-gray-400"}`}>Analytics set to private</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f] p-4">
-      <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-white/5 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs uppercase tracking-wider text-white/40">Fyxvo</p>
-          <div className={`h-2 w-2 rounded-full ${data.gatewayStatus === "healthy" ? "bg-emerald-400" : "bg-amber-400"}`} />
-        </div>
-        <p className="font-semibold text-white truncate">{data.projectName}</p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-white/40">Requests today</p>
-            <p className="mt-0.5 text-lg font-semibold text-white">{data.requestsToday.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-xs text-white/40">Avg latency</p>
-            <p className="mt-0.5 text-lg font-semibold text-white">{data.avgLatencyMs}ms</p>
-          </div>
-        </div>
-        <p className="mt-4 text-xs text-white/30 text-center">powered by fyxvo.com</p>
-      </div>
-    </div>
-  );
+  return <WidgetCard id={id} initialData={data} isDark={isDark} isLive={isLive} />;
+}
+
+async function getWidgetData(id: string) {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.fyxvo.com";
+    const res = await fetch(`${apiUrl}/v1/projects/${id}/widget`, {
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) return null;
+    return res.json() as Promise<{
+      projectName: string;
+      requestsToday: number;
+      gatewayStatus: string;
+      avgLatencyMs: number;
+      isPublic: boolean;
+    }>;
+  } catch {
+    return null;
+  }
 }

@@ -4,6 +4,7 @@ export interface PortalUser {
   readonly displayName: string;
   readonly role: "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
   readonly status: "ACTIVE" | "INVITED" | "DISABLED";
+  readonly onboardingDismissed?: boolean;
 }
 
 export interface PortalProject {
@@ -557,4 +558,12 @@ export interface SampleStatusNarrative {
   readonly title: string;
   readonly body: string;
   readonly tone: "success" | "warning" | "danger" | "neutral";
+}
+
+export interface NetworkStats {
+  readonly totalRequests: number;
+  readonly totalProjects: number;
+  readonly totalApiKeys: number;
+  readonly totalSolFees?: string;
+  readonly updatedAt: string;
 }

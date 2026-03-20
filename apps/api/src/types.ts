@@ -52,6 +52,7 @@ export interface CreateProjectInput {
   readonly slug: string;
   readonly name: string;
   readonly description?: string;
+  readonly templateType?: string;
   readonly chainProjectId: bigint;
   readonly onChainProjectPda: string;
 }
@@ -63,6 +64,7 @@ export interface UpdateProjectInput {
   readonly displayName?: string | null;
   readonly lowBalanceThresholdSol?: number | null;
   readonly dailyRequestAlertThreshold?: number | null;
+  readonly archivedAt?: Date | null;
 }
 
 export interface CreateNotificationInput {
@@ -448,6 +450,7 @@ export interface NetworkStats {
   readonly totalRequests: number;
   readonly totalProjects: number;
   readonly totalApiKeys: number;
+  readonly totalSolFees: string; // lamports as string to avoid BigInt JSON issues
   readonly updatedAt: string;
 }
 
@@ -463,8 +466,9 @@ export interface ServiceHealthEntry {
 export type ServiceHealthHistory = Record<string, ServiceHealthEntry[]>;
 
 export interface ApiRepository {
-  findUserByWallet(walletAddress: string): Promise<AuthenticatedUser & { authNonce: string } | null>;
-  findUserById(userId: string): Promise<AuthenticatedUser & { authNonce: string } | null>;
+  findUserByWallet(walletAddress: string): Promise<AuthenticatedUser & { authNonce: string; onboardingDismissed: boolean } | null>;
+  findUserById(userId: string): Promise<AuthenticatedUser & { authNonce: string; onboardingDismissed: boolean } | null>;
+  updateUser(userId: string, data: { onboardingDismissed?: boolean }): Promise<void>;
   createOrRefreshWalletUser(
     walletAddress: string,
     authNonce: string

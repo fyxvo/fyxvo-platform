@@ -7,6 +7,7 @@ import { getStatusSnapshot } from "../lib/server-status";
 import { getNetworkStats } from "../lib/api";
 import { formatDuration } from "../lib/format";
 import { liveDevnetState } from "../lib/live-state";
+import { AnimatedStat } from "../components/animated-stat";
 
 export default async function HomePage() {
   const [status, networkStats] = await Promise.all([
@@ -20,6 +21,7 @@ export default async function HomePage() {
   const totalRequests = networkStats?.totalRequests ?? status.gatewayStatus.metrics?.totals?.requests ?? 0;
   const totalProjects = networkStats?.totalProjects ?? 0;
   const totalApiKeys = networkStats?.totalApiKeys ?? 0;
+  const totalSolFees = networkStats?.totalSolFees ? Number(BigInt(networkStats.totalSolFees)) / 1_000_000_000 : null;
 
   const curlExample = `curl -X POST https://rpc.fyxvo.com/rpc \\
   -H "content-type: application/json" \\
@@ -138,17 +140,22 @@ export default async function HomePage() {
             ) : null}
             {totalRequests > 0 ? (
               <div className="text-sm text-[var(--fyxvo-text-muted)]">
-                {totalRequests.toLocaleString()} requests served
+                <AnimatedStat value={totalRequests} /> requests served
               </div>
             ) : null}
             {totalProjects > 0 ? (
               <div className="text-sm text-[var(--fyxvo-text-muted)]">
-                {totalProjects.toLocaleString()} {totalProjects === 1 ? "project" : "projects"}
+                <AnimatedStat value={totalProjects} /> {totalProjects === 1 ? "project" : "projects"}
               </div>
             ) : null}
             {totalApiKeys > 0 ? (
               <div className="text-sm text-[var(--fyxvo-text-muted)]">
-                {totalApiKeys.toLocaleString()} API {totalApiKeys === 1 ? "key" : "keys"}
+                <AnimatedStat value={totalApiKeys} /> API {totalApiKeys === 1 ? "key" : "keys"}
+              </div>
+            ) : null}
+            {totalSolFees !== null && totalSolFees > 0 ? (
+              <div className="text-sm text-[var(--fyxvo-text-muted)]">
+                <AnimatedStat value={totalSolFees} formatter={(n) => `${n.toFixed(4)} SOL`} /> collected
               </div>
             ) : null}
             <Link

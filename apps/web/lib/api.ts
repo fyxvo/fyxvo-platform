@@ -446,7 +446,18 @@ export async function getProjectRateLimits(projectId: string, token: string) {
 }
 
 export async function getNetworkStats() {
-  return requestApi<{ totalRequests: number; totalProjects: number; totalApiKeys: number; updatedAt: string }>("/v1/network/stats");
+  return requestApi<{ totalRequests: number; totalProjects: number; totalApiKeys: number; totalSolFees?: string; updatedAt: string }>("/v1/network/stats");
+}
+
+export async function updateMe(input: { onboardingDismissed?: boolean; token: string }): Promise<void> {
+  await requestApi<{ success: boolean }>(
+    "/v1/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify({ onboardingDismissed: input.onboardingDismissed }),
+    },
+    input.token
+  );
 }
 
 export async function getServiceHealthHistory() {
