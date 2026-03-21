@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { webEnv } from "../../lib/env";
+
+export const metadata: Metadata = {
+  title: "Updates — Fyxvo",
+  description: "Latest Fyxvo platform updates, release notes, and announcements.",
+};
 
 interface UpdatePost {
   readonly id: string;

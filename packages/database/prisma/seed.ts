@@ -390,6 +390,127 @@ async function main() {
       windowEnd: new Date("2026-03-18T19:00:00.000Z")
     }
   });
+
+  await prisma.blogPost.upsert({
+    where: { slug: "devnet-private-alpha" },
+    update: {
+      title: "Fyxvo Devnet Private Alpha Is Live",
+      summary:
+        "We're opening access to Fyxvo's Solana RPC infrastructure on devnet. Here's what's working, what we're building, and how to get started.",
+      content: `## What's live today
+
+Fyxvo is a usage-based Solana RPC layer that routes requests through a decentralised operator network and settles payments on-chain in SOL. As of today, the devnet private alpha is open.
+
+What you can use right now:
+
+- **Solana devnet RPC proxying** — send JSON-RPC requests to \`rpc.fyxvo.com/rpc\` using your API key
+- **API key management** — create, revoke, and scope keys per project from the dashboard
+- **Project analytics** — request counts, error rates, and latency graphs updated in near real time
+- **Usage-based billing in SOL** — your project balance is drawn down per request; fund it with devnet SOL from any faucet
+
+## Getting started
+
+1. Sign in at [fyxvo.com](https://fyxvo.com) with your Solana wallet
+2. Create a project and copy your API key
+3. Fund the project wallet with devnet SOL (the dashboard links to a faucet)
+4. Point your RPC client at \`https://rpc.fyxvo.com/rpc\` with your key in the \`Authorization\` header or as a query param
+
+Standard \`@solana/web3.js\` usage:
+
+\`\`\`ts
+import { Connection } from "@solana/web3.js";
+
+const connection = new Connection(
+  "https://rpc.fyxvo.com/rpc?key=YOUR_API_KEY",
+  "confirmed"
+);
+\`\`\`
+
+## What we're building toward
+
+Devnet is the foundation. The roadmap from here:
+
+- **Mainnet launch** — same infrastructure, real SOL, SLA-backed uptime guarantees
+- **Priority lanes** — low-latency routing for time-sensitive transactions (MEV protection optional)
+- **Open operator network** — let node operators register, earn SOL rewards, and exit permissionlessly
+- **SDK improvements** — first-class TypeScript and Rust clients with automatic key rotation and retry logic
+
+## A honest note on current limitations
+
+Analytics are still basic — you'll see aggregate counts and latency but not per-method breakdowns yet. Uptime guarantees come with mainnet; devnet may have maintenance windows without notice. If something breaks, reach out directly.
+
+## Get involved
+
+This alpha is small on purpose. We want early feedback before we scale.
+
+- Discord: [discord.gg/Uggu236Jgj](https://discord.gg/Uggu236Jgj)
+- Telegram: [t.me/fyxvo](https://t.me/fyxvo)
+- X: [@fyxvo](https://x.com/fyxvo)
+
+If you're building on Solana and want to try it, come in.`,
+      publishedAt: new Date("2026-03-21T12:00:00Z"),
+      visible: true
+    },
+    create: {
+      slug: "devnet-private-alpha",
+      title: "Fyxvo Devnet Private Alpha Is Live",
+      summary:
+        "We're opening access to Fyxvo's Solana RPC infrastructure on devnet. Here's what's working, what we're building, and how to get started.",
+      content: `## What's live today
+
+Fyxvo is a usage-based Solana RPC layer that routes requests through a decentralised operator network and settles payments on-chain in SOL. As of today, the devnet private alpha is open.
+
+What you can use right now:
+
+- **Solana devnet RPC proxying** — send JSON-RPC requests to \`rpc.fyxvo.com/rpc\` using your API key
+- **API key management** — create, revoke, and scope keys per project from the dashboard
+- **Project analytics** — request counts, error rates, and latency graphs updated in near real time
+- **Usage-based billing in SOL** — your project balance is drawn down per request; fund it with devnet SOL from any faucet
+
+## Getting started
+
+1. Sign in at [fyxvo.com](https://fyxvo.com) with your Solana wallet
+2. Create a project and copy your API key
+3. Fund the project wallet with devnet SOL (the dashboard links to a faucet)
+4. Point your RPC client at \`https://rpc.fyxvo.com/rpc\` with your key in the \`Authorization\` header or as a query param
+
+Standard \`@solana/web3.js\` usage:
+
+\`\`\`ts
+import { Connection } from "@solana/web3.js";
+
+const connection = new Connection(
+  "https://rpc.fyxvo.com/rpc?key=YOUR_API_KEY",
+  "confirmed"
+);
+\`\`\`
+
+## What we're building toward
+
+Devnet is the foundation. The roadmap from here:
+
+- **Mainnet launch** — same infrastructure, real SOL, SLA-backed uptime guarantees
+- **Priority lanes** — low-latency routing for time-sensitive transactions (MEV protection optional)
+- **Open operator network** — let node operators register, earn SOL rewards, and exit permissionlessly
+- **SDK improvements** — first-class TypeScript and Rust clients with automatic key rotation and retry logic
+
+## A honest note on current limitations
+
+Analytics are still basic — you'll see aggregate counts and latency but not per-method breakdowns yet. Uptime guarantees come with mainnet; devnet may have maintenance windows without notice. If something breaks, reach out directly.
+
+## Get involved
+
+This alpha is small on purpose. We want early feedback before we scale.
+
+- Discord: [discord.gg/Uggu236Jgj](https://discord.gg/Uggu236Jgj)
+- Telegram: [t.me/fyxvo](https://t.me/fyxvo)
+- X: [@fyxvo](https://x.com/fyxvo)
+
+If you're building on Solana and want to try it, come in.`,
+      publishedAt: new Date("2026-03-21T12:00:00Z"),
+      visible: true
+    }
+  });
 }
 
 main()

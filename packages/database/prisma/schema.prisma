@@ -574,27 +574,28 @@ model WebhookDelivery {
   eventType      String
   payload        Json
   attemptNumber  Int       @default(1)
+  status         String    @default("pending")
   responseStatus Int?
   responseBody   String?
-  success        Boolean   @default(false)
-  attemptedAt    DateTime  @default(now())
   nextRetryAt    DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
   webhook        Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
   @@index([webhookId])
-  @@index([success, nextRetryAt])
+  @@index([status, nextRetryAt])
 }
 
 model PerformanceMetric {
   id        String   @id @default(uuid()) @db.Uuid
-  page      String
+  pathname  String
   fcp       Float?   // First Contentful Paint ms
   lcp       Float?   // Largest Contentful Paint ms
   tti       Float?   // Time to Interactive ms
   ua        String?  // User agent category: "mobile" | "desktop" | "tablet"
   createdAt DateTime @default(now())
 
-  @@index([page, createdAt])
+  @@index([pathname, createdAt])
 }
 
 model SupportTicket {
