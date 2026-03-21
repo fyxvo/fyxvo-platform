@@ -40,7 +40,10 @@ import type {
   WebhookItem,
   IncidentItem,
   ReferralStats,
-  WhatsNewItem
+  WhatsNewItem,
+  WebhookDeliveryRecord,
+  PerformanceMetricInput,
+  ProjectHealthScore
 } from "./types.js";
 
 type PrismaProject = PrismaNamespace.ProjectGetPayload<{
@@ -1519,6 +1522,149 @@ export class PrismaApiRepository implements ApiRepository {
   async dismissWhatsNew(userId: string, version: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma as any).user.update({ where: { id: userId }, data: { whatsNewDismissedVersion: version } });
+  }
+
+  async recordWebhookDelivery(input: {
+    webhookId: string;
+    eventType: string;
+    payload: unknown;
+    attemptNumber: number;
+    responseStatus?: number | null;
+    responseBody?: string | null;
+    success: boolean;
+    nextRetryAt?: Date | null;
+  }): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    const rec = await db.webhookDelivery.create({
+      data: {
+        webhookId: input.webhookId,
+        eventType: input.eventType,
+        payload: input.payload as object,
+        attemptNumber: input.attemptNumber,
+        responseStatus: input.responseStatus ?? null,
+        responseBody: input.responseBody ? input.responseBody.slice(0, 1000) : null,
+        success: input.success,
+        nextRetryAt: input.nextRetryAt ?? null,
+      },
+      select: { id: true },
+    });
+    return rec.id as string;
+  }
+
+  async getWebhookDeliveries(webhookId: string, limit = 20): Promise<WebhookDeliveryRecord[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    const rows = await db.webhookDelivery.findMany({
+      where: { webhookId },
+      orderBy: { attemptedAt: "desc" },
+      take: limit,
+      select: { id: true, webhookId: true, eventType: true, success: true, responseStatus: true, attemptNumber: true, attemptedAt: true },
+    }) as WebhookDeliveryRecord[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (rows as any[]).map((r: { attemptedAt: Date | string } & Record<string, unknown>) => ({
+      ...r,
+      attemptedAt: r.attemptedAt instanceof Date ? r.attemptedAt.toISOString() : String(r.attemptedAt),
+    })) as WebhookDeliveryRecord[];
+  }
+
+  async getPendingWebhookRetries(): Promise<{ id: string; webhookId: string; webhook: { url: string; secret: string }; payload: unknown; eventType: string; attemptNumber: number }[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    return db.webhookDelivery.findMany({
+      where: { success: false, nextRetryAt: { lte: new Date() }, attemptNumber: { lt: 5 } },
+      include: { webhook: { select: { url: true, secret: true } } },
+      take: 50,
+    }) as Promise<{ id: string; webhookId: string; webhook: { url: string; secret: string }; payload: unknown; eventType: string; attemptNumber: number }[]>;
+  }
+
+  async updateWebhookDelivery(id: string, data: { responseStatus?: number; responseBody?: string; success: boolean; nextRetryAt?: Date | null }): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.webhookDelivery.update({
+      where: { id },
+      data: {
+        responseStatus: data.responseStatus ?? null,
+        responseBody: data.responseBody ? data.responseBody.slice(0, 1000) : null,
+        success: data.success,
+        nextRetryAt: data.nextRetryAt ?? null,
+      },
+    });
+  }
+
+  async recordPerformanceMetric(input: PerformanceMetricInput): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.performanceMetric.create({
+      data: {
+        page: input.page.slice(0, 200),
+        fcp: input.fcp ?? null,
+        lcp: input.lcp ?? null,
+        tti: input.tti ?? null,
+        ua: input.ua ? input.ua.slice(0, 50) : null,
+      },
+    });
+  }
+
+  async getPerformanceMetricSummary(days = 7): Promise<{ page: string; avgFcp: number | null; avgLcp: number | null; sampleCount: number }[]> {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.$queryRaw<{ page: string; avgFcp: number | null; avgLcp: number | null; sampleCount: bigint }[]>`
+      SELECT page, AVG(fcp) as "avgFcp", AVG(lcp) as "avgLcp", COUNT(*) as "sampleCount"
+      FROM "PerformanceMetric"
+      WHERE "createdAt" >= ${cutoff}
+      GROUP BY page
+      ORDER BY "sampleCount" DESC
+      LIMIT 20
+    `;
+    return rows.map((r) => ({
+      page: r.page,
+      avgFcp: r.avgFcp !== null ? Math.round(r.avgFcp) : null,
+      avgLcp: r.avgLcp !== null ? Math.round(r.avgLcp) : null,
+      sampleCount: Number(r.sampleCount),
+    }));
+  }
+
+  async subscribeToStatus(email: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.statusSubscriber.upsert({
+      where: { email },
+      create: { email },
+      update: { active: true },
+    });
+  }
+
+  async getProjectHealthScore(projectId: string): Promise<ProjectHealthScore> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    const project = await db.project.findUnique({
+      where: { id: projectId },
+      select: {
+        activated: true,
+        balance: true,
+        _count: { select: { apiKeys: true } },
+      },
+    });
+    if (!project) return { score: 0, activated: false, hasFunding: false, hasApiKeys: false, hasTraffic: false, successRate: null };
+
+    const reqCount = await this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } });
+    const successCount = await this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, statusCode: { lt: 400 } } });
+
+    const activated = project.activated as boolean;
+    const balNum = Number(project.balance ?? 0n);
+    const hasFunding = balNum > 1_000_000; // > 0.001 SOL in lamports
+    const hasApiKeys = (project._count?.apiKeys ?? 0) > 0;
+    const hasTraffic = reqCount > 0;
+    const successRate = reqCount > 0 ? successCount / reqCount : null;
+
+    let score = 0;
+    if (activated) score += 30;
+    if (hasFunding) score += 20;
+    if (hasApiKeys) score += 20;
+    if (hasTraffic) score += 20;
+    if (successRate !== null) score += Math.round(successRate * 10);
+
+    return { score: Math.min(100, score), activated, hasFunding, hasApiKeys, hasTraffic, successRate };
   }
 }
 

@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppFrame } from "../components/app-frame";
 import { CookieNotice } from "../components/cookie-notice";
 import { FeedbackWidget } from "../components/feedback-widget";
+import { PerformanceObserver } from "../components/performance-observer";
 import { NavProgress } from "../components/nav-progress";
 import { PortalProvider } from "../components/portal-provider";
 import { ServiceWorkerRegistration } from "../components/service-worker-registration";
@@ -93,6 +94,9 @@ export default function RootLayout({
               <ServiceWorkerRegistration />
               <Suspense fallback={null}>
                 <FeedbackWidget />
+              </Suspense>
+              <Suspense fallback={null}>
+                <PerformanceObserver />
               </Suspense>
             </PortalProvider>
           </SolanaProvider>

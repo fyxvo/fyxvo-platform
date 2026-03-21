@@ -483,6 +483,7 @@ model Webhook {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliveries      WebhookDelivery[]
 
   @@index([projectId])
 }
@@ -550,4 +551,42 @@ model WhatsNew {
   updatedAt   DateTime @updatedAt
 
   @@index([active, publishedAt])
+}
+
+model StatusSubscriber {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([active])
+}
+
+model WebhookDelivery {
+  id             String    @id @default(uuid()) @db.Uuid
+  webhookId      String    @db.Uuid
+  eventType      String
+  payload        Json
+  attemptNumber  Int       @default(1)
+  responseStatus Int?
+  responseBody   String?
+  success        Boolean   @default(false)
+  attemptedAt    DateTime  @default(now())
+  nextRetryAt    DateTime?
+  webhook        Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([success, nextRetryAt])
+}
+
+model PerformanceMetric {
+  id        String   @id @default(uuid()) @db.Uuid
+  page      String
+  fcp       Float?   // First Contentful Paint ms
+  lcp       Float?   // Largest Contentful Paint ms
+  tti       Float?   // Time to Interactive ms
+  ua        String?  // User agent category: "mobile" | "desktop" | "tablet"
+  createdAt DateTime @default(now())
+
+  @@index([page, createdAt])
 }

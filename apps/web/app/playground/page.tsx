@@ -200,6 +200,29 @@ const RPC_METHODS: RpcMethod[] = [
 const CATEGORIES = [...new Set(RPC_METHODS.map((m) => m.category))];
 
 // ---------------------------------------------------------------------------
+// Solana RPC error code lookup
+// ---------------------------------------------------------------------------
+
+const SOLANA_RPC_ERRORS: Record<number, { name: string; explanation: string }> = {
+  [-32700]: { name: "Parse error", explanation: "The JSON sent is not valid. Check your request body syntax." },
+  [-32600]: { name: "Invalid request", explanation: "The JSON sent is not a valid JSON-RPC request object." },
+  [-32601]: { name: "Method not found", explanation: "The RPC method does not exist. Check the method name for typos." },
+  [-32602]: { name: "Invalid params", explanation: "Invalid method parameters — often a malformed account address or missing required field." },
+  [-32603]: { name: "Internal error", explanation: "The node encountered an internal error. Try again or check the node's status." },
+  [-32000]: { name: "Server error", explanation: "Generic server error. The node may be under load." },
+  [-32004]: { name: "Block not found", explanation: "The requested block does not exist. It may have been pruned." },
+  [-32005]: { name: "Node behind", explanation: "The node is behind. Wait for it to catch up." },
+  [-32009]: { name: "Slot skipped", explanation: "The requested slot was skipped and has no block." },
+  [-32010]: { name: "Epoch rewards period", explanation: "Request not allowed during epoch rewards distribution. Retry after the epoch boundary." },
+  [-32015]: { name: "Transaction signature verification failed", explanation: "The transaction's signature is invalid. Re-sign the transaction." },
+  [-32016]: { name: "Blockhash not found", explanation: "The blockhash is too old or was never valid. Fetch a fresh blockhash and retry." },
+  [-32017]: { name: "Cluster maintenance", explanation: "The cluster is undergoing maintenance. Check status.solana.com." },
+  [-32018]: { name: "SendTransactionPreflightFailure", explanation: "Transaction simulation failed. Check the transaction logs for the specific error." },
+  [-32020]: { name: "Minimum context slot not reached", explanation: "The requested slot has not been reached yet. Wait and retry." },
+  [-32021]: { name: "Token owner mismatch", explanation: "The token account does not belong to the expected owner." },
+};
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -277,6 +300,16 @@ function PlaygroundContent() {
 
   // Share copied
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Response time display
+  const [responseTimeMs, setResponseTimeMs] = useState<number | null>(null);
+  const [compareResponseTimeMs, setCompareResponseTimeMs] = useState<number | null>(null);
+
+  // Session request counter
+  const [sessionRequestCount, setSessionRequestCount] = useState(0);
+
+  // Error explanation derived from response
+  const [errorExplanation, setErrorExplanation] = useState<{ name: string; explanation: string } | null>(null);
   const initializedFromUrl = useRef(false);
 
   // On mount, restore state from URL search params
@@ -307,7 +340,29 @@ function PlaygroundContent() {
     setDurationMs(null);
     setCompareDurationMs(null);
     setSchemaOpen(false);
+    setResponseTimeMs(null);
+    setCompareResponseTimeMs(null);
+    setErrorExplanation(null);
   }, []);
+
+  // Derive error explanation from response
+  useEffect(() => {
+    if (!response) {
+      setErrorExplanation(null);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(response) as { error?: { code?: unknown } };
+      const code = parsed?.error?.code;
+      if (typeof code === "number" && code in SOLANA_RPC_ERRORS) {
+        setErrorExplanation(SOLANA_RPC_ERRORS[code] ?? null);
+      } else {
+        setErrorExplanation(null);
+      }
+    } catch {
+      setErrorExplanation(null);
+    }
+  }, [response]);
 
   const activeApiKey = portal.apiKeys.find((k) => k.id === selectedKeyId && k.status === "ACTIVE") ??
     portal.apiKeys.find((k) => k.status === "ACTIVE");
@@ -337,6 +392,8 @@ function PlaygroundContent() {
     setCompareError(null);
     setDurationMs(null);
     setCompareDurationMs(null);
+    setResponseTimeMs(null);
+    setCompareResponseTimeMs(null);
 
     try {
       if (compareMode) {
@@ -347,6 +404,7 @@ function PlaygroundContent() {
         if (standardResult.status === "fulfilled") {
           setResponse(formatResponse(standardResult.value.text));
           setDurationMs(standardResult.value.durationMs);
+          setResponseTimeMs(standardResult.value.durationMs);
           addHistory(selectedMethod.method, "standard", standardResult.value.durationMs, standardResult.value.status);
         } else {
           setError(standardResult.reason instanceof Error ? standardResult.reason.message : "Network error");
@@ -354,15 +412,21 @@ function PlaygroundContent() {
         if (priorityResult.status === "fulfilled") {
           setCompareResponse(formatResponse(priorityResult.value.text));
           setCompareDurationMs(priorityResult.value.durationMs);
+          setCompareResponseTimeMs(priorityResult.value.durationMs);
           addHistory(selectedMethod.method, "priority", priorityResult.value.durationMs, priorityResult.value.status);
         } else {
           setCompareError(priorityResult.reason instanceof Error ? priorityResult.reason.message : "Network error");
         }
+        setSessionRequestCount((c) => c + 1);
       } else {
+        const startMs = Date.now();
         const result = await sendRpcRequest(gatewayBase, mode, body, activeApiKey?.prefix);
+        const elapsed = Date.now() - startMs;
         setDurationMs(result.durationMs);
+        setResponseTimeMs(elapsed);
         setResponse(formatResponse(result.text));
         addHistory(selectedMethod.method, mode, result.durationMs, result.status);
+        setSessionRequestCount((c) => c + 1);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -403,7 +467,14 @@ function PlaygroundContent() {
         {/* Left: Method selector */}
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] xl:self-start">
           <CardHeader>
-            <CardTitle>Methods</CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle>Methods</CardTitle>
+              {sessionRequestCount > 0 && (
+                <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                  {sessionRequestCount} request{sessionRequestCount !== 1 ? "s" : ""} this session
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="flex gap-1 overflow-x-auto border-b border-[var(--fyxvo-border)] px-4 pb-0 pt-0">
@@ -609,6 +680,13 @@ function PlaygroundContent() {
             </CardContent>
           </Card>
 
+          {/* Loading progress bar */}
+          {loading && (
+            <div className="h-0.5 w-full overflow-hidden rounded-full bg-[var(--fyxvo-border)]">
+              <div className="h-full animate-[progress_1.5s_ease-in-out_infinite] bg-[var(--fyxvo-brand,#7c3aed)] rounded-full" style={{ width: "60%" }} />
+            </div>
+          )}
+
           {/* Response(s) */}
           {(response !== null || error !== null || compareResponse !== null || compareError !== null) && (
             compareMode ? (
@@ -619,6 +697,7 @@ function PlaygroundContent() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm">Standard</CardTitle>
                       <div className="flex items-center gap-2">
+                        {responseTimeMs !== null && <span className="text-xs text-[var(--fyxvo-text-muted)]">{responseTimeMs}ms</span>}
                         {durationMs !== null && <Badge tone="neutral">{durationMs}ms</Badge>}
                         {response !== null && (
                           <button
@@ -647,6 +726,7 @@ function PlaygroundContent() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm">Priority</CardTitle>
                       <div className="flex items-center gap-2">
+                        {compareResponseTimeMs !== null && <span className="text-xs text-[var(--fyxvo-text-muted)]">{compareResponseTimeMs}ms</span>}
                         {compareDurationMs !== null && (
                           <Badge tone={compareDurationMs < (durationMs ?? Infinity) ? "success" : "neutral"}>
                             {compareDurationMs}ms
@@ -680,6 +760,7 @@ function PlaygroundContent() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Response</CardTitle>
                     <div className="flex items-center gap-2">
+                      {responseTimeMs !== null && <span className="text-xs text-[var(--fyxvo-text-muted)]">{responseTimeMs}ms</span>}
                       {durationMs !== null && <Badge tone="neutral">{durationMs}ms</Badge>}
                       {response !== null && (
                         <button
@@ -696,9 +777,17 @@ function PlaygroundContent() {
                   {error ? (
                     <Notice tone="warning" title="Request failed">{error}</Notice>
                   ) : (
-                    <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-96">
-                      <code>{response}</code>
-                    </pre>
+                    <>
+                      <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-96">
+                        <code>{response}</code>
+                      </pre>
+                      {errorExplanation && (
+                        <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                          <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">{errorExplanation.name}</p>
+                          <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{errorExplanation.explanation}</p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

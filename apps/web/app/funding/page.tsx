@@ -41,6 +41,10 @@ function estimateRequests(lamports: bigint): { standard: string; computeHeavy: s
   };
 }
 
+// Pricing: 1000 lamports per standard request → 1 SOL = 1,000,000 requests
+const LAMPORTS_PER_REQUEST = 1000n;
+const SOL_DECIMALS = 1_000_000_000n;
+
 export default function FundingPage() {
   const portal = usePortal();
   const [asset, setAsset] = useState<"SOL" | "USDC">("SOL");
@@ -56,6 +60,23 @@ export default function FundingPage() {
       return 0n;
     }
   })();
+
+  const isDefaultEstimate = !portal.projectAnalytics?.totals?.requestLogs;
+  const dailyRequests = portal.projectAnalytics?.totals?.requestLogs
+    ? Math.round(portal.projectAnalytics.totals.requestLogs / 7)
+    : 1000;
+
+  const balanceLamports = availableSolCredits;
+
+  const dailyCostLamports = BigInt(dailyRequests) * LAMPORTS_PER_REQUEST;
+  const daysRunway =
+    dailyCostLamports > 0n ? Math.floor(Number(balanceLamports / dailyCostLamports)) : null;
+
+  const recommendedRawLamports = dailyCostLamports * 30n - balanceLamports;
+  const recommendedSol =
+    recommendedRawLamports > 0n
+      ? (Number(recommendedRawLamports) / Number(SOL_DECIMALS)).toFixed(4)
+      : null;
   const hasLowBalance = availableSolCredits > 0n && availableSolCredits < 100_000_000n;
   const phase = portal.transactionState.phase;
 
@@ -345,6 +366,38 @@ export default function FundingPage() {
           </CardContent>
         </Card>
       </section>
+
+      <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
+        <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Usage estimator</h3>
+        {isDefaultEstimate && (
+          <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)] opacity-70">
+            Based on a default estimate of 1,000 requests/day (no usage history yet).
+          </p>
+        )}
+        <dl className="mt-4 grid grid-cols-3 gap-4">
+          <div>
+            <dt className="text-xs text-[var(--fyxvo-text-muted)]">Daily requests</dt>
+            <dd className="mt-1 text-lg font-semibold text-[var(--fyxvo-text)]">
+              {dailyRequests.toLocaleString()}
+              {isDefaultEstimate && (
+                <span className="ml-1 text-xs font-normal text-[var(--fyxvo-text-muted)]">est.</span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--fyxvo-text-muted)]">Days of runway</dt>
+            <dd className="mt-1 text-lg font-semibold text-[var(--fyxvo-text)]">
+              {daysRunway !== null ? `${daysRunway}d` : "\u221e"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-[var(--fyxvo-text-muted)]">Rec. top-up (30d)</dt>
+            <dd className="mt-1 text-lg font-semibold text-[var(--fyxvo-text)]">
+              {recommendedSol !== null ? `${recommendedSol} SOL` : "None needed"}
+            </dd>
+          </div>
+        </dl>
+      </div>
 
       {portal.walletPhase === "authenticated" && (
         <section>

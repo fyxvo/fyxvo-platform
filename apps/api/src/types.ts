@@ -523,6 +523,33 @@ export interface WhatsNewItem {
   readonly publishedAt: string;
 }
 
+export interface WebhookDeliveryRecord {
+  id: string;
+  webhookId: string;
+  eventType: string;
+  success: boolean;
+  responseStatus: number | null;
+  attemptNumber: number;
+  attemptedAt: string;
+}
+
+export interface PerformanceMetricInput {
+  page: string;
+  fcp?: number | null;
+  lcp?: number | null;
+  tti?: number | null;
+  ua?: string | null;
+}
+
+export interface ProjectHealthScore {
+  score: number;
+  activated: boolean;
+  hasFunding: boolean;
+  hasApiKeys: boolean;
+  hasTraffic: boolean;
+  successRate: number | null;
+}
+
 export interface ProjectMemberItem {
   readonly id: string;
   readonly projectId: string;
@@ -619,6 +646,28 @@ export interface ApiRepository {
   upsertAnnouncement(input: { message: string; severity: string }): Promise<void>;
   getWhatsNew(userId: string): Promise<WhatsNewItem | null>;
   dismissWhatsNew(userId: string, version: string): Promise<void>;
+
+  recordWebhookDelivery(input: {
+    webhookId: string;
+    eventType: string;
+    payload: unknown;
+    attemptNumber: number;
+    responseStatus?: number | null;
+    responseBody?: string | null;
+    success: boolean;
+    nextRetryAt?: Date | null;
+  }): Promise<string>; // returns delivery id
+
+  getWebhookDeliveries(webhookId: string, limit?: number): Promise<WebhookDeliveryRecord[]>;
+  getPendingWebhookRetries(): Promise<{ id: string; webhookId: string; webhook: { url: string; secret: string }; payload: unknown; eventType: string; attemptNumber: number }[]>;
+  updateWebhookDelivery(id: string, data: { responseStatus?: number; responseBody?: string; success: boolean; nextRetryAt?: Date | null }): Promise<void>;
+
+  recordPerformanceMetric(input: PerformanceMetricInput): Promise<void>;
+  getPerformanceMetricSummary(days?: number): Promise<{ page: string; avgFcp: number | null; avgLcp: number | null; sampleCount: number }[]>;
+
+  subscribeToStatus(email: string): Promise<void>;
+
+  getProjectHealthScore(projectId: string): Promise<ProjectHealthScore>;
 }
 
 export interface ProjectCreationPreparation {

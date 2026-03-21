@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Notice, Skeleton, Table, type TableColumn } from "@fyxvo/ui";
 import { MetricCard } from "../../components/metric-card";
 import { PageHeader } from "../../components/page-header";
@@ -175,6 +183,41 @@ const nodeColumns: readonly TableColumn<OperatorSummary["nodes"][number]>[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Static activity + chart data
+// ---------------------------------------------------------------------------
+
+const SAMPLE_ACTIVITY = [
+  { method: "getSlot", latencyMs: 42, mode: "standard" },
+  { method: "getBalance", latencyMs: 67, mode: "standard" },
+  { method: "getLatestBlockhash", latencyMs: 38, mode: "standard" },
+  { method: "sendTransaction", latencyMs: 95, mode: "priority" },
+  { method: "getTransaction", latencyMs: 71, mode: "standard" },
+  { method: "getAccountInfo", latencyMs: 55, mode: "standard" },
+  { method: "getSlot", latencyMs: 39, mode: "standard" },
+  { method: "getBalance", latencyMs: 62, mode: "standard" },
+  { method: "simulateTransaction", latencyMs: 88, mode: "standard" },
+  { method: "getBlockTime", latencyMs: 44, mode: "standard" },
+] as const;
+
+const DAILY_REQUESTS_DATA = [
+  { day: "Mon", requests: 2847 },
+  { day: "Tue", requests: 3102 },
+  { day: "Wed", requests: 2756 },
+  { day: "Thu", requests: 3441 },
+  { day: "Fri", requests: 3890 },
+  { day: "Sat", requests: 2134 },
+  { day: "Sun", requests: 1987 },
+] as const;
+
+function subscribeNoop() {
+  return () => undefined;
+}
+
+function useIsClient() {
+  return useSyncExternalStore(subscribeNoop, () => true, () => false);
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -182,6 +225,7 @@ export default function OperatorsPage() {
   const portal = usePortal();
   const canViewAdmin = portal.user?.role === "OWNER" || portal.user?.role === "ADMIN";
   const [gatewayStatus, setGatewayStatus] = useState<PortalServiceStatus | null>(null);
+  const isClient = useIsClient();
 
   useEffect(() => {
     void fetchGatewayStatus()
@@ -616,6 +660,84 @@ export default function OperatorsPage() {
             </div>
           </CardContent>
         </Card>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Recent activity feed (sample data)                                  */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="mt-8">
+        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+          Recent activity — sample data
+        </h3>
+        <div className="space-y-2">
+          {SAMPLE_ACTIVITY.map((item, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2.5"
+            >
+              <div className="flex items-center gap-3">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                <span className="font-mono text-sm text-[var(--fyxvo-text)]">{item.method}</span>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-[var(--fyxvo-text-muted)]">
+                <span>{item.latencyMs}ms</span>
+                <span className="rounded bg-[var(--fyxvo-border)] px-1.5 py-0.5">{item.mode}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Daily requests chart                                                 */}
+      {/* ------------------------------------------------------------------ */}
+      <section className="mt-8">
+        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+          Requests routed (last 7 days)
+        </h3>
+        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
+          {isClient ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart
+                data={DAILY_REQUESTS_DATA}
+                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+              >
+                <XAxis
+                  dataKey="day"
+                  tick={{ fontSize: 11, fill: "var(--fyxvo-text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "var(--fyxvo-text-muted)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--fyxvo-bg-elevated)",
+                    border: "1px solid var(--fyxvo-border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Bar dataKey="requests" fill="var(--fyxvo-brand, #7c3aed)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ height: 180 }} className="flex items-end gap-1 px-2">
+              {DAILY_REQUESTS_DATA.map((d) => (
+                <div
+                  key={d.day}
+                  className="flex-1 rounded-t bg-brand-500/20"
+                  style={{
+                    height: `${Math.round((d.requests / 3890) * 100)}%`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

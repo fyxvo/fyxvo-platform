@@ -26,6 +26,7 @@ import { usePortal } from "./portal-provider";
 import { NotificationBell } from "./notification-bell";
 import { CommandPalette } from "./command-palette";
 import { ConnectionQualityIndicator } from "./connection-quality";
+import { KeyboardShortcuts } from "./keyboard-shortcuts";
 import { shortenAddress } from "../lib/format";
 
 const navItems = [
@@ -87,9 +88,11 @@ function NavItem({
 function SidebarContent({
   pathname,
   onNavigate,
+  onOpenShortcuts,
 }: {
   pathname: string;
   onNavigate?: () => void;
+  onOpenShortcuts?: () => void;
 }) {
   const portal = usePortal();
   const projectHref =
@@ -99,9 +102,26 @@ function SidebarContent({
     <div className="flex h-full flex-col">
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--fyxvo-border)] px-4">
         <BrandLogo priority />
-        {portal.walletPhase === "authenticated" && portal.token ? (
-          <NotificationBell token={portal.token} />
-        ) : null}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onOpenShortcuts}
+            aria-label="Keyboard shortcuts"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--fyxvo-border)] bg-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)] transition"
+            title="Keyboard shortcuts (?)"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
+              <rect x="2" y="5" width="16" height="11" rx="2" />
+              <rect x="4.5" y="7.5" width="2" height="2" rx="0.5" fill="currentColor" stroke="none" />
+              <rect x="8.5" y="7.5" width="2" height="2" rx="0.5" fill="currentColor" stroke="none" />
+              <rect x="12.5" y="7.5" width="2" height="2" rx="0.5" fill="currentColor" stroke="none" />
+              <rect x="4.5" y="11" width="10" height="2" rx="0.5" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+          {portal.walletPhase === "authenticated" && portal.token ? (
+            <NotificationBell token={portal.token} />
+          ) : null}
+        </div>
       </div>
 
       {portal.walletPhase === "authenticated" && portal.selectedProject ? (
@@ -166,6 +186,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
   const pathname = usePathname();
   const portal = usePortal();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // Close the mobile drawer whenever the route changes
   useEffect(() => {
@@ -175,7 +196,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
   return (
     <div className="relative flex min-h-screen">
       <aside className="hidden lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-[var(--fyxvo-border)] lg:bg-[var(--fyxvo-bg)]">
-        <SidebarContent pathname={pathname} />
+        <SidebarContent pathname={pathname} onOpenShortcuts={() => setShortcutsOpen(true)} />
       </aside>
 
       {/* Mobile drawer — always rendered, animated in/out via translate */}
@@ -197,7 +218,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <SidebarContent pathname={pathname} onNavigate={() => setSidebarOpen(false)} />
+          <SidebarContent pathname={pathname} onNavigate={() => setSidebarOpen(false)} onOpenShortcuts={() => setShortcutsOpen(true)} />
         </aside>
       </div>
 
@@ -213,6 +234,21 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
           </button>
           <BrandLogo />
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShortcutsOpen(true)}
+              aria-label="Keyboard shortcuts"
+              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--fyxvo-border)] bg-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)] transition"
+              title="Keyboard shortcuts (?)"
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
+                <rect x="2" y="5" width="16" height="11" rx="2" />
+                <rect x="4.5" y="7.5" width="2" height="2" rx="0.5" fill="currentColor" stroke="none" />
+                <rect x="8.5" y="7.5" width="2" height="2" rx="0.5" fill="currentColor" stroke="none" />
+                <rect x="12.5" y="7.5" width="2" height="2" rx="0.5" fill="currentColor" stroke="none" />
+                <rect x="4.5" y="11" width="10" height="2" rx="0.5" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
             {portal.walletPhase === "authenticated" && portal.token ? (
               <NotificationBell token={portal.token} />
             ) : <div className="w-9" />}
@@ -258,6 +294,9 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
 
       {/* Command palette — fixed position, renders on top of everything */}
       <CommandPalette />
+
+      {/* Keyboard shortcuts modal */}
+      <KeyboardShortcuts open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }

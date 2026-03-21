@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from "../lib/api";
 import { formatRelativeDate } from "../lib/format";
 import type { Notification } from "../lib/types";
@@ -45,13 +46,151 @@ function typeIcon(type: Notification["type"]) {
   }
 }
 
+function getNotificationHref(n: Notification): string | null {
+  const meta = n.metadata as Record<string, string> | null | undefined;
+  switch (n.type) {
+    case "project_activated":
+      return meta?.projectSlug
+        ? `/projects/${meta.projectSlug}`
+        : n.projectId
+          ? `/projects/${n.projectId}`
+          : "/projects";
+    case "api_key_created":
+    case "api_key_revoked":
+    case "api_key_rotated":
+      return "/api-keys";
+    case "low_balance":
+    case "balance_low":
+      return "/funding";
+    case "funding_confirmed":
+      return "/transactions";
+    case "rate_limit_warning":
+      return "/analytics";
+    default:
+      return null;
+  }
+}
+
+type GroupedNotification = {
+  id: string;
+  grouped: true;
+  count: number;
+  type: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  href: string | null;
+};
+
+type DisplayItem = Notification | GroupedNotification;
+
+function isGrouped(item: DisplayItem): item is GroupedNotification {
+  return "grouped" in item && item.grouped === true;
+}
+
+function typeDescription(type: string): string {
+  switch (type) {
+    case "api_key_created": return "API key created";
+    case "api_key_revoked": return "API key revoked";
+    case "api_key_rotated": return "API key rotated";
+    case "project_activated": return "project activated";
+    case "low_balance": return "low balance";
+    case "balance_low": return "balance low";
+    case "funding_confirmed": return "funding confirmed";
+    case "rate_limit_warning": return "rate limit warning";
+    default: return type.replace(/_/g, " ");
+  }
+}
+
+function groupNotifications(notifications: Notification[]): DisplayItem[] {
+  if (notifications.length === 0) return [];
+
+  // Count occurrences of each type
+  const typeCounts = new Map<string, number>();
+  for (const n of notifications) {
+    typeCounts.set(n.type, (typeCounts.get(n.type) ?? 0) + 1);
+  }
+
+  const result: DisplayItem[] = [];
+  let i = 0;
+
+  while (i < notifications.length) {
+    const n = notifications[i]!;
+    const count = typeCounts.get(n.type) ?? 0;
+
+    if (count >= 3) {
+      // Collect all consecutive same-type notifications
+      const group: Notification[] = [];
+      const startIdx = i;
+      while (i < notifications.length && notifications[i]!.type === n.type) {
+        group.push(notifications[i]!);
+        i++;
+      }
+
+      // Only group if we collected 3+ consecutive
+      if (group.length >= 3) {
+        const desc = typeDescription(n.type);
+        const representative = group[0]!;
+        const grouped: GroupedNotification = {
+          id: `group-${n.type}-${startIdx}`,
+          grouped: true,
+          count: group.length,
+          type: n.type,
+          title: `${group.length} ${desc} events`,
+          message: `${group.length} notifications of the same type`,
+          createdAt: representative.createdAt,
+          href: getNotificationHref(representative),
+        };
+        result.push(grouped);
+      } else {
+        // Not enough consecutive — push individually
+        for (const item of group) {
+          result.push(item);
+        }
+      }
+    } else {
+      result.push(n);
+      i++;
+    }
+  }
+
+  return result;
+}
+
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+  } catch { /* ignore */ }
+}
+
 export function NotificationBell({ token }: { readonly token: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
+  const prevUnreadRef = useRef<number>(0);
+  const router = useRouter();
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Play sound when unread count increases
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current) {
+      if (typeof window !== "undefined" && localStorage.getItem("fyxvo_notification_sound") === "1") {
+        playNotificationSound();
+      }
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +241,25 @@ export function NotificationBell({ token }: { readonly token: string }) {
     setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
     void markNotificationRead(id, token).catch(() => undefined);
   }
+
+  function handleItemClick(item: DisplayItem) {
+    if (!isGrouped(item)) {
+      markRead(item.id);
+    }
+    const href = isGrouped(item) ? item.href : getNotificationHref(item);
+    if (href) {
+      setOpen(false);
+      router.push(href);
+    }
+  }
+
+  function handleItemKeyDown(e: React.KeyboardEvent, item: DisplayItem) {
+    if (e.key === "Enter") {
+      handleItemClick(item);
+    }
+  }
+
+  const displayItems = groupNotifications(notifications);
 
   return (
     <div ref={ref} className="relative">
@@ -163,29 +321,53 @@ export function NotificationBell({ token }: { readonly token: string }) {
               </div>
             ) : (
               <div className="divide-y divide-[var(--fyxvo-border)]">
-                {notifications.map((n) => {
-                  const isRead = n.read;
+                {displayItems.map((item) => {
+                  if (isGrouped(item)) {
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex gap-3 px-4 py-3 transition cursor-pointer hover:bg-[var(--fyxvo-panel-soft)]"
+                        onClick={() => handleItemClick(item)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => handleItemKeyDown(e, item)}
+                      >
+                        <div className="mt-0.5 shrink-0">{typeIcon(item.type)}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-semibold text-[var(--fyxvo-text)]">{item.title}</p>
+                          </div>
+                          <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)] leading-5">{item.message}</p>
+                          <p className="mt-1 text-[10px] text-[var(--fyxvo-text-muted)]">
+                            {formatRelativeDate(item.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const isRead = item.read;
                   return (
                     <div
-                      key={n.id}
-                      className={`flex gap-3 px-4 py-3 transition ${isRead ? "opacity-60" : "bg-brand-500/5"}`}
-                      onClick={() => markRead(n.id)}
+                      key={item.id}
+                      className={`flex gap-3 px-4 py-3 transition cursor-pointer ${isRead ? "opacity-60" : "bg-brand-500/5"} hover:bg-[var(--fyxvo-panel-soft)]`}
+                      onClick={() => handleItemClick(item)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === "Enter") markRead(n.id); }}
+                      onKeyDown={(e) => handleItemKeyDown(e, item)}
                     >
-                      <div className="mt-0.5 shrink-0">{typeIcon(n.type)}</div>
+                      <div className="mt-0.5 shrink-0">{typeIcon(item.type)}</div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-xs font-semibold text-[var(--fyxvo-text)]">{n.title}</p>
+                          <p className="text-xs font-semibold text-[var(--fyxvo-text)]">{item.title}</p>
                           {!isRead && (
                             <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-brand-400" />
                           )}
                         </div>
-                        <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)] leading-5">{n.message}</p>
+                        <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)] leading-5">{item.message}</p>
                         <p className="mt-1 text-[10px] text-[var(--fyxvo-text-muted)]">
-                          {formatRelativeDate(n.createdAt)}
-                          {n.projectName ? ` · ${n.projectName}` : ""}
+                          {formatRelativeDate(item.createdAt)}
+                          {item.projectName ? ` · ${item.projectName}` : ""}
                         </p>
                       </div>
                     </div>

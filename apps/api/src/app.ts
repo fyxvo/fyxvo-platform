@@ -2158,6 +2158,16 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
         body,
         signal: AbortSignal.timeout(5000),
       });
+      void input.repository.recordWebhookDelivery({
+        webhookId: webhook.id,
+        eventType: "test",
+        payload: payload,
+        attemptNumber: 1,
+        responseStatus: res.status,
+        responseBody: (await res.text().catch(() => "")).slice(0, 1000),
+        success: res.ok,
+        nextRetryAt: res.ok ? null : new Date(Date.now() + 30_000),
+      }).catch(() => undefined);
       return reply.send({ success: res.ok, statusCode: res.status });
     } catch (e) {
       return reply.send({ success: false, error: e instanceof Error ? e.message : "Request failed" });
@@ -2364,6 +2374,126 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
     void reply.header("content-type", "image/svg+xml").header("cache-control", "max-age=300, s-maxage=300").header("access-control-allow-origin", "*");
     return reply.send(svg);
   });
+
+  // ── Project health score ──────────────────────────────────────────────────
+
+  app.get("/v1/projects/:projectId/health", async (request) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) throw new HttpError(404, "project_not_found", "Project not found.");
+    const health = await input.repository.getProjectHealthScore(projectId);
+    return { health };
+  });
+
+  // ── Webhook deliveries ────────────────────────────────────────────────────
+
+  app.get("/v1/projects/:projectId/webhooks/:webhookId/deliveries", async (request) => {
+    const user = requireUser(request);
+    const { projectId, webhookId } = z.object({ projectId: z.string().uuid(), webhookId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) throw new HttpError(404, "project_not_found", "Project not found.");
+    const deliveries = await input.repository.getWebhookDeliveries(webhookId);
+    return { items: deliveries };
+  });
+
+  // ── Performance analytics ─────────────────────────────────────────────────
+
+  app.post("/v1/analytics/performance", async (request, reply) => {
+    const body = z.object({
+      page: z.string().max(200),
+      fcp: z.number().positive().max(60000).optional().nullable(),
+      lcp: z.number().positive().max(60000).optional().nullable(),
+      tti: z.number().positive().max(60000).optional().nullable(),
+      ua: z.enum(["mobile", "desktop", "tablet"]).optional().nullable(),
+    }).safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: "Invalid data" });
+    const d = body.data;
+    await input.repository.recordPerformanceMetric({
+      page: d.page,
+      fcp: d.fcp ?? null,
+      lcp: d.lcp ?? null,
+      tti: d.tti ?? null,
+      ua: d.ua ?? null,
+    });
+    return reply.status(201).send({ ok: true });
+  });
+
+  // ── Status page subscription ──────────────────────────────────────────────
+
+  app.post("/v1/status/subscribe", async (request, reply) => {
+    const { email } = z.object({ email: z.string().email().max(256) }).parse(request.body);
+    await input.repository.subscribeToStatus(email);
+    return reply.status(201).send({ success: true });
+  });
+
+  // ── Admin performance summary ─────────────────────────────────────────────
+
+  app.get("/v1/admin/performance", async (request) => {
+    const user = requireUser(request);
+    if (user.role !== "ADMIN" && user.role !== "OWNER") throw new HttpError(403, "forbidden", "Admin access required.");
+    const summary = await input.repository.getPerformanceMetricSummary(7);
+    return { items: summary };
+  });
+
+  // Webhook delivery retry worker — processes retries every 30 seconds
+  const retryWorker = setInterval(() => {
+    void (async () => {
+      try {
+        const pending = await input.repository.getPendingWebhookRetries();
+        for (const delivery of pending) {
+          const payload = JSON.stringify(delivery.payload);
+          const sig = createHash("sha256").update(delivery.webhook.secret + payload).digest("hex");
+          const newAttempt = delivery.attemptNumber + 1;
+          const RETRY_DELAYS = [30_000, 300_000, 1_800_000, 7_200_000]; // 30s, 5m, 30m, 2h
+          let success = false;
+          let responseStatus: number | null = null;
+          let responseBody: string | null = null;
+          try {
+            const res = await fetch(delivery.webhook.url, {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "x-fyxvo-signature": sig,
+                "x-fyxvo-attempt": String(newAttempt),
+              },
+              body: payload,
+              signal: AbortSignal.timeout(10_000),
+            });
+            responseStatus = res.status;
+            responseBody = await res.text().catch(() => null);
+            success = res.ok;
+          } catch {
+            success = false;
+          }
+          const retryDelay = RETRY_DELAYS[newAttempt - 1];
+          const nextRetryAt = !success && newAttempt < 5 && retryDelay
+            ? new Date(Date.now() + retryDelay)
+            : null;
+          const updateData: { responseStatus?: number; responseBody?: string; success: boolean; nextRetryAt: Date | null } = { success, nextRetryAt };
+          if (responseStatus !== null) updateData.responseStatus = responseStatus;
+          if (responseBody !== null) updateData.responseBody = responseBody;
+          await input.repository.updateWebhookDelivery(delivery.id, updateData);
+          // Record new attempt
+          if (!success && newAttempt < 5) {
+            await input.repository.recordWebhookDelivery({
+              webhookId: delivery.webhookId,
+              eventType: delivery.eventType,
+              payload: delivery.payload,
+              attemptNumber: newAttempt,
+              responseStatus,
+              responseBody,
+              success,
+              nextRetryAt,
+            });
+          }
+        }
+      } catch { /* background worker — silent fail */ }
+    })();
+  }, 30_000);
+
+  // Clean up on app close
+  app.addHook("onClose", () => { clearInterval(retryWorker); });
 
   return app;
 }

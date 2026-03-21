@@ -94,6 +94,12 @@ vi.mock("../lib/api", () => ({
   verifyWalletSession: apiMocks.verifyWalletSession
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("../lib/phantom", () => ({
   ensureInjectedPhantomDevnet: walletMocks.ensureInjectedPhantomDevnet
 }));

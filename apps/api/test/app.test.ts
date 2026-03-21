@@ -52,11 +52,14 @@ import type {
   MethodBreakdownItem,
   NotificationItem,
   OperatorSummary,
+  PerformanceMetricInput,
   ProjectAnalytics,
+  ProjectHealthScore,
   ProjectWithOwner,
   RequestLogInput,
   SaveIdempotencyInput,
-  UpdateProjectInput
+  UpdateProjectInput,
+  WebhookDeliveryRecord
 } from "../src/types.js";
 
 function makeEnv(overrides: Partial<Record<string, string>> = {}) {
@@ -952,6 +955,14 @@ class MemoryApiRepository implements ApiRepository {
   async upsertAnnouncement(_input: { message: string; severity: string }): Promise<void> {}
   async getWhatsNew(_userId: string) { return null; }
   async dismissWhatsNew(_userId: string, _version: string): Promise<void> {}
+  async recordWebhookDelivery(_input: { webhookId: string; eventType: string; payload: unknown; attemptNumber: number; responseStatus?: number | null; responseBody?: string | null; success: boolean; nextRetryAt?: Date | null }): Promise<string> { return "test-delivery-id"; }
+  async getWebhookDeliveries(_webhookId: string, _limit?: number): Promise<WebhookDeliveryRecord[]> { return []; }
+  async getPendingWebhookRetries(): Promise<{ id: string; webhookId: string; webhook: { url: string; secret: string }; payload: unknown; eventType: string; attemptNumber: number }[]> { return []; }
+  async updateWebhookDelivery(_id: string, _data: { responseStatus?: number; responseBody?: string; success: boolean; nextRetryAt?: Date | null }): Promise<void> {}
+  async recordPerformanceMetric(_input: PerformanceMetricInput): Promise<void> {}
+  async getPerformanceMetricSummary(_days?: number): Promise<{ page: string; avgFcp: number | null; avgLcp: number | null; sampleCount: number }[]> { return []; }
+  async subscribeToStatus(_email: string): Promise<void> {}
+  async getProjectHealthScore(_projectId: string): Promise<ProjectHealthScore> { return { score: 80, activated: true, hasFunding: true, hasApiKeys: true, hasTraffic: true, successRate: 1.0 }; }
 }
 
 async function createTestApp(options: { rateLimitMax?: number } = {}) {

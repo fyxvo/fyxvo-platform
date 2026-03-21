@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "pnpm --filter @fyxvo/config build && pnpm --filter @fyxvo/ui build && pnpm run build"
+  "buildCommand": "pnpm --filter @fyxvo/config build && pnpm --filter @fyxvo/ui build && pnpm run build",
+  "env": {
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "TURBO_TELEMETRY_DISABLED": "1"
+  }
 }

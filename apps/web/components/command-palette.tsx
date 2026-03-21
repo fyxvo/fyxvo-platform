@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "./portal-provider";
 
@@ -9,6 +9,7 @@ interface NavEntry {
   href: string;
   description?: string;
   group?: string;
+  category?: "nav" | "data";
 }
 
 function buildNavEntries(selectedProjectSlug?: string | null): NavEntry[] {
@@ -48,10 +49,42 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  const entries = buildNavEntries(portal.selectedProject?.slug);
-  const filtered = query.trim()
-    ? entries.filter((e) => e.label.toLowerCase().includes(query.toLowerCase()))
-    : entries;
+  const filtered = useMemo<NavEntry[]>(() => {
+    const entries = buildNavEntries(portal.selectedProject?.slug);
+    const q = query.trim().toLowerCase();
+    if (!q) return entries;
+    const navFiltered = entries.filter((e) => e.label.toLowerCase().includes(q));
+    const dataResults: NavEntry[] = [
+      ...portal.projects
+        .filter((p) => p.name.toLowerCase().includes(q))
+        .map((p) => ({
+          label: `Project: ${p.name}`,
+          href: `/projects/${p.slug}`,
+          description: p.archivedAt ? "Archived" : "Not activated",
+          group: "data",
+          category: "data" as const,
+        })),
+      ...portal.apiKeys
+        .filter(
+          (k) =>
+            k.label.toLowerCase().includes(q) ||
+            k.prefix.toLowerCase().includes(q),
+        )
+        .map((k) => ({
+          label: `Key: ${k.label}`,
+          href: "/api-keys",
+          description: k.prefix,
+          group: "data",
+          category: "data" as const,
+        })),
+    ].filter(
+      (entry, idx, arr) => arr.findIndex((e) => e.href === entry.href && e.label === entry.label) === idx,
+    );
+    return [...navFiltered, ...dataResults];
+  }, [query, portal.selectedProject?.slug, portal.projects, portal.apiKeys]);
+
+  const navFiltered = filtered.filter((e) => e.category !== "data");
+  const dataResults = filtered.filter((e) => e.category === "data");
 
   // Reset highlight when filter changes
   useEffect(() => {
@@ -213,10 +246,10 @@ export function CommandPalette() {
                 </div>
               )}
               <ul role="listbox" aria-label="Navigation results">
-                {filtered.map((item, idx) => {
+                {navFiltered.map((item, idx) => {
                   const isHighlighted = idx === highlighted;
                   return (
-                    <li key={item.href} role="option" aria-selected={isHighlighted}>
+                    <li key={`nav-${item.href}`} role="option" aria-selected={isHighlighted}>
                       <button
                         type="button"
                         className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
@@ -243,6 +276,50 @@ export function CommandPalette() {
                   );
                 })}
               </ul>
+              {dataResults.length > 0 && (
+                <>
+                  <div className="mx-4 my-1 border-t border-[var(--fyxvo-border)]" />
+                  <p className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+                    Data
+                  </p>
+                  <ul role="listbox" aria-label="Data results">
+                    {dataResults.map((item, idx) => {
+                      const globalIdx = navFiltered.length + idx;
+                      const isHighlighted = globalIdx === highlighted;
+                      return (
+                        <li key={`data-${item.label}-${item.href}`} role="option" aria-selected={isHighlighted}>
+                          <button
+                            type="button"
+                            className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                              isHighlighted
+                                ? "bg-[var(--fyxvo-brand,#7c3aed)]/10 text-[var(--fyxvo-text)]"
+                                : "text-[var(--fyxvo-text-soft)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+                            }`}
+                            onMouseEnter={() => setHighlighted(globalIdx)}
+                            onClick={() => {
+                              setRecentPages((prev) => [{ label: item.label, href: item.href }, ...prev.filter((p) => p.href !== item.href)].slice(0, 3));
+                              router.push(item.href);
+                              setOpen(false);
+                            }}
+                          >
+                            <span className="flex-1">
+                              <span className="block font-medium">{item.label}</span>
+                              {item.description && (
+                                <span className="block text-[11px] text-[var(--fyxvo-text-muted)]">
+                                  {item.description}
+                                </span>
+                              )}
+                            </span>
+                            <span className="shrink-0 font-mono text-[11px] text-[var(--fyxvo-text-muted)]">
+                              {item.href}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
             </>
           )}
         </div>

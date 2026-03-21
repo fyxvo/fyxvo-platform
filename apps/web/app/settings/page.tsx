@@ -100,6 +100,11 @@ export default function SettingsPage() {
 
   // Appearance
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
+
+  // Notification sound
+  const [soundEnabled, setSoundEnabled] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("fyxvo_notification_sound") === "1" : false
+  );
   useEffect(() => {
     const saved = localStorage.getItem("fyxvo-density");
     if (saved === "compact" || saved === "comfortable") setDensity(saved);
@@ -952,6 +957,25 @@ export default function SettingsPage() {
               ))}
             </div>
           ) : null}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-[var(--fyxvo-text)]">Notification sound</p>
+              <p className="text-xs text-[var(--fyxvo-text-muted)]">Play a subtle sound when new notifications arrive</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundEnabled}
+              onClick={() => {
+                const next = !soundEnabled;
+                setSoundEnabled(next);
+                localStorage.setItem("fyxvo_notification_sound", next ? "1" : "0");
+              }}
+              className={`relative inline-flex h-5 w-9 cursor-pointer rounded-full border-2 border-transparent transition-colors ${soundEnabled ? "bg-[var(--fyxvo-brand,#7c3aed)]" : "bg-[var(--fyxvo-border)]"}`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${soundEnabled ? "translate-x-4" : "translate-x-0"}`} />
+            </button>
+          </div>
           <Notice tone="neutral" title="How alerts work">
             Notifications appear in the bell icon in the dashboard header when thresholds are crossed.
             Low-balance checks run with each metrics aggregation cycle.

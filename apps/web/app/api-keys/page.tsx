@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Badge,
   Button,
@@ -25,6 +26,7 @@ import type { PortalApiKey } from "../../lib/types";
 
 export default function ApiKeysPage() {
   const portal = usePortal();
+  const router = useRouter();
   const [label, setLabel] = useState("Priority relay");
   const [scopes, setScopes] = useState("project:read, rpc:request, priority:relay");
   const [expiresAt, setExpiresAt] = useState("");
@@ -143,6 +145,17 @@ export default function ApiKeysPage() {
               </span>
             ) : null}
           </p>
+          {portal.selectedProject ? (
+            <div className="mt-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push(`/projects/${portal.selectedProject!.slug}?tab=endpoints`)}
+              >
+                Done — set up your endpoint
+              </Button>
+            </div>
+          ) : null}
         </Notice>
       ) : null}
 

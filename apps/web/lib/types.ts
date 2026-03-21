@@ -510,6 +510,7 @@ export interface Notification {
   readonly projectId: string | null;
   readonly projectName: string | null;
   readonly createdAt: string;
+  readonly metadata?: unknown;
 }
 
 export interface ApiKeyAnalytics {

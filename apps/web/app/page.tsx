@@ -79,6 +79,9 @@ export default async function HomePage() {
                   Talk to the founder
                 </TrackedLinkButton>
               </div>
+              <p className="mt-3 text-sm text-[var(--fyxvo-text-muted)]">
+                Get your first response in under 5 minutes.
+              </p>
             </div>
 
             {/* Animated terminal */}
@@ -395,6 +398,9 @@ export default async function HomePage() {
                 <CopyButton value="https://rpc.fyxvo.com/priority" label="Copy priority endpoint" />
                 <Button asChild size="sm" variant="secondary">
                   <Link href="/docs">Full quickstart</Link>
+                </Button>
+                <Button asChild size="sm">
+                  <Link href="/playground?method=getHealth">Try it in the Playground</Link>
                 </Button>
               </div>
             </div>

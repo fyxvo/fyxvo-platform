@@ -40,28 +40,66 @@ import type { AdminOverview, NetworkStats, PortalProject } from "../../lib/types
 import { webEnv } from "../../lib/env";
 import { getNetworkStats, getActiveAnnouncement, getWhatsNew, dismissWhatsNew } from "../../lib/api";
 
+interface ProjectHealthInput {
+  activated: boolean;
+  apiKeyCount: number;
+  hasTraffic: boolean;
+}
+
+function computeHealthScore(p: ProjectHealthInput): number {
+  let score = 0;
+  if (p.activated) score += 30;
+  if (p.apiKeyCount > 0) score += 20;
+  if (p.hasTraffic) score += 20;
+  return Math.min(100, score);
+}
+
+function healthColor(score: number): string {
+  if (score >= 80) return "text-green-600 dark:text-green-400 border-green-500/20 bg-green-500/5";
+  if (score >= 50) return "text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5";
+  return "text-red-600 dark:text-red-400 border-red-500/20 bg-red-500/5";
+}
+
 const projectColumns: readonly TableColumn<PortalProject>[] = [
   {
     key: "name",
     header: "Project",
-    cell: (project) => (
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-[var(--fyxvo-text)]">{project.name}</span>
-          {project.starred ? (
-            <span className="text-xs text-[var(--fyxvo-accent)]" title="Starred">★</span>
-          ) : null}
-          {project.environment && project.environment !== "development" ? (
-            <Badge tone={project.environment === "production" ? "danger" : "warning"} className="text-[10px]">
-              {project.environment}
-            </Badge>
-          ) : null}
+    cell: (project) => {
+      const isActivated = !!(
+        project.onChainProjectPda &&
+        project.onChainProjectPda.length > 10 &&
+        !project.archivedAt
+      );
+      const score = computeHealthScore({
+        activated: isActivated,
+        apiKeyCount: project._count?.apiKeys ?? 0,
+        hasTraffic: (project._count?.requestLogs ?? 0) > 0,
+      });
+      return (
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[var(--fyxvo-text)]">{project.name}</span>
+            <span
+              title={`Health ${score}/100\n${isActivated ? "✓" : "✗"} Activated\n${(project._count?.apiKeys ?? 0) > 0 ? "✓" : "✗"} Has API keys\n${(project._count?.requestLogs ?? 0) > 0 ? "✓" : "✗"} Has traffic`}
+              className={`inline-flex items-center rounded border px-1.5 py-0.5 font-mono text-[10px] font-semibold ${healthColor(score)}`}
+            >
+              {score}
+            </span>
+            {project.starred ? (
+              <span className="text-xs text-[var(--fyxvo-accent)]" title="Starred">★</span>
+            ) : null}
+            {project.environment && project.environment !== "development" ? (
+              <Badge tone={project.environment === "production" ? "danger" : "warning"} className="text-[10px]">
+                {project.environment}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
+            {project.slug}
+          </div>
         </div>
-        <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
-          {project.slug}
-        </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     key: "requests",
@@ -342,6 +380,22 @@ export default function DashboardPage() {
       if (data.item) setWhatsNew(data.item);
     }).catch(() => undefined);
   }, [portal.token, portal.walletPhase]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        router.push("/projects?new=1");
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        void navigator.clipboard.writeText(window.location.href);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [router]);
 
   function handleCreateClose() {
     setCreateOpen(false);
@@ -796,6 +850,22 @@ export default function DashboardPage() {
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{step.body}</p>
                 <div className="mt-4">{step.action}</div>
+                {step.title === "Generate API key" && !hasApiKeys && (
+                  <div className="mt-2 rounded-lg border border-[var(--fyxvo-brand,#7c3aed)]/20 bg-[var(--fyxvo-brand,#7c3aed)]/5 px-4 py-3">
+                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">
+                      You don&apos;t have any API keys yet.
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)]">
+                      Create one to start routing requests.
+                    </p>
+                    <Link
+                      href="/api-keys"
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[var(--fyxvo-brand,#7c3aed)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
+                    >
+                      Create API key →
+                    </Link>
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>

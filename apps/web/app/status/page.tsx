@@ -15,6 +15,8 @@ import { webEnv } from "../../lib/env";
 import { formatDuration, shortenAddress } from "../../lib/format";
 import { liveDevnetState } from "../../lib/live-state";
 import { StatusRefreshIndicator } from "../../components/status-refresh-indicator";
+import { ResponseTimeTicker } from "../../components/response-time-ticker";
+import { StatusSubscribeForm } from "../../components/status-subscribe-form";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,22 @@ function percentage(value?: number) {
     : "Unavailable";
 }
 
+function computeUptime(
+  snapshots: { checkedAt: string; status: string }[],
+  days = 90,
+): { uptime: number; actualDays: number } {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const recent = snapshots.filter(
+    (s) => new Date(s.checkedAt).getTime() >= cutoff,
+  );
+  if (recent.length === 0) return { uptime: 100, actualDays: days };
+  const healthy = recent.filter((s) => s.status === "healthy").length;
+  const uptime = Math.round((healthy / recent.length) * 1000) / 10;
+  const oldest = Math.min(...recent.map((s) => new Date(s.checkedAt).getTime()));
+  const actualDays = Math.max(1, Math.round((Date.now() - oldest) / (24 * 60 * 60 * 1000)));
+  return { uptime, actualDays };
+}
+
 export default async function StatusPage() {
   const [status, serviceHealth, incidents] = await Promise.all([
     getStatusSnapshot(),
@@ -45,6 +63,9 @@ export default async function StatusPage() {
     status.apiHealth.status === "ok" &&
     status.gatewayHealth.status === "ok" &&
     Boolean(readiness?.ready);
+
+  const apiUptime = computeUptime(serviceHealth?.api ?? []);
+  const gatewayUptime = computeUptime(serviceHealth?.gateway ?? []);
 
   const notes = [
     {
@@ -100,6 +121,7 @@ export default async function StatusPage() {
           Live condition across the Fyxvo control plane, relay gateway, and Solana devnet program.
         </p>
         <StatusRefreshIndicator />
+        <ResponseTimeTicker apiBase={webEnv.apiBaseUrl} />
       </div>
 
       {/* Three service cards */}
@@ -138,6 +160,9 @@ export default async function StatusPage() {
             >
               API health endpoint →
             </Link>
+            <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+              {apiUptime.uptime}% uptime over the last {apiUptime.actualDays} days
+            </p>
           </CardContent>
         </Card>
 
@@ -178,6 +203,9 @@ export default async function StatusPage() {
                 </span>
               </p>
             </div>
+            <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+              {gatewayUptime.uptime}% uptime over the last {gatewayUptime.actualDays} days
+            </p>
           </CardContent>
         </Card>
 
@@ -511,6 +539,9 @@ export default async function StatusPage() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Subscribe to status updates */}
+      <StatusSubscribeForm />
     </div>
   );
 }
