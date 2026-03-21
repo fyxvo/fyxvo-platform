@@ -73,6 +73,9 @@ export default function ProjectPage({
   const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; details: Record<string, unknown> | null; actorWallet: string | null; createdAt: string }>>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const [healthHistory, setHealthHistory] = useState<number[]>([]);
+  const [embedTheme, setEmbedTheme] = useState<"dark" | "light" | "auto">("dark");
+  const [embedSize, setEmbedSize] = useState<"small" | "medium" | "large">("medium");
+  const [embedCompact, setEmbedCompact] = useState(false);
 
   const project =
     portal.projects.find((item) => item.slug === params.slug) ??
@@ -675,20 +678,74 @@ export default function ProjectPage({
               </div>
 
               {/* General iframe */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Iframe embed</p>
-                <p className="text-sm text-[var(--fyxvo-text-soft)]">Embed a live project widget on any HTML page:</p>
-                <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
-                  <pre className="overflow-x-auto font-mono text-xs text-[var(--fyxvo-text-soft)] whitespace-pre-wrap break-all">{`<iframe src="https://www.fyxvo.com/widget/project/${project.id}" width="300" height="80" frameborder="0"></iframe>`}</pre>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CopyButton value={`<iframe src="https://www.fyxvo.com/widget/project/${project.id}" width="300" height="80" frameborder="0"></iframe>`} label="Copy iframe" />
-                  {/* Preview */}
-                  <div className="inline-flex items-center gap-2 rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1.5 text-xs text-[var(--fyxvo-text-muted)]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    fyxvo widget · 300×80
+                <p className="text-sm text-[var(--fyxvo-text-soft)]">Embed a live project widget on any HTML page. Configure the appearance below:</p>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-[var(--fyxvo-text-muted)]">Theme</label>
+                    <select
+                      value={embedTheme}
+                      onChange={(e) => setEmbedTheme(e.target.value as "dark" | "light" | "auto")}
+                      className="rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2 py-1 text-xs text-[var(--fyxvo-text)] focus:outline-none"
+                    >
+                      <option value="dark">Dark</option>
+                      <option value="light">Light</option>
+                      <option value="auto">Auto (system)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-[var(--fyxvo-text-muted)]">Size</label>
+                    <select
+                      value={embedSize}
+                      onChange={(e) => setEmbedSize(e.target.value as "small" | "medium" | "large")}
+                      className="rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2 py-1 text-xs text-[var(--fyxvo-text)] focus:outline-none"
+                    >
+                      <option value="small">Small (status + count)</option>
+                      <option value="medium">Medium (+ latency + success)</option>
+                      <option value="large">Large (+ 24h chart)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 justify-end">
+                    <label className="text-xs text-[var(--fyxvo-text-muted)]">Compact</label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={embedCompact}
+                      onClick={() => setEmbedCompact((v) => !v)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${embedCompact ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border)]"}`}
+                    >
+                      <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${embedCompact ? "translate-x-4" : "translate-x-0"}`} />
+                    </button>
                   </div>
                 </div>
+                {(() => {
+                  const params = new URLSearchParams({ theme: embedTheme, size: embedSize });
+                  if (embedCompact) params.set("compact", "true");
+                  const embedUrl = `https://www.fyxvo.com/widget/project/${project.id}?${params.toString()}`;
+                  const iframeSnippet = `<iframe src="${embedUrl}" width="300" height="${embedSize === "large" ? "220" : embedSize === "medium" ? "160" : "120"}" frameborder="0"></iframe>`;
+                  return (
+                    <>
+                      <div>
+                        <p className="mb-1 text-xs text-[var(--fyxvo-text-muted)]">Live embed URL</p>
+                        <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-2 flex items-center justify-between gap-2">
+                          <code className="font-mono text-xs text-[var(--fyxvo-brand)] break-all truncate">{embedUrl}</code>
+                          <CopyButton value={embedUrl} className="shrink-0" />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
+                        <pre className="overflow-x-auto font-mono text-xs text-[var(--fyxvo-text-soft)] whitespace-pre-wrap break-all">{iframeSnippet}</pre>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <CopyButton value={iframeSnippet} label="Copy iframe" />
+                        <div className="inline-flex items-center gap-2 rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1.5 text-xs text-[var(--fyxvo-text-muted)]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          fyxvo widget · {embedTheme} · {embedSize}{embedCompact ? " · compact" : ""}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </details>

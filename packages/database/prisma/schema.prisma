@@ -103,6 +103,7 @@ model User {
   projectMemberships ProjectMember[]
   activityLogs       ActivityLog[]
   supportTickets     SupportTicket[]
+  digestSchedule     DigestSchedule?
 
   @@index([referralCode])
 }
@@ -503,15 +504,18 @@ model Webhook {
 }
 
 model ProjectMember {
-  id          String    @id @default(uuid()) @db.Uuid
-  projectId   String    @db.Uuid
-  userId      String    @db.Uuid
-  role        String    @default("member")
-  invitedBy   String?   @db.Uuid
-  invitedAt   DateTime  @default(now())
-  acceptedAt  DateTime?
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String    @db.Uuid
+  userId       String?   @db.Uuid
+  role         String    @default("member")
+  status       String    @default("active")
+  invitedBy    String?   @db.Uuid
+  invitedAt    DateTime  @default(now())
+  acceptedAt   DateTime?
+  inviteToken  String?   @unique
+  inviteExpiry DateTime?
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@index([projectId])
@@ -648,4 +652,14 @@ model NewsletterSubscriber {
   confirmed Boolean  @default(false)
   createdAt DateTime @default(now())
   @@index([email])
+}
+
+model DigestSchedule {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @unique @db.Uuid
+  frequency  String    @default("weekly")
+  lastSentAt DateTime?
+  nextSendAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

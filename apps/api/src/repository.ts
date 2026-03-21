@@ -1374,20 +1374,22 @@ export class PrismaApiRepository implements ApiRepository {
 
   async listProjectMembers(projectId: string): Promise<ProjectMemberItem[]> {
     const rows = await this.prisma.projectMember.findMany({
-      where: { projectId },
+      where: { projectId, userId: { not: null } },
       include: { user: { select: { walletAddress: true, displayName: true } } },
       orderBy: { invitedAt: "asc" }
     });
-    return rows.map((r) => ({
-      id: r.id,
-      projectId: r.projectId,
-      userId: r.userId,
-      role: r.role,
-      invitedBy: r.invitedBy ?? null,
-      invitedAt: r.invitedAt.toISOString(),
-      acceptedAt: r.acceptedAt ? r.acceptedAt.toISOString() : null,
-      user: { walletAddress: r.user.walletAddress, displayName: r.user.displayName },
-    }));
+    return rows
+      .filter((r) => r.userId !== null && r.user !== null)
+      .map((r) => ({
+        id: r.id,
+        projectId: r.projectId,
+        userId: r.userId as string,
+        role: r.role,
+        invitedBy: r.invitedBy ?? null,
+        invitedAt: r.invitedAt.toISOString(),
+        acceptedAt: r.acceptedAt ? r.acceptedAt.toISOString() : null,
+        user: { walletAddress: r.user!.walletAddress, displayName: r.user!.displayName },
+      }));
   }
 
   async findProjectMember(projectId: string, userId: string): Promise<ProjectMemberItem | null> {
@@ -1395,7 +1397,7 @@ export class PrismaApiRepository implements ApiRepository {
       where: { projectId, userId },
       include: { user: { select: { walletAddress: true, displayName: true } } }
     });
-    if (!r) return null;
+    if (!r || !r.userId || !r.user) return null;
     return {
       id: r.id,
       projectId: r.projectId,
@@ -1413,7 +1415,7 @@ export class PrismaApiRepository implements ApiRepository {
       where: { id: memberId },
       include: { user: { select: { walletAddress: true, displayName: true } } }
     });
-    if (!r) return null;
+    if (!r || !r.userId || !r.user) return null;
     return {
       id: r.id,
       projectId: r.projectId,
@@ -1434,12 +1436,12 @@ export class PrismaApiRepository implements ApiRepository {
     return {
       id: r.id,
       projectId: r.projectId,
-      userId: r.userId,
+      userId: r.userId ?? input.userId,
       role: r.role,
       invitedBy: r.invitedBy ?? null,
       invitedAt: r.invitedAt.toISOString(),
       acceptedAt: r.acceptedAt ? r.acceptedAt.toISOString() : null,
-      user: { walletAddress: r.user.walletAddress, displayName: r.user.displayName },
+      user: { walletAddress: r.user?.walletAddress ?? "", displayName: r.user?.displayName ?? "" },
     };
   }
 
@@ -2207,6 +2209,66 @@ export class PrismaApiRepository implements ApiRepository {
       results.push({ date: dayStart.toISOString().slice(0, 10), score: Math.min(100, score) });
     }
     return results;
+  }
+
+  async generateInviteLink(projectId: string, createdById: string): Promise<{ token: string; expiresAt: string }> {
+    const token = randomBytes(24).toString("base64url");
+    const expiresAt = new Date(Date.now() + 48 * 3_600_000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).projectMember.create({
+      data: {
+        projectId,
+        invitedBy: createdById,
+        status: "pending",
+        inviteToken: token,
+        inviteExpiry: expiresAt,
+      },
+    });
+    return { token, expiresAt: expiresAt.toISOString() };
+  }
+
+  async lookupInviteToken(token: string): Promise<{ projectId: string; projectName: string; inviterWallet: string } | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const member = await (this.prisma as any).projectMember.findUnique({
+      where: { inviteToken: token },
+    });
+    if (!member || (member.inviteExpiry && new Date(member.inviteExpiry) < new Date())) return null;
+    const project = await this.prisma.project.findUnique({
+      where: { id: member.projectId },
+      select: { id: true, name: true, owner: { select: { walletAddress: true } } },
+    });
+    if (!project) return null;
+    return { projectId: project.id, projectName: project.name, inviterWallet: project.owner.walletAddress };
+  }
+
+  async acceptInviteToken(token: string, userId: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const member = await (this.prisma as any).projectMember.findUnique({ where: { inviteToken: token } });
+    if (!member) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).projectMember.update({
+      where: { id: member.id },
+      data: { userId, status: "active", acceptedAt: new Date(), inviteToken: null, inviteExpiry: null },
+    });
+  }
+
+  async declineInviteToken(token: string, _userId: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).projectMember.deleteMany({ where: { inviteToken: token } });
+  }
+
+  async upsertDigestSchedule(userId: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).digestSchedule.upsert({
+      where: { userId },
+      update: {},
+      create: { userId, nextSendAt: new Date(Date.now() + 7 * 86_400_000) },
+    });
+  }
+
+  async deleteDigestSchedule(userId: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).digestSchedule.deleteMany({ where: { userId } });
   }
 }
 

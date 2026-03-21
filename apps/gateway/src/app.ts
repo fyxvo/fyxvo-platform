@@ -13,7 +13,7 @@ import { calculateRequestPrice, chooseFundingAsset } from "./pricing.js";
 import { PrismaGatewayRepository } from "./repository.js";
 import { HttpUpstreamRouter } from "./router.js";
 import { RedisGatewayStateStore } from "./state.js";
-import type { GatewayAppDependencies, GatewayMetricsSnapshot, JsonRpcPayload, RoutedRpcNode, RoutingMode } from "./types.js";
+import type { GatewayAppDependencies, GatewayMetricsSnapshot, JsonRpcPayload, JsonRpcRequest, RoutedRpcNode, RoutingMode } from "./types.js";
 
 const jsonRpcRequestSchema = z.object({
   jsonrpc: z.literal("2.0"),
@@ -171,6 +171,14 @@ async function sendGatewayError(
 
 const STARTUP_TIME_MS = Date.now();
 
+const CACHE_TTL_MS: Record<string, number> = {
+  getHealth: 10_000,
+  getSlot: 500,
+  getLatestBlockhash: 500,
+  getEpochInfo: 5_000,
+  getVersion: 60_000,
+};
+
 // ---------------------------------------------------------------------------
 // Solana JSON-RPC error hint table
 // ---------------------------------------------------------------------------
@@ -290,6 +298,230 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
 
       projectId = projectAccess.project.id;
       apiKeyId = projectAccess.apiKey.id;
+
+      // ── Response cache for read-only RPC methods ──────────────────────────
+      if (!Array.isArray(payload)) {
+        const singlePayload = payload as JsonRpcRequest;
+        const rpcMethod = singlePayload.method;
+        const cacheTtl = CACHE_TTL_MS[rpcMethod];
+        if (cacheTtl !== undefined) {
+          const cacheKey = `fyxvo:rpc:${rpcMethod}`;
+          const cached = await input.stateStore.getCached(cacheKey).catch(() => null);
+          if (cached !== null) {
+            statusCode = 200;
+            reply.header("x-fyxvo-cache", "hit");
+            reply.status(200).send(JSON.parse(cached));
+            return;
+          }
+          // Cache miss — proceed normally, store result after upstream call
+          const requiredScopes = gatewayRequiredApiKeyScopes(mode);
+          const missingScopes = getMissingApiKeyScopes({
+            grantedScopes: projectAccess.apiKey.scopes,
+            requiredScopes
+          });
+          if (missingScopes.length > 0) {
+            throw new GatewayHttpError(
+              403,
+              "insufficient_api_key_scope",
+              mode === "priority"
+                ? "This API key is not allowed to use priority relay. Issue a key with rpc:request and priority:relay."
+                : "This API key is not allowed to send relay traffic. Issue a key with rpc:request.",
+              {
+                requiredScopes,
+                missingScopes,
+                grantedScopes: projectAccess.apiKey.scopes
+              }
+            );
+          }
+
+          const KEY_RATE_LIMIT_MAX = 300;
+          const keyRateLimitDecision = await input.stateStore.acquireRateLimit({
+            subject: `key:${apiKeyId}`,
+            mode,
+            limit: KEY_RATE_LIMIT_MAX,
+            windowMs: input.env.GATEWAY_RATE_LIMIT_WINDOW_MS
+          });
+          setRateLimitHeaders(reply, keyRateLimitDecision);
+
+          if (!keyRateLimitDecision.allowed) {
+            throw new GatewayHttpError(429, "key_rate_limited", "API key rate limit exceeded. Wait for the current window to reset before retrying.", {
+              error: "rate_limited",
+              code: "key_rate_limited",
+              limit: keyRateLimitDecision.limit,
+              remaining: keyRateLimitDecision.remaining,
+              resetAt: keyRateLimitDecision.resetAt,
+              retryAfterMs: Math.max(keyRateLimitDecision.resetAt - Date.now(), 0)
+            });
+          }
+
+          const rateLimitDecision = await input.stateStore.acquireRateLimit({
+            subject: apiKeyId,
+            mode,
+            limit:
+              mode === "priority"
+                ? input.env.GATEWAY_PRIORITY_RATE_LIMIT_MAX
+                : input.env.GATEWAY_RATE_LIMIT_MAX,
+            windowMs:
+              mode === "priority"
+                ? input.env.GATEWAY_PRIORITY_RATE_LIMIT_WINDOW_MS
+                : input.env.GATEWAY_RATE_LIMIT_WINDOW_MS
+          });
+          setRateLimitHeaders(reply, rateLimitDecision);
+
+          if (!rateLimitDecision.allowed) {
+            throw new GatewayHttpError(429, "rate_limited", "Gateway rate limit exceeded. Wait for the current window to reset before retrying.", {
+              limit: rateLimitDecision.limit,
+              remaining: rateLimitDecision.remaining,
+              resetAt: rateLimitDecision.resetAt,
+              retryAfterMs: Math.max(rateLimitDecision.resetAt - Date.now(), 0)
+            });
+          }
+
+          const simulateQuery = (request.query as Record<string, string | undefined>)["simulate"];
+          const isSimulated = simulateQuery === "true" || simulateQuery === "1";
+
+          if (isSimulated) {
+            const reqId = singlePayload.id ?? null;
+            let result: unknown;
+            if (rpcMethod === "getHealth") {
+              result = "ok";
+            } else if (rpcMethod === "getSlot") {
+              result = 312847293;
+            } else if (rpcMethod === "getLatestBlockhash") {
+              result = {
+                context: { slot: 312847293 },
+                value: {
+                  blockhash: "SimulatedBlockhash1111111111111111111111111111",
+                  lastValidBlockHeight: 312857293,
+                },
+              };
+            } else {
+              reply.header("x-fyxvo-simulated", "true");
+              reply.header("x-fyxvo-project-id", projectAccess.project.id);
+              reply.header("x-fyxvo-routing-mode", mode);
+              statusCode = 200;
+              reply.status(200).send({
+                jsonrpc: "2.0",
+                id: reqId,
+                error: {
+                  code: -32600,
+                  message: "Method not simulated. Remove ?simulate=true to use real data.",
+                },
+              });
+              return;
+            }
+            reply.header("x-fyxvo-simulated", "true");
+            reply.header("x-fyxvo-project-id", projectAccess.project.id);
+            reply.header("x-fyxvo-routing-mode", mode);
+            statusCode = 200;
+            reply.status(200).send({ jsonrpc: "2.0", id: reqId, result });
+            return;
+          }
+
+          const pricing = calculateRequestPrice(payload, mode, input.env);
+          const [fundingState, spendState, fetchedNodes] = await Promise.all([
+            input.balanceResolver.getProjectFundingState(projectAccess.project),
+            input.stateStore.getProjectSpend(projectAccess.project.id),
+            input.repository.listUpstreamNodes(projectAccess.project.id)
+          ]);
+          upstreamNodes = fetchedNodes;
+
+          const fundingDecision = chooseFundingAsset({
+            funding: fundingState,
+            spend: spendState,
+            requiredCredits: pricing.totalPrice,
+            minimumReserve: BigInt(input.env.GATEWAY_MIN_AVAILABLE_LAMPORTS)
+          });
+
+          if (!fundingDecision) {
+            throw new GatewayHttpError(402, "insufficient_project_funds", "Project balance is insufficient for this request.", {
+              requiredCredits: pricing.totalPrice.toString(),
+              availableSolCredits: (fundingState.availableSolCredits - spendState.sol).toString(),
+              availableUsdcCredits: (fundingState.availableUsdcCredits - spendState.usdc).toString()
+            });
+          }
+
+          if (upstreamNodes.length === 0) {
+            throw new GatewayHttpError(503, "no_upstream_nodes", "No healthy Solana upstream nodes are configured.");
+          }
+
+          const openNodes = upstreamNodes.filter((node) => !isCircuitOpen(node.endpoint));
+          const routingNodes = openNodes.length > 0 ? openNodes : upstreamNodes;
+
+          const routed = await input.router.route({
+            mode,
+            payload,
+            serializedBody: serializeRpcPayload(payload),
+            nodes: routingNodes,
+            timeoutMs:
+              mode === "priority"
+                ? input.env.GATEWAY_PRIORITY_TIMEOUT_MS
+                : input.env.GATEWAY_UPSTREAM_TIMEOUT_MS
+          });
+
+          const success = routed.statusCode < 500 && !routed.hasJsonRpcError;
+          const durationMs = Date.now() - startedAt;
+
+          if (success) {
+            recordUpstreamSuccess(routed.node.endpoint);
+          } else {
+            recordUpstreamFailure(routed.node.endpoint);
+          }
+
+          await input.stateStore.recordMetric({
+            mode,
+            projectId: projectAccess.project.id,
+            latencyMs: durationMs,
+            success,
+            upstreamFailure: false
+          });
+
+          if (success) {
+            await Promise.all([
+              input.repository.touchApiKeyUsage(projectAccess.apiKey.id),
+              input.stateStore.incrementProjectSpend(
+                projectAccess.project.id,
+                fundingDecision.asset,
+                pricing.totalPrice
+              )
+            ]);
+            // Store in cache on success
+            const responseBody = injectSolanaErrorHint(routed.body);
+            await input.stateStore.setCached(cacheKey, JSON.stringify(responseBody), cacheTtl).catch(() => undefined);
+          }
+
+          app.log.info(
+            {
+              event: "gateway.request.completed",
+              requestId: request.id,
+              projectId: projectAccess.project.id,
+              apiKeyId: projectAccess.apiKey.id,
+              mode,
+              rpcMethods: pricing.methods,
+              upstreamNodeId: routed.node.id,
+              upstreamEndpoint: routed.node.endpoint,
+              chargedAsset: fundingDecision.asset,
+              priceCredits: pricing.totalPrice.toString(),
+              durationMs,
+              statusCode: routed.statusCode,
+              success
+            },
+            "Gateway RPC request completed"
+          );
+
+          reply.header("x-fyxvo-project-id", projectAccess.project.id);
+          reply.header("x-fyxvo-project-slug", projectAccess.project.slug);
+          reply.header("x-fyxvo-upstream-node-id", routed.node.id);
+          reply.header("x-fyxvo-routing-mode", mode);
+          reply.header("x-fyxvo-price-credits", pricing.totalPrice.toString());
+          reply.header("x-fyxvo-billed-asset", fundingDecision.asset);
+          reply.header("x-fyxvo-cache", "miss");
+
+          statusCode = routed.statusCode;
+          reply.status(routed.statusCode).send(injectSolanaErrorHint(routed.body));
+          return;
+        }
+      }
 
       const requiredScopes = gatewayRequiredApiKeyScopes(mode);
       const missingScopes = getMissingApiKeyScopes({
@@ -702,6 +934,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         failures: state.count,
         nextRetryAt: state.openUntil > 0 ? new Date(state.openUntil).toISOString() : null,
       })),
+      cache: { cachedMethods: Object.keys(CACHE_TTL_MS), enabled: true },
       timestamp: new Date().toISOString()
     });
   });

@@ -1024,6 +1024,14 @@ class MemoryApiRepository implements ApiRepository {
     return { projects: [], apiKeys: [], requests: [] };
   }
   async getHealthHistory(_projectId: string): Promise<Array<{ date: string; score: number }>> { return []; }
+  async generateInviteLink(_projectId: string, _createdById: string): Promise<{ token: string; expiresAt: string }> {
+    return { token: "stub-token", expiresAt: new Date(Date.now() + 48 * 3_600_000).toISOString() };
+  }
+  async lookupInviteToken(_token: string): Promise<{ projectId: string; projectName: string; inviterWallet: string } | null> { return null; }
+  async acceptInviteToken(_token: string, _userId: string): Promise<void> { return Promise.resolve(); }
+  async declineInviteToken(_token: string, _userId: string): Promise<void> { return Promise.resolve(); }
+  async upsertDigestSchedule(_userId: string): Promise<void> { return Promise.resolve(); }
+  async deleteDigestSchedule(_userId: string): Promise<void> { return Promise.resolve(); }
 }
 
 async function createTestApp(options: { rateLimitMax?: number } = {}) {

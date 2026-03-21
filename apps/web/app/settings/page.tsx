@@ -126,6 +126,10 @@ export default function SettingsPage() {
   const [soundEnabled, setSoundEnabled] = useState(() =>
     typeof window !== "undefined" ? localStorage.getItem("fyxvo_notification_sound") === "1" : false
   );
+
+  // Weekly digest
+  const [digestEnabled, setDigestEnabled] = useState(false);
+  const [digestSaving, setDigestSaving] = useState(false);
   useEffect(() => {
     const saved = localStorage.getItem("fyxvo-density");
     if (saved === "compact" || saved === "comfortable") setDensity(saved);
@@ -197,6 +201,12 @@ export default function SettingsPage() {
   const [inviteSaving, setInviteSaving] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [cancellingInviteId, setCancellingInviteId] = useState<string | null>(null);
+
+  // Invite link
+  const [inviteLinkUrl, setInviteLinkUrl] = useState<string | null>(null);
+  const [inviteLinkExpiry, setInviteLinkExpiry] = useState<string | null>(null);
+  const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
 
   // Webhook event log
   const [webhookEvents, setWebhookEvents] = useState<Array<{
@@ -424,6 +434,24 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleGenerateInviteLink() {
+    if (!portal.token || !portal.selectedProject) return;
+    setInviteLinkLoading(true);
+    try {
+      const res = await fetch(
+        new URL(`/v1/projects/${portal.selectedProject.id}/invite-link`, webEnv.apiBaseUrl),
+        { headers: { authorization: `Bearer ${portal.token}` } }
+      );
+      if (res.ok) {
+        const body = await res.json() as { url: string; expiresAt?: string };
+        setInviteLinkUrl(body.url);
+        setInviteLinkExpiry(body.expiresAt ?? null);
+      }
+    } finally {
+      setInviteLinkLoading(false);
+    }
+  }
+
   async function handleArchiveProject(skip: boolean) {
     if (!portal.token || !portal.selectedProject) return;
     setArchiving(true);
@@ -490,6 +518,24 @@ export default function SettingsPage() {
       await portal.refresh();
     } finally {
       setTransferring(false);
+    }
+  }
+
+  async function toggleDigest() {
+    if (!portal.token) return;
+    setDigestSaving(true);
+    const next = !digestEnabled;
+    setDigestEnabled(next);
+    try {
+      await fetch(new URL("/v1/me/digest", webEnv.apiBaseUrl), {
+        method: next ? "POST" : "DELETE",
+        headers: { authorization: `Bearer ${portal.token}` },
+      });
+    } catch {
+      // revert on error
+      setDigestEnabled(!next);
+    } finally {
+      setDigestSaving(false);
     }
   }
 
@@ -1274,6 +1320,45 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            <div className="border-t border-[var(--fyxvo-border)] pt-4 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Invite link</p>
+              <p className="text-xs text-[var(--fyxvo-text-muted)]">Generate a shareable link that anyone can use to request access to this project.</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleGenerateInviteLink()}
+                disabled={inviteLinkLoading || !portal.selectedProject || !portal.token}
+              >
+                {inviteLinkLoading ? "Generating…" : "Generate invite link"}
+              </Button>
+              {inviteLinkUrl ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={inviteLinkUrl}
+                      className="flex-1 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)] focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        void navigator.clipboard.writeText(inviteLinkUrl);
+                        setInviteLinkCopied(true);
+                        setTimeout(() => setInviteLinkCopied(false), 2000);
+                      }}
+                      className="rounded border border-[var(--fyxvo-border)] px-2 py-1.5 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                    >
+                      {inviteLinkCopied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                  {inviteLinkExpiry ? (
+                    <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                      Expires: {new Date(inviteLinkExpiry).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
             {/* Transfer ownership */}
             {portal.user?.id === portal.selectedProject.ownerId ? (
               <div className="border-t border-[var(--fyxvo-border)] pt-4 space-y-3">
@@ -1438,6 +1523,22 @@ export default function SettingsPage() {
               className={`relative inline-flex h-5 w-9 cursor-pointer rounded-full border-2 border-transparent transition-colors ${soundEnabled ? "bg-[var(--fyxvo-brand,#7c3aed)]" : "bg-[var(--fyxvo-border)]"}`}
             >
               <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${soundEnabled ? "translate-x-4" : "translate-x-0"}`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-[var(--fyxvo-text)]">Weekly digest</p>
+              <p className="text-xs text-[var(--fyxvo-text-muted)]">Receive a weekly summary of your project activity by email</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={digestEnabled}
+              disabled={digestSaving || !isAuthenticated}
+              onClick={() => void toggleDigest()}
+              className={`relative inline-flex h-5 w-9 cursor-pointer rounded-full border-2 border-transparent transition-colors disabled:opacity-50 ${digestEnabled ? "bg-[var(--fyxvo-brand,#7c3aed)]" : "bg-[var(--fyxvo-border)]"}`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${digestEnabled ? "translate-x-4" : "translate-x-0"}`} />
             </button>
           </div>
           <Notice tone="neutral" title="How alerts work">

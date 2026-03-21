@@ -2876,6 +2876,64 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     return results;
   });
 
+  // ── Invite links ──────────────────────────────────────────────────────────
+  app.get("/v1/projects/:projectId/invite-link", async (request, reply) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || project.ownerId !== user.id) throw new HttpError(403, "forbidden", "Only the project owner can generate invite links.");
+    const result = await input.repository.generateInviteLink(projectId, user.id);
+    return reply.status(201).send({ inviteUrl: `https://www.fyxvo.com/invite/${result.token}`, expiresAt: result.expiresAt });
+  });
+
+  app.get("/v1/invite/:token", async (request) => {
+    const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
+    const invite = await input.repository.lookupInviteToken(token);
+    if (!invite) throw new HttpError(404, "not_found", "Invite link is invalid or has expired.");
+    return invite;
+  });
+
+  app.post("/v1/invite/:token/accept", async (request) => {
+    const user = requireUser(request);
+    const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
+    await input.repository.acceptInviteToken(token, user.id);
+    return { accepted: true };
+  });
+
+  app.post("/v1/invite/:token/decline", async (request) => {
+    const user = requireUser(request);
+    const { token } = z.object({ token: z.string().min(1) }).parse(request.params);
+    await input.repository.declineInviteToken(token, user.id);
+    return { declined: true };
+  });
+
+  // ── Digest schedule ───────────────────────────────────────────────────────
+  app.post("/v1/me/digest", async (request, reply) => {
+    const user = requireUser(request);
+    await input.repository.upsertDigestSchedule(user.id);
+    return reply.status(201).send({ enrolled: true });
+  });
+
+  app.delete("/v1/me/digest", async (request) => {
+    const user = requireUser(request);
+    await input.repository.deleteDigestSchedule(user.id);
+    return { removed: true };
+  });
+
+  // ── Admin gateway upstreams ───────────────────────────────────────────────
+  app.get("/v1/admin/gateway/upstreams", async (request) => {
+    const user = requireUser(request);
+    if (user.role !== "ADMIN") throw new HttpError(403, "forbidden", "Admin only.");
+    const gatewayBase = process.env.GATEWAY_BASE_URL ?? "https://rpc.fyxvo.com";
+    try {
+      const res = await fetch(`${gatewayBase}/health`);
+      const data = await res.json() as { upstreamCircuits?: unknown[]; upstreams?: unknown[] };
+      return { upstreams: data.upstreamCircuits ?? data.upstreams ?? [], source: gatewayBase };
+    } catch {
+      return { upstreams: [], source: gatewayBase, error: "Could not reach gateway health endpoint." };
+    }
+  });
+
   return app;
 }
 

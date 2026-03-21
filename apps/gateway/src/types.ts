@@ -110,6 +110,8 @@ export interface GatewayStateStore {
   incrementProjectSpend(projectId: string, asset: "SOL" | "USDC", amount: bigint): Promise<ProjectSpendState>;
   recordMetric(input: GatewayRequestMetric): Promise<void>;
   getMetricsSnapshot(): Promise<GatewayMetricsSnapshot>;
+  getCached(key: string): Promise<string | null>;
+  setCached(key: string, value: string, ttlMs: number): Promise<void>;
   ping(): Promise<boolean>;
   close(): Promise<void>;
 }

@@ -38,6 +38,7 @@ const NAV_SECTIONS = [
   { id: "rate-limits-reference", label: "Rate Limits Reference", keywords: "rate limit table devnet requests per second 429" },
   { id: "error-codes", label: "Error Codes", keywords: "error codes 401 403 402 429 503 gateway api errors reference" },
   { id: "faq", label: "FAQ", keywords: "frequently asked questions faq devnet solana rpc gateway" },
+  { id: "rpc-reference", label: "RPC Reference", keywords: "rpc methods reference getSlot getBalance getAccountInfo getBlock sendTransaction solana jsonrpc glossary" },
 ] as const;
 
 function CodeBlock({ code, label }: { readonly code: string; readonly label?: string }) {
@@ -1421,54 +1422,209 @@ curl -I ${webEnv.apiBaseUrl}/health
               id="troubleshooting"
               eyebrow="Section 10"
               title="Troubleshooting"
-              description="Common issues and fastest paths to resolution."
+              description="A detailed diagnostic guide for the most common failure categories."
             />
-            <div className="space-y-4">
-              {[
-                {
-                  title: "Project not activated",
-                  badge: "403",
-                  tone: "warning" as const,
-                  body: "If the gateway returns 403 and the project was just created, the on-chain activation transaction may not have confirmed yet. Check the project page — the status will show Pending until devnet confirms. If it stays pending more than 30 seconds, try re-sending the activation transaction from the dashboard.",
-                },
-                {
-                  title: "Wrong network",
-                  badge: "config",
-                  tone: "warning" as const,
-                  body: `The API and gateway are configured for Solana devnet (${webEnv.solanaCluster}). Wallet adapters must also point to devnet. If you see RPC errors or unexpected balances, confirm the cluster is set correctly in your wallet and SDK config.`,
-                },
-                {
-                  title: "Low SOL balance",
-                  badge: "402",
-                  tone: "warning" as const,
-                  body: "A 402 response from the gateway means the project's funded SOL balance is insufficient to cover the request. Check the project's current balance in the dashboard, fund more SOL, and verify the transaction before retrying.",
-                },
-                {
-                  title: "Wrong scope on key",
-                  badge: "403",
-                  tone: "warning" as const,
-                  body: "Standard relay requires rpc:request. Priority relay requires both rpc:request and priority:relay. Sending a standard key to /priority returns 403. Generate a new key with the correct scopes from the API keys page.",
-                },
-                {
-                  title: "402 after funding",
-                  badge: "402",
-                  tone: "warning" as const,
-                  body: "If a 402 persists after funding, the API may not have verified the transaction yet. Use the fund/verify endpoint with the transaction signature to trigger a manual balance refresh. If the issue continues, check that the correct project ID is selected.",
-                },
-                {
-                  title: "JWT expired",
-                  badge: "401",
-                  tone: "neutral" as const,
-                  body: "JWTs expire after 24 hours. A 401 from the API means the token is expired or malformed. Re-run the challenge + verify flow to get a fresh token. There is no silent refresh endpoint.",
-                },
-              ].map((item) => (
-                <Notice key={item.title} tone={item.tone} title={item.title}>
-                  <span className="mr-2 inline-flex items-center rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-1.5 py-0.5 text-xs font-mono text-[var(--fyxvo-text-muted)]">
-                    {item.badge}
-                  </span>
-                  {item.body}
-                </Notice>
-              ))}
+            <div className="space-y-6">
+
+              {/* ---- Authentication Errors ---- */}
+              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
+                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
+                  <span className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-rose-500">401 / 403</span>
+                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Authentication Errors</h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The gateway or API rejected your credentials. This covers both missing-token (401) and insufficient-scope (403) failures.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>JWT has expired (tokens expire after 24 hours)</li>
+                      <li>API key was revoked or does not exist</li>
+                      <li>Key is missing required scope (<code className="font-mono text-xs">rpc:request</code> for standard, <code className="font-mono text-xs">priority:relay</code> for priority)</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Diagnosis</p>
+                    <p className="text-sm text-[var(--fyxvo-text-soft)]">Check the <code className="font-mono text-xs">error.code</code> field in the response body. Code <code className="font-mono text-xs">TOKEN_EXPIRED</code> means re-authenticate. Code <code className="font-mono text-xs">INSUFFICIENT_SCOPE</code> means generate a new key with the right scopes.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Re-authenticate via <code className="font-mono text-xs">POST /v1/auth/challenge</code> + <code className="font-mono text-xs">POST /v1/auth/verify</code></li>
+                      <li>Generate a new API key from the API Keys page with the required scopes</li>
+                      <li>Confirm the <code className="font-mono text-xs">X-Api-Key</code> or <code className="font-mono text-xs">Authorization: Bearer</code> header is present and correctly formatted</li>
+                    </ul>
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: re-authenticate</summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
+                      <code>{`# Step 1 — get a challenge
+curl -X POST ${webEnv.apiBaseUrl}/v1/auth/challenge \\
+  -H "content-type: application/json" \\
+  -d '{"walletAddress":"YOUR_WALLET"}'
+
+# Step 2 — sign the returned message with your wallet and verify
+curl -X POST ${webEnv.apiBaseUrl}/v1/auth/verify \\
+  -H "content-type: application/json" \\
+  -d '{"walletAddress":"YOUR_WALLET","message":"<from-step-1>","signature":"<base58-sig>"}'`}</code>
+                    </pre>
+                  </details>
+                </div>
+              </div>
+
+              {/* ---- Connection Errors ---- */}
+              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
+                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
+                  <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-500">network</span>
+                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Connection Errors</h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The request never reaches the gateway or returns a non-JSON response.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Wrong endpoint URL (common: using API base instead of gateway base)</li>
+                      <li>No internet access or DNS resolution failure</li>
+                      <li>Gateway is temporarily unavailable (planned maintenance or incident)</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Verify the RPC endpoint: <code className="font-mono text-xs">{webEnv.gatewayBaseUrl}/rpc</code></li>
+                      <li>Check <a href={webEnv.statusPageUrl} className="text-[var(--fyxvo-brand)] hover:underline" target="_blank" rel="noopener noreferrer">status.fyxvo.com</a> for active incidents</li>
+                    </ul>
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: health check</summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
+                      <code>{`curl https://rpc.fyxvo.com/health
+# Expected: {"status":"ok"}
+
+curl ${webEnv.apiBaseUrl}/health
+# Expected: {"status":"ok"}`}</code>
+                    </pre>
+                  </details>
+                </div>
+              </div>
+
+              {/* ---- Rate Limit Errors ---- */}
+              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
+                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
+                  <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-500">429</span>
+                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Rate Limit Errors</h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The gateway returned a 429 Too Many Requests. Your project has exceeded its per-minute request quota.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Burst of requests exceeded the per-minute limit for your tier</li>
+                      <li>Multiple clients sharing the same API key concurrently</li>
+                      <li>Missing backoff logic causing retry storms</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Diagnosis</p>
+                    <p className="text-sm text-[var(--fyxvo-text-soft)]">Check the <code className="font-mono text-xs">X-RateLimit-Remaining</code> and <code className="font-mono text-xs">Retry-After</code> headers on the 429 response.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Implement exponential backoff using the <code className="font-mono text-xs">Retry-After</code> header value</li>
+                      <li>Consider upgrading to the Priority tier for higher throughput limits</li>
+                      <li>Deduplicate requests and use batch methods where available</li>
+                    </ul>
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: check rate limit headers</summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
+                      <code>{`curl -i -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'
+
+# Look for: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After`}</code>
+                    </pre>
+                  </details>
+                </div>
+              </div>
+
+              {/* ---- Balance Errors ---- */}
+              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
+                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
+                  <span className="rounded-md border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-orange-500">402</span>
+                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Balance Errors</h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-sm text-[var(--fyxvo-text-soft)]">A 402 Payment Required means the project does not have enough SOL credits to cover the relay request.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Project treasury balance has been exhausted</li>
+                      <li>Funding transaction was sent but not yet verified by the API</li>
+                      <li>Using a key from a different project with an empty treasury</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Fund the project at <a href="/funding" className="text-[var(--fyxvo-brand)] hover:underline">fyxvo.com/funding</a></li>
+                      <li>Verify a pending funding transaction using <code className="font-mono text-xs">POST /v1/projects/:id/funding/:fid/verify</code></li>
+                    </ul>
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: check balance via API</summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
+                      <code>{`curl ${webEnv.apiBaseUrl}/v1/me/balance \\
+  -H "authorization: Bearer YOUR_JWT"
+
+# Returns: { "availableSolCredits": "...", "totalSolFunded": "..." }`}</code>
+                    </pre>
+                  </details>
+                </div>
+              </div>
+
+              {/* ---- Unexpected RPC Errors ---- */}
+              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
+                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
+                  <span className="rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-2 py-0.5 font-mono text-xs font-semibold text-[var(--fyxvo-text-muted)]">RPC</span>
+                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Unexpected RPC Errors</h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The gateway reached Solana devnet but the RPC call itself failed. Check the <code className="font-mono text-xs">fyxvo_hint</code> field in the error response for a human-readable diagnosis.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li>Solana devnet node under load or temporarily unavailable</li>
+                      <li>Blockhash has expired before the transaction was submitted (use <code className="font-mono text-xs">getLatestBlockhash</code> again)</li>
+                      <li>Transaction simulation failed due to an account constraint or insufficient lamports</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Common codes</p>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      <li><code className="font-mono text-xs">-32002</code> — Transaction simulation failed: check transaction logs in the response</li>
+                      <li><code className="font-mono text-xs">-32003</code> — Blockhash expired: fetch a fresh blockhash and re-sign</li>
+                      <li><code className="font-mono text-xs">-32016</code> — Blockhash not found: same resolution as -32003</li>
+                    </ul>
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: inspect fyxvo_hint</summary>
+                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
+                      <code>{`# A Fyxvo error response looks like:
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32002,
+    "message": "Transaction simulation failed",
+    "fyxvo_hint": "The transaction failed simulation. Check that the fee payer has enough SOL and all accounts are valid."
+  }
+}`}</code>
+                    </pre>
+                  </details>
+                </div>
+              </div>
+
             </div>
           </section>
 
@@ -1835,6 +1991,187 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                 <div key={item.q} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
                   <p className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.q}</p>
                   <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── RPC Reference ─────────────────────────────────────── */}
+          <section id="rpc-reference">
+            <SectionHeading
+              id="rpc-reference"
+              eyebrow="Reference"
+              title="RPC Reference"
+              description="A glossary of key Solana JSON-RPC methods routed through the Fyxvo gateway."
+            />
+            <div className="space-y-6">
+              {(
+                [
+                  {
+                    category: "Account & Balance",
+                    methods: [
+                      {
+                        name: "getBalance",
+                        description: "Returns the lamport balance of the account at the given public key.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"]}'`,
+                      },
+                      {
+                        name: "getAccountInfo",
+                        description: "Returns all information associated with the account at the given public key.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",{"encoding":"base58"}]}'`,
+                      },
+                      {
+                        name: "getMultipleAccounts",
+                        description: "Returns the account information for a list of public keys.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getMultipleAccounts","params":[["PUBKEY1","PUBKEY2"],{"encoding":"base58"}]}'`,
+                      },
+                    ],
+                  },
+                  {
+                    category: "Block & Slot",
+                    methods: [
+                      {
+                        name: "getSlot",
+                        description: "Returns the slot that has reached the given or default commitment level.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'`,
+                      },
+                      {
+                        name: "getBlock",
+                        description: "Returns identity and transaction information about a confirmed block in the ledger.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBlock","params":[SLOT_NUMBER,{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
+                      },
+                      {
+                        name: "getLatestBlockhash",
+                        description: "Returns the latest blockhash and the last block height at which it is valid.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"confirmed"}]}'`,
+                      },
+                      {
+                        name: "getBlockHeight",
+                        description: "Returns the current block height of the node.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBlockHeight","params":[]}'`,
+                      },
+                    ],
+                  },
+                  {
+                    category: "Transaction",
+                    methods: [
+                      {
+                        name: "sendTransaction",
+                        description: "Submits a signed transaction to the cluster for processing.",
+                        tier: "Priority",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
+  -H "x-api-key: YOUR_PRIORITY_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["<base64-signed-tx>",{"encoding":"base64","skipPreflight":false}]}'`,
+                      },
+                      {
+                        name: "simulateTransaction",
+                        description: "Simulate sending a transaction without actually submitting it to the network.",
+                        tier: "Priority",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
+  -H "x-api-key: YOUR_PRIORITY_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"simulateTransaction","params":["<base64-tx>",{"encoding":"base64","sigVerify":false}]}'`,
+                      },
+                      {
+                        name: "getTransaction",
+                        description: "Returns transaction details for a confirmed transaction.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTransaction","params":["SIGNATURE",{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
+                      },
+                      {
+                        name: "getSignatureStatuses",
+                        description: "Returns the statuses of a list of transaction signatures.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getSignatureStatuses","params":[["SIG1","SIG2"],{"searchTransactionHistory":false}]}'`,
+                      },
+                    ],
+                  },
+                  {
+                    category: "Network",
+                    methods: [
+                      {
+                        name: "getHealth",
+                        description: "Returns the current health of the node — \u201cok\u201d if healthy.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'`,
+                      },
+                      {
+                        name: "getVersion",
+                        description: "Returns the current Solana version running on the node.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getVersion","params":[]}'`,
+                      },
+                      {
+                        name: "getEpochInfo",
+                        description: "Returns information about the current epoch including slot index and epoch number.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getEpochInfo","params":[]}'`,
+                      },
+                      {
+                        name: "getGenesisHash",
+                        description: "Returns the genesis hash of the ledger.",
+                        tier: "Standard",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getGenesisHash","params":[]}'`,
+                      },
+                    ],
+                  },
+                ] as Array<{ category: string; methods: Array<{ name: string; description: string; tier: string; example: string }> }>
+              ).map(({ category, methods }) => (
+                <div key={category} className="space-y-3">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">{category}</h3>
+                  <div className="divide-y divide-[var(--fyxvo-border)] rounded-xl border border-[var(--fyxvo-border)] overflow-hidden">
+                    {methods.map((m) => (
+                      <div key={m.name} className="bg-[var(--fyxvo-panel-soft)] p-4">
+                        <div className="flex flex-wrap items-center gap-3 mb-1">
+                          <code className="font-mono text-sm font-semibold text-[var(--fyxvo-text)]">{m.name}</code>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${m.tier === "Priority" ? "bg-amber-500/15 text-amber-500" : "bg-brand-500/10 text-[var(--fyxvo-brand)]"}`}>
+                            {m.tier}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-5 text-[var(--fyxvo-text-soft)] mb-2">{m.description}</p>
+                        <details className="text-xs">
+                          <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">
+                            Example
+                          </summary>
+                          <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
+                            <code>{m.example}</code>
+                          </pre>
+                        </details>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

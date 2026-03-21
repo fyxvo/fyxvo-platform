@@ -428,8 +428,10 @@ function PlaygroundContent() {
 
   // Benchmark
   const [benchmarkCount, setBenchmarkCount] = useState(10);
+  const [benchmarkMethod, setBenchmarkMethod] = useState<"getSlot" | "getLatestBlockhash" | "getBalance" | "getAccountInfo">("getSlot");
   const [benchmarkResults, setBenchmarkResults] = useState<number[]>([]);
   const [benchmarkRunning, setBenchmarkRunning] = useState(false);
+  const [benchmarkNetworkAvg, setBenchmarkNetworkAvg] = useState<number | null>(null);
 
   // Webhook test
   const [webhookTestUrl, setWebhookTestUrl] = useState("");
@@ -664,20 +666,50 @@ function PlaygroundContent() {
   async function runBenchmark() {
     setBenchmarkRunning(true);
     setBenchmarkResults([]);
-    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getSlot", params: [] });
+    setBenchmarkNetworkAvg(null);
+
+    const BENCH_ADDRESS = "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa";
+    const methodParams: Record<string, unknown[]> = {
+      getSlot: [],
+      getLatestBlockhash: [],
+      getBalance: [BENCH_ADDRESS],
+      getAccountInfo: [BENCH_ADDRESS, { encoding: "base58" }],
+    };
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: benchmarkMethod, params: methodParams[benchmarkMethod] ?? [] });
+
+    // Fetch network stats concurrently with first batch
+    const networkStatsPromise = fetch(`${webEnv.apiBaseUrl}/v1/network/stats`)
+      .then((r) => r.ok ? r.json() as Promise<{ averageLatencyMs?: number }> : null)
+      .catch(() => null);
+
+    const BATCH_SIZE = 5;
+    const collected: number[] = [];
     try {
-      for (let i = 0; i < benchmarkCount; i++) {
-        const start = Date.now();
-        try {
-          await sendRpcRequest(gatewayBase, mode, body, activeApiKey?.prefix, simulateMode);
-        } catch {
-          // still record a high value so the chart shows the failure
+      for (let i = 0; i < benchmarkCount; i += BATCH_SIZE) {
+        const batchSize = Math.min(BATCH_SIZE, benchmarkCount - i);
+        const batchPromises = Array.from({ length: batchSize }, () => {
+          const start = Date.now();
+          return sendRpcRequest(gatewayBase, mode, body, activeApiKey?.prefix, simulateMode)
+            .then(() => Date.now() - start)
+            .catch(() => null);
+        });
+        const results = await Promise.allSettled(batchPromises);
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value !== null) {
+            collected.push(r.value);
+          }
         }
-        const latency = Date.now() - start;
-        setBenchmarkResults((prev) => [...prev, latency]);
+        setBenchmarkResults([...collected]);
+        if (i + BATCH_SIZE < benchmarkCount) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 200));
+        }
       }
     } finally {
       setBenchmarkRunning(false);
+      const statsData = await networkStatsPromise;
+      if (typeof statsData?.averageLatencyMs === "number") {
+        setBenchmarkNetworkAvg(statsData.averageLatencyMs);
+      }
     }
   }
 
@@ -935,6 +967,21 @@ function PlaygroundContent() {
                 <div className="space-y-4">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
+                      RPC method
+                    </label>
+                    <select
+                      value={benchmarkMethod}
+                      onChange={(e) => setBenchmarkMethod(e.target.value as typeof benchmarkMethod)}
+                      className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                    >
+                      <option value="getSlot">getSlot</option>
+                      <option value="getLatestBlockhash">getLatestBlockhash</option>
+                      <option value="getBalance">getBalance</option>
+                      <option value="getAccountInfo">getAccountInfo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
                       Request count (5{"\u201350"})
                     </label>
                     <input
@@ -957,6 +1004,7 @@ function PlaygroundContent() {
                   {benchmarkResults.length > 0 && (() => {
                     const maxVal = Math.max(...benchmarkResults);
                     const stats = computeStats(benchmarkResults);
+                    const isFasterThanNetwork = benchmarkNetworkAvg !== null && stats !== null && stats.avg < benchmarkNetworkAvg;
                     return (
                       <div className="space-y-4">
                         <div>
@@ -1007,6 +1055,29 @@ function PlaygroundContent() {
                               ))}
                             </tbody>
                           </table>
+                        ) : null}
+                        {stats ? (
+                          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3 space-y-1.5">
+                            <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Comparison</p>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-[var(--fyxvo-text-muted)]">Your avg</span>
+                              <span className="font-mono font-medium text-[var(--fyxvo-text)]">{stats.avg}ms</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-[var(--fyxvo-text-muted)]">Network avg</span>
+                              <span className="font-mono font-medium text-[var(--fyxvo-text)]">
+                                {benchmarkNetworkAvg !== null ? `${benchmarkNetworkAvg}ms` : "—"}
+                              </span>
+                            </div>
+                            {benchmarkNetworkAvg !== null ? (
+                              <div className="flex items-center justify-between text-xs pt-1 border-t border-[var(--fyxvo-border)]">
+                                <span className="text-[var(--fyxvo-text-muted)]">Rating</span>
+                                <span className={isFasterThanNetwork ? "text-emerald-500 font-medium" : "text-[var(--fyxvo-text-muted)]"}>
+                                  {isFasterThanNetwork ? "Faster than average \u2713" : "Slower than average"}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                     );

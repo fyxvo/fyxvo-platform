@@ -62,6 +62,10 @@ abstract class BaseGatewayStateStore implements GatewayStateStore {
   abstract ping(): Promise<boolean>;
 
   abstract close(): Promise<void>;
+
+  // Default no-op cache (overridden by Redis implementation)
+  async getCached(_key: string): Promise<string | null> { return null; }
+  async setCached(_key: string, _value: string, _ttlMs: number): Promise<void> { /* no-op */ }
 }
 
 export class InMemoryGatewayStateStore extends BaseGatewayStateStore {
@@ -131,6 +135,12 @@ export class InMemoryGatewayStateStore extends BaseGatewayStateStore {
       priority: this.metrics.get("priority") ?? emptyModeMetrics()
     };
   }
+
+  async getCached(_key: string): Promise<string | null> {
+    return null;
+  }
+
+  async setCached(_key: string, _value: string, _ttlMs: number): Promise<void> {}
 
   async ping(): Promise<boolean> {
     return true;
@@ -239,6 +249,16 @@ export class RedisGatewayStateStore extends BaseGatewayStateStore {
       standard: parseModeMetrics(standard),
       priority: parseModeMetrics(priority)
     };
+  }
+
+  async getCached(key: string): Promise<string | null> {
+    await this.ready();
+    return this.client.get(key);
+  }
+
+  async setCached(key: string, value: string, ttlMs: number): Promise<void> {
+    await this.ready();
+    await this.client.set(key, value, { PX: ttlMs });
   }
 
   async ping(): Promise<boolean> {

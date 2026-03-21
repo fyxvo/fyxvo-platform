@@ -250,6 +250,10 @@ export default function OperatorsPage() {
   const [loadingActivity, setLoadingActivity] = useState(false);
   const isClient = useIsClient();
 
+  // Upstream configuration (admin only)
+  const [upstreams, setUpstreams] = useState<Array<{ url: string; circuitStatus: string; failureCount: number }>>([]);
+  const [upstreamsLoaded, setUpstreamsLoaded] = useState(false);
+
   useEffect(() => {
     void fetchGatewayStatus()
       .then((status) => {
@@ -302,6 +306,22 @@ export default function OperatorsPage() {
 
     return () => { cancelled = true; clearTimeout(loadTimer); };
   }, [portal.token]);
+
+  useEffect(() => {
+    if (!portal.token || portal.user?.role !== "ADMIN") return;
+    void fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/v1/admin/gateway/upstreams`, {
+      headers: { authorization: `Bearer ${portal.token}` },
+      cache: "no-store",
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((body: unknown) => {
+        if (body && typeof body === "object" && "items" in body && Array.isArray((body as Record<string, unknown>).items)) {
+          setUpstreams((body as { items: Array<{ url: string; circuitStatus: string; failureCount: number }> }).items);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setUpstreamsLoaded(true));
+  }, [portal.token, portal.user?.role]);
 
   const operatorSummary = useMemo(() => {
     const nodes = portal.operators.flatMap((summary) => summary.nodes);
@@ -764,6 +784,58 @@ export default function OperatorsPage() {
           </div>
         )}
       </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Upstream Configuration (admin only)                                 */}
+      {/* ------------------------------------------------------------------ */}
+      {portal.user?.role === "ADMIN" && (
+        <section>
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Upstream Configuration</CardTitle>
+              <CardDescription>
+                Live upstream URLs registered with the gateway, their circuit breaker status, and recent failure count.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!upstreamsLoaded ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-10 animate-pulse rounded-lg bg-[var(--fyxvo-panel-soft)]" />
+                  ))}
+                </div>
+              ) : upstreams.length === 0 ? (
+                <p className="text-sm text-[var(--fyxvo-text-muted)]">No upstream configuration data available.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)]">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Upstream URL</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Circuit</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Failures</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {upstreams.map((upstream, i) => (
+                        <tr key={i} className="border-b border-[var(--fyxvo-border)] last:border-0">
+                          <td className="px-4 py-2.5 font-mono text-xs text-[var(--fyxvo-text)] break-all">{upstream.url}</td>
+                          <td className="px-4 py-2.5">
+                            <Badge tone={upstream.circuitStatus === "closed" ? "success" : upstream.circuitStatus === "open" ? "danger" : "warning"}>
+                              {upstream.circuitStatus}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-sm text-[var(--fyxvo-text)]">{upstream.failureCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Daily requests chart                                                 */}

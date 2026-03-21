@@ -792,6 +792,12 @@ export interface ApiRepository {
   redeliverWebhookEvent(deliveryId: string, projectId: string): Promise<void>;
   globalSearch(userId: string, query: string): Promise<SearchResults>;
   getHealthHistory(projectId: string): Promise<Array<{ date: string; score: number }>>;
+  generateInviteLink(projectId: string, createdById: string): Promise<{ token: string; expiresAt: string }>;
+  lookupInviteToken(token: string): Promise<{ projectId: string; projectName: string; inviterWallet: string } | null>;
+  acceptInviteToken(token: string, userId: string): Promise<void>;
+  declineInviteToken(token: string, userId: string): Promise<void>;
+  upsertDigestSchedule(userId: string): Promise<void>;
+  deleteDigestSchedule(userId: string): Promise<void>;
 }
 
 export interface AdminPlatformStats {
