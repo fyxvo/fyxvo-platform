@@ -472,6 +472,8 @@ export async function buildApiApp(input: {
   readonly healthcheck?: () => Promise<boolean>;
   readonly logger?: boolean;
 }) {
+  const cspViolations: Array<{ blockedUri: string; violatedDirective: string; timestamp: string; receivedAt: string }> = [];
+
   const app = Fastify({
     logger: input.logger ?? false
   });
@@ -2495,6 +2497,16 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     return { health };
   });
 
+  app.get("/v1/projects/:projectId/health/history", async (request) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(403, "forbidden", "Access denied.");
+    }
+    return { history: await input.repository.getHealthHistory(projectId) };
+  });
+
   // ── Webhook deliveries ────────────────────────────────────────────────────
 
   app.get("/v1/projects/:projectId/webhooks/:webhookId/deliveries", async (request) => {
@@ -2701,6 +2713,29 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     return { points: await input.repository.getSuccessRateTrend(projectId, range) };
   });
 
+  // ── CSP violation reporting ───────────────────────────────────────────────
+  app.post("/v1/analytics/csp-violation", {
+    config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
+    // Log CSP violations — no persistent storage, admin panel reads from in-memory buffer
+    const body = z.object({
+      blockedUri: z.string().max(500),
+      violatedDirective: z.string().max(200),
+      timestamp: z.string().max(30),
+    }).safeParse(request.body);
+    if (!body.success) return reply.status(204).send();
+    // Best-effort: store in a rolling in-memory buffer (last 20 entries)
+    cspViolations.push({ ...body.data, receivedAt: new Date().toISOString() });
+    if (cspViolations.length > 20) cspViolations.shift();
+    return reply.status(204).send();
+  });
+
+  app.get("/v1/admin/csp-violations", async (request) => {
+    const user = requireUser(request);
+    if (user.role !== "ADMIN") throw new HttpError(403, "forbidden", "Admin only.");
+    return { violations: [...cspViolations].reverse() };
+  });
+
   // ── Client error reporting ────────────────────────────────────────────────
   app.post("/v1/analytics/errors", async (request, reply) => {
     const body = z.object({
@@ -2831,6 +2866,14 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
   app.get("/v1/me/tos-status", async (request) => {
     const user = requireUser(request);
     return input.repository.getTosStatus(user.id);
+  });
+
+  // ── System-wide search ────────────────────────────────────────────────────
+  app.get("/v1/search", async (request) => {
+    const user = requireUser(request);
+    const { q } = z.object({ q: z.string().min(1).max(100) }).parse(request.query);
+    const results = await input.repository.globalSearch(user.id, q);
+    return results;
   });
 
   return app;

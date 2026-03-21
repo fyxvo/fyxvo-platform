@@ -79,10 +79,10 @@ export function KeyboardShortcuts({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard shortcuts"
+        aria-labelledby="keyboard-shortcuts-title"
       >
         <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-5 py-4">
-          <span className="text-sm font-semibold text-[var(--fyxvo-text)]">Keyboard shortcuts</span>
+          <span id="keyboard-shortcuts-title" className="text-sm font-semibold text-[var(--fyxvo-text)]">Keyboard shortcuts</span>
           <button
             type="button"
             onClick={close}

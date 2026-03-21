@@ -203,9 +203,9 @@ curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
 #   }
 # }`;
 
-  const sdkInstallCode = `npm install @fyxvo/sdk
-# or
-pnpm add @fyxvo/sdk`;
+  const sdkInstallNpmCode = `npm install @fyxvo/sdk`;
+  const sdkInstallYarnCode = `yarn add @fyxvo/sdk`;
+  const sdkInstallPnpmCode = `pnpm add @fyxvo/sdk`;
 
   const sdkClientCode = `import { createFyxvoClient } from "@fyxvo/sdk";
 
@@ -1169,9 +1169,13 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
             />
             <div className="space-y-5">
               <Notice tone="neutral" title="SDK install">
-                Install {"@fyxvo/sdk"} with npm or pnpm. The package exposes a typed client for the gateway and API. Use the curl / fetch examples in the Standard RPC and Priority Relay sections if you prefer to integrate without the SDK.
+                Install {"@fyxvo/sdk"} with npm, yarn, or pnpm. The package exposes a typed client for the gateway and API. Use the curl / fetch examples in the Standard RPC and Priority Relay sections if you prefer to integrate without the SDK.
               </Notice>
-              <CodeBlock code={sdkInstallCode} label="Install" />
+              <div className="space-y-2">
+                <CodeBlock code={sdkInstallNpmCode} label="npm" />
+                <CodeBlock code={sdkInstallYarnCode} label="yarn" />
+                <CodeBlock code={sdkInstallPnpmCode} label="pnpm" />
+              </div>
               <CodeBlock code={sdkClientCode} label="Create a client" />
               <CodeBlock code={sdkRpcCode} label="client.rpc() — standard relay" />
               <CodeBlock code={sdkPriorityCode} label="client.rpc() with /priority path — priority relay" />

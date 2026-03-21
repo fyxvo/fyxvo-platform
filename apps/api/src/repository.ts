@@ -51,7 +51,8 @@ import type {
   OperatorActivityItem,
   DailyRequestCount,
   AdminPlatformStats,
-  NewsletterSubscriberList
+  NewsletterSubscriberList,
+  SearchResults
 } from "./types.js";
 
 type PrismaProject = PrismaNamespace.ProjectGetPayload<{
@@ -2160,6 +2161,52 @@ export class PrismaApiRepository implements ApiRepository {
         status: "pending",
       },
     });
+  }
+
+  async globalSearch(userId: string, query: string): Promise<SearchResults> {
+    const [projectRows, keyRows, requestRows] = await Promise.all([
+      this.prisma.project.findMany({
+        where: { ownerId: userId, name: { contains: query, mode: "insensitive" }, archivedAt: null },
+        select: { id: true, name: true, slug: true },
+        take: 5,
+      }),
+      this.prisma.apiKey.findMany({
+        where: { createdById: userId, OR: [{ label: { contains: query, mode: "insensitive" } }, { prefix: { contains: query, mode: "insensitive" } }] },
+        select: { id: true, label: true, prefix: true },
+        take: 5,
+      }),
+      this.prisma.requestLog.findMany({
+        where: { userId, method: { contains: query, mode: "insensitive" } },
+        select: { id: true, method: true, route: true, durationMs: true },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
+    ]);
+    return {
+      projects: projectRows.map((p) => ({ type: "project" as const, displayName: p.name, description: p.slug, path: `/projects/${p.slug}` })),
+      apiKeys: keyRows.map((k) => ({ type: "api_key" as const, displayName: k.label, description: k.prefix, path: "/api-keys" })),
+      requests: requestRows.map((r) => ({ type: "request" as const, displayName: r.method, description: `${r.durationMs}ms`, path: `/analytics` })),
+    };
+  }
+
+  async getHealthHistory(projectId: string): Promise<Array<{ date: string; score: number }>> {
+    const days = 7;
+    const results: Array<{ date: string; score: number }> = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const dayStart = new Date(Date.now() - i * 86_400_000);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+      const [reqCount, successCount] = await Promise.all([
+        this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: dayStart, lt: dayEnd } } }),
+        this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: dayStart, lt: dayEnd }, statusCode: { lt: 400 } } }),
+      ]);
+      let score = 40; // base
+      if (reqCount > 0) score += 30;
+      const rate = reqCount > 0 ? successCount / reqCount : null;
+      if (rate !== null) score += Math.round(rate * 30);
+      results.push({ date: dayStart.toISOString().slice(0, 10), score: Math.min(100, score) });
+    }
+    return results;
   }
 }
 

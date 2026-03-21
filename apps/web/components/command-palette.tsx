@@ -3,6 +3,20 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "./portal-provider";
+import { webEnv } from "../lib/env";
+
+interface BackendSearchResult {
+  type: "project" | "api_key" | "request";
+  displayName: string;
+  description?: string;
+  path: string;
+}
+
+interface BackendSearchResults {
+  projects: BackendSearchResult[];
+  apiKeys: BackendSearchResult[];
+  requests: BackendSearchResult[];
+}
 
 interface NavEntry {
   label: string;
@@ -46,8 +60,35 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
   const [recentPages, setRecentPages] = useState<{ label: string; href: string }[]>([]);
+  const [backendResults, setBackendResults] = useState<BackendSearchResults | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced backend search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.trim().length < 3 || !portal.token) {
+      setTimeout(() => setBackendResults(null), 0);
+      return;
+    }
+    const tok = portal.token;
+    const q = query.trim();
+    debounceRef.current = setTimeout(() => {
+      fetch(`${webEnv.apiBaseUrl}/v1/search?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data = await res.json() as BackendSearchResults;
+          setBackendResults(data);
+        })
+        .catch(() => undefined);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, portal.token]);
 
   const filtered = useMemo<NavEntry[]>(() => {
     const entries = buildNavEntries(portal.selectedProject?.slug);
@@ -60,7 +101,7 @@ export function CommandPalette() {
         .map((p) => ({
           label: `Project: ${p.name}`,
           href: `/projects/${p.slug}`,
-          description: p.archivedAt ? "Archived" : "Not activated",
+          description: p.archivedAt ? "Archived" : "Active",
           group: "data",
           category: "data" as const,
         })),
@@ -77,11 +118,29 @@ export function CommandPalette() {
           group: "data",
           category: "data" as const,
         })),
+      ...(backendResults
+        ? [
+            ...backendResults.projects.map((r) => ({
+              label: `Project: ${r.displayName}`,
+              href: r.path,
+              ...(r.description ? { description: r.description } : {}),
+              group: "data",
+              category: "data" as const,
+            })),
+            ...backendResults.apiKeys.map((r) => ({
+              label: `Key: ${r.displayName}`,
+              href: r.path,
+              ...(r.description ? { description: r.description } : {}),
+              group: "data",
+              category: "data" as const,
+            })),
+          ]
+        : []),
     ].filter(
       (entry, idx, arr) => arr.findIndex((e) => e.href === entry.href && e.label === entry.label) === idx,
     );
     return [...navFiltered, ...dataResults];
-  }, [query, portal.selectedProject?.slug, portal.projects, portal.apiKeys]);
+  }, [query, portal.selectedProject?.slug, portal.projects, portal.apiKeys, backendResults]);
 
   const navFiltered = filtered.filter((e) => e.category !== "data");
   const dataResults = filtered.filter((e) => e.category === "data");
@@ -168,6 +227,9 @@ export function CommandPalette() {
       <div
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-xl"
         onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
       >
         {/* Search input */}
         <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-4 py-3">

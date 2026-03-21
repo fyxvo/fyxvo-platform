@@ -632,6 +632,18 @@ export interface NotificationPrefsUpdate {
   readonly notifyReferralConversion?: boolean;
 }
 
+export interface SearchResult {
+  type: "project" | "api_key" | "request";
+  displayName: string;
+  description?: string;
+  path: string;
+}
+export interface SearchResults {
+  projects: SearchResult[];
+  apiKeys: SearchResult[];
+  requests: SearchResult[];
+}
+
 export interface ApiRepository {
   findUserByWallet(walletAddress: string): Promise<AuthenticatedUser & { authNonce: string; onboardingDismissed: boolean; createdAt: Date; tosAcceptedAt: Date | null; emailVerified: boolean } | null>;
   findUserById(userId: string): Promise<AuthenticatedUser & { authNonce: string; onboardingDismissed: boolean; createdAt: Date; tosAcceptedAt: Date | null; emailVerified: boolean } | null>;
@@ -778,6 +790,8 @@ export interface ApiRepository {
     createdAt: string;
   }>>;
   redeliverWebhookEvent(deliveryId: string, projectId: string): Promise<void>;
+  globalSearch(userId: string, query: string): Promise<SearchResults>;
+  getHealthHistory(projectId: string): Promise<Array<{ date: string; score: number }>>;
 }
 
 export interface AdminPlatformStats {

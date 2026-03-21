@@ -72,6 +72,7 @@ export default function ProjectPage({
   const [activeTab, setActiveTab] = useState<"overview" | "activity" | "realtime">("overview");
   const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; details: Record<string, unknown> | null; actorWallet: string | null; createdAt: string }>>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
+  const [healthHistory, setHealthHistory] = useState<number[]>([]);
 
   const project =
     portal.projects.find((item) => item.slug === params.slug) ??
@@ -90,6 +91,20 @@ export default function ProjectPage({
         setActivityLoaded(true);
       });
   }, [portal.token, project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!portal.token || !project?.id) return;
+    void fetch(`${webEnv.apiBaseUrl}/v1/projects/${project.id}/health/history`, {
+      headers: { Authorization: `Bearer ${portal.token}` },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { history: Array<{ date: string; score: number }> } | null) => {
+        if (data?.history) {
+          const scores = data.history.map((h) => h.score);
+          setTimeout(() => setHealthHistory(scores), 0);
+        }
+      });
+  }, [portal.token, project?.id]);
 
   if (!project) {
     return (
@@ -358,6 +373,64 @@ export default function ProjectPage({
                 ? `${(Number(availableSolCredits) / 1_000_000_000).toFixed(3)} SOL`
                 : "0 SOL"}
             </p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] col-span-1 xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Health score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const isActivated = !!(
+                project.onChainProjectPda &&
+                project.onChainProjectPda.length > 10 &&
+                !project.archivedAt
+              );
+              let score = 0;
+              if (isActivated) score += 30;
+              if ((project._count?.apiKeys ?? 0) > 0) score += 20;
+              if (portal.projectAnalytics.totals.requestLogs > 0) score += 20;
+              score = Math.min(100, score);
+              const scoreColor =
+                score >= 70
+                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                  : score >= 40
+                    ? "text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5"
+                    : "text-red-600 dark:text-red-400 border-red-500/20 bg-red-500/5";
+              return (
+                <div className="flex items-center gap-3">
+                  <span
+                    title={`Health ${score}/100`}
+                    className={`inline-flex items-center rounded border px-2 py-1 font-mono text-xl font-semibold ${scoreColor}`}
+                  >
+                    {score}
+                  </span>
+                  {healthHistory.length >= 2 && (() => {
+                    const min = Math.min(...healthHistory);
+                    const max = Math.max(...healthHistory);
+                    const range = max - min || 1;
+                    const latest = healthHistory[healthHistory.length - 1] ?? 0;
+                    const color = latest >= 70 ? "var(--fyxvo-brand)" : latest >= 40 ? "#f59e0b" : "#ef4444";
+                    const path = healthHistory
+                      .map((v, i) => {
+                        const x = (i / (healthHistory.length - 1)) * 60;
+                        const y = 20 - ((v - min) / range) * 20;
+                        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+                      })
+                      .join(" ");
+                    return (
+                      <svg width={60} height={20} className="ml-2 shrink-0" aria-hidden="true">
+                        <path d={path} fill="none" stroke={color} strokeWidth={1.5} />
+                      </svg>
+                    );
+                  })()}
+                  <span className="text-xs text-[var(--fyxvo-text-muted)]">/100</span>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </section>

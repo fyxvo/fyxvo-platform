@@ -78,6 +78,17 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function parseRpcUrl(url: string): { provider: string; network: string; fyxvoEndpoint: string } | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if (host.includes("helius")) return { provider: "Helius", network: "mainnet-beta", fyxvoEndpoint: "https://rpc.fyxvo.com/rpc" };
+    if (host.includes("quicknode")) return { provider: "QuickNode", network: "mainnet-beta", fyxvoEndpoint: "https://rpc.fyxvo.com/rpc" };
+    if (host.includes("alchemy")) return { provider: "Alchemy", network: "mainnet-beta", fyxvoEndpoint: "https://rpc.fyxvo.com/rpc" };
+    return null;
+  } catch { return null; }
+}
+
 export default function SettingsPage() {
   const portal = usePortal();
 
@@ -203,6 +214,10 @@ export default function SettingsPage() {
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
+
+  // Import configuration
+  const [importUrl, setImportUrl] = useState("");
+  const [importParsed, setImportParsed] = useState<{ provider: string; network: string; fyxvoEndpoint: string } | null>(null);
 
   // Transfer ownership
   const [transferOpen, setTransferOpen] = useState(false);
@@ -1022,6 +1037,44 @@ export default function SettingsPage() {
             {portal.selectedProject ? (
               <span className="font-mono text-sm text-[var(--fyxvo-text)]">{shortenAddress(portal.selectedProject.owner.walletAddress, 8, 8)}</span>
             ) : <span className="text-sm text-[var(--fyxvo-text-muted)]">No project selected</span>}
+          </SettingRow>
+          <SettingRow
+            label="Import Configuration"
+            description="Paste a Helius, QuickNode, or Alchemy endpoint URL to get the equivalent Fyxvo configuration."
+          >
+            <div className="w-full space-y-2">
+              <Input
+                type="url"
+                placeholder="https://mainnet.helius-rpc.com/?api-key=..."
+                value={importUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTimeout(() => {
+                    setImportUrl(val);
+                    setImportParsed(parseRpcUrl(val));
+                  }, 0);
+                }}
+                className="w-full font-mono text-xs"
+              />
+              {importParsed ? (
+                <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3 space-y-2">
+                  <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                    Detected: <span className="font-medium text-[var(--fyxvo-text)]">{importParsed.provider}</span> on <span className="font-medium text-[var(--fyxvo-text)]">{importParsed.network}</span>
+                  </p>
+                  <div>
+                    <p className="text-xs text-[var(--fyxvo-text-muted)] mb-1">Fyxvo equivalent:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 rounded border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 font-mono text-xs text-[var(--fyxvo-text)] truncate">
+                        {importParsed.fyxvoEndpoint}
+                      </code>
+                      <CopyButton text={importParsed.fyxvoEndpoint} />
+                    </div>
+                  </div>
+                </div>
+              ) : importUrl.length > 0 ? (
+                <p className="text-xs text-[var(--fyxvo-text-muted)]">Provider not recognized. Supported: Helius, QuickNode, Alchemy.</p>
+              ) : null}
+            </div>
           </SettingRow>
           {portal.selectedProject && !portal.selectedProject.archivedAt ? (
             <SettingRow label="Archive project" description="Archive this project to hide it from active views. It can be restored later.">

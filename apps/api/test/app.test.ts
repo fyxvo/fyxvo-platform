@@ -67,7 +67,8 @@ import type {
   OperatorActivityItem,
   DailyRequestCount,
   AdminPlatformStats,
-  NewsletterSubscriberList
+  NewsletterSubscriberList,
+  SearchResults
 } from "../src/types.js";
 
 function makeEnv(overrides: Partial<Record<string, string>> = {}) {
@@ -1019,6 +1020,10 @@ class MemoryApiRepository implements ApiRepository {
   async transferProjectOwnership(_projectId: string, _newOwnerId: string, _previousOwnerId: string): Promise<void> { return Promise.resolve(); }
   async listWebhookEvents(_projectId: string): Promise<Array<{ id: string; webhookId: string; webhookUrl: string; webhookName: string; eventType: string; status: string; responseStatus: number | null; attemptNumber: number; createdAt: string }>> { return []; }
   async redeliverWebhookEvent(_deliveryId: string, _projectId: string): Promise<void> { return Promise.resolve(); }
+  async globalSearch(_userId: string, _query: string): Promise<SearchResults> {
+    return { projects: [], apiKeys: [], requests: [] };
+  }
+  async getHealthHistory(_projectId: string): Promise<Array<{ date: string; score: number }>> { return []; }
 }
 
 async function createTestApp(options: { rateLimitMax?: number } = {}) {

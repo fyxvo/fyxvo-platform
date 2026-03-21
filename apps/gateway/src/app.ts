@@ -172,6 +172,44 @@ async function sendGatewayError(
 const STARTUP_TIME_MS = Date.now();
 
 // ---------------------------------------------------------------------------
+// Solana JSON-RPC error hint table
+// ---------------------------------------------------------------------------
+
+const SOLANA_ERROR_HINTS: Record<number, { explanation: string; action: string }> = {
+  [-32002]: { explanation: "Transaction simulation failed — the transaction would fail if submitted.", action: "Check your transaction instructions and account balances before submitting." },
+  [-32003]: { explanation: "Blockhash not found — the blockhash you used has expired (valid for ~150 slots).", action: "Fetch a new recent blockhash and rebuild your transaction." },
+  [-32004]: { explanation: "Node is unhealthy — the RPC node is behind or not fully synced.", action: "Retry in a moment. Fyxvo will route to a healthy node." },
+  [-32005]: { explanation: "Slot skipped — this slot was not produced by any validator.", action: "This is normal; retry with the next slot." },
+  [-32009]: { explanation: "Transaction precompile verification failed — a program instruction signature check failed.", action: "Verify your transaction signer keys and instruction data are correct." },
+  [-32010]: { explanation: "Preflight simulation failed — transaction would fail on-chain.", action: "Review the simulation error logs to find the failing instruction." },
+  [-32012]: { explanation: "Transaction already processed — this transaction was already confirmed on-chain.", action: "Do not retry; check transaction status before resubmitting." },
+};
+
+function injectSolanaErrorHint(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return body;
+  }
+  const rpcBody = body as Record<string, unknown>;
+  const error = rpcBody["error"];
+  if (typeof error !== "object" || error === null) {
+    return body;
+  }
+  const rpcError = error as Record<string, unknown>;
+  const code = rpcError["code"];
+  if (typeof code !== "number") {
+    return body;
+  }
+  const hint = SOLANA_ERROR_HINTS[code];
+  if (!hint) {
+    return body;
+  }
+  return {
+    ...rpcBody,
+    error: { ...rpcError, fyxvo_hint: hint },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // In-memory circuit breaker (per upstream URL)
 // ---------------------------------------------------------------------------
 
@@ -474,7 +512,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       reply.header("x-fyxvo-billed-asset", fundingDecision.asset);
 
       statusCode = routed.statusCode;
-      reply.status(routed.statusCode).send(routed.body);
+      reply.status(routed.statusCode).send(injectSolanaErrorHint(routed.body));
     } catch (error) {
       const normalizedError = normalizeGatewayRuntimeError(error);
       const durationMs = Date.now() - startedAt;

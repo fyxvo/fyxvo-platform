@@ -26,6 +26,37 @@ The fastest first-user path is:
 5. Send one request to `/rpc`.
 6. Watch analytics and status update from live data.
 
+## Getting Started (SDK)
+
+Install the Fyxvo SDK:
+
+```bash
+npm install @fyxvo/sdk
+```
+
+Then create a client and send your first request:
+
+```ts
+import { createFyxvoClient } from "@fyxvo/sdk";
+
+const client = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
+  apiKey: process.env.FYXVO_API_KEY,
+});
+
+// Standard RPC request
+const health = await client.rpc({ id: 1, method: "getHealth" });
+
+// Fetch the latest blockhash
+const blockhash = await client.rpc({
+  id: 2,
+  method: "getLatestBlockhash",
+  params: [{ commitment: "confirmed" }],
+});
+```
+
+Full documentation is available at [fyxvo.com/docs](https://fyxvo.com/docs).
+
 ## 2. Architecture
 
 Fyxvo is organized as a pnpm monorepo and uses a split architecture where the user-facing product, control plane, relay plane, and on-chain settlement layer are separate processes.

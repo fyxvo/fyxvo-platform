@@ -36,6 +36,8 @@ type RpcMethod = {
   examples?: MethodExample[];
   responseSchema?: ResponseSchemaField[];
   isTraceLookup?: boolean;
+  isBenchmark?: boolean;
+  isWebhookTest?: boolean;
 };
 
 const RPC_METHODS: RpcMethod[] = [
@@ -217,6 +219,22 @@ const RPC_METHODS: RpcMethod[] = [
     params: [],
     isTraceLookup: true,
   },
+  // Benchmark
+  {
+    method: "benchmark",
+    category: "Benchmark",
+    description: "Measure gateway latency across multiple requests",
+    params: [],
+    isBenchmark: true,
+  },
+  // Webhook
+  {
+    method: "webhookTest",
+    category: "Webhook",
+    description: "Test that a webhook URL receives events correctly",
+    params: [],
+    isWebhookTest: true,
+  },
 ];
 
 const CATEGORIES = [...new Set(RPC_METHODS.map((m) => m.category))];
@@ -342,6 +360,21 @@ function decodeTransactionResponse(raw: string): DecodedTransaction | null {
 }
 
 // ---------------------------------------------------------------------------
+// Benchmark helpers
+// ---------------------------------------------------------------------------
+
+function computeStats(arr: number[]): { min: number; max: number; avg: number; median: number; p95: number } | null {
+  if (arr.length === 0) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const min = sorted[0]!;
+  const max = sorted[sorted.length - 1]!;
+  const avg = Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
+  const median = sorted[Math.floor(sorted.length / 2)]!;
+  const p95 = sorted[Math.floor(sorted.length * 0.95)]!;
+  return { min, max, avg, median, p95 };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -393,6 +426,16 @@ function PlaygroundContent() {
   // Trace lookup
   const [traceId, setTraceId] = useState("");
 
+  // Benchmark
+  const [benchmarkCount, setBenchmarkCount] = useState(10);
+  const [benchmarkResults, setBenchmarkResults] = useState<number[]>([]);
+  const [benchmarkRunning, setBenchmarkRunning] = useState(false);
+
+  // Webhook test
+  const [webhookTestUrl, setWebhookTestUrl] = useState("");
+  const [webhookTestEvent, setWebhookTestEvent] = useState("request.completed");
+  const [webhookTestResponse, setWebhookTestResponse] = useState<{ status: number; body: string; latencyMs: number } | null>(null);
+
   const initializedFromUrl = useRef(false);
 
   // On mount, restore state from URL search params
@@ -428,6 +471,8 @@ function PlaygroundContent() {
     setCompareResponseTimeMs(null);
     setErrorExplanation(null);
     setDecodedView(null);
+    setBenchmarkResults([]);
+    setWebhookTestResponse(null);
   }, []);
 
   // Derive error explanation from response
@@ -469,6 +514,43 @@ function PlaygroundContent() {
 
   async function sendRequest() {
     if (!isAuthenticated) return;
+
+    // Webhook test — POSTs a test payload directly to the user-supplied URL
+    if (selectedMethod.isWebhookTest) {
+      if (!webhookTestUrl.trim()) return;
+      setLoading(true);
+      setWebhookTestResponse(null);
+      const payload = JSON.stringify({
+        event: webhookTestEvent,
+        projectId: "test",
+        timestamp: new Date().toISOString(),
+        data: { method: "getSlot", latencyMs: 42, success: true },
+      });
+      const start = Date.now();
+      try {
+        const res = await fetch(webhookTestUrl.trim(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+        });
+        const elapsed = Date.now() - start;
+        const resBody = (await res.text()).slice(0, 500);
+        setTimeout(() => setWebhookTestResponse({ status: res.status, body: resBody, latencyMs: elapsed }), 0);
+      } catch (e) {
+        const elapsed = Date.now() - start;
+        const isCors = e instanceof TypeError;
+        setTimeout(() => setWebhookTestResponse({
+          status: 0,
+          body: isCors
+            ? "CORS blocked — test from your server or use a CORS-permissive webhook receiver like webhook.site"
+            : (e instanceof Error ? e.message : "Network error"),
+          latencyMs: elapsed,
+        }), 0);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     // Trace lookup — hits API directly, bypasses gateway RPC path
     if (selectedMethod.isTraceLookup) {
@@ -577,6 +659,26 @@ function PlaygroundContent() {
       },
       ...prev.slice(0, 19),
     ]);
+  }
+
+  async function runBenchmark() {
+    setBenchmarkRunning(true);
+    setBenchmarkResults([]);
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getSlot", params: [] });
+    try {
+      for (let i = 0; i < benchmarkCount; i++) {
+        const start = Date.now();
+        try {
+          await sendRpcRequest(gatewayBase, mode, body, activeApiKey?.prefix, simulateMode);
+        } catch {
+          // still record a high value so the chart shows the failure
+        }
+        const latency = Date.now() - start;
+        setBenchmarkResults((prev) => [...prev, latency]);
+      }
+    } finally {
+      setBenchmarkRunning(false);
+    }
   }
 
   return (
@@ -770,7 +872,147 @@ function PlaygroundContent() {
               )}
 
               {/* Params + Examples */}
-              {selectedMethod.isTraceLookup ? (
+              {selectedMethod.isWebhookTest ? (
+                <div className="space-y-4">
+                  <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Webhook Test</p>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
+                      Webhook URL<span className="ml-1 text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={webhookTestUrl}
+                      onChange={(e) => setWebhookTestUrl(e.target.value)}
+                      placeholder="https://webhook.site/your-unique-id"
+                      className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">Event type</label>
+                    <select
+                      value={webhookTestEvent}
+                      onChange={(e) => setWebhookTestEvent(e.target.value)}
+                      className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                    >
+                      <option value="request.completed">request.completed</option>
+                      <option value="balance.low">balance.low</option>
+                      <option value="rate_limit.warning">rate_limit.warning</option>
+                      <option value="project.activated">project.activated</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void sendRequest()}
+                    disabled={loading || !webhookTestUrl.trim()}
+                    className="w-full rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+                  >
+                    {loading ? "Sending\u2026" : "Send Test Webhook"}
+                  </button>
+                  {webhookTestResponse !== null && (
+                    <div className="space-y-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-[var(--fyxvo-text-muted)]">HTTP status</span>
+                        <span
+                          className={`font-mono text-xs font-semibold ${
+                            webhookTestResponse.status >= 200 && webhookTestResponse.status < 300
+                              ? "text-emerald-500"
+                              : webhookTestResponse.status === 0
+                                ? "text-amber-500"
+                                : "text-red-500"
+                          }`}
+                        >
+                          {webhookTestResponse.status === 0 ? "CORS / Network" : webhookTestResponse.status}
+                        </span>
+                        <span className="ml-auto text-xs text-[var(--fyxvo-text-muted)]">{webhookTestResponse.latencyMs}ms</span>
+                      </div>
+                      <pre className="overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3 text-xs text-[var(--fyxvo-text)]">
+                        <code>{webhookTestResponse.body || "(empty)"}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ) : selectedMethod.isBenchmark ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
+                      Request count (5{"\u201350"})
+                    </label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={50}
+                      value={benchmarkCount}
+                      onChange={(e) => setBenchmarkCount(Math.min(50, Math.max(5, Number(e.target.value))))}
+                      className="w-32 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void runBenchmark()}
+                    disabled={benchmarkRunning || !isAuthenticated}
+                    className="w-full rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+                  >
+                    {benchmarkRunning ? `Running\u2026 (${benchmarkResults.length}/${benchmarkCount})` : "Run Benchmark"}
+                  </button>
+                  {benchmarkResults.length > 0 && (() => {
+                    const maxVal = Math.max(...benchmarkResults);
+                    const stats = computeStats(benchmarkResults);
+                    return (
+                      <div className="space-y-4">
+                        <div>
+                          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+                            Latency per request (ms)
+                          </p>
+                          <div
+                            className="flex items-end gap-1 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3"
+                            style={{ minHeight: "60px" }}
+                          >
+                            {benchmarkResults.map((v, i) => (
+                              <div
+                                key={i}
+                                title={`${v}ms`}
+                                style={{
+                                  width: "100%",
+                                  height: `${Math.max(4, (v / (maxVal || 1)) * 40)}px`,
+                                  background:
+                                    v > (stats?.avg ?? 0) * 1.5
+                                      ? "var(--fyxvo-accent)"
+                                      : "var(--fyxvo-brand)",
+                                  borderRadius: "2px",
+                                  flexShrink: 0,
+                                  minWidth: "4px",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        {stats ? (
+                          <table className="w-full text-xs">
+                            <tbody className="divide-y divide-[var(--fyxvo-border)]">
+                              {(
+                                [
+                                  ["Min", `${stats.min}ms`],
+                                  ["Max", `${stats.max}ms`],
+                                  ["Avg", `${stats.avg}ms`],
+                                  ["Median", `${stats.median}ms`],
+                                  ["P95", `${stats.p95}ms`],
+                                ] as [string, string][]
+                              ).map(([statLabel, value]) => (
+                                <tr key={statLabel}>
+                                  <td className="py-1.5 text-[var(--fyxvo-text-muted)]">{statLabel}</td>
+                                  <td className="py-1.5 text-right font-mono font-medium text-[var(--fyxvo-text)]">
+                                    {value}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : selectedMethod.isTraceLookup ? (
                 <div className="space-y-3">
                   <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Parameters</p>
                   <div>
@@ -842,21 +1084,23 @@ function PlaygroundContent() {
                 </div>
               ) : null}
 
-              <Button
-                onClick={() => void sendRequest()}
-                disabled={loading || !isAuthenticated}
-                className="w-full"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    Sending…
-                  </span>
-                ) : selectedMethod.isTraceLookup ? "Look Up Trace" : selectedMethod.method === "decodeTransaction" ? "Decode Transaction" : compareMode ? "Send (Standard + Priority)" : "Send Request"}
-              </Button>
+              {!selectedMethod.isBenchmark && !selectedMethod.isWebhookTest && (
+                <Button
+                  onClick={() => void sendRequest()}
+                  disabled={loading || !isAuthenticated}
+                  className="w-full"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Sending&hellip;
+                    </span>
+                  ) : selectedMethod.isTraceLookup ? "Look Up Trace" : selectedMethod.method === "decodeTransaction" ? "Decode Transaction" : compareMode ? "Send (Standard + Priority)" : "Send Request"}
+                </Button>
+              )}
             </CardContent>
           </Card>
 
