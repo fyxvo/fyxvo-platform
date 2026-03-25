@@ -209,7 +209,7 @@ Post the post-mortem to Discord `#incidents` and link it from the status page in
 | Status Page | https://status.fyxvo.com |
 | Discord | https://discord.gg/Uggu236Jgj |
 | Solana Explorer (devnet) | https://explorer.solana.com/?cluster=devnet |
-| GitHub | https://github.com/fyxvo/fyxvo |
+| GitHub | https://github.com/fyxvo/fyxvo-platform |
 
 ---
 

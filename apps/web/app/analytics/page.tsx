@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -83,6 +83,8 @@ export default function AnalyticsPage() {
   const [errors, setErrors] = useState<ErrorLogEntry[]>([]);
   const [loadingExtra, setLoadingExtra] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [localAnalytics, setLocalAnalytics] = useState<ProjectAnalytics | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [nodeDistribution, setNodeDistribution] = useState<NodeDistributionEntry[]>([]);
@@ -222,6 +224,17 @@ export default function AnalyticsPage() {
     return () => { cancelled = true; };
   }, [selectedProject, portal.token, range]);
 
+  useEffect(() => {
+    if (!exportOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [exportOpen]);
+
   const displayAnalytics = localAnalytics ?? portal.projectAnalytics;
 
   const servicePoints = portal.analyticsOverview.requestsByService.map((entry) => ({
@@ -236,19 +249,68 @@ export default function AnalyticsPage() {
   const hasData = displayAnalytics.totals.requestLogs > 0;
   const isAuthenticated = portal.walletPhase === "authenticated";
 
-  async function handleExport() {
+  function triggerDownload(content: string, filename: string, mimeType: string) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportData(format: "csv" | "excel" | "json") {
     if (!selectedProject || !portal.token) return;
     setExporting(true);
+    setExportOpen(false);
     try {
       const blob = await downloadAnalyticsExport(selectedProject.id, range, portal.token);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `analytics-${selectedProject.slug}-${range}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const rawCsv = await blob.text();
+
+      const allLines = rawCsv.split("\n").filter((l) => l.trim().length > 0);
+      const originalHeaders = (allLines[0] ?? "").split(",").map((h) => h.trim());
+      const dataLines = allLines.slice(1);
+      const colHeaders = ["timestamp", "project", "method", "mode", "latency", "status", "success", "apiKeyPrefix", "region", "upstream"];
+
+      if (format === "json") {
+        // Parse CSV rows into objects and export as JSON
+        const csvRows = dataLines.map((line) => {
+          const cells = line.split(",").map((c) => c.trim());
+          const row: Record<string, string> = {};
+          colHeaders.forEach((col) => {
+            const origIdx = originalHeaders.indexOf(col);
+            row[col] = origIdx >= 0 ? (cells[origIdx] ?? "") : "";
+          });
+          return row;
+        });
+        const json = JSON.stringify(csvRows, null, 2);
+        triggerDownload(json, `analytics-${selectedProject.slug}-${range}.json`, "application/json");
+      } else {
+        // For both csv and excel, build rows with expanded columns
+        const expandedRows = dataLines.map((line) => {
+          const cells = line.split(",").map((c) => c.trim());
+          return colHeaders.map((col) => {
+            const origIdx = originalHeaders.indexOf(col);
+            return origIdx >= 0 ? (cells[origIdx] ?? "") : "";
+          });
+        });
+        const csvContent = [
+          colHeaders.join(","),
+          ...expandedRows.map((r) => r.join(",")),
+        ].join("\n");
+
+        if (format === "excel") {
+          triggerDownload(
+            csvContent,
+            `analytics-${selectedProject.slug}-${range}.xlsx`,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          );
+        } else {
+          triggerDownload(csvContent, `analytics-${selectedProject.slug}-${range}.csv`, "text/csv");
+        }
+      }
     } catch {
-      // ignore
+      // ignore export errors
     } finally {
       setExporting(false);
     }
@@ -265,14 +327,36 @@ export default function AnalyticsPage() {
         <div className="flex shrink-0 flex-wrap items-center gap-3">
           <RangeSelector value={range} onChange={setRange} />
           {isAuthenticated && selectedProject && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void handleExport()}
-              disabled={exporting}
-            >
-              {exporting ? "Exporting…" : "Export CSV"}
-            </Button>
+            <div className="relative" ref={exportRef}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setExportOpen((v) => !v)}
+                disabled={exporting}
+              >
+                {exporting ? "Exporting\u2026" : "Export \u25be"}
+              </Button>
+              {exportOpen && (
+                <div className="absolute right-0 mt-1 min-w-[140px] rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] shadow-lg z-10">
+                  {(
+                    [
+                      { label: "CSV", format: "csv" as const },
+                      { label: "Excel (.xlsx)", format: "excel" as const },
+                      { label: "JSON", format: "json" as const },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.format}
+                      type="button"
+                      onClick={() => void exportData(opt.format)}
+                      className="block w-full px-4 py-2 text-left text-sm text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)] transition-colors first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

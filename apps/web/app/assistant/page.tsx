@@ -6,11 +6,18 @@ import { WalletConnectButton } from "../../components/wallet-connect-button";
 import { PageHeader } from "../../components/page-header";
 import { usePortal } from "../../components/portal-provider";
 import { webEnv } from "../../lib/env";
-import { getAssistantRateLimitStatus } from "../../lib/api";
+import { fetchApiStatus, getAssistantRateLimitStatus } from "../../lib/api";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface AssistantErrorPayload {
+  code?: string;
+  error?: string;
+  message?: string;
+  retryAfterMs?: number;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -80,6 +87,70 @@ function MessageContent({ content }: { content: string }) {
 
 const HISTORY_KEY = "fyxvo.assistant.history";
 
+function extractSsePayloads(input: string): { payloads: string[]; remainder: string } {
+  const events = input.split(/\r?\n\r?\n/);
+  const remainder = events.pop() ?? "";
+  const payloads = events
+    .map((event) =>
+      event
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n")
+    )
+    .filter((payload) => payload.length > 0);
+
+  return { payloads, remainder };
+}
+
+async function parseAssistantErrorPayload(response: Response): Promise<AssistantErrorPayload | null> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  try {
+    if (contentType.includes("application/json")) {
+      return (await response.json()) as AssistantErrorPayload;
+    }
+
+    const text = await response.text();
+    return text ? ({ error: text } satisfies AssistantErrorPayload) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAssistantErrorMessage(
+  status: number,
+  payload: AssistantErrorPayload | null | undefined
+): string {
+  if (status === 401) {
+    return "Your session expired. Reconnect your wallet and try again.";
+  }
+
+  if (status === 429) {
+    const retryAfterMs = payload?.retryAfterMs;
+    if (typeof retryAfterMs === "number" && retryAfterMs > 0) {
+      const retryMinutes = Math.max(1, Math.ceil(retryAfterMs / 60_000));
+      return `You have reached the assistant rate limit. Try again in ${retryMinutes} minute${retryMinutes === 1 ? "" : "s"}.`;
+    }
+
+    return payload?.message ?? "You have reached the assistant rate limit. Please try again shortly.";
+  }
+
+  if (status === 503) {
+    return payload?.message ?? "The AI assistant is not configured right now. Please check back soon.";
+  }
+
+  if (status === 500) {
+    return payload?.message ?? "The AI assistant ran into an internal error. Please try again.";
+  }
+
+  if (status === 400) {
+    return payload?.message ?? "That request could not be processed. Please rephrase your message.";
+  }
+
+  return payload?.message ?? payload?.error ?? "The AI assistant request failed. Please try again.";
+}
+
 export default function AssistantPage() {
   const portal = usePortal();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -88,6 +159,7 @@ export default function AssistantPage() {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [rateLimitStatus, setRateLimitStatus] = useState<{ messagesUsedThisHour: number; limit: number } | null>(null);
   const [assistantAvailable, setAssistantAvailable] = useState<boolean | null>(null);
+  const [assistantStatusMessage, setAssistantStatusMessage] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -115,14 +187,45 @@ export default function AssistantPage() {
     try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
   }, []);
 
-  const isAuthenticated = portal.walletPhase === "authenticated";
+  const replaceLastAssistantMessage = useCallback((content: string) => {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (last && last.role === "assistant") {
+        copy[copy.length - 1] = { ...last, content };
+      }
+      return copy;
+    });
+  }, []);
 
-  // Check whether the AI service is configured (ANTHROPIC_API_KEY present in API)
+  const isAuthenticated = portal.walletPhase === "authenticated";
+  const isAssistantUnavailable = assistantAvailable === false;
+
+  // Check whether the AI service is configured before the user starts typing.
   useEffect(() => {
-    fetch(new URL("/health", webEnv.apiBaseUrl))
-      .then((r) => r.json() as Promise<{ assistantAvailable?: boolean }>)
-      .then((data) => setAssistantAvailable(data.assistantAvailable ?? false))
-      .catch(() => setAssistantAvailable(false));
+    let cancelled = false;
+
+    fetchApiStatus()
+      .then((data) => {
+        if (cancelled) return;
+        setAssistantAvailable(data.assistantAvailable ?? false);
+        setAssistantStatusMessage(
+          data.assistantAvailable === false
+            ? "The AI assistant is currently unavailable. Please check back after the next deployment."
+            : null
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAssistantAvailable(null);
+        setAssistantStatusMessage(
+          "Fyxvo could not verify assistant availability right now. You can still try sending a message."
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load rate limit status when authenticated
@@ -151,7 +254,7 @@ export default function AssistantPage() {
     : undefined;
 
   async function sendMessage(content: string) {
-    if (!content.trim() || isStreaming) return;
+    if (!content.trim() || isStreaming || isAssistantUnavailable) return;
     if (!portal.token) return;
 
     const userMessage: Message = { role: "user", content: content.trim() };
@@ -173,73 +276,83 @@ export default function AssistantPage() {
         body: JSON.stringify({ messages: newMessages, projectContext }),
       });
 
-      if (!response.ok || !response.body) {
-        let errorContent = "AI service error. Please try again.";
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!response.ok) {
+        const errorPayload = await parseAssistantErrorPayload(response);
+        const errorContent = getAssistantErrorMessage(response.status, errorPayload);
         if (response.status === 503) {
-          errorContent = "The AI assistant is not configured yet. Check back soon.";
-        } else if (response.status === 429) {
-          let retryMin = "a few";
-          try {
-            const errBody = await response.clone().json() as { retryAfterMs?: number };
-            if (errBody.retryAfterMs) retryMin = String(Math.ceil(errBody.retryAfterMs / 60000));
-          } catch { /* ignore */ }
-          errorContent = `Rate limit reached. You can send more messages in ${retryMin} minute${retryMin === "1" ? "" : "s"}.`;
-        } else if (response.status === 401) {
-          errorContent = "Your session has expired. Please reconnect your wallet.";
-        } else if (response.status === 400) {
-          errorContent = "Invalid request. Please rephrase your message.";
+          setAssistantAvailable(false);
+          setAssistantStatusMessage(errorContent);
         }
-        setMessages((prev) => {
-          const copy = [...prev];
-          const last = copy[copy.length - 1];
-          if (last && last.role === "assistant") {
-            copy[copy.length - 1] = { ...last, content: errorContent };
-          }
-          return copy;
-        });
+        replaceLastAssistantMessage(errorContent);
+        return;
+      }
+
+      if (!response.body || !contentType.includes("text/event-stream")) {
+        const errorPayload = await parseAssistantErrorPayload(response);
+        replaceLastAssistantMessage(
+          getAssistantErrorMessage(response.status || 500, errorPayload)
+        );
         return;
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
+      let buffer = "";
+      let streamError: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
+
+        buffer += decoder.decode(value, { stream: true });
+        const { payloads, remainder } = extractSsePayloads(buffer);
+        buffer = remainder;
+
+        for (const payload of payloads) {
+          if (payload === "[DONE]") continue;
+
           try {
-            const event = JSON.parse(data) as { text?: string; error?: string };
+            const event = JSON.parse(payload) as { text?: string; error?: string };
             if (event.text) {
               accumulated += event.text;
-              setMessages((prev) => {
-                const copy = [...prev];
-                const last = copy[copy.length - 1];
-                if (last && last.role === "assistant") {
-                  copy[copy.length - 1] = { ...last, content: accumulated };
-                }
-                return copy;
-              });
+              replaceLastAssistantMessage(accumulated);
+            }
+
+            if (event.error) {
+              streamError = event.error;
             }
           } catch {
             // skip
           }
         }
       }
-    } catch {
-      setMessages((prev) => {
-        const copy = [...prev];
-        const last = copy[copy.length - 1];
-        if (last && last.role === "assistant") {
-          copy[copy.length - 1] = { ...last, content: "Network error. Check your connection and try again." };
+
+      buffer += decoder.decode();
+      const { payloads: trailingPayloads } = extractSsePayloads(`${buffer}\n\n`);
+      for (const payload of trailingPayloads) {
+        if (payload === "[DONE]") continue;
+
+        try {
+          const event = JSON.parse(payload) as { text?: string; error?: string };
+          if (event.text) {
+            accumulated += event.text;
+            replaceLastAssistantMessage(accumulated);
+          }
+          if (event.error) {
+            streamError = event.error;
+          }
+        } catch {
+          // skip
         }
-        return copy;
-      });
+      }
+
+      if (streamError && accumulated.length === 0) {
+        replaceLastAssistantMessage(streamError);
+      }
+    } catch {
+      replaceLastAssistantMessage("Network error. Check your connection and try again.");
     } finally {
       setIsStreaming(false);
     }
@@ -273,10 +386,13 @@ export default function AssistantPage() {
             </Button>
           )}
         </div>
-        {assistantAvailable === false && (
+        {assistantStatusMessage && (
           <div className="mt-4">
-            <Notice tone="warning" title="AI assistant not yet configured">
-              <span>The AI assistant is coming soon — the API key has not been configured yet. Check back after the next deployment.</span>
+            <Notice
+              tone={isAssistantUnavailable ? "warning" : "neutral"}
+              title={isAssistantUnavailable ? "AI assistant unavailable" : "Assistant status"}
+            >
+              <span>{assistantStatusMessage}</span>
             </Notice>
           </div>
         )}
@@ -312,7 +428,7 @@ export default function AssistantPage() {
                 <button
                   key={q}
                   onClick={() => void sendMessage(q)}
-                  disabled={!isAuthenticated}
+                  disabled={!isAuthenticated || isAssistantUnavailable}
                   className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)] transition-colors hover:border-brand-500/30 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {q}
@@ -396,8 +512,14 @@ export default function AssistantPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isAuthenticated ? "Ask anything about Solana or Fyxvo… (Enter to send, Shift+Enter for newline)" : "Connect wallet to chat"}
-              disabled={!isAuthenticated || isStreaming}
+              placeholder={
+                isAssistantUnavailable
+                  ? "The AI assistant is currently unavailable"
+                  : isAuthenticated
+                    ? "Ask anything about Solana or Fyxvo… (Enter to send, Shift+Enter for newline)"
+                    : "Connect wallet to chat"
+              }
+              disabled={!isAuthenticated || isStreaming || isAssistantUnavailable}
               rows={1}
               className="flex-1 resize-none bg-transparent text-sm text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-muted)] outline-none disabled:opacity-50"
               style={{ maxHeight: "200px" }}
@@ -410,7 +532,7 @@ export default function AssistantPage() {
             <Button
               size="sm"
               onClick={() => void sendMessage(input)}
-              disabled={!input.trim() || !isAuthenticated || isStreaming}
+              disabled={!input.trim() || !isAuthenticated || isStreaming || isAssistantUnavailable}
               className="shrink-0"
             >
               {isStreaming ? (

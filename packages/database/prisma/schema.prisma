@@ -92,6 +92,7 @@ model User {
   emailVerified            Boolean   @default(false)
   emailVerificationToken   String?
   emailVerificationExpiry  DateTime?
+  reputationLevel          String    @default("Explorer")
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   projects           Project[]
@@ -104,6 +105,7 @@ model User {
   activityLogs       ActivityLog[]
   supportTickets     SupportTicket[]
   digestSchedule     DigestSchedule?
+  digestRecords      DigestRecord[]
 
   @@index([referralCode])
 }
@@ -173,6 +175,7 @@ model Project {
   leaderboardVisible         Boolean             @default(false)
   archiveReason              String?
   firstRequestCelebrationShown Boolean           @default(false)
+  tags                       String[]            @default([])
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
   owner                      User                @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -662,4 +665,13 @@ model DigestSchedule {
   nextSendAt DateTime  @default(now())
   createdAt  DateTime  @default(now())
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DigestRecord {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  generatedAt DateTime @default(now())
+  htmlContent String
+  sent        Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

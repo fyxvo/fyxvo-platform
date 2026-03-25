@@ -63,7 +63,9 @@ export function CommandPalette() {
   const [backendResults, setBackendResults] = useState<BackendSearchResults | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // Debounced backend search
   useEffect(() => {
@@ -153,12 +155,16 @@ export function CommandPalette() {
   // Focus input when opened
   useEffect(() => {
     if (open) {
-      window.setTimeout(() => inputRef.current?.focus(), 10);
+      previousFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const timeout = window.setTimeout(() => inputRef.current?.focus(), 10);
+      return () => window.clearTimeout(timeout);
     } else {
       startTransition(() => {
         setQuery("");
         setHighlighted(0);
       });
+      previousFocusRef.current?.focus();
     }
   }, [open]);
 
@@ -177,6 +183,29 @@ export function CommandPalette() {
         e.preventDefault();
         setOpen(false);
         return;
+      }
+
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((element) => !element.hasAttribute("disabled"));
+
+        if (focusable.length > 0) {
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+
+          if (first && last) {
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }
       }
 
       if (e.key === "ArrowDown") {
@@ -225,6 +254,7 @@ export function CommandPalette() {
       }}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] shadow-[0_24px_64px_rgba(0,0,0,0.32)] backdrop-blur-xl"
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"

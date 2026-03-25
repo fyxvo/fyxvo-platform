@@ -24,7 +24,7 @@ The fastest way to get a working environment is to open this repository in GitHu
 **Steps:**
 
 ```bash
-git clone https://github.com/fyxvo/fyxvo.git
+git clone https://github.com/fyxvo/fyxvo-platform.git
 cd fyxvo
 pnpm install
 

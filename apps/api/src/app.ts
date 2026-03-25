@@ -409,6 +409,32 @@ function sanitizeErrorForLogs(error: unknown) {
   };
 }
 
+function isAssistantConfigured(env: Pick<ApiEnv, "ANTHROPIC_API_KEY">): boolean {
+  return Boolean(env.ANTHROPIC_API_KEY?.trim());
+}
+
+function extractSseDataPayloads(input: string): {
+  readonly payloads: string[];
+  readonly remainder: string;
+} {
+  const events = input.split(/\r?\n\r?\n/);
+  const remainder = events.pop() ?? "";
+  const payloads = events
+    .map((event) =>
+      event
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n")
+    )
+    .filter((payload) => payload.length > 0);
+
+  return {
+    payloads,
+    remainder
+  };
+}
+
 async function withIdempotency<T extends Record<string, unknown>>(
   repository: ApiRepository,
   request: FastifyRequest,
@@ -711,7 +737,7 @@ export async function buildApiApp(input: {
       status: overallOk ? "ok" : "degraded",
       service: "api",
       uptime: Math.round(uptime),
-      assistantAvailable: !!input.env.ANTHROPIC_API_KEY,
+      assistantAvailable: isAssistantConfigured(input.env),
       dependencies: {
         database: { ok: dbOk, responseTimeMs: dbMs },
         redis: { ok: redisOk, responseTimeMs: redisMs },
@@ -731,6 +757,8 @@ export async function buildApiApp(input: {
     return {
       service: "fyxvo-api",
       environment: input.env.FYXVO_ENV,
+      region: process.env.GATEWAY_REGION ?? 'us-east-1',
+      assistantAvailable: isAssistantConfigured(input.env),
       solanaCluster: input.env.SOLANA_CLUSTER,
       solanaRpcUrl: network.rpcUrl,
       programId: input.env.FYXVO_PROGRAM_ID,
@@ -767,7 +795,7 @@ export async function buildApiApp(input: {
     }
 
     reply.header("cache-control", "public, max-age=30, stale-while-revalidate=60");
-    return networkStatsCache.data;
+    return { ...networkStatsCache.data, region: process.env.GATEWAY_REGION ?? 'us-east-1' };
   });
 
   app.get("/v1/network/service-health", {
@@ -791,6 +819,16 @@ export async function buildApiApp(input: {
     const incidents = await input.repository.listIncidents(50);
     reply.header("cache-control", "public, max-age=60, stale-while-revalidate=120");
     return { incidents };
+  });
+
+  // GET /v1/network/health-calendar — public, no auth required
+  // Returns last 30 days of network health as calendar data
+  app.get("/v1/network/health-calendar", {
+    config: { rateLimit: { max: 60, timeWindow: "1 minute" } }
+  }, async (_request, reply) => {
+    const calendar = await input.repository.getNetworkHealthCalendar();
+    reply.header("cache-control", "public, max-age=300, stale-while-revalidate=600");
+    return { calendar };
   });
 
   app.get("/v1/referral/stats", async (request) => {
@@ -840,6 +878,8 @@ export async function buildApiApp(input: {
         createdAt: fullUser?.createdAt?.toISOString() ?? null,
         tosAcceptedAt: fullUser?.tosAcceptedAt?.toISOString() ?? null,
         emailVerified: fullUser?.emailVerified ?? false,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        reputationLevel: (fullUser as any)?.reputationLevel ?? 'Explorer',
       },
       projectCount: projects.length
     };
@@ -1077,7 +1117,8 @@ export async function buildApiApp(input: {
   app.get("/v1/projects", async (request) => {
     const user = requireUser(request);
     const projects = await input.repository.listProjects(user);
-    return { items: projects };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { items: projects.map((p) => ({ ...p, tags: (p as any).tags ?? [] })) };
   });
 
   app.post("/v1/projects", async (request, reply) => {
@@ -1161,7 +1202,15 @@ export async function buildApiApp(input: {
       throw new HttpError(404, "project_not_found", "The requested project could not be found.");
     }
 
-    return { item: project };
+    return {
+      item: {
+        ...project,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tags: (project as any).tags ?? [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ownerReputationLevel: (project.owner as any)?.reputationLevel ?? 'Explorer',
+      }
+    };
   });
 
   app.patch("/v1/projects/:projectId", async (request) => {
@@ -1205,6 +1254,53 @@ export async function buildApiApp(input: {
 
     return {
       item: await input.repository.deleteProject(project.id)
+    };
+  });
+
+  // GET /v1/projects/:id/stats/public — API-key auth (x-api-key header), requires project:read scope
+  // This endpoint is intentionally unauthenticated via JWT; it uses x-api-key to identify the caller.
+  app.get("/v1/projects/:id/stats/public", async (request) => {
+    const params = z.object({ id: z.string().uuid() }).parse(request.params);
+    const rawApiKey = request.headers["x-api-key"];
+    if (typeof rawApiKey !== "string" || rawApiKey.length === 0) {
+      throw new HttpError(401, "missing_api_key", "An x-api-key header is required for this endpoint.");
+    }
+    const keyHash = sha256(rawApiKey);
+    const apiKey = await input.repository.findApiKeyByHash(keyHash);
+    if (!apiKey) {
+      throw new HttpError(401, "invalid_api_key", "The provided API key is invalid or revoked.");
+    }
+    if (apiKey.projectId !== params.id) {
+      throw new HttpError(403, "forbidden", "The API key does not belong to this project.");
+    }
+    const scopes = Array.isArray(apiKey.scopes) ? (apiKey.scopes as string[]) : [];
+    if (!scopes.includes("project:read")) {
+      throw new HttpError(403, "insufficient_scope", "The API key requires the project:read scope.");
+    }
+    const stats = await input.repository.getPublicProjectStats(params.id);
+    return stats;
+  });
+
+  // PATCH /v1/projects/:projectId/tags — JWT auth, owner or admin only
+  app.patch("/v1/projects/:projectId/tags", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      tags: z.array(
+        z.string().trim().max(20).regex(/^[a-z0-9-]+$/, "Tags must be lowercase alphanumeric with hyphens only")
+      ).max(10),
+    }).parse(request.body);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    await input.repository.updateProjectTags(project.id, body.tags);
+    const updated = await input.repository.findProjectById(project.id);
+    return {
+      item: {
+        ...updated,
+        tags: body.tags,
+      }
     };
   });
 
@@ -1788,8 +1884,13 @@ export async function buildApiApp(input: {
     const hashedUserId = sha256(user.id).slice(0, 16);
 
     const anthropicKey = input.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) {
-      return reply.status(503).send({ error: "AI assistant is not configured" });
+    if (!isAssistantConfigured(input.env) || !anthropicKey) {
+      return reply.status(503).send({
+        code: "assistant_unavailable",
+        error: "The AI assistant is not configured.",
+        message: "The AI assistant is currently unavailable for this environment.",
+        requestId: request.id
+      });
     }
 
     const systemPrompt = `You are the Fyxvo Developer Assistant — a knowledgeable, honest, and practical AI guide for developers building on Solana using the Fyxvo RPC gateway platform. You are an AI and may make mistakes; always recommend testing code before production use. For critical infrastructure questions, also consult the official Solana documentation at docs.solana.com.
@@ -1979,16 +2080,8 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
 8. Keep responses focused — answer the question asked, don't pad with extras.
 9. When a developer is stuck, ask one clarifying question to narrow down the problem.`;
 
-    reply.raw.setHeader("Content-Type", "text/event-stream");
-    reply.raw.setHeader("Cache-Control", "no-cache");
-    reply.raw.setHeader("Connection", "keep-alive");
-    reply.raw.setHeader("X-Accel-Buffering", "no");
-
-    // Suppress Fastify's default response handling
-    void user;
-
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const upstreamResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2004,7 +2097,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
         }),
       });
 
-      if (!response.ok || !response.body) {
+      if (!upstreamResponse.ok || !upstreamResponse.body) {
         const durationMs = Date.now() - requestStart;
         app.log.warn({
           event: "assistant.chat.upstream_error",
@@ -2012,28 +2105,43 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
           model: "claude-sonnet-4-5-20251001",
           messageCount: messages.length,
           durationMs,
-          statusCode: response.status
+          statusCode: upstreamResponse.status
         }, "Anthropic API returned non-OK status");
-        reply.raw.write(`data: ${JSON.stringify({ error: "AI service unavailable" })}\n\n`);
-        reply.raw.end();
-        return;
+
+        return reply.status(500).send({
+          code: "assistant_internal_error",
+          error: "The AI provider request failed.",
+          message: "Fyxvo could not complete the assistant request. Please try again.",
+          requestId: request.id
+        });
       }
 
-      const reader = response.body.getReader();
+      reply.hijack();
+      reply.raw.statusCode = 200;
+      reply.raw.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
+      reply.raw.setHeader("Connection", "keep-alive");
+      reply.raw.setHeader("X-Accel-Buffering", "no");
+      reply.raw.flushHeaders?.();
+
+      const reader = upstreamResponse.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
       let outputTokenEstimate = 0;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
+
+        buffer += decoder.decode(value, { stream: true });
+        const { payloads, remainder } = extractSseDataPayloads(buffer);
+        buffer = remainder;
+
+        for (const payload of payloads) {
+          if (payload === "[DONE]") continue;
+
           try {
-            const event = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string }; usage?: { output_tokens?: number }; error?: unknown };
+            const event = JSON.parse(payload) as { type?: string; delta?: { type?: string; text?: string }; usage?: { output_tokens?: number }; error?: unknown };
             if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
               outputTokenEstimate += Math.ceil(event.delta.text.length / 4);
               reply.raw.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
@@ -2041,6 +2149,22 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
           } catch {
             // skip malformed lines
           }
+        }
+      }
+
+      buffer += decoder.decode();
+      const { payloads: finalPayloads } = extractSseDataPayloads(`${buffer}\n\n`);
+      for (const payload of finalPayloads) {
+        if (payload === "[DONE]") continue;
+
+        try {
+          const event = JSON.parse(payload) as { type?: string; delta?: { type?: string; text?: string } };
+          if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
+            outputTokenEstimate += Math.ceil(event.delta.text.length / 4);
+            reply.raw.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+          }
+        } catch {
+          // skip malformed trailing payloads
         }
       }
 
@@ -2067,8 +2191,21 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
         durationMs,
         error: sanitizeErrorForLogs(err)
       }, "Assistant chat failed");
-      reply.raw.write(`data: ${JSON.stringify({ error: "Failed to contact AI service" })}\n\n`);
-      reply.raw.end();
+      if (reply.raw.headersSent) {
+        reply.raw.write(
+          `data: ${JSON.stringify({ error: "The assistant stream was interrupted. Please try again." })}\n\n`
+        );
+        reply.raw.write("data: [DONE]\n\n");
+        reply.raw.end();
+        return;
+      }
+
+      return reply.status(500).send({
+        code: "assistant_internal_error",
+        error: "The AI assistant request failed.",
+        message: "Fyxvo could not complete the assistant request. Please try again.",
+        requestId: request.id
+      });
     }
   });
 
@@ -2216,6 +2353,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     const payload = { event: "test", projectId, timestamp: new Date().toISOString(), data: { message: "This is a test webhook from Fyxvo." } };
     const body = JSON.stringify(payload);
     const sig = createHash("sha256").update(webhook.secret + body).digest("hex");
+    const startedAt = Date.now();
     try {
       const res = await fetch(webhook.url, {
         method: "POST",
@@ -2223,19 +2361,27 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
         body,
         signal: AbortSignal.timeout(5000),
       });
+      const responseBody = (await res.text().catch(() => "")).slice(0, 500);
+      const latencyMs = Date.now() - startedAt;
       void input.repository.recordWebhookDelivery({
         webhookId: webhook.id,
         eventType: "test",
         payload: payload,
         attemptNumber: 1,
         responseStatus: res.status,
-        responseBody: (await res.text().catch(() => "")).slice(0, 1000),
+        responseBody,
         success: res.ok,
         nextRetryAt: res.ok ? null : new Date(Date.now() + 30_000),
       }).catch(() => undefined);
-      return reply.send({ success: res.ok, statusCode: res.status });
+      return reply.send({ success: res.ok, statusCode: res.status, latencyMs, body: responseBody });
     } catch (e) {
-      return reply.send({ success: false, error: e instanceof Error ? e.message : "Request failed" });
+      return reply.send({
+        success: false,
+        statusCode: 0,
+        latencyMs: Date.now() - startedAt,
+        body: "",
+        error: e instanceof Error ? e.message : "Request failed"
+      });
     }
   });
 
@@ -2692,6 +2838,17 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     return log;
   });
 
+  app.get("/v1/projects/:projectId/requests/first", async (request) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({
+      projectId: z.string().uuid()
+    }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project) throw new HttpError(404, "not_found", "Project not found.");
+    if (!canAccessProject(user, project)) throw new HttpError(403, "forbidden", "Access denied.");
+    return { item: await input.repository.getFirstSuccessfulProjectRequest(projectId) };
+  });
+
   // ── Network capacity ──────────────────────────────────────────────────────
   app.get("/v1/network/capacity", async () => {
     const since = new Date(Date.now() - 60_000);
@@ -2932,6 +3089,19 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     } catch {
       return { upstreams: [], source: gatewayBase, error: "Could not reach gateway health endpoint." };
     }
+  });
+
+  // ── Admin digest preview ──────────────────────────────────────────────────
+  // GET /v1/admin/digest/preview/:userId — admin only, returns latest digest HTML for a user
+  app.get("/v1/admin/digest/preview/:userId", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const { userId } = z.object({ userId: z.string().uuid() }).parse(request.params);
+    const record = await input.repository.getLatestDigestRecord(userId);
+    if (!record) {
+      throw new HttpError(404, "digest_not_found", "No digest record found for this user.");
+    }
+    return { html: record.htmlContent, generatedAt: record.generatedAt };
   });
 
   return app;

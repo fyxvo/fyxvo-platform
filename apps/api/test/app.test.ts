@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   anchorAccountDiscriminator,
   fyxvoProgramSeeds,
@@ -1015,6 +1015,18 @@ class MemoryApiRepository implements ApiRepository {
     return Array.from({ length: 24 }, () => Array(7).fill(0));
   }
   async findRequestByTraceId(_projectId: string, _traceId: string): Promise<Record<string, unknown> | null> { return null; }
+  async getFirstSuccessfulProjectRequest(projectId: string): Promise<{ method: string; durationMs: number; createdAt: string } | null> {
+    const rows = [...this.requestLogs.values()]
+      .filter((entry) => entry.projectId === projectId && entry.statusCode < 400)
+      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+    const first = rows[0];
+    if (!first) return null;
+    return {
+      method: first.method,
+      durationMs: first.durationMs,
+      createdAt: first.createdAt.toISOString()
+    };
+  }
   async countRecentRequests(_since: Date): Promise<number> { return 0; }
   async getSuccessRateTrend(_projectId: string, _range: "24h" | "7d" | "30d"): Promise<Array<{ time: string; successRate: number }>> { return []; }
   async transferProjectOwnership(_projectId: string, _newOwnerId: string, _previousOwnerId: string): Promise<void> { return Promise.resolve(); }
@@ -1034,10 +1046,38 @@ class MemoryApiRepository implements ApiRepository {
   async deleteDigestSchedule(_userId: string): Promise<void> { return Promise.resolve(); }
 }
 
-async function createTestApp(options: { rateLimitMax?: number } = {}) {
-  const env = makeEnv(
-    options.rateLimitMax !== undefined ? { API_RATE_LIMIT_MAX: String(options.rateLimitMax) } : {}
+function createAssistantSseResponse(chunks: readonly string[]) {
+  let index = 0;
+
+  return new Response(
+    new ReadableStream({
+      pull(controller) {
+        if (index >= chunks.length) {
+          controller.close();
+          return;
+        }
+
+        controller.enqueue(new TextEncoder().encode(chunks[index]!));
+        index += 1;
+      }
+    }),
+    {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream"
+      }
+    }
   );
+}
+
+async function createTestApp(options: {
+  rateLimitMax?: number;
+  envOverrides?: Partial<Record<string, string>>;
+} = {}) {
+  const env = makeEnv({
+    ...(options.rateLimitMax !== undefined ? { API_RATE_LIMIT_MAX: String(options.rateLimitMax) } : {}),
+    ...options.envOverrides
+  });
   const programId = new PublicKey(getSolanaNetworkConfig(env.SOLANA_CLUSTER).programIds.fyxvo);
   const protocolConfigPda = PublicKey.findProgramAddressSync(
     [fyxvoProgramSeeds.protocolConfig],
@@ -1251,6 +1291,8 @@ async function authenticateWallet(input: {
 const appsToClose = new Set<Awaited<ReturnType<typeof createTestApp>>["app"]>();
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+
   for (const app of appsToClose) {
     await app.close();
     appsToClose.delete(app);
@@ -1270,6 +1312,7 @@ describe("Fyxvo API service", () => {
     expect(healthResponse.json()).toMatchObject({
       status: "ok",
       service: "api",
+      assistantAvailable: false
     });
 
     const statusResponse = await healthyContext.app.inject({
@@ -1280,6 +1323,7 @@ describe("Fyxvo API service", () => {
     expect(statusResponse.json()).toMatchObject({
       service: "fyxvo-api",
       environment: "test",
+      assistantAvailable: false,
       solanaCluster: "devnet",
       authorityPlan: {
         mode: "single-signer",
@@ -1308,6 +1352,102 @@ describe("Fyxvo API service", () => {
       code: "rate_limited",
       error: "Too Many Requests"
     });
+  });
+
+  it("returns assistant availability, 503 when not configured, 500 on upstream failure, and streams SSE responses", async () => {
+    const unavailableContext = await createTestApp();
+    appsToClose.add(unavailableContext.app);
+    const unavailableAuth = await authenticateWallet({ app: unavailableContext.app });
+
+    const unavailableResponse = await unavailableContext.app.inject({
+      method: "POST",
+      url: "/v1/assistant/chat",
+      headers: {
+        authorization: `Bearer ${unavailableAuth.token}`
+      },
+      payload: {
+        messages: [{ role: "user", content: "How do I use the gateway?" }]
+      }
+    });
+
+    expect(unavailableResponse.statusCode).toBe(503);
+    expect(unavailableResponse.json()).toMatchObject({
+      code: "assistant_unavailable"
+    });
+
+    const configuredContext = await createTestApp({
+      envOverrides: {
+        ANTHROPIC_API_KEY: "anthropic-test-key"
+      }
+    });
+    appsToClose.add(configuredContext.app);
+    const configuredAuth = await authenticateWallet({ app: configuredContext.app });
+
+    const healthResponse = await configuredContext.app.inject({
+      method: "GET",
+      url: "/health"
+    });
+    expect(healthResponse.json()).toMatchObject({
+      assistantAvailable: true
+    });
+
+    const statusResponse = await configuredContext.app.inject({
+      method: "GET",
+      url: "/v1/status"
+    });
+    expect(statusResponse.json()).toMatchObject({
+      assistantAvailable: true
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("provider failure", {
+        status: 500,
+        headers: {
+          "content-type": "text/plain"
+        }
+      })
+    );
+
+    const failedUpstreamResponse = await configuredContext.app.inject({
+      method: "POST",
+      url: "/v1/assistant/chat",
+      headers: {
+        authorization: `Bearer ${configuredAuth.token}`
+      },
+      payload: {
+        messages: [{ role: "user", content: "Tell me about pricing." }]
+      }
+    });
+
+    expect(failedUpstreamResponse.statusCode).toBe(500);
+    expect(failedUpstreamResponse.json()).toMatchObject({
+      code: "assistant_internal_error"
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      createAssistantSseResponse([
+        'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}\n\n',
+        'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":" from Fyxvo"}}\n\n',
+        "data: [DONE]\n\n"
+      ])
+    );
+
+    const streamingResponse = await configuredContext.app.inject({
+      method: "POST",
+      url: "/v1/assistant/chat",
+      headers: {
+        authorization: `Bearer ${configuredAuth.token}`
+      },
+      payload: {
+        messages: [{ role: "user", content: "Say hello." }]
+      }
+    });
+
+    expect(streamingResponse.statusCode).toBe(200);
+    expect(streamingResponse.headers["content-type"]).toContain("text/event-stream");
+    expect(streamingResponse.body).toContain('{"text":"Hello"}');
+    expect(streamingResponse.body).toContain('{"text":" from Fyxvo"}');
+    expect(streamingResponse.body).toContain("data: [DONE]");
   });
 
   it("authenticates wallets and supports project CRUD with idempotency", async () => {

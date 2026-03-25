@@ -99,6 +99,18 @@ const projectColumns: readonly TableColumn<PortalProject>[] = [
           <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
             {project.slug}
           </div>
+          {((project as { tags?: string[] }).tags ?? []).length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {((project as { tags?: string[] }).tags ?? []).map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-2 py-0.5 rounded-full bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       );
     },
@@ -374,6 +386,16 @@ export default function DashboardPage() {
     invitedAt: string;
   }>>([]);
   const [celebrationProject, setCelebrationProject] = useState<PortalProject | null>(null);
+  const [celebrationRequestSummary, setCelebrationRequestSummary] = useState<{
+    method: string;
+    latencyMs: number;
+    createdAt: string;
+  } | null>(null);
+  const [cspViolations, setCspViolations] = useState<
+    Array<{ blockedUri: string; violatedDirective: string; timestamp: string; receivedAt: string }>
+  >([]);
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const celebrationProjectId = celebrationProject?.id ?? null;
 
   useEffect(() => {
     void getNetworkStats().then(setNetworkStats).catch(() => {});
@@ -429,6 +451,87 @@ export default function DashboardPage() {
       setCelebrationProject(candidate);
     }
   }, [portal.projects, portal.walletPhase, portal.loading]);
+
+  useEffect(() => {
+    if (!celebrationProjectId || !portal.token) {
+      setCelebrationRequestSummary(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(new URL(`/v1/projects/${celebrationProjectId}/requests/first`, webEnv.apiBaseUrl), {
+      headers: {
+        authorization: `Bearer ${portal.token}`
+      }
+    })
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              item: { method: string; durationMs: number; createdAt: string } | null;
+            }>)
+          : null
+      )
+      .then((data) => {
+        if (cancelled) return;
+        setCelebrationRequestSummary(
+          data?.item
+            ? {
+                method: data.item.method,
+                latencyMs: data.item.durationMs,
+                createdAt: data.item.createdAt
+              }
+            : null
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCelebrationRequestSummary(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [celebrationProjectId, portal.token]);
+
+  useEffect(() => {
+    if (!portal.adminOverview || !portal.token) {
+      setCspViolations([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    fetch(new URL("/v1/admin/csp-violations", webEnv.apiBaseUrl), {
+      headers: {
+        authorization: `Bearer ${portal.token}`
+      }
+    })
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              violations: Array<{
+                blockedUri: string;
+                violatedDirective: string;
+                timestamp: string;
+                receivedAt: string;
+              }>;
+            }>)
+          : null
+      )
+      .then((data) => {
+        if (cancelled) return;
+        setCspViolations(data?.violations ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCspViolations([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [portal.adminOverview, portal.token]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -623,6 +726,7 @@ export default function DashboardPage() {
       {celebrationProject ? (
         <FirstRequestCelebration
           project={celebrationProject}
+          requestSummary={celebrationRequestSummary}
           onDismiss={handleCelebrationDismiss}
         />
       ) : null}
@@ -1233,7 +1337,50 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Table columns={projectColumns} rows={portal.projects} getRowKey={(item) => item.id} />
+        <div className="space-y-3">
+          {(() => {
+            const allTags = [...new Set(
+              portal.projects.flatMap((p) => (p as { tags?: string[] }).tags ?? [])
+            )];
+            return allTags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setActiveTagFilter((prev) => (prev === tag ? null : tag))}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      activeTagFilter === tag
+                        ? "bg-[var(--fyxvo-brand)] text-white"
+                        : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+                {activeTagFilter ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTagFilter(null)}
+                    className="rounded-full border border-[var(--fyxvo-border)] px-2 py-1 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                  >
+                    Clear filter
+                  </button>
+                ) : null}
+              </div>
+            ) : null;
+          })()}
+          <Table
+            columns={projectColumns}
+            rows={activeTagFilter
+              ? portal.projects.filter((p) =>
+                  ((p as { tags?: string[] }).tags ?? []).includes(activeTagFilter)
+                )
+              : portal.projects
+            }
+            getRowKey={(item) => item.id}
+          />
+        </div>
 
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
@@ -1572,6 +1719,36 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </section>
+
+          {cspViolations.length > 0 ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Recent CSP violations</CardTitle>
+                <CardDescription>
+                  Browser CSP reports forwarded through `/api/csp-report`, with blocked URLs,
+                  violated directives, and timestamps for quick admin review.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {cspViolations.map((violation) => (
+                  <div
+                    key={`${violation.receivedAt}-${violation.blockedUri}-${violation.violatedDirective}`}
+                    className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="warning">{violation.violatedDirective}</Badge>
+                      <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                        {formatRelativeDate(violation.timestamp)}
+                      </span>
+                    </div>
+                    <div className="mt-2 break-all text-sm text-[var(--fyxvo-text)]">
+                      {violation.blockedUri}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <section className="grid gap-6 xl:grid-cols-2">
             <OpsTimeline

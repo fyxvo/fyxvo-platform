@@ -32,6 +32,10 @@ Install the Fyxvo SDK:
 
 ```bash
 npm install @fyxvo/sdk
+# or
+yarn add @fyxvo/sdk
+# or
+pnpm add @fyxvo/sdk
 ```
 
 Then create a client and send your first request:
@@ -42,6 +46,7 @@ import { createFyxvoClient } from "@fyxvo/sdk";
 const client = createFyxvoClient({
   baseUrl: "https://rpc.fyxvo.com",
   apiKey: process.env.FYXVO_API_KEY,
+  timeoutMs: 10_000,
 });
 
 // Standard RPC request

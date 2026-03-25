@@ -8,11 +8,19 @@ import { PRICING_LAMPORTS, PRICING_USDC, VOLUME_DISCOUNT, FREE_TIER_REQUESTS, RE
 import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
-  title: "Pricing — Fyxvo",
+  title: {
+    absolute: "Pricing — Fyxvo"
+  },
   description: "Devnet launch pricing for Fyxvo: SOL-funded standard RPC and priority relay, lamport-per-request rates, volume discounts, and on-chain funding mechanics for early teams.",
+  alternates: {
+    canonical: `${webEnv.siteUrl}/pricing`
+  },
   openGraph: {
     title: "Pricing — Fyxvo",
     description: "Devnet launch pricing for Fyxvo: SOL-funded standard RPC and priority relay, lamport-per-request rates, volume discounts, and on-chain funding mechanics for early teams.",
+    url: `${webEnv.siteUrl}/pricing`,
+    siteName: "Fyxvo",
+    type: "website",
     images: [{ url: webEnv.socialImageUrl }]
   },
   twitter: {

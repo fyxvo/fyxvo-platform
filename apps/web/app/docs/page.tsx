@@ -2014,6 +2014,8 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getBalance",
                         description: "Returns the lamport balance of the account at the given public key.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "[pubkey]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"]}'`,
@@ -2022,17 +2024,71 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getAccountInfo",
                         description: "Returns all information associated with the account at the given public key.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "[pubkey]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",{"encoding":"base58"}]}'`,
                       },
                       {
                         name: "getMultipleAccounts",
-                        description: "Returns the account information for a list of public keys.",
+                        description: "Get info for multiple accounts at once.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "[pubkeys[]]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getMultipleAccounts","params":[["PUBKEY1","PUBKEY2"],{"encoding":"base58"}]}'`,
+                      },
+                      {
+                        name: "getTokenAccountBalance",
+                        description: "Get token account balance for an SPL Token account.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[pubkey]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenAccountBalance","params":["TOKEN_ACCOUNT_PUBKEY"]}'`,
+                      },
+                      {
+                        name: "getTokenAccountsByOwner",
+                        description: "Get all token accounts owned by an address, filtered by mint or program ID.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[ownerAddress, { mint | programId }]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenAccountsByOwner","params":["OWNER_PUBKEY",{"programId":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},{"encoding":"jsonParsed"}]}'`,
+                      },
+                      {
+                        name: "getTokenLargestAccounts",
+                        description: "Get the 20 largest token accounts for a given mint.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[mintAddress]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenLargestAccounts","params":["MINT_ADDRESS"]}'`,
+                      },
+                      {
+                        name: "getTokenSupply",
+                        description: "Get the total supply of an SPL Token mint.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[mintAddress]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenSupply","params":["MINT_ADDRESS"]}'`,
+                      },
+                      {
+                        name: "getProgramAccounts",
+                        description: "Get all accounts owned by a program. Compute-heavy — use filters to narrow results.",
+                        tier: "Standard",
+                        heavy: true,
+                        params: "[programId]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getProgramAccounts","params":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"]}'`,
                       },
                     ],
                   },
@@ -2043,14 +2099,18 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getSlot",
                         description: "Returns the slot that has reached the given or default commitment level.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'`,
                       },
                       {
                         name: "getBlock",
-                        description: "Returns identity and transaction information about a confirmed block in the ledger.",
+                        description: "Returns identity and transaction information about a confirmed block in the ledger. Compute-heavy.",
                         tier: "Standard",
+                        heavy: true,
+                        params: "[slot]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getBlock","params":[SLOT_NUMBER,{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
@@ -2059,6 +2119,8 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getLatestBlockhash",
                         description: "Returns the latest blockhash and the last block height at which it is valid.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"confirmed"}]}'`,
@@ -2067,9 +2129,41 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getBlockHeight",
                         description: "Returns the current block height of the node.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getBlockHeight","params":[]}'`,
+                      },
+                      {
+                        name: "getBlockTime",
+                        description: "Get estimated production time of a block, as Unix timestamp.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[slot]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBlockTime","params":[SLOT_NUMBER]}'`,
+                      },
+                      {
+                        name: "getBlocks",
+                        description: "Get confirmed blocks in a slot range.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[startSlot, endSlot?]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBlocks","params":[START_SLOT,END_SLOT]}'`,
+                      },
+                      {
+                        name: "getFirstAvailableBlock",
+                        description: "Get the slot of the lowest confirmed block that has not been purged from the ledger.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "none",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getFirstAvailableBlock","params":[]}'`,
                       },
                     ],
                   },
@@ -2080,6 +2174,8 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "sendTransaction",
                         description: "Submits a signed transaction to the cluster for processing.",
                         tier: "Priority",
+                        heavy: false,
+                        params: "[encodedTransaction]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
   -H "x-api-key: YOUR_PRIORITY_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["<base64-signed-tx>",{"encoding":"base64","skipPreflight":false}]}'`,
@@ -2088,6 +2184,8 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "simulateTransaction",
                         description: "Simulate sending a transaction without actually submitting it to the network.",
                         tier: "Priority",
+                        heavy: false,
+                        params: "[transaction]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
   -H "x-api-key: YOUR_PRIORITY_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"simulateTransaction","params":["<base64-tx>",{"encoding":"base64","sigVerify":false}]}'`,
@@ -2096,14 +2194,38 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getTransaction",
                         description: "Returns transaction details for a confirmed transaction.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "[signature]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getTransaction","params":["SIGNATURE",{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
                       },
                       {
+                        name: "getTransactions",
+                        description: "Get details for multiple transactions by signature array.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[signatures[]]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getTransactions","params":[["SIG1","SIG2"],{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
+                      },
+                      {
+                        name: "getSignaturesForAddress",
+                        description: "Get confirmed signatures for transactions involving an address.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[address]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getSignaturesForAddress","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",{"limit":10}]}'`,
+                      },
+                      {
                         name: "getSignatureStatuses",
                         description: "Returns the statuses of a list of transaction signatures.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "[signatures[]]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getSignatureStatuses","params":[["SIG1","SIG2"],{"searchTransactionHistory":false}]}'`,
@@ -2115,8 +2237,10 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                     methods: [
                       {
                         name: "getHealth",
-                        description: "Returns the current health of the node — \u201cok\u201d if healthy.",
+                        description: "Returns the current health of the node \u2014 \u201cok\u201d if healthy.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'`,
@@ -2125,6 +2249,8 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getVersion",
                         description: "Returns the current Solana version running on the node.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getVersion","params":[]}'`,
@@ -2133,21 +2259,95 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         name: "getEpochInfo",
                         description: "Returns information about the current epoch including slot index and epoch number.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getEpochInfo","params":[]}'`,
                       },
                       {
+                        name: "getEpochSchedule",
+                        description: "Get epoch schedule information from the cluster\u2019s genesis config.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "none",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getEpochSchedule","params":[]}'`,
+                      },
+                      {
                         name: "getGenesisHash",
                         description: "Returns the genesis hash of the ledger.",
                         tier: "Standard",
+                        heavy: false,
+                        params: "none",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getGenesisHash","params":[]}'`,
                       },
+                      {
+                        name: "getClusterNodes",
+                        description: "Get information about all cluster nodes participating in the network.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "none",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getClusterNodes","params":[]}'`,
+                      },
+                      {
+                        name: "getLeaderSchedule",
+                        description: "Get the leader schedule for the current or a specific epoch.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "none",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getLeaderSchedule","params":[]}'`,
+                      },
+                      {
+                        name: "getMinimumBalanceForRentExemption",
+                        description: "Get minimum balance required to make account rent exempt for a given data size.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[dataSize]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getMinimumBalanceForRentExemption","params":[128]}'`,
+                      },
+                      {
+                        name: "getRecentPerformanceSamples",
+                        description: "Get recent performance samples showing transactions and slots per second.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[limit?]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getRecentPerformanceSamples","params":[5]}'`,
+                      },
+                      {
+                        name: "getStakeActivation",
+                        description: "Get epoch activation information for a stake account.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "[pubkey]",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getStakeActivation","params":["STAKE_ACCOUNT_PUBKEY"]}'`,
+                      },
+                      {
+                        name: "getVoteAccounts",
+                        description: "Get account info and stake for all voting accounts in the current bank.",
+                        tier: "Standard",
+                        heavy: false,
+                        params: "none",
+                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getVoteAccounts","params":[]}'`,
+                      },
                     ],
                   },
-                ] as Array<{ category: string; methods: Array<{ name: string; description: string; tier: string; example: string }> }>
+                ] as Array<{ category: string; methods: Array<{ name: string; description: string; tier: string; heavy: boolean; params: string; example: string }> }>
               ).map(({ category, methods }) => (
                 <div key={category} className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">{category}</h3>
@@ -2159,6 +2359,14 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${m.tier === "Priority" ? "bg-amber-500/15 text-amber-500" : "bg-brand-500/10 text-[var(--fyxvo-brand)]"}`}>
                             {m.tier}
                           </span>
+                          {m.heavy && (
+                            <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-500">
+                              ⚡ Heavy
+                            </span>
+                          )}
+                          {m.params !== "none" && (
+                            <span className="font-mono text-[10px] text-[var(--fyxvo-text-muted)]">{m.params}</span>
+                          )}
                         </div>
                         <p className="text-sm leading-5 text-[var(--fyxvo-text-soft)] mb-2">{m.description}</p>
                         <details className="text-xs">

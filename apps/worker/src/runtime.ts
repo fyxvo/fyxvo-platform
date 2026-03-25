@@ -7,6 +7,7 @@ import { processNodeHealthMonitoring } from "./jobs/node-health.js";
 import { processRewardCalculation } from "./jobs/rewards.js";
 import { processWalletIndexing } from "./jobs/indexing.js";
 import { processServiceHealthCheck } from "./jobs/service-health.js";
+import { updateReputations, checkErrorRates, generateWeeklyDigests } from "./jobs/maintenance.js";
 import { PrismaWorkerRepository } from "./repository.js";
 import { JsonRpcNodeProbeClient, RpcSolanaIndexerClient } from "./solana.js";
 import type {
@@ -92,6 +93,9 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
   private readonly queue: Queue;
   private readonly worker: Worker;
   private interval: NodeJS.Timeout | null = null;
+  private reputationInterval: NodeJS.Timeout | null = null;
+  private errorRateInterval: NodeJS.Timeout | null = null;
+  private digestInterval: NodeJS.Timeout | null = null;
 
   constructor(private readonly dependencies: WorkerProcessorDependencies) {
     this.queueName = `${dependencies.env.WORKER_NAME}-jobs`;
@@ -166,6 +170,29 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
       });
     }, this.dependencies.env.WORKER_INTERVAL_MS);
 
+    const prismaClient = this.dependencies.repository.prisma;
+    const logger = this.dependencies.logger;
+
+    if (prismaClient) {
+      // Reputation updates — every hour
+      void updateReputations(prismaClient, logger);
+      this.reputationInterval = setInterval(() => {
+        void updateReputations(prismaClient, logger);
+      }, 3_600_000);
+
+      // Error rate checks — every 5 minutes
+      void checkErrorRates(prismaClient, logger);
+      this.errorRateInterval = setInterval(() => {
+        void checkErrorRates(prismaClient, logger);
+      }, 300_000);
+
+      // Weekly digest generation — run once on startup, then weekly
+      void generateWeeklyDigests(prismaClient, logger);
+      this.digestInterval = setInterval(() => {
+        void generateWeeklyDigests(prismaClient, logger);
+      }, 7 * 24 * 3_600_000);
+    }
+
     this.dependencies.logger.info(
       {
         event: "worker.runtime.started",
@@ -181,6 +208,18 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
+    }
+    if (this.reputationInterval) {
+      clearInterval(this.reputationInterval);
+      this.reputationInterval = null;
+    }
+    if (this.errorRateInterval) {
+      clearInterval(this.errorRateInterval);
+      this.errorRateInterval = null;
+    }
+    if (this.digestInterval) {
+      clearInterval(this.digestInterval);
+      this.digestInterval = null;
     }
 
     await this.worker.close();

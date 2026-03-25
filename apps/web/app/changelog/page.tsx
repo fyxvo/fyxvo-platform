@@ -4,11 +4,27 @@ import { PageHeader } from "../../components/page-header";
 import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
-  title: "Changelog — Fyxvo",
+  title: {
+    absolute: "Changelog — Fyxvo"
+  },
   description: "Release notes and updates for the Fyxvo devnet control plane and relay gateway.",
   alternates: {
     canonical: `${webEnv.siteUrl}/changelog`,
   },
+  openGraph: {
+    title: "Changelog — Fyxvo",
+    description: "Release notes and updates for the Fyxvo devnet control plane and relay gateway.",
+    url: `${webEnv.siteUrl}/changelog`,
+    siteName: "Fyxvo",
+    type: "website",
+    images: [{ url: webEnv.socialImageUrl }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Changelog — Fyxvo",
+    description: "Release notes and updates for the Fyxvo devnet control plane and relay gateway.",
+    images: [webEnv.socialImageUrl]
+  }
 };
 
 interface ChangeEntry {

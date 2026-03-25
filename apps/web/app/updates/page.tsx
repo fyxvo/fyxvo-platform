@@ -3,8 +3,27 @@ import Link from "next/link";
 import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
-  title: "Updates — Fyxvo",
+  title: {
+    absolute: "Updates — Fyxvo"
+  },
   description: "Latest Fyxvo platform updates, release notes, and announcements.",
+  alternates: {
+    canonical: `${webEnv.siteUrl}/updates`
+  },
+  openGraph: {
+    title: "Updates — Fyxvo",
+    description: "Latest Fyxvo platform updates, release notes, and announcements.",
+    url: `${webEnv.siteUrl}/updates`,
+    siteName: "Fyxvo",
+    type: "website",
+    images: [{ url: webEnv.socialImageUrl }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Updates — Fyxvo",
+    description: "Latest Fyxvo platform updates, release notes, and announcements.",
+    images: [webEnv.socialImageUrl]
+  }
 };
 
 interface UpdatePost {

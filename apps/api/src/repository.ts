@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   ApiKeyStatus,
   Prisma,
+  UserRole,
   type PrismaClientType,
   type PrismaNamespace
 } from "@fyxvo/database";
@@ -2045,6 +2046,37 @@ export class PrismaApiRepository implements ApiRepository {
     };
   }
 
+  async getFirstSuccessfulProjectRequest(projectId: string): Promise<{
+    method: string;
+    durationMs: number;
+    createdAt: string;
+  } | null> {
+    const log = await this.prisma.requestLog.findFirst({
+      where: {
+        projectId,
+        statusCode: { lt: 400 }
+      },
+      select: {
+        method: true,
+        durationMs: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    if (!log) {
+      return null;
+    }
+
+    return {
+      method: log.method,
+      durationMs: log.durationMs,
+      createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt)
+    };
+  }
+
   async countRecentRequests(since: Date): Promise<number> {
     return this.prisma.requestLog.count({ where: { createdAt: { gte: since } } });
   }
@@ -2269,6 +2301,106 @@ export class PrismaApiRepository implements ApiRepository {
   async deleteDigestSchedule(userId: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma as any).digestSchedule.deleteMany({ where: { userId } });
+  }
+
+  async getPublicProjectStats(projectId: string): Promise<{
+    projectId: string;
+    totalRequests: number;
+    successRate: number;
+    avgLatencyMs: number;
+    uptime: number;
+    lastUpdated: string;
+  }> {
+    const [totalRequests, successCount, latencyAgg] = await Promise.all([
+      this.prisma.requestLog.count({ where: { projectId } }),
+      this.prisma.requestLog.count({ where: { projectId, statusCode: { lt: 400 } } }),
+      this.prisma.requestLog.aggregate({
+        where: { projectId },
+        _avg: { durationMs: true },
+      }),
+    ]);
+
+    const since24h = new Date(Date.now() - 24 * 3_600_000);
+    const snapshots = await this.prisma.serviceHealthSnapshot.findMany({
+      where: { checkedAt: { gte: since24h } },
+      select: { status: true },
+    });
+    const uptime =
+      snapshots.length > 0
+        ? snapshots.filter((s) => s.status === "healthy").length / snapshots.length
+        : 1.0;
+
+    return {
+      projectId,
+      totalRequests,
+      successRate: totalRequests > 0 ? successCount / totalRequests : 1.0,
+      avgLatencyMs: latencyAgg._avg.durationMs ?? 0,
+      uptime,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  async updateProjectTags(projectId: string, tags: string[]): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).project.update({ where: { id: projectId }, data: { tags } });
+  }
+
+  async getNetworkHealthCalendar(): Promise<Array<{ date: string; availability: number; color: 'green' | 'amber' | 'red' }>> {
+    const days: Array<{ date: string; availability: number; color: 'green' | 'amber' | 'red' }> = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0]!;
+      const start = new Date(dateStr);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      const snapshots = await this.prisma.serviceHealthSnapshot.findMany({
+        where: { checkedAt: { gte: start, lt: end } },
+        select: { status: true },
+      });
+      const total: number = snapshots.length;
+      const healthy: number = snapshots.filter((s) => s.status === 'healthy').length;
+      const avg = total > 0 ? healthy / total : 1.0;
+      const color: 'green' | 'amber' | 'red' = avg >= 0.95 ? 'green' : avg >= 0.80 ? 'amber' : 'red';
+      days.push({ date: dateStr, availability: avg, color });
+    }
+    return days;
+  }
+
+  async findApiKeyByHash(keyHash: string): Promise<{ id: string; projectId: string; scopes: unknown; status: string; expiresAt: Date | null } | null> {
+    const record = await this.prisma.apiKey.findFirst({
+      where: {
+        keyHash,
+        status: ApiKeyStatus.ACTIVE,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true, projectId: true, scopes: true, status: true, expiresAt: true },
+    });
+    return record ?? null;
+  }
+
+  async getLatestDigestRecord(userId: string): Promise<{ htmlContent: string; generatedAt: Date } | null> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const record = await (this.prisma as any).digestRecord.findFirst({
+      where: { userId },
+      orderBy: { generatedAt: 'desc' },
+      select: { htmlContent: true, generatedAt: true },
+    });
+    return record as { htmlContent: string; generatedAt: Date } | null;
+  }
+
+  async createDigestRecord(input: { userId: string; htmlContent: string }): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma as any).digestRecord.create({
+      data: { userId: input.userId, htmlContent: input.htmlContent },
+    });
+  }
+
+  async findAdminUsers(): Promise<Array<{ id: string }>> {
+    return this.prisma.user.findMany({
+      where: { role: { in: [UserRole.ADMIN, UserRole.OWNER] } },
+      select: { id: true },
+    });
   }
 }
 

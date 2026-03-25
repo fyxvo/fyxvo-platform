@@ -11,6 +11,8 @@ Fyxvo is a managed, wallet-authenticated RPC relay for Solana devnet. You fund a
 ```bash
 npm install @fyxvo/sdk
 # or
+yarn add @fyxvo/sdk
+# or
 pnpm add @fyxvo/sdk
 ```
 
@@ -20,19 +22,20 @@ pnpm add @fyxvo/sdk
 import { createFyxvoClient } from "@fyxvo/sdk";
 
 const fyxvo = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
   apiKey: "fyxvo_live_YOUR_KEY_HERE",
-  // Optional: defaults to https://rpc.fyxvo.com
-  gatewayUrl: "https://rpc.fyxvo.com",
+  timeoutMs: 10_000,
 });
 
 // Send a standard JSON-RPC request
-const slotResult = await fyxvo.rpc<number>("getSlot");
+const slotResult = await fyxvo.rpc<number>({ method: "getSlot" });
 console.log("Current slot:", slotResult);
 
 // Get the balance of a wallet
-const balance = await fyxvo.rpc<{ value: number }>("getBalance", [
-  "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"
-]);
+const balance = await fyxvo.rpc<{ value: number }>({
+  method: "getBalance",
+  params: ["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"]
+});
 console.log("Balance (lamports):", balance.value);
 ```
 
@@ -42,14 +45,13 @@ Priority requests are routed through a low-latency path with guaranteed capacity
 
 ```typescript
 const fyxvo = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com/priority",
   apiKey: "fyxvo_live_YOUR_KEY_HERE",
-  gatewayUrl: "https://rpc.fyxvo.com",
-  usePriority: true, // route all requests through /priority
 });
 
 const latestBlockhash = await fyxvo.rpc<{
   value: { blockhash: string; lastValidBlockHeight: number }
-}>("getLatestBlockhash");
+}>({ method: "getLatestBlockhash" });
 ```
 
 ## Error Handling
@@ -60,7 +62,10 @@ import { createFyxvoClient, FyxvoApiError, FyxvoNetworkError } from "@fyxvo/sdk"
 const fyxvo = createFyxvoClient({ apiKey: "fyxvo_live_..." });
 
 try {
-  const result = await fyxvo.rpc("getBalance", ["<pubkey>"]);
+  const result = await fyxvo.rpc({
+    method: "getBalance",
+    params: ["<pubkey>"]
+  });
 } catch (err) {
   if (err instanceof FyxvoApiError) {
     // API returned an error response (4xx/5xx)
@@ -78,11 +83,11 @@ try {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `apiKey` | `string` | required | Your Fyxvo API key (starts with `fyxvo_live_`) |
-| `gatewayUrl` | `string` | `https://rpc.fyxvo.com` | Gateway base URL |
-| `apiBaseUrl` | `string` | `https://api.fyxvo.com` | Control plane API base URL |
-| `timeout` | `number` | `10000` | Request timeout in milliseconds |
-| `usePriority` | `boolean` | `false` | Route all RPC requests through the priority path |
+| `baseUrl` | `string` | required | Base URL for the gateway or API you are calling |
+| `apiKey` | `string` | optional | Your Fyxvo API key (starts with `fyxvo_live_`) |
+| `timeoutMs` | `number` | `10000` | Request timeout in milliseconds |
+| `headers` | `HeadersInit` | optional | Extra headers to attach to every request |
+| `fetcher` | `typeof fetch` | optional | Custom fetch implementation |
 
 ## Checking Gateway Health
 

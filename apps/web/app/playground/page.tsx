@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { PageHeader } from "../../components/page-header";
 import { usePortal } from "../../components/portal-provider";
+import { listWebhooks, testWebhook } from "../../lib/api";
 import { webEnv } from "../../lib/env";
 
 // ---------------------------------------------------------------------------
@@ -434,9 +435,14 @@ function PlaygroundContent() {
   const [benchmarkNetworkAvg, setBenchmarkNetworkAvg] = useState<number | null>(null);
 
   // Webhook test
+  const [projectWebhooks, setProjectWebhooks] = useState<
+    Array<{ id: string; url: string; events: string[]; secret: string; active: boolean; lastTriggeredAt: string | null; createdAt: string }>
+  >([]);
+  const [selectedWebhookTarget, setSelectedWebhookTarget] = useState<string>("custom");
   const [webhookTestUrl, setWebhookTestUrl] = useState("");
   const [webhookTestEvent, setWebhookTestEvent] = useState("request.completed");
   const [webhookTestResponse, setWebhookTestResponse] = useState<{ status: number; body: string; latencyMs: number } | null>(null);
+  const selectedProjectId = portal.selectedProject?.id ?? null;
 
   const initializedFromUrl = useRef(false);
 
@@ -496,6 +502,34 @@ function PlaygroundContent() {
     }
   }, [response]);
 
+  useEffect(() => {
+    if (!selectedMethod.isWebhookTest || !portal.token || !selectedProjectId) {
+      setProjectWebhooks([]);
+      setSelectedWebhookTarget("custom");
+      return;
+    }
+
+    let cancelled = false;
+
+    listWebhooks(selectedProjectId, portal.token)
+      .then((data) => {
+        if (cancelled) return;
+        setProjectWebhooks(data.items);
+        setSelectedWebhookTarget((current) =>
+          current === "custom" || data.items.some((item) => item.id === current) ? current : "custom"
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProjectWebhooks([]);
+        setSelectedWebhookTarget("custom");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMethod.isWebhookTest, selectedProjectId, portal.token]);
+
   const activeApiKey = portal.apiKeys.find((k) => k.id === selectedKeyId && k.status === "ACTIVE") ??
     portal.apiKeys.find((k) => k.status === "ACTIVE");
 
@@ -517,19 +551,41 @@ function PlaygroundContent() {
   async function sendRequest() {
     if (!isAuthenticated) return;
 
-    // Webhook test — POSTs a test payload directly to the user-supplied URL
+    // Webhook test — send to a configured project webhook or a custom URL.
     if (selectedMethod.isWebhookTest) {
-      if (!webhookTestUrl.trim()) return;
+      const usingConfiguredWebhook =
+        selectedWebhookTarget !== "custom" && portal.selectedProject && portal.token;
+
+      if (!usingConfiguredWebhook && !webhookTestUrl.trim()) return;
       setLoading(true);
       setWebhookTestResponse(null);
-      const payload = JSON.stringify({
-        event: webhookTestEvent,
-        projectId: "test",
-        timestamp: new Date().toISOString(),
-        data: { method: "getSlot", latencyMs: 42, success: true },
-      });
       const start = Date.now();
+
       try {
+        if (usingConfiguredWebhook && portal.selectedProject && portal.token) {
+          const result = await testWebhook(
+            portal.selectedProject.id,
+            selectedWebhookTarget,
+            portal.token
+          );
+          setTimeout(
+            () =>
+              setWebhookTestResponse({
+                status: result.statusCode ?? 0,
+                body: result.body ?? result.error ?? "(empty)",
+                latencyMs: result.latencyMs ?? 0
+              }),
+            0
+          );
+          return;
+        }
+
+        const payload = JSON.stringify({
+          event: webhookTestEvent,
+          projectId: "test",
+          timestamp: new Date().toISOString(),
+          data: { method: "getSlot", latencyMs: 42, success: true },
+        });
         const res = await fetch(webhookTestUrl.trim(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -727,7 +783,7 @@ function PlaygroundContent() {
         </Notice>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[300px_1fr_260px]">
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-[300px_1fr_260px]">
         {/* Left: Method selector */}
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] xl:self-start">
           <CardHeader>
@@ -741,12 +797,12 @@ function PlaygroundContent() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="flex gap-1 overflow-x-auto border-b border-[var(--fyxvo-border)] px-4 pb-0 pt-0">
+            <div className="flex gap-1 overflow-x-auto whitespace-nowrap border-b border-[var(--fyxvo-border)] px-4 pb-0 pt-0">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`shrink-0 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
+                  className={`shrink-0 inline-block border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
                     selectedCategory === cat
                       ? "border-[var(--fyxvo-brand)] text-[var(--fyxvo-text)]"
                       : "border-transparent text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
@@ -908,37 +964,67 @@ function PlaygroundContent() {
                 <div className="space-y-4">
                   <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Webhook Test</p>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
-                      Webhook URL<span className="ml-1 text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={webhookTestUrl}
-                      onChange={(e) => setWebhookTestUrl(e.target.value)}
-                      placeholder="https://webhook.site/your-unique-id"
-                      className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">Event type</label>
+                    <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">Destination</label>
                     <select
-                      value={webhookTestEvent}
-                      onChange={(e) => setWebhookTestEvent(e.target.value)}
+                      value={selectedWebhookTarget}
+                      onChange={(e) => setSelectedWebhookTarget(e.target.value)}
                       className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
                     >
-                      <option value="request.completed">request.completed</option>
-                      <option value="balance.low">balance.low</option>
-                      <option value="rate_limit.warning">rate_limit.warning</option>
-                      <option value="project.activated">project.activated</option>
+                      <option value="custom">Custom webhook URL</option>
+                      {projectWebhooks.map((webhook) => (
+                        <option key={webhook.id} value={webhook.id}>
+                          {webhook.url}
+                        </option>
+                      ))}
                     </select>
                   </div>
+                  {selectedWebhookTarget !== "custom" ? (
+                    <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3 text-xs text-[var(--fyxvo-text-muted)]">
+                      Send a signed test delivery to the selected project webhook and inspect its status,
+                      latency, and first 500 response characters.
+                    </div>
+                  ) : null}
+                  {selectedWebhookTarget === "custom" ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">
+                        Webhook URL<span className="ml-1 text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={webhookTestUrl}
+                        onChange={(e) => setWebhookTestUrl(e.target.value)}
+                        placeholder="https://webhook.site/your-unique-id"
+                        className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                      />
+                    </div>
+                  ) : null}
+                  {selectedWebhookTarget === "custom" ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--fyxvo-text)]">Event type</label>
+                      <select
+                        value={webhookTestEvent}
+                        onChange={(e) => setWebhookTestEvent(e.target.value)}
+                        className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                      >
+                        <option value="request.completed">request.completed</option>
+                        <option value="balance.low">balance.low</option>
+                        <option value="rate_limit.warning">rate_limit.warning</option>
+                        <option value="project.activated">project.activated</option>
+                      </select>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void sendRequest()}
-                    disabled={loading || !webhookTestUrl.trim()}
+                    disabled={
+                      loading ||
+                      (selectedWebhookTarget === "custom"
+                        ? !webhookTestUrl.trim()
+                        : !portal.selectedProject || !portal.token)
+                    }
                     className="w-full rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
                   >
-                    {loading ? "Sending\u2026" : "Send Test Webhook"}
+                    {loading ? "Sending\u2026" : selectedWebhookTarget === "custom" ? "Send Test Webhook" : "Test Configured Webhook"}
                   </button>
                   {webhookTestResponse !== null && (
                     <div className="space-y-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4">
@@ -1011,9 +1097,10 @@ function PlaygroundContent() {
                           <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
                             Latency per request (ms)
                           </p>
+                          <div className="overflow-x-auto">
                           <div
                             className="flex items-end gap-1 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3"
-                            style={{ minHeight: "60px" }}
+                            style={{ minHeight: "60px", minWidth: "400px" }}
                           >
                             {benchmarkResults.map((v, i) => (
                               <div
@@ -1033,8 +1120,10 @@ function PlaygroundContent() {
                               />
                             ))}
                           </div>
+                          </div>
                         </div>
                         {stats ? (
+                          <div className="overflow-x-auto">
                           <table className="w-full text-xs">
                             <tbody className="divide-y divide-[var(--fyxvo-border)]">
                               {(
@@ -1055,6 +1144,7 @@ function PlaygroundContent() {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         ) : null}
                         {stats ? (
                           <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3 space-y-1.5">
@@ -1217,9 +1307,11 @@ function PlaygroundContent() {
                     {error ? (
                       <Notice tone="warning" title="Request failed">{error}</Notice>
                     ) : (
-                      <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-80">
-                        <code>{response}</code>
-                      </pre>
+                      <div className="overflow-x-auto">
+                        <pre className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-80" style={{ wordBreak: "break-all" }}>
+                          <code>{response}</code>
+                        </pre>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -1250,9 +1342,11 @@ function PlaygroundContent() {
                     {compareError ? (
                       <Notice tone="warning" title="Request failed">{compareError}</Notice>
                     ) : (
-                      <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-80">
-                        <code>{compareResponse}</code>
-                      </pre>
+                      <div className="overflow-x-auto">
+                        <pre className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-80" style={{ wordBreak: "break-all" }}>
+                          <code>{compareResponse}</code>
+                        </pre>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -1281,9 +1375,11 @@ function PlaygroundContent() {
                     <Notice tone="warning" title="Request failed">{error}</Notice>
                   ) : (
                     <>
-                      <pre className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-96">
-                        <code>{response}</code>
-                      </pre>
+                      <div className="overflow-x-auto">
+                        <pre className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 text-xs text-[var(--fyxvo-text)] max-h-96" style={{ wordBreak: "break-all" }}>
+                          <code>{response}</code>
+                        </pre>
+                      </div>
                       {errorExplanation && (
                         <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-4 py-3">
                           <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">{errorExplanation.name}</p>

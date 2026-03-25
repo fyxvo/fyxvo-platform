@@ -777,6 +777,11 @@ export interface ApiRepository {
   findRequestByTraceId(projectId: string, traceId: string): Promise<Record<string, unknown> | null>;
   countRecentRequests(since: Date): Promise<number>;
   getSuccessRateTrend(projectId: string, range: "24h" | "7d" | "30d"): Promise<Array<{ time: string; successRate: number }>>;
+  getFirstSuccessfulProjectRequest(projectId: string): Promise<{
+    method: string;
+    durationMs: number;
+    createdAt: string;
+  } | null>;
   transferProjectOwnership(projectId: string, newOwnerId: string, previousOwnerId: string): Promise<void>;
   listWebhookEvents(projectId: string): Promise<Array<{
     id: string;
@@ -798,6 +803,20 @@ export interface ApiRepository {
   declineInviteToken(token: string, userId: string): Promise<void>;
   upsertDigestSchedule(userId: string): Promise<void>;
   deleteDigestSchedule(userId: string): Promise<void>;
+  getPublicProjectStats(projectId: string): Promise<{
+    projectId: string;
+    totalRequests: number;
+    successRate: number;
+    avgLatencyMs: number;
+    uptime: number;
+    lastUpdated: string;
+  }>;
+  updateProjectTags(projectId: string, tags: string[]): Promise<void>;
+  getNetworkHealthCalendar(): Promise<Array<{ date: string; availability: number; color: 'green' | 'amber' | 'red' }>>;
+  findApiKeyByHash(keyHash: string): Promise<{ id: string; projectId: string; scopes: unknown; status: string; expiresAt: Date | null } | null>;
+  getLatestDigestRecord(userId: string): Promise<{ htmlContent: string; generatedAt: Date } | null>;
+  createDigestRecord(input: { userId: string; htmlContent: string }): Promise<void>;
+  findAdminUsers(): Promise<Array<{ id: string }>>;
 }
 
 export interface AdminPlatformStats {

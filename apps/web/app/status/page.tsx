@@ -17,16 +17,35 @@ import { liveDevnetState } from "../../lib/live-state";
 import { StatusRefreshIndicator } from "../../components/status-refresh-indicator";
 import { ResponseTimeTicker } from "../../components/response-time-ticker";
 import { StatusSubscribeForm } from "../../components/status-subscribe-form";
+import { StatusRegions, StatusHealthCalendar } from "../../components/status-regions";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Status — Fyxvo",
+  title: {
+    absolute: "Status — Fyxvo"
+  },
   description:
     "Live service readiness for the Fyxvo devnet control plane, gateway, and on-chain protocol accounts.",
   alternates: {
-    canonical: webEnv.statusPageUrl,
+    canonical: `${webEnv.siteUrl}/status`,
   },
+  openGraph: {
+    title: "Status — Fyxvo",
+    description:
+      "Live service readiness for the Fyxvo devnet control plane, gateway, and on-chain protocol accounts.",
+    url: `${webEnv.siteUrl}/status`,
+    siteName: "Fyxvo",
+    type: "website",
+    images: [{ url: webEnv.socialImageUrl }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Status — Fyxvo",
+    description:
+      "Live service readiness for the Fyxvo devnet control plane, gateway, and on-chain protocol accounts.",
+    images: [webEnv.socialImageUrl]
+  }
 };
 
 function percentage(value?: number) {
@@ -603,6 +622,16 @@ export default async function StatusPage() {
             })()}
           </CardContent>
         </Card>
+      </section>
+
+      {/* Gateway Regions */}
+      <section>
+        <StatusRegions />
+      </section>
+
+      {/* 30-Day Network Health Calendar */}
+      <section>
+        <StatusHealthCalendar />
       </section>
 
       {/* Subscribe to status updates */}

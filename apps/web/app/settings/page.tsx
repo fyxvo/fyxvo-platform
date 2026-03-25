@@ -220,6 +220,15 @@ export default function SettingsPage() {
   const [webhookEventsLoaded, setWebhookEventsLoaded] = useState(false);
   const [redelivering, setRedelivering] = useState<string | null>(null);
 
+  // Reputation level
+  const [reputationLevel, setReputationLevel] = useState<string | null>(null);
+
+  // Project tags
+  const [projectTags, setProjectTags] = useState<string[]>((portal.selectedProject as { tags?: string[] } | null)?.tags ?? []);
+  const [tagInput, setTagInput] = useState("");
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [tagsSaving, setTagsSaving] = useState(false);
+
   // Archive modal
   const [archiveModalOpen, setArchiveModalOpen] = useState(false);
   const [archiveReason, setArchiveReason] = useState<string | null>(null);
@@ -317,6 +326,25 @@ export default function SettingsPage() {
     setRevokingKeyId(keyId);
     try { await revokeApiKey({ projectId, apiKeyId: keyId, token: portal.token }); await portal.refresh(); } finally { setRevokingKeyId(null); }
   }
+
+  // Load reputation level
+  useEffect(() => {
+    if (!portal.token || !isAuthenticated) return;
+    void fetch(new URL("/v1/user/me", webEnv.apiBaseUrl), {
+      headers: { authorization: `Bearer ${portal.token}` },
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: unknown) => {
+        if (body && typeof body === "object" && "reputationLevel" in body) {
+          const level = (body as { reputationLevel?: unknown }).reputationLevel;
+          if (typeof level === "string") {
+            setTimeout(() => setReputationLevel(level), 0);
+          }
+        }
+      })
+      .catch(() => undefined);
+  }, [portal.token, isAuthenticated]);
 
   // Load referral stats + notification prefs
   useEffect(() => {
@@ -571,6 +599,47 @@ export default function SettingsPage() {
     localStorage.setItem("fyxvo-density", value);
   }
 
+  async function saveTags() {
+    if (!portal.selectedProject || !portal.token) return;
+    setTagsSaving(true);
+    try {
+      await fetch(
+        new URL(`/v1/projects/${portal.selectedProject.slug}/tags`, webEnv.apiBaseUrl),
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json", authorization: `Bearer ${portal.token}` },
+          body: JSON.stringify({ tags: projectTags }),
+        }
+      );
+    } finally {
+      setTagsSaving(false);
+    }
+  }
+
+  function addTag() {
+    const tag = tagInput.trim().toLowerCase();
+    if (!tag) return;
+    if (!/^[a-z0-9-]+$/.test(tag)) {
+      setTagError("Tags may only contain lowercase letters, numbers, and hyphens.");
+      return;
+    }
+    if (tag.length > 20) {
+      setTagError("Tags must be 20 characters or fewer.");
+      return;
+    }
+    if (projectTags.length >= 10) {
+      setTagError("Maximum 10 tags per project.");
+      return;
+    }
+    if (projectTags.includes(tag)) {
+      setTagError("Tag already added.");
+      return;
+    }
+    setTagError(null);
+    setProjectTags((prev) => [...prev, tag]);
+    setTagInput("");
+  }
+
   const archivedProjects = portal.projects.filter((p) => p.archivedAt != null);
   const activeProjects = portal.projects.filter((p) => p.archivedAt == null);
 
@@ -682,8 +751,59 @@ export default function SettingsPage() {
                     Member since {new Date(portal.user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                   </p>
                 ) : null}
+                {reputationLevel ? (
+                  <div className="mt-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        reputationLevel === "Operator"
+                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          : reputationLevel === "Architect"
+                            ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                            : reputationLevel === "Builder"
+                              ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                              : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
+                      }`}
+                    >
+                      {reputationLevel === "Explorer"
+                        ? "🌱"
+                        : reputationLevel === "Builder"
+                          ? "🔨"
+                          : reputationLevel === "Architect"
+                            ? "🏗️"
+                            : "⚙️"}{" "}
+                      {reputationLevel}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
+          ) : null}
+          {isAuthenticated && reputationLevel ? (
+            <SettingRow
+              label="Developer Level"
+              description="Your reputation tier on the Fyxvo network based on usage and activity."
+            >
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold ${
+                  reputationLevel === "Operator"
+                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    : reputationLevel === "Architect"
+                      ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                      : reputationLevel === "Builder"
+                        ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                        : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
+                }`}
+              >
+                {reputationLevel === "Explorer"
+                  ? "🌱"
+                  : reputationLevel === "Builder"
+                    ? "🔨"
+                    : reputationLevel === "Architect"
+                      ? "🏗️"
+                      : "⚙️"}{" "}
+                {reputationLevel}
+              </span>
+            </SettingRow>
           ) : null}
           <SettingRow label="Wallet address" description="Your primary authentication identity. Read-only.">
             {portal.walletAddress ? (
@@ -1072,6 +1192,59 @@ export default function SettingsPage() {
               <span className="text-xs text-[var(--fyxvo-text-muted)]">
                 {projectLeaderboardVisible ? "Show on public leaderboard" : "Hidden from leaderboard"}
               </span>
+            </div>
+          </SettingRow>
+          <SettingRow
+            label="Tags"
+            description="Add up to 10 tags (lowercase, letters/numbers/hyphens, max 20 chars each)."
+          >
+            <div className="space-y-3 w-full">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => { setTagInput(e.target.value); setTagError(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+                  placeholder="e.g. defi, indexing, mainnet"
+                  className="flex-1 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1.5 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                />
+                <Button variant="secondary" size="sm" onClick={addTag} disabled={!tagInput.trim()}>
+                  Add
+                </Button>
+              </div>
+              {tagError ? (
+                <p className="text-xs text-rose-500">{tagError}</p>
+              ) : null}
+              {projectTags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {projectTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2.5 py-0.5 text-xs text-[var(--fyxvo-text-muted)]"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => setProjectTags((prev) => prev.filter((t) => t !== tag))}
+                        className="text-[var(--fyxvo-text-muted)] hover:text-rose-500 transition-colors"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--fyxvo-text-muted)]">No tags yet.</p>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void saveTags()}
+                disabled={tagsSaving || !portal.selectedProject || !portal.token}
+              >
+                {tagsSaving ? "Saving tags…" : "Save tags"}
+              </Button>
             </div>
           </SettingRow>
           <SettingRow label="" description="">

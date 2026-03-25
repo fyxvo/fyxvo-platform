@@ -123,6 +123,7 @@ export interface PortalHealth {
   readonly status: string;
   readonly service: string;
   readonly timestamp: string;
+  readonly assistantAvailable?: boolean;
   readonly database?: boolean;
   readonly chain?: boolean;
   readonly protocolReady?: boolean;
@@ -165,6 +166,7 @@ export interface PortalProtocolReadiness {
 export interface PortalServiceStatus {
   readonly service: string;
   readonly environment?: string;
+  readonly assistantAvailable?: boolean;
   readonly solanaCluster?: string;
   readonly adminAuthority?: string;
   readonly authorityPlan?: {

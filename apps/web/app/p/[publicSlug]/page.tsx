@@ -13,6 +13,7 @@ interface PublicProjectData {
   totalRequests: number;
   avgLatencyMs: number;
   requestVolume7d: unknown[];
+  ownerReputationLevel?: string;
 }
 
 async function fetchPublicProject(publicSlug: string): Promise<PublicProjectData | null> {
@@ -39,17 +40,22 @@ export async function generateMetadata({
   return {
     title: `${name} — Fyxvo`,
     description: `${name} is live on Solana Devnet via Fyxvo RPC gateway. ${requests.toLocaleString()} requests served.`,
+    alternates: {
+      canonical: `${webEnv.siteUrl}/p/${publicSlug}`
+    },
     openGraph: {
       title: `${name} — Fyxvo`,
       description: `${name} is routing Solana devnet traffic via Fyxvo. ${requests.toLocaleString()} requests served.`,
-      url: `https://www.fyxvo.com/p/${publicSlug}`,
+      url: `${webEnv.siteUrl}/p/${publicSlug}`,
       siteName: "Fyxvo",
       type: "website",
+      images: [{ url: webEnv.socialImageUrl }]
     },
     twitter: {
       card: "summary",
       title: `${name} — Fyxvo`,
       description: `${name} is routing Solana devnet traffic via Fyxvo. ${requests.toLocaleString()} requests served.`,
+      images: [webEnv.socialImageUrl]
     },
   };
 }
@@ -98,8 +104,32 @@ export default async function PublicProjectPage({
 
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-[var(--fyxvo-brand)] mb-4">
-              Public project
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-[var(--fyxvo-brand)]">
+                Public project
+              </div>
+              {project.ownerReputationLevel ? (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    project.ownerReputationLevel === "Operator"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      : project.ownerReputationLevel === "Architect"
+                        ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                        : project.ownerReputationLevel === "Builder"
+                          ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                          : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
+                  }`}
+                >
+                  {project.ownerReputationLevel === "Explorer"
+                    ? "🌱"
+                    : project.ownerReputationLevel === "Builder"
+                      ? "🔨"
+                      : project.ownerReputationLevel === "Architect"
+                        ? "🏗️"
+                        : "⚙️"}{" "}
+                  {project.ownerReputationLevel}
+                </span>
+              ) : null}
             </div>
             <h1 className="font-display text-3xl font-bold text-[var(--fyxvo-text)] sm:text-4xl">
               {displayName}

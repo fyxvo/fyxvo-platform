@@ -20,6 +20,10 @@ const booleanFlagSchema = z
   .union([z.literal("true"), z.literal("false")])
   .default("false")
   .transform((value) => value === "true");
+const indexingFlagSchema = z
+  .union([z.literal("true"), z.literal("false")])
+  .default("true")
+  .transform((value) => value === "true");
 const csvUrlListSchema = z
   .string()
   .default(solanaDevnetConfig.rpcUrl)
@@ -70,7 +74,7 @@ export const apiEnvSchema = sharedEnvSchema.extend({
     .trim()
     .min(32)
     .default(solanaDevnetConfig.usdcMintAddress),
-  ANTHROPIC_API_KEY: z.string().optional()
+  ANTHROPIC_API_KEY: z.string().trim().min(1).optional().catch(undefined)
 });
 
 export const gatewayEnvSchema = sharedEnvSchema.extend({
@@ -117,7 +121,7 @@ export const webEnvSchema = z.object({
   NEXT_PUBLIC_SOLANA_CLUSTER: z.literal("devnet").default("devnet"),
   NEXT_PUBLIC_SOLANA_RPC_URL: z.url().default(solanaDevnetConfig.rpcUrl),
   NEXT_PUBLIC_ENABLE_USDC: booleanFlagSchema,
-  NEXT_PUBLIC_ALLOW_INDEXING: booleanFlagSchema
+  NEXT_PUBLIC_ALLOW_INDEXING: indexingFlagSchema
 });
 
 export type SharedEnv = z.output<typeof sharedEnvSchema>;
@@ -162,7 +166,9 @@ export function resolveAllowedCorsOrigins(input: {
   readonly WEB_ORIGIN: string;
   readonly CORS_ALLOWED_ORIGINS: readonly string[];
 }) {
-  return Array.from(new Set([input.WEB_ORIGIN, ...input.CORS_ALLOWED_ORIGINS]));
+  return Array.from(
+    new Set(["https://www.fyxvo.com", "https://fyxvo.com", input.WEB_ORIGIN, ...input.CORS_ALLOWED_ORIGINS])
+  );
 }
 
 export function assertProductionEnv(

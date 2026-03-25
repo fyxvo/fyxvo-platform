@@ -238,6 +238,19 @@ function useIsClient() {
 }
 
 // ---------------------------------------------------------------------------
+// Gateway Performance types
+// ---------------------------------------------------------------------------
+
+interface GatewayMetrics {
+  requestsPerMinute?: number;
+  averageLatencyMs?: number;
+  p95LatencyMs?: number;
+  cacheHitRate?: number;
+  circuitBreakerState?: string;
+  uptimePercent24h?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -253,6 +266,27 @@ export default function OperatorsPage() {
   // Upstream configuration (admin only)
   const [upstreams, setUpstreams] = useState<Array<{ url: string; circuitStatus: string; failureCount: number }>>([]);
   const [upstreamsLoaded, setUpstreamsLoaded] = useState(false);
+
+  // Gateway performance metrics
+  const [gatewayMetrics, setGatewayMetrics] = useState<GatewayMetrics | null>(null);
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const res = await fetch(`${apiBase}/v1/network/stats`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json() as GatewayMetrics;
+          setTimeout(() => setGatewayMetrics(data), 0);
+        }
+      } catch {
+        // metrics unavailable
+      }
+    };
+    void fetchMetrics();
+    const interval = setInterval(() => { void fetchMetrics(); }, 30000);
+    return () => clearInterval(interval);
+  }, [apiBase]);
 
   useEffect(() => {
     void fetchGatewayStatus()
@@ -363,6 +397,98 @@ export default function OperatorsPage() {
           body="The preview below shows the operator experience, and admin sessions replace it with the current platform roster from the API."
         />
       ) : null}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Gateway Performance Dashboard                                        */}
+      {/* ------------------------------------------------------------------ */}
+      <section>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Gateway Performance</CardTitle>
+            <CardDescription>
+              Live gateway metrics updated every 30 seconds. Visible to all users.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Requests/min</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {gatewayMetrics?.requestsPerMinute != null
+                    ? gatewayMetrics.requestsPerMinute.toLocaleString()
+                    : "—"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Avg Latency</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {gatewayMetrics?.averageLatencyMs != null
+                    ? `${gatewayMetrics.averageLatencyMs}ms`
+                    : "—"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">P95 Latency</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {gatewayMetrics?.p95LatencyMs != null
+                    ? `${gatewayMetrics.p95LatencyMs}ms`
+                    : "—"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Cache Hit Rate</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {gatewayMetrics?.cacheHitRate != null
+                    ? `${(gatewayMetrics.cacheHitRate * 100).toFixed(1)}%`
+                    : "—"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Circuit Breaker</div>
+                <div className="mt-2 flex items-center gap-2">
+                  {gatewayMetrics?.circuitBreakerState ? (
+                    <>
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor:
+                            gatewayMetrics.circuitBreakerState === "closed"
+                              ? "#22c55e"
+                              : gatewayMetrics.circuitBreakerState === "open"
+                                ? "#ef4444"
+                                : "#f59e0b",
+                        }}
+                        aria-hidden="true"
+                      />
+                      <span
+                        className={`text-lg font-semibold capitalize ${
+                          gatewayMetrics.circuitBreakerState === "closed"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : gatewayMetrics.circuitBreakerState === "open"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {gatewayMetrics.circuitBreakerState}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-2xl font-semibold text-[var(--fyxvo-text)]">—</span>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">24h Uptime</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {gatewayMetrics?.uptimePercent24h != null
+                    ? `${gatewayMetrics.uptimePercent24h.toFixed(2)}%`
+                    : "—"}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* Metric cards                                                         */}

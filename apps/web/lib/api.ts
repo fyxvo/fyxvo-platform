@@ -541,7 +541,7 @@ export async function deleteWebhook(projectId: string, webhookId: string, token:
 }
 
 export async function testWebhook(projectId: string, webhookId: string, token: string) {
-  return requestApi<{ success: boolean; statusCode?: number; error?: string }>(`/v1/projects/${projectId}/webhooks/${webhookId}/test`, { method: "POST" }, token);
+  return requestApi<{ success: boolean; statusCode?: number; latencyMs?: number; body?: string; error?: string }>(`/v1/projects/${projectId}/webhooks/${webhookId}/test`, { method: "POST" }, token);
 }
 
 export async function listProjectMembers(projectId: string, token: string) {

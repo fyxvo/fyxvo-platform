@@ -6,24 +6,72 @@ import type { PortalProject } from "../lib/types";
 
 interface Props {
   project: PortalProject;
+  requestSummary?: {
+    method: string;
+    latencyMs: number;
+    createdAt: string;
+  } | null;
   onDismiss: () => void;
 }
 
-export function FirstRequestCelebration({ project, onDismiss }: Props) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+function formatTimestamp(value: string): string {
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
+}
 
-  // Close on Escape
+export function FirstRequestCelebration({ project, requestSummary, onDismiss }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         onDismiss();
+        return;
+      }
+
+      if (e.key !== "Tab" || !dialogRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => !element.hasAttribute("disabled"));
+
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (!first || !last) {
+        return;
+      }
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      previousFocusRef.current?.focus();
+    };
   }, [onDismiss]);
 
-  // Trap focus inside modal on open
   useEffect(() => {
     dialogRef.current?.focus();
   }, []);
@@ -98,9 +146,38 @@ export function FirstRequestCelebration({ project, onDismiss }: Props) {
           <span className="font-medium text-[var(--fyxvo-text)]">
             {project.name}
           </span>{" "}
-          just processed its first request. The relay is working — here&apos;s
-          what to do next.
+          just processed its first request. The relay is working and the next
+          steps below adapt to the current project state.
         </p>
+
+        {requestSummary ? (
+          <div className="mt-4 grid gap-3 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 sm:grid-cols-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Method
+              </div>
+              <div className="mt-1 text-sm font-medium text-[var(--fyxvo-text)]">
+                {requestSummary.method}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Latency
+              </div>
+              <div className="mt-1 text-sm font-medium text-[var(--fyxvo-text)]">
+                {requestSummary.latencyMs}ms
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                Timestamp
+              </div>
+              <div className="mt-1 text-sm font-medium text-[var(--fyxvo-text)]">
+                {formatTimestamp(requestSummary.createdAt)}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <ul className="mt-5 space-y-3">
           <li>

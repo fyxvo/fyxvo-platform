@@ -171,6 +171,8 @@ async function sendGatewayError(
 
 const STARTUP_TIME_MS = Date.now();
 
+const gatewayRegion = process.env.GATEWAY_REGION ?? 'us-east-1';
+
 const CACHE_TTL_MS: Record<string, number> = {
   getHealth: 10_000,
   getSlot: 500,
@@ -908,6 +910,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
     reply.status(ok ? 200 : 503).send({
       status: ok ? "ok" : "degraded",
       service: "gateway",
+      region: gatewayRegion,
       uptime: Math.floor(uptimeMs / 1000),
       solanaCluster: input.env.SOLANA_CLUSTER,
       requests: {
@@ -948,6 +951,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
     return {
       service: "fyxvo-gateway",
       environment: input.env.FYXVO_ENV,
+      region: gatewayRegion,
       solanaCluster: input.env.SOLANA_CLUSTER,
       programId: input.env.FYXVO_PROGRAM_ID,
       controlPlaneOrigin: input.env.API_ORIGIN,

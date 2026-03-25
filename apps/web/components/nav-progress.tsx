@@ -8,8 +8,6 @@ export function NavProgress() {
   const searchParams = useSearchParams();
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevRoute = useRef(`${pathname}${searchParams.toString()}`);
 
   useEffect(() => {
@@ -17,27 +15,21 @@ export function NavProgress() {
     if (currentRoute === prevRoute.current) return;
     prevRoute.current = currentRoute;
 
-    const timer = timerRef.current;
-    const interval = intervalRef.current;
-    if (timer) clearTimeout(timer);
-    if (interval) clearInterval(interval);
+    let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Complete any in-progress animation via microtask to avoid sync setState in effect
-    const t = setTimeout(() => {
+    const completeTimer = setTimeout(() => {
       setProgress(100);
       setVisible(true);
-      timerRef.current = setTimeout(() => {
+
+      resetTimer = setTimeout(() => {
         setVisible(false);
         setProgress(0);
       }, 300);
     }, 0);
-    timerRef.current = t;
 
-    const capturedInterval = intervalRef.current;
     return () => {
-      clearTimeout(t);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (capturedInterval) clearInterval(capturedInterval);
+      clearTimeout(completeTimer);
+      if (resetTimer) clearTimeout(resetTimer);
     };
   }, [pathname, searchParams]);
 
