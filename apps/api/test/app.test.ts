@@ -1463,9 +1463,11 @@ describe("Fyxvo API service", () => {
     expect(healthResponse.statusCode).toBe(200);
     expect(healthResponse.json()).toMatchObject({
       status: "ok",
-      service: "api",
+      service: "fyxvo-api",
+      version: "v1",
       assistantAvailable: false
     });
+    expect(healthResponse.json().timestamp).toEqual(expect.any(String));
 
     const statusResponse = await healthyContext.app.inject({
       method: "GET",
@@ -1473,7 +1475,9 @@ describe("Fyxvo API service", () => {
     });
     expect(statusResponse.statusCode).toBe(200);
     expect(statusResponse.json()).toMatchObject({
+      status: "ok",
       service: "fyxvo-api",
+      version: "v1",
       environment: "test",
       assistantAvailable: false,
       solanaCluster: "devnet",
@@ -1483,6 +1487,7 @@ describe("Fyxvo API service", () => {
         pauseAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem"
       }
     });
+    expect(statusResponse.json().timestamp).toEqual(expect.any(String));
 
     const limitedContext = await createTestApp({
       rateLimitMax: 1
@@ -1540,6 +1545,8 @@ describe("Fyxvo API service", () => {
       url: "/health"
     });
     expect(healthResponse.json()).toMatchObject({
+      service: "fyxvo-api",
+      version: "v1",
       assistantAvailable: true
     });
 
@@ -1548,6 +1555,8 @@ describe("Fyxvo API service", () => {
       url: "/v1/status"
     });
     expect(statusResponse.json()).toMatchObject({
+      status: "ok",
+      version: "v1",
       assistantAvailable: true
     });
 

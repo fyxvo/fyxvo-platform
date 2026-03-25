@@ -53,6 +53,8 @@ class HttpError extends Error {
   }
 }
 
+const API_STATUS_VERSION = "v1";
+
 const challengeSchema = z.object({
   walletAddress: z.string().trim().min(32)
 });
@@ -742,7 +744,8 @@ export async function buildApiApp(input: {
 
     return {
       status: overallOk ? "ok" : "degraded",
-      service: "api",
+      service: "fyxvo-api",
+      version: API_STATUS_VERSION,
       uptime: Math.round(uptime),
       assistantAvailable: isAssistantConfigured(input.env),
       dependencies: {
@@ -761,8 +764,12 @@ export async function buildApiApp(input: {
       source: process.env,
       protocolAuthorityFallback: input.env.FYXVO_ADMIN_AUTHORITY
     });
+    const overallStatus = readiness?.ready === false ? "degraded" : "ok";
     return {
+      status: overallStatus,
       service: "fyxvo-api",
+      version: API_STATUS_VERSION,
+      timestamp: new Date().toISOString(),
       environment: input.env.FYXVO_ENV,
       region: process.env.GATEWAY_REGION ?? 'us-east-1',
       assistantAvailable: isAssistantConfigured(input.env),

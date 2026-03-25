@@ -10,6 +10,7 @@ import { webEnv } from "../../lib/env";
 import {
   clearAssistantConversation,
   createAssistantConversation,
+  fetchApiHealth,
   fetchApiStatus,
   getAssistantConversation,
   getAssistantRateLimitStatus,
@@ -265,14 +266,24 @@ export default function AssistantPage() {
   useEffect(() => {
     let cancelled = false;
 
-    fetchApiStatus()
-      .then((data) => {
+    Promise.allSettled([fetchApiHealth(), fetchApiStatus()])
+      .then(([healthResult, statusResult]) => {
         if (cancelled) return;
-        setAssistantAvailable(data.assistantAvailable ?? false);
+
+        const availability =
+          statusResult.status === "fulfilled" && typeof statusResult.value.assistantAvailable === "boolean"
+            ? statusResult.value.assistantAvailable
+            : healthResult.status === "fulfilled" && typeof healthResult.value.assistantAvailable === "boolean"
+              ? healthResult.value.assistantAvailable
+              : null;
+
+        setAssistantAvailable(availability);
         setAssistantStatusMessage(
-          data.assistantAvailable === false
-            ? "The AI assistant is currently unavailable. Please check back after the next deployment."
-            : null
+          availability === false
+            ? "The AI assistant is currently unavailable. Please check back shortly."
+            : availability === null
+              ? "Fyxvo could not verify assistant availability right now. You can still try sending a message."
+              : null
         );
       })
       .catch(() => {

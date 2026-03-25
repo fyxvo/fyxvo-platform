@@ -122,6 +122,7 @@ export type LaunchEventName =
 export interface PortalHealth {
   readonly status: string;
   readonly service: string;
+  readonly version?: string;
   readonly timestamp: string;
   readonly assistantAvailable?: boolean;
   readonly database?: boolean;
@@ -164,7 +165,10 @@ export interface PortalProtocolReadiness {
 }
 
 export interface PortalServiceStatus {
+  readonly status?: string;
   readonly service: string;
+  readonly version?: string;
+  readonly timestamp?: string;
   readonly environment?: string;
   readonly assistantAvailable?: boolean;
   readonly solanaCluster?: string;
