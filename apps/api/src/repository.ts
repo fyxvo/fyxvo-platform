@@ -9,6 +9,9 @@ import {
 import type {
   ActivityLogItem,
   AssistantConversationDetail,
+  AssistantMessageFeedback,
+  AssistantPlaygroundPayload,
+  AssistantSuggestedAction,
   AssistantConversationSummary,
   AdminOverviewBase,
   AdminStats,
@@ -138,6 +141,66 @@ function mapAssistantConversationSummary(row: {
     messageCount: row._count?.messages ?? 0,
   };
 }
+
+function mapAssistantFeedback(row: {
+  id: string;
+  rating: string;
+  note: string | null;
+  createdAt: Date;
+}): AssistantMessageFeedback {
+  return {
+    id: row.id,
+    rating: row.rating as "up" | "down",
+    note: row.note,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapAssistantMessage(row: {
+  id: string;
+  role: string;
+  content: string;
+  createdAt: Date;
+  projectId?: string | null;
+  matchedDocsSection?: string | null;
+  suggestedActions?: Prisma.JsonValue | null;
+  playgroundPayload?: Prisma.JsonValue | null;
+  promptCategory?: string | null;
+  responseTimeMs?: number | null;
+  inputTokenEstimate?: number | null;
+  outputTokenEstimate?: number | null;
+  feedback?: {
+    id: string;
+    rating: string;
+    note: string | null;
+    createdAt: Date;
+  } | null;
+}) {
+  return {
+    id: row.id,
+    role: row.role as "user" | "assistant",
+    content: row.content,
+    createdAt: row.createdAt.toISOString(),
+    projectId: row.projectId ?? null,
+    matchedDocsSection: row.matchedDocsSection ?? null,
+    suggestedActions: (row.suggestedActions as AssistantSuggestedAction[] | null | undefined) ?? [],
+    playgroundPayload: (row.playgroundPayload as AssistantPlaygroundPayload | null | undefined) ?? null,
+    promptCategory: row.promptCategory ?? null,
+    responseTimeMs: row.responseTimeMs ?? null,
+    inputTokenEstimate: row.inputTokenEstimate ?? null,
+    outputTokenEstimate: row.outputTokenEstimate ?? null,
+    feedback: row.feedback ? mapAssistantFeedback(row.feedback) : null,
+  };
+}
+
+type AssistantFeedbackRow = {
+  id: string;
+  rating: string;
+  note: string | null;
+  createdAt: Date;
+  conversationId: string;
+  messageId: string;
+};
 
 export class PrismaApiRepository implements ApiRepository {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -1251,11 +1314,136 @@ export class PrismaApiRepository implements ApiRepository {
   }
 
   async getAssistantStats(): Promise<AssistantStats> {
+    const now = new Date();
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const startOfWeek = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const assistantRoute = "/v1/assistant/chat";
+
+    const [requestsToday, requestsThisWeek, responseTimeAggregate, rateLimitHitsToday, recentLogs, assistantMessages, feedbackRows] =
+      await Promise.all([
+        this.prisma.requestLog.count({
+          where: {
+            route: assistantRoute,
+            statusCode: { lt: 400 },
+            createdAt: { gte: startOfToday },
+          },
+        }),
+        this.prisma.requestLog.count({
+          where: {
+            route: assistantRoute,
+            statusCode: { lt: 400 },
+            createdAt: { gte: startOfWeek },
+          },
+        }),
+        this.prisma.requestLog.aggregate({
+          where: {
+            route: assistantRoute,
+            statusCode: { lt: 400 },
+            createdAt: { gte: startOfWeek },
+          },
+          _avg: { durationMs: true },
+        }),
+        this.prisma.requestLog.count({
+          where: {
+            route: assistantRoute,
+            statusCode: 429,
+            createdAt: { gte: startOfToday },
+          },
+        }),
+        this.prisma.requestLog.findMany({
+          where: {
+            route: assistantRoute,
+            statusCode: { lt: 400 },
+            createdAt: { gte: startOfWeek },
+          },
+          select: { createdAt: true },
+        }),
+        this.prisma.assistantMessage.findMany({
+          where: {
+            role: "assistant",
+            createdAt: { gte: startOfWeek },
+          },
+          select: {
+            matchedDocsSection: true,
+            promptCategory: true,
+            outputTokenEstimate: true,
+          },
+        }),
+        this.prisma.assistantFeedback.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: {
+            id: true,
+            rating: true,
+            note: true,
+            createdAt: true,
+            conversationId: true,
+            messageId: true,
+          },
+        }),
+      ]);
+
+    const countsByDay = new Map<string, number>();
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const date = new Date(startOfToday.getTime() - offset * 24 * 60 * 60 * 1000);
+      countsByDay.set(date.toISOString().slice(0, 10), 0);
+    }
+    for (const row of recentLogs) {
+      const key = row.createdAt.toISOString().slice(0, 10);
+      countsByDay.set(key, (countsByDay.get(key) ?? 0) + 1);
+    }
+
+    const promptCategories = new Map<string, number>();
+    const docsSections = new Map<string, number>();
+    let outputTokenTotal = 0;
+    let outputTokenCount = 0;
+    for (const message of assistantMessages) {
+      if (message.promptCategory) {
+        promptCategories.set(message.promptCategory, (promptCategories.get(message.promptCategory) ?? 0) + 1);
+      }
+      if (message.matchedDocsSection) {
+        docsSections.set(message.matchedDocsSection, (docsSections.get(message.matchedDocsSection) ?? 0) + 1);
+      }
+      if (typeof message.outputTokenEstimate === "number") {
+        outputTokenTotal += message.outputTokenEstimate;
+        outputTokenCount += 1;
+      }
+    }
+
+    const [positive, negative, withNotes] = await Promise.all([
+      this.prisma.assistantFeedback.count({ where: { rating: "up" } }),
+      this.prisma.assistantFeedback.count({ where: { rating: "down" } }),
+      this.prisma.assistantFeedback.count({ where: { note: { not: null } } }),
+    ]);
+
     return {
-      requestsToday: 0,
-      requestsThisWeek: 0,
-      averageResponseTimeMs: 0,
-      rateLimitHitsToday: 0,
+      requestsToday,
+      requestsThisWeek,
+      averageResponseTimeMs: Math.round(responseTimeAggregate._avg.durationMs ?? 0),
+      averageTokensPerResponse: outputTokenCount > 0 ? Math.round(outputTokenTotal / outputTokenCount) : 0,
+      rateLimitHitsToday,
+      messagesPerDay: [...countsByDay.entries()].map(([date, count]) => ({ date, count })),
+      topPromptCategories: [...promptCategories.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 5)
+        .map(([category, count]) => ({ category, count })),
+      topLinkedDocsSections: [...docsSections.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 5)
+        .map(([section, count]) => ({ section, count })),
+      feedback: {
+        positive,
+        negative,
+        withNotes,
+        recent: feedbackRows.map((row: AssistantFeedbackRow) => ({
+          id: row.id,
+          rating: row.rating as "up" | "down",
+          note: row.note,
+          createdAt: row.createdAt.toISOString(),
+          conversationId: row.conversationId,
+          messageId: row.messageId,
+        })),
+      },
     };
   }
 
@@ -1638,23 +1826,19 @@ export class PrismaApiRepository implements ApiRepository {
       where: { id: conversationId, userId },
       include: {
         _count: { select: { messages: true } },
-        messages: { orderBy: { createdAt: "asc" }, take: 50 },
+        messages: {
+          orderBy: { createdAt: "asc" },
+          take: 50,
+          include: {
+            feedback: true,
+          },
+        },
       },
     });
     if (!row) return null;
     return {
       ...mapAssistantConversationSummary(row),
-      messages: row.messages.map((message: {
-        id: string;
-        role: string;
-        content: string;
-        createdAt: Date;
-      }) => ({
-        id: message.id,
-        role: message.role as "user" | "assistant",
-        content: message.content,
-        createdAt: message.createdAt.toISOString(),
-      })),
+      messages: row.messages.map((message) => mapAssistantMessage(message)),
     };
   }
 
@@ -1673,7 +1857,18 @@ export class PrismaApiRepository implements ApiRepository {
     userId: string;
     conversationId?: string;
     titleFromFirstUserMessage?: string;
-    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    messages: Array<{
+      role: "user" | "assistant";
+      content: string;
+      projectId?: string | null;
+      matchedDocsSection?: string | null;
+      suggestedActions?: readonly AssistantSuggestedAction[] | null;
+      playgroundPayload?: AssistantPlaygroundPayload | null;
+      promptCategory?: string | null;
+      responseTimeMs?: number | null;
+      inputTokenEstimate?: number | null;
+      outputTokenEstimate?: number | null;
+    }>;
   }): Promise<AssistantConversationDetail> {
     const titleSource =
       input.titleFromFirstUserMessage?.trim() ||
@@ -1696,21 +1891,57 @@ export class PrismaApiRepository implements ApiRepository {
     })).id;
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.assistantMessage.deleteMany({ where: { conversationId } });
-      if (input.messages.length > 0) {
+      const cappedMessages = input.messages.slice(-50);
+      const existingMessages = await tx.assistantMessage.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: "asc" },
+        include: { feedback: true },
+      });
+
+      const isPrefixMatch =
+        existingMessages.length <= cappedMessages.length &&
+        existingMessages.every((message, index) => {
+          const candidate = cappedMessages[index];
+          return candidate?.role === message.role && candidate?.content === message.content;
+        });
+
+      if (!isPrefixMatch) {
+        await tx.assistantMessage.deleteMany({ where: { conversationId } });
+      }
+
+      const messagesToCreate = isPrefixMatch ? cappedMessages.slice(existingMessages.length) : cappedMessages;
+      if (messagesToCreate.length > 0) {
         await tx.assistantMessage.createMany({
-          data: input.messages.slice(-50).map((message) => ({
+          data: messagesToCreate.map((message) => ({
             conversationId,
             role: message.role,
             content: message.content,
+            projectId: message.projectId ?? null,
+            matchedDocsSection: message.matchedDocsSection ?? null,
+            ...(message.suggestedActions
+              ? {
+                  suggestedActions: message.suggestedActions as unknown as PrismaNamespace.InputJsonValue,
+                }
+              : {}),
+            ...(message.playgroundPayload
+              ? {
+                  playgroundPayload: message.playgroundPayload as unknown as PrismaNamespace.InputJsonValue,
+                }
+              : {}),
+            promptCategory: message.promptCategory ?? null,
+            responseTimeMs: message.responseTimeMs ?? null,
+            inputTokenEstimate: message.inputTokenEstimate ?? null,
+            outputTokenEstimate: message.outputTokenEstimate ?? null,
           })),
         });
       }
+
+      const lastMessage = cappedMessages.at(-1);
       await tx.assistantConversation.update({
         where: { id: conversationId },
         data: {
           title,
-          lastMessageAt: new Date(),
+          ...(lastMessage ? { lastMessageAt: new Date() } : {}),
         },
       });
     });
@@ -1726,6 +1957,45 @@ export class PrismaApiRepository implements ApiRepository {
     await this.prisma.assistantConversation.deleteMany({
       where: { id: conversationId, userId },
     });
+  }
+
+  async upsertAssistantFeedback(input: {
+    userId: string;
+    conversationId: string;
+    messageId: string;
+    rating: "up" | "down";
+    note?: string | null;
+  }): Promise<AssistantMessageFeedback> {
+    const message = await this.prisma.assistantMessage.findFirst({
+      where: {
+        id: input.messageId,
+        role: "assistant",
+        conversationId: input.conversationId,
+        conversation: { userId: input.userId },
+      },
+      select: { id: true, conversationId: true },
+    });
+
+    if (!message) {
+      throw new Error("Assistant message not found for feedback.");
+    }
+
+    const feedback = await this.prisma.assistantFeedback.upsert({
+      where: { messageId: input.messageId },
+      update: {
+        rating: input.rating,
+        note: input.note?.trim() ? input.note.trim() : null,
+      },
+      create: {
+        userId: input.userId,
+        conversationId: input.conversationId,
+        messageId: input.messageId,
+        rating: input.rating,
+        note: input.note?.trim() ? input.note.trim() : null,
+      },
+    });
+
+    return mapAssistantFeedback(feedback);
   }
 
   async getWhatsNew(userId: string): Promise<WhatsNewItem | null> {

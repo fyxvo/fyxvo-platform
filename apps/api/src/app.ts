@@ -472,6 +472,163 @@ function assistantConversationTitleFromMessage(message: string): string {
   return `${normalized.slice(0, 57).trimEnd()}...`;
 }
 
+type AssistantProjectContext = {
+  projectId?: string | undefined;
+  projectName?: string | undefined;
+  projectNames?: string[] | undefined;
+  balance?: string | undefined;
+  totalBalanceSol?: number | undefined;
+  requestCount?: number | undefined;
+  requestsLast7Days?: number | undefined;
+  successRate?: number | undefined;
+  gatewayStatus?: string | undefined;
+  activationStatus?: string | undefined;
+  latestApiKeyMasked?: string | undefined;
+  simulationModeAvailable?: boolean | undefined;
+  activeAnnouncements?: string[] | undefined;
+};
+
+function sanitizeAssistantProjectContext(context: AssistantProjectContext): AssistantProjectContext {
+  return Object.fromEntries(
+    Object.entries(context).filter(([, value]) => value !== undefined)
+  ) as AssistantProjectContext;
+}
+
+type AssistantUiAction = {
+  id: string;
+  label: string;
+  href: string;
+  kind: "playground" | "funding" | "api_keys" | "analytics" | "docs" | "invite" | "project";
+};
+
+type AssistantPlaygroundPayload = {
+  method: string;
+  params?: Record<string, string>;
+  snippet?: string;
+  mode?: "standard" | "priority";
+  simulate?: boolean;
+};
+
+const ASSISTANT_DOCS_LINKS = {
+  quickstart: { href: "/docs#quickstart", label: "Open quickstart" },
+  authentication: { href: "/docs#authentication", label: "Open auth docs" },
+  funding: { href: "/docs#funding", label: "Open funding docs" },
+  "priority-relay": { href: "/docs#priority-relay", label: "Open priority relay docs" },
+  analytics: { href: "/docs#analytics", label: "Open analytics docs" },
+  webhooks: { href: "/docs#webhooks", label: "Open webhook docs" },
+  "simulation-mode": { href: "/docs#simulation-mode", label: "Open simulation docs" },
+  pricing: { href: "/pricing", label: "Open pricing" },
+} as const;
+
+function detectAssistantDocsSection(content: string): keyof typeof ASSISTANT_DOCS_LINKS | null {
+  const lower = content.toLowerCase();
+  if (lower.includes("pricing") || lower.includes("lamport")) return "pricing";
+  if (lower.includes("webhook")) return "webhooks";
+  if (lower.includes("api key") || lower.includes("x-api-key") || lower.includes("authentication")) return "authentication";
+  if (lower.includes("fund") || lower.includes("treasury") || lower.includes("devnet sol")) return "funding";
+  if (lower.includes("priority")) return "priority-relay";
+  if (lower.includes("analytics") || lower.includes("latency") || lower.includes("request log")) return "analytics";
+  if (lower.includes("simulation")) return "simulation-mode";
+  if (lower.includes("quickstart") || lower.includes("first request")) return "quickstart";
+  return null;
+}
+
+function firstAssistantCodeBlock(content: string): string | null {
+  const match = content.match(/```[\w-]*\n([\s\S]*?)```/);
+  return match?.[1]?.trim() ?? null;
+}
+
+function detectAssistantPlaygroundPayload(content: string): AssistantPlaygroundPayload | null {
+  const block = firstAssistantCodeBlock(content) ?? content;
+  const methodMatch =
+    block.match(/"method"\s*:\s*"([^"]+)"/) ??
+    block.match(/\b(getHealth|getSlot|getLatestBlockhash|getBalance|getAccountInfo|getEpochInfo|simulateTransaction|getVersion)\b/);
+  if (!methodMatch) return null;
+
+  const method = methodMatch[1]!;
+  const params: Record<string, string> = {};
+  if (method === "getBalance" || method === "getAccountInfo") {
+    const keyMatch = block.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/);
+    if (keyMatch) {
+      params.pubkey = keyMatch[0];
+    }
+  }
+  if (method === "simulateTransaction") {
+    params.signature = "";
+  }
+
+  const mode = /\/priority\b|priority relay|priority endpoint/i.test(block) ? "priority" : "standard";
+  const simulate =
+    /simulate=true|simulation mode|simulated response|method-not-simulated/i.test(block) || method === "simulateTransaction";
+  return {
+    method,
+    params,
+    snippet: block,
+    mode,
+    simulate,
+  };
+}
+
+function inferAssistantPromptCategory(input: string): string {
+  const lower = input.toLowerCase();
+  if (/(first request|quickstart|getting started|how do i start)/.test(lower)) return "getting_started";
+  if (/(fund|pricing|lamport|devnet sol|cost|volume discount)/.test(lower)) return "funding_pricing";
+  if (/(rpc|priority|relay|getlatestblockhash|getbalance|getaccountinfo|json-rpc)/.test(lower)) return "rpc_relay";
+  if (/(debug|error|trace|failed|401|429|500|503|issue|broken)/.test(lower)) return "debugging";
+  if (/(analytics|latency|requests|traffic|dashboard|metrics)/.test(lower)) return "analytics";
+  return "general";
+}
+
+function inferAssistantSuggestedActions(input: {
+  content: string;
+  projectContext?: AssistantProjectContext | undefined;
+  docsSection: keyof typeof ASSISTANT_DOCS_LINKS | null;
+  playgroundPayload: AssistantPlaygroundPayload | null;
+}): AssistantUiAction[] {
+  const actions = new Map<string, AssistantUiAction>();
+  const lower = input.content.toLowerCase();
+
+  const add = (action: AssistantUiAction | null) => {
+    if (!action) return;
+    actions.set(action.id, action);
+  };
+
+  if (input.playgroundPayload) {
+    add({ id: "open_playground", label: "Open playground", href: "/playground", kind: "playground" });
+  }
+
+  if (input.docsSection) {
+    const docs = ASSISTANT_DOCS_LINKS[input.docsSection];
+    add({ id: `docs_${input.docsSection}`, label: docs.label, href: docs.href, kind: "docs" });
+  }
+
+  if (lower.includes("api key") || lower.includes("x-api-key") || lower.includes("authentication")) {
+    add({ id: "open_api_keys", label: "Open API keys", href: "/api-keys", kind: "api_keys" });
+  }
+
+  if (lower.includes("fund") || lower.includes("treasury") || lower.includes("devnet sol")) {
+    add({ id: "open_funding", label: "Open funding page", href: "/funding", kind: "funding" });
+  }
+
+  if (lower.includes("analytics") || lower.includes("latency") || lower.includes("request log")) {
+    add({ id: "open_analytics", label: "Open analytics", href: "/analytics", kind: "analytics" });
+  }
+
+  if (lower.includes("invite") || lower.includes("team") || lower.includes("collabor")) {
+    add({ id: "invite_teammate", label: "Invite teammate", href: "/settings", kind: "invite" });
+  }
+
+  if (!input.projectContext?.latestApiKeyMasked && input.projectContext?.projectId) {
+    add({ id: "create_api_key", label: "Create API key", href: "/api-keys", kind: "api_keys" });
+  }
+
+  if (input.projectContext?.activationStatus !== "activated" && input.projectContext?.projectId) {
+    add({ id: "open_project", label: "Open project", href: "/dashboard", kind: "project" });
+  }
+
+  return [...actions.values()].slice(0, 4);
+}
+
 async function withIdempotency<T extends Record<string, unknown>>(
   repository: ApiRepository,
   request: FastifyRequest,
@@ -1921,6 +2078,7 @@ export async function buildApiApp(input: {
       content: z.string().min(1).max(8000),
     })).min(1).max(50),
     projectContext: z.object({
+      projectId: z.string().uuid().optional(),
       projectName: z.string().optional(),
       projectNames: z.array(z.string()).optional(),
       balance: z.string().optional(),
@@ -1929,6 +2087,9 @@ export async function buildApiApp(input: {
       requestsLast7Days: z.number().optional(),
       successRate: z.number().optional(),
       gatewayStatus: z.string().optional(),
+      activationStatus: z.string().optional(),
+      latestApiKeyMasked: z.string().optional(),
+      simulationModeAvailable: z.boolean().optional(),
       activeAnnouncements: z.array(z.string()).optional(),
     }).optional(),
   });
@@ -1975,6 +2136,26 @@ export async function buildApiApp(input: {
     return reply.status(204).send();
   });
 
+  app.post("/v1/assistant/messages/:messageId/feedback", async (request, reply) => {
+    const user = requireUser(request);
+    const params = z.object({ messageId: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      conversationId: z.string().uuid(),
+      rating: z.enum(["up", "down"]),
+      note: z.string().trim().max(280).optional().nullable(),
+    }).parse(request.body);
+
+    const item = await input.repository.upsertAssistantFeedback({
+      userId: user.id,
+      conversationId: body.conversationId,
+      messageId: params.messageId,
+      rating: body.rating,
+      ...(body.note !== undefined ? { note: body.note } : {}),
+    });
+
+    return reply.status(201).send({ item });
+  });
+
   app.post("/v1/assistant/chat", async (request, reply) => {
     const user = requireUser(request);
 
@@ -2010,6 +2191,16 @@ export async function buildApiApp(input: {
     const projects = await input.repository.listProjects(user);
     const openIncidents = (await input.repository.listIncidents(10)).filter((incident) => !incident.resolvedAt);
     const activeAnnouncement = await input.repository.getActiveAnnouncement();
+    const selectedProject =
+      projectContext?.projectId
+        ? projects.find((project) => project.id === projectContext.projectId) ?? null
+        : null;
+    const selectedProjectApiKeys =
+      selectedProject ? await input.repository.listApiKeys(selectedProject.id).catch(() => []) : [];
+    const latestSelectedApiKey = selectedProjectApiKeys
+      .slice()
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
+    const latestSelectedApiKeyMasked = latestSelectedApiKey ? `${latestSelectedApiKey.prefix}••••` : null;
     const liveContextLines = [
       `- Projects in workspace: ${projects.length}`,
       projects.length > 0
@@ -2017,7 +2208,10 @@ export async function buildApiApp(input: {
         : "- Project names: none yet",
       `- Activated projects: ${projects.filter((project) => Boolean(project.onChainProjectPda)).length}/${projects.length}`,
       `- Projects with funding events: ${projects.filter((project) => (project._count?.fundingRequests ?? 0) > 0).length}/${projects.length}`,
+      selectedProject ? `- Selected project: ${selectedProject.name}` : null,
+      selectedProject ? `- Selected project activation status: ${projectContext?.activationStatus ?? "unknown"}` : null,
       projectContext?.balance ? `- Selected project funded SOL balance: ${projectContext.balance}` : null,
+      latestSelectedApiKeyMasked ? `- Latest selected project API key: ${latestSelectedApiKeyMasked}` : "- Latest selected project API key: none yet",
       projectContext?.totalBalanceSol !== undefined
         ? `- Total funded SOL balance across projects: ${projectContext.totalBalanceSol.toFixed(4)} SOL`
         : null,
@@ -2343,6 +2537,21 @@ ${liveContextLines.join("\n")}
 
       const durationMs = Date.now() - requestStart;
       const inputTokenEstimate = messages.reduce((acc, m) => acc + Math.ceil(m.content.length / 4), 0);
+      const lastUserMessage = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+      const matchedDocsSection = detectAssistantDocsSection(assistantText);
+      const playgroundPayload = detectAssistantPlaygroundPayload(assistantText);
+      const suggestedActions = inferAssistantSuggestedActions({
+        content: assistantText,
+        projectContext: projectContext
+          ? sanitizeAssistantProjectContext({
+              ...projectContext,
+              ...(latestSelectedApiKeyMasked ? { latestApiKeyMasked: latestSelectedApiKeyMasked } : {}),
+            })
+          : undefined,
+        docsSection: matchedDocsSection,
+        playgroundPayload,
+      });
+      const promptCategory = inferAssistantPromptCategory(lastUserMessage);
       app.log.info({
         event: "assistant.chat.success",
         hashedUserId,
@@ -2360,7 +2569,21 @@ ${liveContextLines.join("\n")}
         titleFromFirstUserMessage: assistantConversationTitleFromMessage(
           messages.find((message) => message.role === "user")?.content ?? ""
         ),
-        messages: [...messages, { role: "assistant", content: assistantText || "No assistant response was returned." }],
+        messages: [
+          ...messages,
+          {
+            role: "assistant",
+            content: assistantText || "No assistant response was returned.",
+            projectId: selectedProject?.id ?? projectContext?.projectId ?? null,
+            matchedDocsSection,
+            suggestedActions,
+            playgroundPayload,
+            promptCategory,
+            responseTimeMs: durationMs,
+            inputTokenEstimate,
+            outputTokenEstimate,
+          },
+        ],
       });
 
       reply.raw.write("data: [DONE]\n\n");

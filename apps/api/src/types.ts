@@ -527,11 +527,49 @@ export interface AssistantConversationSummary {
   readonly messageCount: number;
 }
 
+export interface AssistantSuggestedAction {
+  readonly id: string;
+  readonly label: string;
+  readonly href: string;
+  readonly kind:
+    | "playground"
+    | "funding"
+    | "api_keys"
+    | "analytics"
+    | "docs"
+    | "invite"
+    | "project";
+}
+
+export interface AssistantPlaygroundPayload {
+  readonly method: string;
+  readonly params?: Record<string, string>;
+  readonly snippet?: string;
+  readonly mode?: "standard" | "priority";
+  readonly simulate?: boolean;
+}
+
+export interface AssistantMessageFeedback {
+  readonly id: string;
+  readonly rating: "up" | "down";
+  readonly note: string | null;
+  readonly createdAt: string;
+}
+
 export interface AssistantConversationMessage {
   readonly id: string;
   readonly role: "user" | "assistant";
   readonly content: string;
   readonly createdAt: string;
+  readonly projectId?: string | null;
+  readonly matchedDocsSection?: string | null;
+  readonly suggestedActions?: readonly AssistantSuggestedAction[];
+  readonly playgroundPayload?: AssistantPlaygroundPayload | null;
+  readonly promptCategory?: string | null;
+  readonly responseTimeMs?: number | null;
+  readonly inputTokenEstimate?: number | null;
+  readonly outputTokenEstimate?: number | null;
+  readonly feedback?: AssistantMessageFeedback | null;
 }
 
 export interface AssistantConversationDetail extends AssistantConversationSummary {
@@ -751,8 +789,26 @@ export interface ApiRepository {
     userId: string;
     conversationId?: string;
     titleFromFirstUserMessage?: string;
-    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    messages: Array<{
+      role: "user" | "assistant";
+      content: string;
+      projectId?: string | null;
+      matchedDocsSection?: string | null;
+      suggestedActions?: readonly AssistantSuggestedAction[] | null;
+      playgroundPayload?: AssistantPlaygroundPayload | null;
+      promptCategory?: string | null;
+      responseTimeMs?: number | null;
+      inputTokenEstimate?: number | null;
+      outputTokenEstimate?: number | null;
+    }>;
   }): Promise<AssistantConversationDetail>;
+  upsertAssistantFeedback(input: {
+    userId: string;
+    conversationId: string;
+    messageId: string;
+    rating: "up" | "down";
+    note?: string | null;
+  }): Promise<AssistantMessageFeedback>;
   clearAssistantConversation(userId: string, conversationId: string): Promise<void>;
   getWhatsNew(userId: string): Promise<WhatsNewItem | null>;
   dismissWhatsNew(userId: string, version: string): Promise<void>;
@@ -934,7 +990,33 @@ export interface AssistantStats {
   readonly requestsToday: number;
   readonly requestsThisWeek: number;
   readonly averageResponseTimeMs: number;
+  readonly averageTokensPerResponse: number;
   readonly rateLimitHitsToday: number;
+  readonly messagesPerDay: ReadonlyArray<{
+    readonly date: string;
+    readonly count: number;
+  }>;
+  readonly topPromptCategories: ReadonlyArray<{
+    readonly category: string;
+    readonly count: number;
+  }>;
+  readonly topLinkedDocsSections: ReadonlyArray<{
+    readonly section: string;
+    readonly count: number;
+  }>;
+  readonly feedback: {
+    readonly positive: number;
+    readonly negative: number;
+    readonly withNotes: number;
+    readonly recent: ReadonlyArray<{
+      readonly id: string;
+      readonly rating: "up" | "down";
+      readonly note: string | null;
+      readonly createdAt: string;
+      readonly conversationId: string;
+      readonly messageId: string;
+    }>;
+  };
 }
 
 export interface BlockchainClient {

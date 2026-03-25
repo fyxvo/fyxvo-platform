@@ -5,15 +5,19 @@ import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "AI Assistant — Fyxvo"
+    absolute: "Fyxvo Assistant — Solana Help, Debugging, and Workspace Context"
   },
-  description: "Ask the Fyxvo AI assistant anything about Solana development, RPC methods, or integrating the Fyxvo gateway.",
+  description: "Use the Fyxvo Assistant for Solana RPC guidance, debugging help, workspace-aware onboarding, and live platform context tied to your authenticated project session.",
+  robots: {
+    index: false,
+    follow: false,
+  },
   alternates: {
     canonical: `${webEnv.siteUrl}/assistant`
   },
   openGraph: {
-    title: "AI Assistant — Fyxvo",
-    description: "Ask the Fyxvo AI assistant anything about Solana development, RPC methods, or integrating the Fyxvo gateway.",
+    title: "Fyxvo Assistant",
+    description: "Workspace-aware help for Solana RPC, Fyxvo onboarding, debugging, and gateway usage inside your authenticated Fyxvo session.",
     url: `${webEnv.siteUrl}/assistant`,
     siteName: "Fyxvo",
     type: "website",
@@ -21,8 +25,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Assistant — Fyxvo",
-    description: "Ask the Fyxvo AI assistant anything about Solana development, RPC methods, or integrating the Fyxvo gateway.",
+    title: "Fyxvo Assistant",
+    description: "Workspace-aware help for Solana RPC, Fyxvo onboarding, debugging, and gateway usage inside your authenticated Fyxvo session.",
     images: [webEnv.socialImageUrl]
   }
 };

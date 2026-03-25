@@ -523,6 +523,10 @@ function PlaygroundContent() {
         parsed.snippet ??
           `Inserted ${parsed.method} from the assistant${parsed.mode ? ` using ${parsed.mode} mode` : ""}${parsed.simulate ? " with simulation enabled" : ""}.`
       );
+      window.sessionStorage.setItem(
+        "fyxvo.assistant.returnNotice",
+        `Returned from Playground with ${parsed.method} ready.`
+      );
     } catch {
       // ignore malformed cache
     } finally {
