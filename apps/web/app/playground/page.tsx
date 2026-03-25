@@ -490,6 +490,11 @@ function PlaygroundContent() {
       if (val) params[p.name] = val;
     }
     setParamValues(params);
+    const requestedMode = searchParams.get("mode");
+    if (requestedMode === "standard" || requestedMode === "priority") {
+      setMode(requestedMode);
+    }
+    setSimulateMode(searchParams.get("simulate") === "true");
   }, [searchParams]);
 
   useEffect(() => {
@@ -497,14 +502,27 @@ function PlaygroundContent() {
     const raw = window.sessionStorage.getItem("fyxvo.playground.assistantInsert");
     if (!raw) return;
     try {
-      const parsed = JSON.parse(raw) as { method?: string; params?: Record<string, string>; snippet?: string };
+      const parsed = JSON.parse(raw) as {
+        method?: string;
+        params?: Record<string, string>;
+        snippet?: string;
+        mode?: "standard" | "priority";
+        simulate?: boolean;
+      };
       if (!parsed.method) return;
       const found = RPC_METHODS.find((method) => method.method === parsed.method);
       if (!found) return;
       setSelectedMethod(found);
       setSelectedCategory(found.category);
       setParamValues(parsed.params ?? {});
-      setAssistantInsertNotice(parsed.snippet ?? `Inserted ${parsed.method} from the assistant.`);
+      if (parsed.mode) {
+        setMode(parsed.mode);
+      }
+      setSimulateMode(Boolean(parsed.simulate));
+      setAssistantInsertNotice(
+        parsed.snippet ??
+          `Inserted ${parsed.method} from the assistant${parsed.mode ? ` using ${parsed.mode} mode` : ""}${parsed.simulate ? " with simulation enabled" : ""}.`
+      );
     } catch {
       // ignore malformed cache
     } finally {

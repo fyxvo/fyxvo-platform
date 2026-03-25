@@ -643,8 +643,8 @@ model PerformanceMetric {
 
 model SupportTicket {
   id          String   @id @default(cuid())
-  userId      String
-  projectId   String?
+  userId      String   @db.Uuid
+  projectId   String?  @db.Uuid
   category    String   @default("general")
   priority    String   @default("normal")
   subject     String

@@ -42,12 +42,10 @@ interface AssistantErrorPayload {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "How do I connect to the Fyxvo gateway in TypeScript?",
-  "What's the difference between standard and priority relay?",
-  "Show me a curl example for getLatestBlockhash",
-  "How do I migrate from Helius to Fyxvo?",
-  "What pricing is live right now?",
-  "How do I debug an RPC error?",
+  "How do I make my first request with Fyxvo",
+  "What is the difference between standard and priority relay",
+  "How do I fund a project on devnet",
+  "Show me a getBalance example in JavaScript",
 ];
 
 const HISTORY_KEY = "fyxvo.assistant.cache";
@@ -137,7 +135,7 @@ function detectDocsSection(content: string): { href: string; label: string } | n
   return null;
 }
 
-function detectPlaygroundInsert(content: string): { method: string; params: Record<string, string>; snippet: string } | null {
+function detectPlaygroundInsert(content: string): { method: string; params: Record<string, string>; snippet: string; mode?: "standard" | "priority"; simulate?: boolean } | null {
   const block = firstCodeBlock(content) ?? content;
   const methodMatch = block.match(/"method"\s*:\s*"([^"]+)"/) ?? block.match(/\b(getHealth|getSlot|getLatestBlockhash|getBalance|getAccountInfo|getEpochInfo|simulateTransaction|getVersion)\b/);
   if (!methodMatch) return null;
@@ -150,7 +148,32 @@ function detectPlaygroundInsert(content: string): { method: string; params: Reco
   if (method === "simulateTransaction") {
     params.signature = "";
   }
-  return { method, params, snippet: block };
+  const mode = /\/priority\b|priority relay|priority endpoint/i.test(block) ? "priority" : "standard";
+  const simulate = /simulate=true|simulation mode|simulated response|method-not-simulated/i.test(block) || method === "simulateTransaction";
+  return { method, params, snippet: block, mode, simulate };
+}
+
+function ThinkingBubble() {
+  return (
+    <div className="rounded-2xl rounded-tl-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((dot) => (
+            <span
+              key={dot}
+              className="inline-block h-2 w-2 animate-bounce rounded-full bg-[var(--fyxvo-brand)]/70"
+              style={{ animationDelay: `${dot * 0.14}s` }}
+            />
+          ))}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-2.5 w-24 animate-pulse rounded-full bg-[var(--fyxvo-border)]" />
+          <div className="h-2.5 w-full animate-pulse rounded-full bg-[var(--fyxvo-border)]/80" />
+          <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-[var(--fyxvo-border)]/70" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
@@ -407,7 +430,13 @@ export default function AssistantPage() {
     if (!payload) return;
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem(PLAYGROUND_INSERT_KEY, JSON.stringify(payload));
-      window.location.href = `/playground?method=${encodeURIComponent(payload.method)}`;
+      const params = new URLSearchParams({ method: payload.method });
+      if (payload.mode) params.set("mode", payload.mode);
+      if (payload.simulate) params.set("simulate", "true");
+      for (const [key, value] of Object.entries(payload.params)) {
+        if (value) params.set(key, value);
+      }
+      window.location.href = `/playground?${params.toString()}`;
     }
   }
 
@@ -533,7 +562,7 @@ export default function AssistantPage() {
 
       await refreshConversationList();
     } catch {
-      replaceLastAssistantMessage("Network error. Check your connection and try again.");
+      replaceLastAssistantMessage("The assistant connection was interrupted before a response completed. Try again in a moment.");
     } finally {
       setIsStreaming(false);
     }
@@ -570,7 +599,10 @@ export default function AssistantPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               {conversations.length === 0 ? (
-                <p className="px-2 py-4 text-sm text-[var(--fyxvo-text-muted)]">No conversations yet.</p>
+                <div className="rounded-2xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-5 text-sm text-[var(--fyxvo-text-muted)]">
+                  <p className="font-medium text-[var(--fyxvo-text)]">No saved conversations yet</p>
+                  <p className="mt-1">Start a new thread and Fyxvo will keep the last 50 messages available across refreshes.</p>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {conversations.map((conversation) => (
@@ -714,30 +746,23 @@ export default function AssistantPage() {
                   return (
                     <div key={`${message.role}-${index}-${message.content.slice(0, 16)}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
                       <div className="flex max-w-[92%] flex-col gap-2">
-                        <div
-                          className={
-                            message.role === "user"
-                              ? "rounded-2xl rounded-tr-md bg-brand-500 px-4 py-3 text-sm text-white"
-                              : "rounded-2xl rounded-tl-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
-                          }
-                        >
-                          {message.role === "assistant" ? (
-                            <MessageContent content={message.content} />
-                          ) : (
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-                          )}
-                          {isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
-                            <span className="inline-flex gap-1">
-                              {[0, 1, 2].map((dot) => (
-                                <span
-                                  key={dot}
-                                  className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--fyxvo-text-muted)]"
-                                  style={{ animationDelay: `${dot * 0.15}s` }}
-                                />
-                              ))}
-                            </span>
-                          ) : null}
-                        </div>
+                        {isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
+                          <ThinkingBubble />
+                        ) : (
+                          <div
+                            className={
+                              message.role === "user"
+                                ? "rounded-2xl rounded-tr-md bg-brand-500 px-4 py-3 text-sm text-white"
+                                : "rounded-2xl rounded-tl-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                            }
+                          >
+                            {message.role === "assistant" ? (
+                              <MessageContent content={message.content} />
+                            ) : (
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                            )}
+                          </div>
+                        )}
 
                         {message.content && message.role === "assistant" ? (
                           <div className="flex flex-wrap items-center gap-2 px-1">

@@ -1768,7 +1768,6 @@ export class PrismaApiRepository implements ApiRepository {
         status: input.success ? "delivered" : input.nextRetryAt ? "pending_retry" : "failed",
         responseStatus: input.responseStatus ?? null,
         responseBody: input.responseBody ? input.responseBody.slice(0, 1000) : null,
-        success: input.success,
         nextRetryAt: input.nextRetryAt ?? null,
         deliveredAt: input.success ? new Date() : null,
       },
@@ -1780,15 +1779,27 @@ export class PrismaApiRepository implements ApiRepository {
   async getWebhookDeliveries(webhookId: string, limit = 20): Promise<WebhookDeliveryRecord[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
+    type WebhookDeliveryRow = {
+      id: string;
+      webhookId: string;
+      eventType: string;
+      status: string;
+      responseStatus: number | null;
+      responseBody: string | null;
+      attemptNumber: number;
+      nextRetryAt: Date | string | null;
+      deliveredAt: Date | string | null;
+      payload: Record<string, unknown> | null;
+      createdAt: Date | string;
+    };
     const rows = await db.webhookDelivery.findMany({
       where: { webhookId },
-      orderBy: { attemptedAt: "desc" },
+      orderBy: { createdAt: "desc" },
       take: limit,
       select: {
         id: true,
         webhookId: true,
         eventType: true,
-        success: true,
         status: true,
         responseStatus: true,
         responseBody: true,
@@ -1796,18 +1807,19 @@ export class PrismaApiRepository implements ApiRepository {
         nextRetryAt: true,
         deliveredAt: true,
         payload: true,
-        attemptedAt: true,
+        createdAt: true,
       },
-    }) as WebhookDeliveryRecord[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (rows as any[]).map((r: {
-      attemptedAt: Date | string;
-      nextRetryAt?: Date | string | null;
-      deliveredAt?: Date | string | null;
-      payload?: Record<string, unknown> | null;
-    } & Record<string, unknown>) => ({
-      ...r,
-      attemptedAt: r.attemptedAt instanceof Date ? r.attemptedAt.toISOString() : String(r.attemptedAt),
+    }) as WebhookDeliveryRow[];
+    return rows.map((r) => ({
+      id: r.id,
+      webhookId: r.webhookId,
+      eventType: r.eventType,
+      success: r.status === "delivered",
+      status: r.status,
+      responseStatus: r.responseStatus,
+      responseBody: r.responseBody,
+      attemptNumber: r.attemptNumber,
+      attemptedAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
       nextRetryAt: r.nextRetryAt
         ? r.nextRetryAt instanceof Date
           ? r.nextRetryAt.toISOString()
@@ -1818,15 +1830,15 @@ export class PrismaApiRepository implements ApiRepository {
           ? r.deliveredAt.toISOString()
           : String(r.deliveredAt)
         : null,
-      payload: (r.payload as Record<string, unknown> | null) ?? null,
-    })) as WebhookDeliveryRecord[];
+      payload: r.payload ?? null,
+    }));
   }
 
   async getPendingWebhookRetries(): Promise<{ id: string; webhookId: string; webhook: { url: string; secret: string }; payload: unknown; eventType: string; attemptNumber: number }[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
     return db.webhookDelivery.findMany({
-      where: { success: false, nextRetryAt: { lte: new Date() }, attemptNumber: { lt: 5 } },
+      where: { status: { not: "delivered" }, nextRetryAt: { lte: new Date() }, attemptNumber: { lt: 5 } },
       include: { webhook: { select: { url: true, secret: true } } },
       take: 50,
     }) as Promise<{ id: string; webhookId: string; webhook: { url: string; secret: string }; payload: unknown; eventType: string; attemptNumber: number }[]>;
@@ -1841,7 +1853,6 @@ export class PrismaApiRepository implements ApiRepository {
         status: data.success ? "delivered" : data.nextRetryAt ? "pending_retry" : "failed",
         responseStatus: data.responseStatus ?? null,
         responseBody: data.responseBody ? data.responseBody.slice(0, 1000) : null,
-        success: data.success,
         nextRetryAt: data.nextRetryAt ?? null,
         deliveredAt: data.success ? new Date() : null,
       },

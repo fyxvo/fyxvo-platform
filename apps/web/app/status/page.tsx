@@ -191,6 +191,12 @@ export default async function StatusPage() {
                   {status.apiStatus.dependencies?.redisConfigured ? "configured" : "not configured"}
                 </span>
               </p>
+              <p>
+                Assistant:{" "}
+                <span className="text-[var(--fyxvo-text-soft)]">
+                  {status.apiStatus.assistantAvailable ? "available" : "unavailable"}
+                </span>
+              </p>
             </div>
             <Link
               href={new URL("/health", webEnv.apiBaseUrl).toString()}

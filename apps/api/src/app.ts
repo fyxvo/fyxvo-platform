@@ -4,6 +4,9 @@ import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import type { ApiEnv } from "@fyxvo/config";
 import {
+  FREE_TIER_REQUESTS,
+  PRICING_LAMPORTS,
+  VOLUME_DISCOUNT,
   normalizeApiKeyScopes,
   resolveAuthorityPlan,
   supportedApiKeyScopes,
@@ -409,6 +412,31 @@ function sanitizeErrorForLogs(error: unknown) {
     message: error.message,
     ...(getRequestErrorStatus(error) !== null ? { statusCode: getRequestErrorStatus(error) } : {})
   };
+}
+
+function applyHijackedCorsHeaders(input: {
+  raw: {
+    setHeader(name: string, value: string): void;
+    getHeader(name: string): number | string | string[] | undefined;
+  };
+  origin: string | undefined;
+  allowedOrigins: ReadonlySet<string>;
+}) {
+  if (!input.origin || !input.allowedOrigins.has(input.origin)) {
+    return;
+  }
+
+  input.raw.setHeader("Access-Control-Allow-Origin", input.origin);
+  input.raw.setHeader("Access-Control-Allow-Credentials", "true");
+  input.raw.setHeader("Access-Control-Expose-Headers", "x-fyxvo-conversation-id, x-request-id");
+
+  const varyHeader = input.raw.getHeader("Vary");
+  if (typeof varyHeader === "string" && varyHeader.length > 0) {
+    input.raw.setHeader("Vary", varyHeader.includes("Origin") ? varyHeader : `${varyHeader}, Origin`);
+    return;
+  }
+
+  input.raw.setHeader("Vary", "Origin");
 }
 
 function isAssistantConfigured(env: Pick<ApiEnv, "ANTHROPIC_API_KEY">): boolean {
@@ -1870,7 +1898,7 @@ export async function buildApiApp(input: {
 
   const ASSISTANT_RATE_LIMIT = 20;
   const ASSISTANT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-  const ASSISTANT_MODEL = "claude-sonnet-4-5-20251001";
+  const ASSISTANT_MODEL = "claude-sonnet-4-20250514";
 
   function checkAssistantRateLimit(userId: string): { allowed: boolean; retryAfterMs: number } {
     const now = Date.now();
@@ -1998,7 +2026,7 @@ export async function buildApiApp(input: {
         : null,
       `- Gateway status: ${openIncidents.length === 0 ? "operational" : "degraded or incident open"}`,
       activeAnnouncement ? `- Active system announcement: ${activeAnnouncement.message}` : "- Active system announcement: none",
-      "- Pricing model: standard 1,000 lamports, compute-heavy 3,000 lamports, priority 5,000 lamports on devnet",
+      `- Pricing model: standard ${PRICING_LAMPORTS.standard.toLocaleString()} lamports, compute-heavy ${PRICING_LAMPORTS.computeHeavy.toLocaleString()} lamports, priority ${PRICING_LAMPORTS.priority.toLocaleString()} lamports on devnet`,
       "- Simulation mode: available in the Playground via the simulate toggle; unsupported methods return a method-not-simulated response",
       "- Mainnet availability: not live yet",
     ].filter((line): line is string => Boolean(line));
@@ -2064,7 +2092,7 @@ const { message } = await fetch("https://api.fyxvo.com/v1/auth/challenge", {
 // Step 2: Sign the message with Phantom
 const encodedMessage = new TextEncoder().encode(message);
 const signedMessage = await window.solana.signMessage(encodedMessage, "utf8");
-const signature = btoa(String.fromCharCode(...signedMessage.signature));
+const signature = bs58.encode(signedMessage.signature);
 
 // Step 3: Verify and receive JWT
 const { token } = await fetch("https://api.fyxvo.com/v1/auth/verify", {
@@ -2078,12 +2106,12 @@ const { token } = await fetch("https://api.fyxvo.com/v1/auth/verify", {
 \`\`\`
 
 ## PRICING MODEL (devnet)
-- **Standard reads**: 1,000 lamports per request (0.000001 SOL)
-- **Compute-heavy methods**: 3,000 lamports per request (0.000003 SOL) — includes getProgramAccounts, getTokenAccountsByOwner, getSignaturesForAddress, getMultipleAccounts, and similar
-- **Priority relay**: 5,000 lamports per request (0.000005 SOL)
-- **Free tier**: 10,000 standard requests for every new project
-- **Volume discount tier 1**: ≥1M requests/month → 20% off
-- **Volume discount tier 2**: ≥10M requests/month → 40% off
+- **Standard reads**: ${PRICING_LAMPORTS.standard.toLocaleString()} lamports per request (${(PRICING_LAMPORTS.standard / 1_000_000_000).toFixed(6)} SOL)
+- **Compute-heavy methods**: ${PRICING_LAMPORTS.computeHeavy.toLocaleString()} lamports per request (${(PRICING_LAMPORTS.computeHeavy / 1_000_000_000).toFixed(6)} SOL) — includes getProgramAccounts, getTokenAccountsByOwner, getSignaturesForAddress, getMultipleAccounts, and similar
+- **Priority relay**: ${PRICING_LAMPORTS.priority.toLocaleString()} lamports per request (${(PRICING_LAMPORTS.priority / 1_000_000_000).toFixed(6)} SOL)
+- **Free tier**: ${FREE_TIER_REQUESTS.toLocaleString()} standard requests for every new project
+- **Volume discount tier 1**: ≥${VOLUME_DISCOUNT.tier1.monthlyRequests.toLocaleString()} requests/month → ${VOLUME_DISCOUNT.tier1.discountBps / 100}% off
+- **Volume discount tier 2**: ≥${VOLUME_DISCOUNT.tier2.monthlyRequests.toLocaleString()} requests/month → ${VOLUME_DISCOUNT.tier2.discountBps / 100}% off
 - **Revenue split**: 80% to node operators / 10% protocol treasury / 10% infra fund
 - **Funding**: Pre-deposit SOL to your project's on-chain treasury via Phantom wallet
 
@@ -2254,6 +2282,11 @@ ${liveContextLines.join("\n")}
 
       reply.hijack();
       reply.raw.statusCode = 200;
+      applyHijackedCorsHeaders({
+        raw: reply.raw,
+        origin: request.headers.origin,
+        allowedOrigins,
+      });
       reply.raw.setHeader("x-fyxvo-conversation-id", effectiveConversationId);
       reply.raw.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       reply.raw.setHeader("Cache-Control", "no-cache, no-transform");

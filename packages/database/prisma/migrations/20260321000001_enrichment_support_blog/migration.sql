@@ -9,8 +9,8 @@ CREATE INDEX IF NOT EXISTS "RequestLog_upstreamNode_idx" ON "RequestLog"("upstre
 -- SupportTicket
 CREATE TABLE IF NOT EXISTS "SupportTicket" (
   "id" TEXT NOT NULL,
-  "userId" TEXT NOT NULL,
-  "projectId" TEXT,
+  "userId" UUID NOT NULL,
+  "projectId" UUID,
   "category" TEXT NOT NULL DEFAULT 'general',
   "priority" TEXT NOT NULL DEFAULT 'normal',
   "subject" TEXT NOT NULL,
