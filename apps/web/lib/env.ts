@@ -9,6 +9,5 @@ export const webEnv = {
   solanaCluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet",
   solanaRpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com",
   enableUsdc: process.env.NEXT_PUBLIC_ENABLE_USDC === "true",
-  allowIndexing: process.env.NEXT_PUBLIC_ALLOW_INDEXING !== "false",
   socialImageUrl: new URL("/brand/social-card.png", process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").toString()
 } as const;

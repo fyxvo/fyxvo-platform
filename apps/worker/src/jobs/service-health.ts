@@ -38,8 +38,8 @@ export async function processServiceHealthCheck(input: {
   readonly repository: WorkerRepository;
   readonly logger: WorkerLogger;
 }): Promise<WorkerJobResult> {
-  const apiOrigin = (process.env.API_ORIGIN ?? process.env.API_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
-  const gatewayOrigin = (process.env.GATEWAY_ORIGIN ?? process.env.GATEWAY_BASE_URL ?? "http://localhost:3002").replace(/\/$/, "");
+  const apiOrigin = input.env.API_ORIGIN.replace(/\/$/, "");
+  const gatewayOrigin = input.env.GATEWAY_ORIGIN.replace(/\/$/, "");
 
   const targets: ServiceTarget[] = [
     { name: "api", url: `${apiOrigin}/health` },

@@ -41,10 +41,10 @@ export async function updateReputations(
 
 export async function checkErrorRates(
   prisma: PrismaClientType,
-  logger: WorkerLogger
+  logger: WorkerLogger,
+  thresholdPercent: number
 ): Promise<void> {
   try {
-    const threshold = Number(process.env.ERROR_RATE_ALERT_THRESHOLD ?? "10");
     const since = new Date(Date.now() - 5 * 60 * 1000);
 
     const recentRequests = await prisma.requestLog.findMany({
@@ -68,7 +68,7 @@ export async function checkErrorRates(
     for (const [projectId, counts] of byProject.entries()) {
       if (projectId === "__none__") continue;
       const rate = counts.total > 0 ? counts.errors / counts.total : 0;
-      if (rate > threshold / 100) {
+      if (rate > thresholdPercent / 100) {
         const project = await prisma.project.findUnique({
           where: { id: projectId },
           select: { ownerId: true, name: true },

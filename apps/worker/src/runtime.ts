@@ -181,9 +181,9 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
       }, 3_600_000);
 
       // Error rate checks — every 5 minutes
-      void checkErrorRates(prismaClient, logger);
+      void checkErrorRates(prismaClient, logger, this.dependencies.env.ERROR_RATE_ALERT_THRESHOLD);
       this.errorRateInterval = setInterval(() => {
-        void checkErrorRates(prismaClient, logger);
+        void checkErrorRates(prismaClient, logger, this.dependencies.env.ERROR_RATE_ALERT_THRESHOLD);
       }, 300_000);
 
       // Weekly digest generation — run once on startup, then weekly

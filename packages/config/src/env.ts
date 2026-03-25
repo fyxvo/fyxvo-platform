@@ -20,10 +20,6 @@ const booleanFlagSchema = z
   .union([z.literal("true"), z.literal("false")])
   .default("false")
   .transform((value) => value === "true");
-const indexingFlagSchema = z
-  .union([z.literal("true"), z.literal("false")])
-  .default("true")
-  .transform((value) => value === "true");
 const csvUrlListSchema = z
   .string()
   .default(solanaDevnetConfig.rpcUrl)
@@ -101,6 +97,8 @@ export const gatewayEnvSchema = sharedEnvSchema.extend({
 });
 
 export const workerEnvSchema = sharedEnvSchema.extend({
+  API_ORIGIN: z.url().default(`http://localhost:${servicePorts.api}`),
+  GATEWAY_ORIGIN: z.url().default(`http://localhost:${servicePorts.gateway}`),
   WORKER_NAME: z.string().trim().min(1).default("fyxvo-worker"),
   WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(5_000),
   WORKER_REDIS_PREFIX: z.string().trim().min(1).default("fyxvo:worker"),
@@ -108,6 +106,7 @@ export const workerEnvSchema = sharedEnvSchema.extend({
   WORKER_REQUEST_LOG_BATCH_SIZE: z.coerce.number().int().positive().default(1_000),
   WORKER_SIGNATURE_BATCH_SIZE: z.coerce.number().int().positive().default(25),
   WORKER_NODE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_500),
+  ERROR_RATE_ALERT_THRESHOLD: z.coerce.number().int().positive().default(10),
   WORKER_REWARD_WINDOW_MINUTES: z.coerce.number().int().positive().default(60),
   WORKER_REWARD_LAMPORTS_PER_REQUEST: z.coerce.number().int().positive().default(250)
 });
@@ -120,8 +119,7 @@ export const webEnvSchema = z.object({
   NEXT_PUBLIC_GATEWAY_BASE_URL: z.url().default(`http://localhost:${servicePorts.gateway}`),
   NEXT_PUBLIC_SOLANA_CLUSTER: z.literal("devnet").default("devnet"),
   NEXT_PUBLIC_SOLANA_RPC_URL: z.url().default(solanaDevnetConfig.rpcUrl),
-  NEXT_PUBLIC_ENABLE_USDC: booleanFlagSchema,
-  NEXT_PUBLIC_ALLOW_INDEXING: indexingFlagSchema
+  NEXT_PUBLIC_ENABLE_USDC: booleanFlagSchema
 });
 
 export type SharedEnv = z.output<typeof sharedEnvSchema>;
