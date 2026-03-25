@@ -172,12 +172,25 @@ function playNotificationSound() {
   } catch { /* ignore */ }
 }
 
+function mergeNotifications(current: Notification[], incoming: Notification[]): Notification[] {
+  if (current.length === 0) return incoming;
+  const byId = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) {
+    const existing = byId.get(item.id);
+    byId.set(item.id, existing ? { ...item, read: existing.read || item.read } : item);
+  }
+  return [...byId.values()].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 export function NotificationBell({ token }: { readonly token: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
   const prevUnreadRef = useRef<number>(0);
+  const openRef = useRef(false);
   const router = useRouter();
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -191,6 +204,10 @@ export function NotificationBell({ token }: { readonly token: string }) {
     }
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,10 +225,12 @@ export function NotificationBell({ token }: { readonly token: string }) {
     const interval = setInterval(() => {
       getNotifications(token)
         .then((items) => {
-          if (!cancelled) setNotifications(items);
+          if (!cancelled) {
+            setNotifications((current) => (openRef.current ? mergeNotifications(current, items) : items));
+          }
         })
         .catch(() => undefined);
-    }, 60_000);
+    }, 30_000);
 
     return () => {
       cancelled = true;

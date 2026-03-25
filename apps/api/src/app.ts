@@ -435,6 +435,13 @@ function extractSseDataPayloads(input: string): {
   };
 }
 
+function assistantConversationTitleFromMessage(message: string): string {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) return "New conversation";
+  if (normalized.length <= 60) return normalized;
+  return `${normalized.slice(0, 57).trimEnd()}...`;
+}
+
 async function withIdempotency<T extends Record<string, unknown>>(
   repository: ApiRepository,
   request: FastifyRequest,
@@ -819,6 +826,35 @@ export async function buildApiApp(input: {
     const incidents = await input.repository.listIncidents(50);
     reply.header("cache-control", "public, max-age=60, stale-while-revalidate=120");
     return { incidents };
+  });
+
+  app.post("/v1/admin/incidents", async (request, reply) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const body = z.object({
+      serviceName: z.string().min(2).max(100),
+      severity: z.enum(["info", "warning", "critical", "degraded"]).default("degraded"),
+      description: z.string().min(5).max(500),
+    }).parse(request.body);
+    const incident = await input.repository.createIncident(body);
+    return reply.status(201).send({ item: incident });
+  });
+
+  app.patch("/v1/admin/incidents/:id", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const params = z.object({ id: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      severity: z.enum(["info", "warning", "critical", "degraded"]).optional(),
+      description: z.string().min(5).max(500).optional(),
+      status: z.enum(["open", "resolved"]).optional(),
+    }).parse(request.body);
+    const incident = await input.repository.updateIncident(params.id, {
+      ...(body.severity !== undefined ? { severity: body.severity } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.status !== undefined ? { resolvedAt: body.status === "resolved" ? new Date() : null } : {}),
+    });
+    return { item: incident };
   });
 
   // GET /v1/network/health-calendar — public, no auth required
@@ -1827,6 +1863,7 @@ export async function buildApiApp(input: {
 
   const ASSISTANT_RATE_LIMIT = 20;
   const ASSISTANT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+  const ASSISTANT_MODEL = "claude-sonnet-4-5-20251001";
 
   function checkAssistantRateLimit(userId: string): { allowed: boolean; retryAfterMs: number } {
     const now = Date.now();
@@ -1843,6 +1880,7 @@ export async function buildApiApp(input: {
   }
 
   const assistantChatSchema = z.object({
+    conversationId: z.string().uuid().optional(),
     messages: z.array(z.object({
       role: z.enum(["user", "assistant"]),
       content: z.string().min(1).max(8000),
@@ -1858,6 +1896,48 @@ export async function buildApiApp(input: {
       gatewayStatus: z.string().optional(),
       activeAnnouncements: z.array(z.string()).optional(),
     }).optional(),
+  });
+
+  app.get("/v1/assistant/conversations", async (request) => {
+    const user = requireUser(request);
+    return {
+      items: await input.repository.listAssistantConversations(user.id, 20)
+    };
+  });
+
+  app.get("/v1/assistant/conversations/latest", async (request) => {
+    const user = requireUser(request);
+    const items = await input.repository.listAssistantConversations(user.id, 1);
+    if (items.length === 0) {
+      return { item: null };
+    }
+    const item = await input.repository.getAssistantConversation(user.id, items[0]!.id);
+    return { item };
+  });
+
+  app.post("/v1/assistant/conversations", async (request, reply) => {
+    const user = requireUser(request);
+    const body = z.object({ title: z.string().trim().max(80).optional() }).parse(request.body ?? {});
+    const item = await input.repository.createAssistantConversation({
+      userId: user.id,
+      title: body.title || "New conversation",
+    });
+    return reply.status(201).send({ item });
+  });
+
+  app.get("/v1/assistant/conversations/:conversationId", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ conversationId: z.string().uuid() }).parse(request.params);
+    const item = await input.repository.getAssistantConversation(user.id, params.conversationId);
+    if (!item) throw new HttpError(404, "not_found", "Conversation not found.");
+    return { item };
+  });
+
+  app.delete("/v1/assistant/conversations/:conversationId", async (request, reply) => {
+    const user = requireUser(request);
+    const params = z.object({ conversationId: z.string().uuid() }).parse(request.params);
+    await input.repository.clearAssistantConversation(user.id, params.conversationId);
+    return reply.status(204).send();
   });
 
   app.post("/v1/assistant/chat", async (request, reply) => {
@@ -1879,10 +1959,9 @@ export async function buildApiApp(input: {
       return reply.status(400).send({ error: "Invalid request", details: parsed.error.issues });
     }
 
-    const { messages, projectContext } = parsed.data;
+    const { messages, projectContext, conversationId: requestedConversationId } = parsed.data;
     const requestStart = Date.now();
     const hashedUserId = sha256(user.id).slice(0, 16);
-
     const anthropicKey = input.env.ANTHROPIC_API_KEY;
     if (!isAssistantConfigured(input.env) || !anthropicKey) {
       return reply.status(503).send({
@@ -1893,7 +1972,54 @@ export async function buildApiApp(input: {
       });
     }
 
+    const projects = await input.repository.listProjects(user);
+    const openIncidents = (await input.repository.listIncidents(10)).filter((incident) => !incident.resolvedAt);
+    const activeAnnouncement = await input.repository.getActiveAnnouncement();
+    const liveContextLines = [
+      `- Projects in workspace: ${projects.length}`,
+      projects.length > 0
+        ? `- Project names: ${projects.map((project) => project.name).join(", ")}`
+        : "- Project names: none yet",
+      `- Activated projects: ${projects.filter((project) => Boolean(project.onChainProjectPda)).length}/${projects.length}`,
+      `- Projects with funding events: ${projects.filter((project) => (project._count?.fundingRequests ?? 0) > 0).length}/${projects.length}`,
+      projectContext?.balance ? `- Selected project funded SOL balance: ${projectContext.balance}` : null,
+      projectContext?.totalBalanceSol !== undefined
+        ? `- Total funded SOL balance across projects: ${projectContext.totalBalanceSol.toFixed(4)} SOL`
+        : null,
+      projectContext?.requestsLast7Days !== undefined
+        ? `- Requests in last 7 days: ${projectContext.requestsLast7Days}`
+        : null,
+      `- Gateway status: ${openIncidents.length === 0 ? "operational" : "degraded or incident open"}`,
+      activeAnnouncement ? `- Active system announcement: ${activeAnnouncement.message}` : "- Active system announcement: none",
+      "- Pricing model: standard 1,000 lamports, compute-heavy 3,000 lamports, priority 5,000 lamports on devnet",
+      "- Simulation mode: available in the Playground via the simulate toggle; unsupported methods return a method-not-simulated response",
+      "- Mainnet availability: not live yet",
+    ].filter((line): line is string => Boolean(line));
+
+    let effectiveConversationId: string;
+    if (requestedConversationId) {
+      const existingConversation = await input.repository.getAssistantConversation(user.id, requestedConversationId);
+      if (!existingConversation) {
+        throw new HttpError(404, "not_found", "Conversation not found.");
+      }
+      effectiveConversationId = existingConversation.id;
+    } else {
+      const createdConversation = await input.repository.createAssistantConversation({
+        userId: user.id,
+        title: assistantConversationTitleFromMessage(
+          messages.find((message) => message.role === "user")?.content ?? "New conversation"
+        ),
+      });
+      effectiveConversationId = createdConversation.id;
+    }
+
     const systemPrompt = `You are the Fyxvo Developer Assistant — a knowledgeable, honest, and practical AI guide for developers building on Solana using the Fyxvo RPC gateway platform. You are an AI and may make mistakes; always recommend testing code before production use. For critical infrastructure questions, also consult the official Solana documentation at docs.solana.com.
+
+## TRUTHFULNESS RULES
+- Never invent Fyxvo features, rollout states, integrations, or guarantees.
+- If something is not in the live context below, say you do not see it live yet.
+- If a user asks whether something exists and it is not clearly live, answer that it is not live yet or that you cannot confirm it from the available live context.
+- Prefer concrete answers grounded in the live context and current product behavior over generic platform claims.
 
 ## WHAT FYXVO IS
 Fyxvo is a hybrid-first decentralized Solana infrastructure network currently in private alpha on devnet. It provides:
@@ -2069,6 +2195,9 @@ ${projectContext?.requestCount !== undefined ? `- Lifetime requests: ${projectCo
 ${projectContext?.requestsLast7Days !== undefined ? `- They have made ${projectContext.requestsLast7Days} requests in the last 7 days.` : ""}
 ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.gatewayStatus}.` : ""}
 
+## LIVE FYXVO CONTEXT
+${liveContextLines.join("\n")}
+
 ## GUIDELINES
 1. You are an AI. Be honest about uncertainty — if you don't know something specific to Fyxvo, say so.
 2. All code should be tested before production use. Fyxvo is devnet private alpha.
@@ -2089,7 +2218,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-5-20251001",
+          model: ASSISTANT_MODEL,
           max_tokens: 4096,
           stream: true,
           system: systemPrompt,
@@ -2102,7 +2231,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
         app.log.warn({
           event: "assistant.chat.upstream_error",
           hashedUserId,
-          model: "claude-sonnet-4-5-20251001",
+          model: ASSISTANT_MODEL,
           messageCount: messages.length,
           durationMs,
           statusCode: upstreamResponse.status
@@ -2118,6 +2247,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
 
       reply.hijack();
       reply.raw.statusCode = 200;
+      reply.raw.setHeader("x-fyxvo-conversation-id", effectiveConversationId);
       reply.raw.setHeader("Content-Type", "text/event-stream; charset=utf-8");
       reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
       reply.raw.setHeader("Connection", "keep-alive");
@@ -2128,6 +2258,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
       const decoder = new TextDecoder();
       let buffer = "";
       let outputTokenEstimate = 0;
+      let assistantText = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -2144,6 +2275,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
             const event = JSON.parse(payload) as { type?: string; delta?: { type?: string; text?: string }; usage?: { output_tokens?: number }; error?: unknown };
             if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
               outputTokenEstimate += Math.ceil(event.delta.text.length / 4);
+              assistantText += event.delta.text;
               reply.raw.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
             }
           } catch {
@@ -2161,6 +2293,7 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
           const event = JSON.parse(payload) as { type?: string; delta?: { type?: string; text?: string } };
           if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
             outputTokenEstimate += Math.ceil(event.delta.text.length / 4);
+            assistantText += event.delta.text;
             reply.raw.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
           }
         } catch {
@@ -2173,13 +2306,22 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
       app.log.info({
         event: "assistant.chat.success",
         hashedUserId,
-        model: "claude-sonnet-4-5-20251001",
+        model: ASSISTANT_MODEL,
         messageCount: messages.length,
         inputTokenEstimate,
         outputTokenEstimate,
         durationMs,
         timestamp: new Date().toISOString()
       }, "Assistant chat completed");
+
+      await input.repository.saveAssistantConversationMessages({
+        userId: user.id,
+        conversationId: effectiveConversationId,
+        titleFromFirstUserMessage: assistantConversationTitleFromMessage(
+          messages.find((message) => message.role === "user")?.content ?? ""
+        ),
+        messages: [...messages, { role: "assistant", content: assistantText || "No assistant response was returned." }],
+      });
 
       reply.raw.write("data: [DONE]\n\n");
       reply.raw.end();
@@ -2241,11 +2383,15 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
     const hourStart = new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000);
     const count = await input.repository.countAssistantMessagesThisHour(user.id, hourStart);
     const limit = 20;
+    const resetAt = new Date(hourStart.getTime() + 3_600_000).toISOString();
     return {
       messagesUsedThisHour: count,
       messagesRemainingThisHour: Math.max(0, limit - count),
       limit,
-      windowResetAt: new Date(hourStart.getTime() + 3_600_000).toISOString(),
+      windowResetAt: resetAt,
+      resetAt,
+      model: ASSISTANT_MODEL,
+      assistantAvailable: isAssistantConfigured(input.env),
     };
   });
 
@@ -2518,8 +2664,18 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
   app.post("/v1/admin/announcements", async (request, reply) => {
     const user = requireUser(request);
     if (user.role !== "ADMIN" && user.role !== "OWNER") throw new HttpError(403, "forbidden", "Admin access required.");
-    const body = z.object({ message: z.string().min(1).max(500), severity: z.enum(["info", "warning", "critical"]).default("info") }).parse(request.body);
-    await input.repository.upsertAnnouncement({ message: body.message, severity: body.severity });
+    const body = z.object({
+      message: z.string().min(1).max(500),
+      severity: z.enum(["info", "warning", "critical"]).default("info"),
+      startAt: z.string().datetime().optional().nullable(),
+      endAt: z.string().datetime().optional().nullable(),
+    }).parse(request.body);
+    await input.repository.upsertAnnouncement({
+      message: body.message,
+      severity: body.severity,
+      startAt: body.startAt ? new Date(body.startAt) : null,
+      endAt: body.endAt ? new Date(body.endAt) : null,
+    });
     return reply.status(201).send({ success: true });
   });
 

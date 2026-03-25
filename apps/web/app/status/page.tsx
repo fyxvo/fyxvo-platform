@@ -15,9 +15,11 @@ import { webEnv } from "../../lib/env";
 import { formatDuration, shortenAddress } from "../../lib/format";
 import { liveDevnetState } from "../../lib/live-state";
 import { StatusRefreshIndicator } from "../../components/status-refresh-indicator";
+import { StatusMetricValue } from "../../components/status-metric-value";
 import { ResponseTimeTicker } from "../../components/response-time-ticker";
 import { StatusSubscribeForm } from "../../components/status-subscribe-form";
 import { StatusRegions, StatusHealthCalendar } from "../../components/status-regions";
+import { StatusAdminIncidents } from "../../components/status-admin-incidents";
 
 export const dynamic = "force-dynamic";
 
@@ -173,7 +175,7 @@ export default async function StatusPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-2xl font-bold text-[var(--fyxvo-text)]">
-              {status.apiStatus.solanaCluster}
+              <StatusMetricValue storageKey="api-cluster" value={status.apiStatus.solanaCluster ?? "Unavailable"} />
             </div>
             <p className="text-xs text-[var(--fyxvo-text-muted)]">Solana cluster</p>
             <div className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">
@@ -213,7 +215,7 @@ export default async function StatusPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-2xl font-bold text-[var(--fyxvo-text)]">
-              {percentage(gatewayMetrics?.standard?.successRate)}
+              <StatusMetricValue storageKey="gateway-success-rate" value={percentage(gatewayMetrics?.standard?.successRate)} />
             </div>
             <p className="text-xs text-[var(--fyxvo-text-muted)]">Standard success rate</p>
             <div className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">
@@ -256,7 +258,7 @@ export default async function StatusPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-2xl font-bold text-[var(--fyxvo-text)]">
-              {shortenAddress(liveDevnetState.programId)}
+              <StatusMetricValue storageKey="protocol-program" value={shortenAddress(liveDevnetState.programId)} />
             </div>
             <p className="text-xs text-[var(--fyxvo-text-muted)]">Program ID</p>
             <div className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">
@@ -575,6 +577,9 @@ export default async function StatusPage() {
             </div>
           </CardContent>
         </Card>
+        <div className="mt-4">
+          <StatusAdminIncidents initialIncidents={incidents} />
+        </div>
       </section>
 
       {/* Network Capacity */}

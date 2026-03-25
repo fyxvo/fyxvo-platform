@@ -38,8 +38,10 @@ import { GatewayHealthCard } from "../../components/gateway-health";
 import { OnboardingChecklist } from "../../components/onboarding-checklist";
 import { TosModal } from "../../components/tos-modal";
 import { FirstRequestCelebration } from "../../components/first-request-celebration";
+import { QuickstartLauncher } from "../../components/quickstart-launcher";
 import type { AdminOverview, NetworkStats, PortalProject } from "../../lib/types";
 import { webEnv } from "../../lib/env";
+import { liveDevnetState } from "../../lib/live-state";
 import { getNetworkStats, getActiveAnnouncement, getWhatsNew, dismissWhatsNew, listProjectMembers } from "../../lib/api";
 
 interface ProjectHealthInput {
@@ -376,6 +378,11 @@ export default function DashboardPage() {
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
   const [announcement, setAnnouncement] = useState<{ id: string; message: string; severity: string } | null>(null);
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  const [announcementDraft, setAnnouncementDraft] = useState("");
+  const [announcementSeverity, setAnnouncementSeverity] = useState<"info" | "warning" | "critical">("info");
+  const [announcementStartAt, setAnnouncementStartAt] = useState("");
+  const [announcementEndAt, setAnnouncementEndAt] = useState("");
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
   const [whatsNew, setWhatsNew] = useState<{ id: string; title: string; description: string; version: string } | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(() => typeof window !== "undefined" && sessionStorage.getItem("onboarding_banner_dismissed") === "1");
   const [pendingInvitations, setPendingInvitations] = useState<Array<{
@@ -403,7 +410,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     getActiveAnnouncement().then((data) => {
-      if (data.announcement) setAnnouncement(data.announcement);
+      if (data.announcement) {
+        setAnnouncement(data.announcement);
+        setAnnouncementDraft(data.announcement.message);
+        setAnnouncementSeverity(data.announcement.severity as "info" | "warning" | "critical");
+        setAnnouncementStartAt(data.announcement.startAt ? data.announcement.startAt.slice(0, 16) : "");
+        setAnnouncementEndAt(data.announcement.endAt ? data.announcement.endAt.slice(0, 16) : "");
+      }
     }).catch(() => undefined);
   }, []);
 
@@ -620,6 +633,37 @@ export default function DashboardPage() {
   -H "x-api-key: ${portal.lastGeneratedApiKey ?? "YOUR_API_KEY"}" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
   const opsItems = useMemo(() => buildOpsItems(portal.adminOverview), [portal.adminOverview]);
+  const isAdminAuthorityWallet =
+    portal.walletPhase === "authenticated" &&
+    portal.walletAddress === liveDevnetState.adminAuthority &&
+    Boolean(portal.token);
+
+  async function saveAnnouncementSchedule() {
+    if (!portal.token || !announcementDraft.trim()) return;
+    setAnnouncementSaving(true);
+    try {
+      await fetch(new URL("/v1/admin/announcements", webEnv.apiBaseUrl), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${portal.token}`,
+        },
+        body: JSON.stringify({
+          message: announcementDraft,
+          severity: announcementSeverity,
+          startAt: announcementStartAt ? new Date(announcementStartAt).toISOString() : null,
+          endAt: announcementEndAt ? new Date(announcementEndAt).toISOString() : null,
+        }),
+      });
+      setAnnouncement({
+        id: announcement?.id ?? crypto.randomUUID(),
+        message: announcementDraft,
+        severity: announcementSeverity,
+      });
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  }
 
   const journeySteps = [
     {
@@ -869,6 +913,8 @@ export default function DashboardPage() {
           </>
         }
       />
+
+      <QuickstartLauncher project={portal.selectedProject} />
 
       {!hasCompletedOnboarding && !bannerDismissed && !portal.loading && portal.user && nextStep ? (
         <div className="mb-4 flex items-center justify-between rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm">
@@ -1746,6 +1792,50 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isAdminAuthorityWallet ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Announcement scheduling</CardTitle>
+                <CardDescription>
+                  Schedule a system announcement with optional start and end times. Active announcements are shown only while the current time is inside the configured window.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px]">
+                <Input
+                  value={announcementDraft}
+                  onChange={(event) => setAnnouncementDraft(event.target.value)}
+                  placeholder="Announcement message"
+                />
+                <select
+                  value={announcementSeverity}
+                  onChange={(event) => setAnnouncementSeverity(event.target.value as "info" | "warning" | "critical")}
+                  className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)]"
+                >
+                  <option value="info">info</option>
+                  <option value="warning">warning</option>
+                  <option value="critical">critical</option>
+                </select>
+                <input
+                  type="datetime-local"
+                  value={announcementStartAt}
+                  onChange={(event) => setAnnouncementStartAt(event.target.value)}
+                  className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)]"
+                />
+                <input
+                  type="datetime-local"
+                  value={announcementEndAt}
+                  onChange={(event) => setAnnouncementEndAt(event.target.value)}
+                  className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)]"
+                />
+                <div className="md:col-span-4">
+                  <Button onClick={() => void saveAnnouncementSchedule()} disabled={announcementSaving || !announcementDraft.trim()}>
+                    {announcementSaving ? "Saving…" : "Save announcement"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : null}

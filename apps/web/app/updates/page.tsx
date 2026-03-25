@@ -67,8 +67,27 @@ function formatDate(value: string): string {
   }
 }
 
+function readingTimeMinutes(content: string): number {
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 220));
+}
+
+function deriveTags(post: UpdatePost): string[] {
+  const source = `${post.title} ${post.summary} ${post.content}`.toLowerCase();
+  const tags = [];
+  if (source.includes("assistant")) tags.push("assistant");
+  if (source.includes("webhook")) tags.push("webhooks");
+  if (source.includes("gateway")) tags.push("gateway");
+  if (source.includes("analytics")) tags.push("analytics");
+  if (source.includes("status")) tags.push("status");
+  if (tags.length === 0) tags.push("product");
+  return tags.slice(0, 3);
+}
+
 export default async function UpdatesPage() {
-  const posts = await fetchUpdates();
+  const posts = [...(await fetchUpdates())].sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-10 px-4 py-16 sm:px-6 lg:px-8">
@@ -110,19 +129,24 @@ export default async function UpdatesPage() {
         </div>
       ) : (
         <div className="space-y-10">
-          {[...posts]
-            .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-            .map((post) => (
+          {posts.map((post, index) => (
               <article
                 key={post.id}
                 className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6"
               >
-                <time
-                  dateTime={post.publishedAt}
-                  className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]"
-                >
-                  {formatDate(post.publishedAt)}
-                </time>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--fyxvo-text-muted)]">
+                  <time dateTime={post.publishedAt} className="font-semibold uppercase tracking-[0.14em]">
+                    {formatDate(post.publishedAt)}
+                  </time>
+                  <span>{readingTimeMinutes(post.content)} min read</span>
+                  <div className="flex flex-wrap gap-2">
+                    {deriveTags(post).map((tag) => (
+                      <span key={tag} className="rounded-full border border-[var(--fyxvo-border)] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <h2 className="mt-2 font-display text-xl font-semibold text-[var(--fyxvo-text)]">
                   {post.title}
                 </h2>
@@ -132,9 +156,25 @@ export default async function UpdatesPage() {
                   </p>
                 ) : null}
                 {post.content ? (
-                  <p className="mt-4 line-clamp-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                    {post.content}
-                  </p>
+                  <div className="mt-4 space-y-3 text-sm leading-7 text-[var(--fyxvo-text-muted)]">
+                    {post.content
+                      .split(/\n{2,}/)
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .map((paragraph) => (
+                        <p key={paragraph.slice(0, 20)}>{paragraph}</p>
+                      ))}
+                  </div>
+                ) : null}
+                {posts.length > 1 ? (
+                  <div className="mt-5 flex items-center justify-between border-t border-[var(--fyxvo-border)] pt-4 text-sm">
+                    <span className="text-[var(--fyxvo-text-muted)]">
+                      {posts[index + 1] ? `Previous: ${posts[index + 1]!.title}` : "Newest post"}
+                    </span>
+                    <span className="text-[var(--fyxvo-text-muted)]">
+                      {posts[index - 1] ? `Next: ${posts[index - 1]!.title}` : "Oldest post"}
+                    </span>
+                  </div>
                 ) : null}
               </article>
             ))}

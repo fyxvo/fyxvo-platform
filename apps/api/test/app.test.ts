@@ -106,6 +106,22 @@ class MemoryApiRepository implements ApiRepository {
   private readonly interestSubmissions = new Map<string, InterestSubmission>();
   private readonly feedbackSubmissions = new Map<string, FeedbackSubmission>();
   private readonly idempotencyRecords = new Map<string, IdempotencyRecord>();
+  private readonly incidents = new Map<
+    string,
+    { id: string; severity: "info" | "warning" | "critical"; description: string; createdAt: string; resolvedAt: string | null }
+  >();
+  private readonly assistantConversations = new Map<
+    string,
+    {
+      id: string;
+      userId: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+      lastMessageAt: string;
+      messages: Array<{ id: string; role: "user" | "assistant"; content: string; createdAt: string }>;
+    }
+  >();
   private readonly operatorSummaries: OperatorSummary[];
   private readonly onProjectCreated?: (project: Project) => void;
 
@@ -948,8 +964,144 @@ class MemoryApiRepository implements ApiRepository {
     this.requestLogs.set(requestLog.id, requestLog);
   }
 
-  // Stubs for new methods not needed in unit tests
+  private mapAssistantConversationSummary(conversation: {
+    id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+    lastMessageAt: string;
+    messages: Array<{ id: string; role: "user" | "assistant"; content: string; createdAt: string }>;
+  }) {
+    return {
+      id: conversation.id,
+      title: conversation.title,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      lastMessageAt: conversation.lastMessageAt,
+      messageCount: conversation.messages.length
+    };
+  }
+
+  async listIncidents(limit = 20) {
+    return [...this.incidents.values()]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
+  }
+
+  async createIncident(input: { severity: "info" | "warning" | "critical"; description: string }) {
+    const incident = {
+      id: randomUUID(),
+      severity: input.severity,
+      description: input.description,
+      createdAt: new Date().toISOString(),
+      resolvedAt: null
+    };
+    this.incidents.set(incident.id, incident);
+    return incident;
+  }
+
+  async updateIncident(
+    incidentId: string,
+    input: { severity?: "info" | "warning" | "critical"; description?: string; resolvedAt?: string | null }
+  ) {
+    const incident = this.incidents.get(incidentId);
+    if (!incident) {
+      throw new Error(`Incident ${incidentId} was not found.`);
+    }
+
+    const nextIncident = {
+      ...incident,
+      ...(input.severity !== undefined ? { severity: input.severity } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.resolvedAt !== undefined ? { resolvedAt: input.resolvedAt } : {})
+    };
+    this.incidents.set(incidentId, nextIncident);
+    return nextIncident;
+  }
+
   async countAssistantMessagesThisHour(_userId: string, _since: Date): Promise<number> { return 0; }
+
+  async listAssistantConversations(userId: string, limit = 20) {
+    return [...this.assistantConversations.values()]
+      .filter((conversation) => conversation.userId === userId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .slice(0, limit)
+      .map((conversation) => this.mapAssistantConversationSummary(conversation));
+  }
+
+  async getAssistantConversation(userId: string, conversationId: string) {
+    const conversation = this.assistantConversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return null;
+    }
+
+    return {
+      ...this.mapAssistantConversationSummary(conversation),
+      messages: [...conversation.messages]
+    };
+  }
+
+  async createAssistantConversation(input: { userId: string; title: string }) {
+    const now = new Date().toISOString();
+    const conversation = {
+      id: randomUUID(),
+      userId: input.userId,
+      title: input.title,
+      createdAt: now,
+      updatedAt: now,
+      lastMessageAt: now,
+      messages: [] as Array<{ id: string; role: "user" | "assistant"; content: string; createdAt: string }>
+    };
+    this.assistantConversations.set(conversation.id, conversation);
+    return this.mapAssistantConversationSummary(conversation);
+  }
+
+  async saveAssistantConversationMessages(input: {
+    userId: string;
+    conversationId: string;
+    titleFromFirstUserMessage?: string;
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+  }) {
+    const conversation = this.assistantConversations.get(input.conversationId);
+    if (!conversation || conversation.userId !== input.userId) {
+      throw new Error(`Conversation ${input.conversationId} was not found.`);
+    }
+
+    const createdAtBase = Date.now();
+    const messages = input.messages.slice(-50).map((message, index) => ({
+      id: randomUUID(),
+      role: message.role,
+      content: message.content,
+      createdAt: new Date(createdAtBase + index).toISOString()
+    }));
+    const lastMessageAt = messages.at(-1)?.createdAt ?? conversation.lastMessageAt;
+    const nextConversation = {
+      ...conversation,
+      title: conversation.messages.length === 0 && input.titleFromFirstUserMessage
+        ? input.titleFromFirstUserMessage
+        : conversation.title,
+      updatedAt: lastMessageAt,
+      lastMessageAt,
+      messages
+    };
+    this.assistantConversations.set(conversation.id, nextConversation);
+
+    return {
+      ...this.mapAssistantConversationSummary(nextConversation),
+      messages: [...nextConversation.messages]
+    };
+  }
+
+  async clearAssistantConversation(userId: string, conversationId: string): Promise<void> {
+    const conversation = this.assistantConversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return;
+    }
+
+    this.assistantConversations.delete(conversationId);
+  }
+
+  // Stubs for new methods not needed in unit tests
   async listWebhooks(_projectId: string) { return []; }
   async createWebhook(_input: { projectId: string; url: string; events: string[]; secret: string }) { return { id: randomUUID(), projectId: _input.projectId, url: _input.url, events: _input.events, secret: _input.secret, active: true, lastTriggeredAt: null, createdAt: new Date().toISOString() }; }
   async findWebhook(_webhookId: string, _projectId: string) { return null; }
@@ -965,7 +1117,7 @@ class MemoryApiRepository implements ApiRepository {
   async logActivity(_input: { projectId: string; userId?: string | null; action: string; details?: Record<string, unknown> | null }): Promise<void> {}
   async listActivityLog(_projectId: string, _limit?: number) { return []; }
   async getActiveAnnouncement() { return null; }
-  async upsertAnnouncement(_input: { message: string; severity: string }): Promise<void> {}
+  async upsertAnnouncement(_input: { message: string; severity: string; startAt?: Date | null; endAt?: Date | null }): Promise<void> {}
   async getWhatsNew(_userId: string) { return null; }
   async dismissWhatsNew(_userId: string, _version: string): Promise<void> {}
   async recordWebhookDelivery(_input: { webhookId: string; eventType: string; payload: unknown; attemptNumber: number; responseStatus?: number | null; responseBody?: string | null; success: boolean; nextRetryAt?: Date | null }): Promise<string> { return "test-delivery-id"; }

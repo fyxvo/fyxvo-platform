@@ -29,12 +29,18 @@ export function RealtimeFeed({ projectId, token }: RealtimeFeedProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [pulseActive, setPulseActive] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [, setTick] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const latestSeenIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Force re-render every second to update relative timestamps
-    const tickInterval = setInterval(() => setTick((n) => n + 1), 1000);
+    const tickInterval = setInterval(() => {
+      setTick((n) => n + 1);
+      setNowMs(Date.now());
+    }, 1000);
     return () => clearInterval(tickInterval);
   }, []);
 
@@ -55,7 +61,14 @@ export function RealtimeFeed({ projectId, token }: RealtimeFeedProps) {
         }
         const json = (await res.json()) as { item: ProjectAnalytics };
         if (!cancelled) {
-          setRequests(json.item.recentRequests ?? []);
+          const nextRequests = json.item.recentRequests ?? [];
+          const nextLatestId = nextRequests[0]?.id ?? null;
+          if (latestSeenIdRef.current && nextLatestId && nextLatestId !== latestSeenIdRef.current) {
+            setPulseActive(true);
+            window.setTimeout(() => setPulseActive(false), 1400);
+          }
+          latestSeenIdRef.current = nextLatestId;
+          setRequests(nextRequests);
           setLoading(false);
           setError(null);
         }
@@ -84,6 +97,9 @@ export function RealtimeFeed({ projectId, token }: RealtimeFeedProps) {
     if (statusFilter === "error") return r.statusCode >= 400;
     return true;
   });
+  const arrivalsLastMinute = requests.filter(
+    (request) => nowMs - new Date(request.createdAt).getTime() <= 60_000
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -108,12 +124,23 @@ export function RealtimeFeed({ projectId, token }: RealtimeFeedProps) {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1.5 ml-auto">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+        <div className="ml-auto flex items-center gap-3">
+          <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1 text-xs text-[var(--fyxvo-text-muted)]">
+            {arrivalsLastMinute} request{arrivalsLastMinute === 1 ? "" : "s"} in the last minute
           </span>
-          <span className="text-xs text-[var(--fyxvo-text-muted)]">Polling every 5s</span>
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span
+                className={`absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 ${
+                  pulseActive ? "animate-ping" : ""
+                }`}
+              />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+            </span>
+            <span className="text-xs text-[var(--fyxvo-text-muted)]">
+              {pulseActive ? "New request detected" : "Polling every 5s"}
+            </span>
+          </div>
         </div>
       </div>
 

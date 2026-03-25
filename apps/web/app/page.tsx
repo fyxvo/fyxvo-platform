@@ -252,6 +252,46 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="border-t border-[var(--fyxvo-border)] py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 max-w-2xl">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+              Built for real developer workflows
+            </p>
+            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              Built for real developer workflows
+            </h2>
+            <p className="mt-3 text-base text-[var(--fyxvo-text-muted)]">
+              Calm, technical surfaces that help teams move from setup to verification without guessing what happens next.
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              {
+                title: "Project-based API keys",
+                body: "Issue keys per project with explicit scopes so relay traffic, analytics access, and operational ownership stay separated.",
+              },
+              {
+                title: "Live analytics and request tracing",
+                body: "Follow first-request success with request logs, trace lookup, latency views, and project-level health instead of opaque black-box behavior.",
+              },
+              {
+                title: "Managed infrastructure with status visibility",
+                body: "Use the managed gateway with public status visibility, incident history, and on-platform operational context when something changes.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5"
+              >
+                <h3 className="text-lg font-semibold text-[var(--fyxvo-text)]">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Use Cases */}
       <section id="use-cases" className="border-t border-[var(--fyxvo-border)] py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

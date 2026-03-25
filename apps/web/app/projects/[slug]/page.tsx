@@ -23,6 +23,7 @@ import { SectionErrorBoundary } from "../../../components/section-error-boundary
 import { OnboardingChecklist } from "../../../components/onboarding-checklist";
 import { PageHeader } from "../../../components/page-header";
 import { AuthGate } from "../../../components/state-panels";
+import { QuickstartLauncher } from "../../../components/quickstart-launcher";
 import { usePortal } from "../../../components/portal-provider";
 import { fundingTrend } from "../../../lib/sample-data";
 import { formatDuration, formatInteger, shortenAddress } from "../../../lib/format";
@@ -246,6 +247,8 @@ export default function ProjectPage({
           requestCount={portal.projectAnalytics.totals.requestLogs}
         />
       ) : null}
+
+      {portal.walletPhase === "authenticated" ? <QuickstartLauncher project={project} /> : null}
 
       <div className="flex gap-1 border-b border-[var(--fyxvo-border)]">
         {(["overview", "activity", "realtime"] as const).map((tab) => (

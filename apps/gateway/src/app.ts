@@ -389,12 +389,57 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
               result = "ok";
             } else if (rpcMethod === "getSlot") {
               result = 312847293;
+            } else if (rpcMethod === "getEpochInfo") {
+              result = {
+                absoluteSlot: 312847293,
+                blockHeight: 289001122,
+                epoch: 731,
+                slotIndex: 1123,
+                slotsInEpoch: 432000,
+                transactionCount: 928112,
+              };
+            } else if (rpcMethod === "getVersion") {
+              result = {
+                "solana-core": "2.1.0-simulated",
+                "feature-set": 327001001,
+              };
+            } else if (rpcMethod === "getBalance") {
+              result = {
+                context: { slot: 312847293 },
+                value: 1000000000,
+              };
+            } else if (rpcMethod === "getAccountInfo") {
+              result = {
+                context: { slot: 312847293 },
+                value: {
+                  data: ["", "base64"],
+                  executable: false,
+                  lamports: 1000000000,
+                  owner: "11111111111111111111111111111111",
+                  rentEpoch: 18446744073709552000,
+                  space: 0,
+                },
+              };
             } else if (rpcMethod === "getLatestBlockhash") {
               result = {
                 context: { slot: 312847293 },
                 value: {
                   blockhash: "SimulatedBlockhash1111111111111111111111111111",
                   lastValidBlockHeight: 312857293,
+                },
+              };
+            } else if (rpcMethod === "simulateTransaction") {
+              result = {
+                context: { slot: 312847293 },
+                value: {
+                  err: null,
+                  logs: [
+                    "Program simulated111111111111111111111111111111 invoke [1]",
+                    "Program simulated111111111111111111111111111111 success",
+                  ],
+                  accounts: null,
+                  unitsConsumed: 18250,
+                  returnData: null,
                 },
               };
             } else {
@@ -614,14 +659,54 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           result = "ok";
         } else if (rpcMethod === "getSlot") {
           result = 312847293;
+        } else if (rpcMethod === "getEpochInfo") {
+          result = {
+            absoluteSlot: 312847293,
+            blockHeight: 289001122,
+            epoch: 731,
+            slotIndex: 1123,
+            slotsInEpoch: 432000,
+            transactionCount: 928112,
+          };
+        } else if (rpcMethod === "getVersion") {
+          result = {
+            "solana-core": "2.1.0-simulated",
+            "feature-set": 327001001,
+          };
         } else if (rpcMethod === "getBalance") {
           result = { context: { slot: 312847293 }, value: 1000000000 };
+        } else if (rpcMethod === "getAccountInfo") {
+          result = {
+            context: { slot: 312847293 },
+            value: {
+              data: ["", "base64"],
+              executable: false,
+              lamports: 1000000000,
+              owner: "11111111111111111111111111111111",
+              rentEpoch: 18446744073709552000,
+              space: 0,
+            },
+          };
         } else if (rpcMethod === "getLatestBlockhash") {
           result = {
             context: { slot: 312847293 },
             value: {
               blockhash: "SimulatedBlockhash1111111111111111111111111111",
               lastValidBlockHeight: 312857293,
+            },
+          };
+        } else if (rpcMethod === "simulateTransaction") {
+          result = {
+            context: { slot: 312847293 },
+            value: {
+              err: null,
+              logs: [
+                "Program simulated111111111111111111111111111111 invoke [1]",
+                "Program simulated111111111111111111111111111111 success",
+              ],
+              accounts: null,
+              unitsConsumed: 18250,
+              returnData: null,
             },
           };
         } else {

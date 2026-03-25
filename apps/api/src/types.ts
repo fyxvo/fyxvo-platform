@@ -513,7 +513,29 @@ export interface SystemAnnouncementItem {
   readonly message: string;
   readonly severity: string;
   readonly active: boolean;
+  readonly startAt: string | null;
+  readonly endAt: string | null;
   readonly createdAt: string;
+}
+
+export interface AssistantConversationSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lastMessageAt: string;
+  readonly messageCount: number;
+}
+
+export interface AssistantConversationMessage {
+  readonly id: string;
+  readonly role: "user" | "assistant";
+  readonly content: string;
+  readonly createdAt: string;
+}
+
+export interface AssistantConversationDetail extends AssistantConversationSummary {
+  readonly messages: AssistantConversationMessage[];
 }
 
 export interface WhatsNewItem {
@@ -529,8 +551,13 @@ export interface WebhookDeliveryRecord {
   webhookId: string;
   eventType: string;
   success: boolean;
+  status: string;
   responseStatus: number | null;
+  responseBody: string | null;
   attemptNumber: number;
+  nextRetryAt: string | null;
+  deliveredAt: string | null;
+  payload: Record<string, unknown> | null;
   attemptedAt: string;
 }
 
@@ -555,12 +582,15 @@ export interface SupportTicketRecord {
   id: string;
   userId: string;
   projectId: string | null;
+  projectName: string | null;
+  projectSlug: string | null;
   category: string;
   priority: string;
   subject: string;
   description: string;
   status: string;
   adminResponse: string | null;
+  adminRespondedAt: string | null;
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
@@ -692,6 +722,8 @@ export interface ApiRepository {
   getServiceHealthHistory(limitPerService: number): Promise<ServiceHealthHistory>;
   getAssistantStats(): Promise<AssistantStats>;
   listIncidents(limit: number): Promise<IncidentItem[]>;
+  createIncident(input: { serviceName: string; severity: string; description: string }): Promise<IncidentItem>;
+  updateIncident(id: string, input: { severity?: string; description?: string; resolvedAt?: Date | null }): Promise<IncidentItem>;
   getReferralStats(userId: string): Promise<ReferralStats>;
   recordReferralClick(referralCode: string): Promise<{ referrerId: string } | null>;
   generateReferralCode(userId: string): Promise<string>;
@@ -711,7 +743,17 @@ export interface ApiRepository {
   logActivity(input: { projectId: string; userId?: string | null; action: string; details?: Record<string, unknown> | null }): Promise<void>;
   listActivityLog(projectId: string, limit?: number): Promise<ActivityLogItem[]>;
   getActiveAnnouncement(): Promise<SystemAnnouncementItem | null>;
-  upsertAnnouncement(input: { message: string; severity: string }): Promise<void>;
+  upsertAnnouncement(input: { message: string; severity: string; startAt?: Date | null; endAt?: Date | null }): Promise<void>;
+  listAssistantConversations(userId: string, limit?: number): Promise<AssistantConversationSummary[]>;
+  getAssistantConversation(userId: string, conversationId: string): Promise<AssistantConversationDetail | null>;
+  createAssistantConversation(input: { userId: string; title: string }): Promise<AssistantConversationSummary>;
+  saveAssistantConversationMessages(input: {
+    userId: string;
+    conversationId?: string;
+    titleFromFirstUserMessage?: string;
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+  }): Promise<AssistantConversationDetail>;
+  clearAssistantConversation(userId: string, conversationId: string): Promise<void>;
   getWhatsNew(userId: string): Promise<WhatsNewItem | null>;
   dismissWhatsNew(userId: string, version: string): Promise<void>;
 
@@ -791,7 +833,12 @@ export interface ApiRepository {
     eventType: string;
     status: string;
     responseStatus: number | null;
+    responseBody: string | null;
     attemptNumber: number;
+    nextRetryAt: string | null;
+    permanentlyFailed: boolean;
+    payload: Record<string, unknown> | null;
+    signature: string;
     createdAt: string;
   }>>;
   redeliverWebhookEvent(deliveryId: string, projectId: string): Promise<void>;

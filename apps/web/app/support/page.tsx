@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 import { usePortal } from "../../components/portal-provider";
 import { PageHeader } from "../../components/page-header";
-import { submitFeedback, isPortalApiError } from "../../lib/api";
+import { webEnv } from "../../lib/env";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,9 +27,16 @@ type SupportCategory =
 interface SupportTicket {
   readonly id: string;
   readonly subject: string;
-  readonly category: TicketCategory;
+  readonly category: string;
   readonly status: TicketStatus;
   readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly resolvedAt: string | null;
+  readonly adminResponse: string | null;
+  readonly adminRespondedAt: string | null;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly projectSlug: string | null;
 }
 
 interface FaqItem {
@@ -48,6 +55,16 @@ const CATEGORY_LABELS: Record<TicketCategory, string> = {
   ONBOARDING_FRICTION: "Onboarding Issue",
   PRODUCT_FEEDBACK: "Product Feedback",
 };
+
+function supportCategoryLabel(value: string): string {
+  if (value in CATEGORY_LABELS) {
+    return CATEGORY_LABELS[value as TicketCategory];
+  }
+  if (value === "technical") return "Technical";
+  if (value === "billing") return "Billing";
+  if (value === "security") return "Security";
+  return "General";
+}
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: "Low",
@@ -340,6 +357,7 @@ export default function SupportPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -380,6 +398,21 @@ export default function SupportPage() {
       ? DOCS_FAQ.filter((item) => item.category === selectedSupportCategory).slice(0, 3)
       : [];
 
+  const user = portal.user;
+
+  useEffect(() => {
+    if (!portal.token) return;
+    fetch(new URL("/v1/support/tickets", webEnv.apiBaseUrl), {
+      headers: { authorization: `Bearer ${portal.token}` },
+      cache: "no-store",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { tickets?: SupportTicket[] } | null) => {
+        setTickets(body?.tickets ?? []);
+      })
+      .catch(() => undefined);
+  }, [portal.token]);
+
   if (portal.walletPhase !== "authenticated" || !portal.token) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -390,8 +423,6 @@ export default function SupportPage() {
     );
   }
 
-  const user = portal.user;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formValid) return;
@@ -401,26 +432,33 @@ export default function SupportPage() {
     setSubmitError(null);
 
     try {
-      const result = await submitFeedback(
-        {
-          name: user.displayName ?? user.walletAddress,
-          email: "support@fyxvo.com",
-          category,
-          message: `[${PRIORITY_LABELS[priority]} priority] ${subject}\n\n${description}`,
-          source: "support-page",
-          page: "/support",
-          ...(portal.walletAddress ? { walletAddress: portal.walletAddress } : {}),
+      const response = await fetch(new URL("/v1/support/tickets", webEnv.apiBaseUrl), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${portal.token}`,
         },
-        portal.token
-      );
+        body: JSON.stringify({
+          projectId: portal.selectedProject?.id,
+          category:
+            category === "SUPPORT_REQUEST"
+              ? "technical"
+              : category === "BUG_REPORT"
+                ? "technical"
+                : category === "ONBOARDING_FRICTION"
+                  ? "general"
+                  : "general",
+          priority,
+          subject,
+          description,
+        }),
+      });
 
-      const newTicket: SupportTicket = {
-        id: result.item.id,
-        subject,
-        category,
-        status: "open",
-        createdAt: result.item.createdAt,
-      };
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const newTicket = (await response.json()) as SupportTicket;
 
       setTickets((prev) => [newTicket, ...prev]);
       setSubject("");
@@ -431,15 +469,13 @@ export default function SupportPage() {
       setPriority("normal");
       setSubmitted(true);
     } catch (err) {
-      if (isPortalApiError(err)) {
-        setSubmitError(err.message);
-      } else {
-        setSubmitError("Failed to submit ticket. Please try again.");
-      }
+      setSubmitError(err instanceof Error ? err.message : "Failed to submit ticket. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
+
+  const filteredTickets = tickets.filter((ticket) => statusFilter === "all" || ticket.status === statusFilter);
 
   return (
     <div className="space-y-8">
@@ -705,7 +741,25 @@ export default function SupportPage() {
       {/* ------------------------------------------------------------------ */}
       {tickets.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Your Tickets</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Your Tickets</h2>
+            <div className="flex flex-wrap gap-2">
+              {(["all", "open", "in_progress", "resolved", "closed"] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setStatusFilter(status)}
+                  className={`rounded-full border px-3 py-1 text-xs transition ${
+                    statusFilter === status
+                      ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"
+                  }`}
+                >
+                  {status === "all" ? "all" : STATUS_STYLES[status].label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="overflow-hidden rounded-lg border border-[var(--fyxvo-border)]">
             <table className="w-full text-sm">
               <thead>
@@ -725,20 +779,36 @@ export default function SupportPage() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map((ticket) => (
+                {filteredTickets.map((ticket) => (
                   <tr
                     key={ticket.id}
                     className="border-b border-[var(--fyxvo-border)] last:border-0 bg-[var(--fyxvo-bg-elevated)]"
                   >
-                    <td className="px-4 py-3 font-medium text-[var(--fyxvo-text)]">{ticket.subject}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-[var(--fyxvo-text)]">{ticket.subject}</div>
+                      {ticket.projectSlug ? (
+                        <a href={`/projects/${ticket.projectSlug}`} className="text-xs text-[var(--fyxvo-brand)] hover:underline">
+                          {ticket.projectName ?? "Open related project"}
+                        </a>
+                      ) : null}
+                      {ticket.adminResponse ? (
+                        <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">
+                          Latest admin response{ticket.adminRespondedAt ? ` · ${formatDate(ticket.adminRespondedAt)}` : ""}: {ticket.adminResponse}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-3 text-[var(--fyxvo-text-muted)]">
-                      {CATEGORY_LABELS[ticket.category]}
+                      {supportCategoryLabel(ticket.category)}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={ticket.status} />
                     </td>
                     <td className="px-4 py-3 text-[var(--fyxvo-text-muted)]">
-                      {formatDate(ticket.createdAt)}
+                      <div>{formatDate(ticket.createdAt)}</div>
+                      <div className="text-xs">
+                        Updated {formatDate(ticket.updatedAt)}
+                        {ticket.resolvedAt ? ` · Resolved ${formatDate(ticket.resolvedAt)}` : ""}
+                      </div>
                     </td>
                   </tr>
                 ))}

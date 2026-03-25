@@ -19,6 +19,7 @@ const NAV_SECTIONS = [
   { id: "priority-relay", label: "Priority Relay", keywords: "priority relay high throughput fast latency /priority scope" },
   { id: "analytics", label: "Analytics", keywords: "analytics overview stats requests latency error rate monitoring project" },
   { id: "analytics-api", label: "Analytics API", keywords: "analytics stats requests latency error rate monitoring project" },
+  { id: "public-stats", label: "Public Stats API", keywords: "public stats api curl node python fetch x-api-key backend service" },
   { id: "api-explorer", label: "API Explorer", keywords: "try it interactive request curl live test endpoint" },
   { id: "webhooks", label: "Webhooks", keywords: "webhook http callback post event funding apikey hmac signature" },
   { id: "team-collaboration", label: "Team Collaboration", keywords: "team member invite wallet collaboration owner role" },
@@ -1016,6 +1017,62 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+
+          <section id="public-stats">
+            <SectionHeading
+              id="public-stats"
+              eyebrow="Project API"
+              title="Public Stats API"
+              description="Read project-level public stats with a project-scoped API key from your backend services."
+            />
+            <div className="space-y-5">
+              <Notice tone="warning" title="Keep keys off the client">
+                Pass <code className="font-mono text-xs">x-api-key</code> from a backend service, serverless function, or CI job. Do not ship project keys in browser bundles.
+              </Notice>
+              <CodeBlock
+                label="curl"
+                code={`curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public \\
+  -H "x-api-key: $FYXVO_API_KEY"`}
+              />
+              <CodeBlock
+                label="JavaScript fetch (server-side)"
+                code={`const response = await fetch("${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public", {
+  headers: {
+    "x-api-key": process.env.FYXVO_API_KEY!,
+  },
+  cache: "no-store",
+});
+
+const stats = await response.json();
+console.log(stats);`}
+              />
+              <CodeBlock
+                label="Node.js"
+                code={`import process from "node:process";
+
+const response = await fetch("${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public", {
+  headers: {
+    "x-api-key": process.env.FYXVO_API_KEY ?? "",
+  },
+});
+
+console.log(await response.json());`}
+              />
+              <CodeBlock
+                label="Python"
+                code={`import os
+import requests
+
+response = requests.get(
+    "${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public",
+    headers={"x-api-key": os.environ["FYXVO_API_KEY"]},
+    timeout=10,
+)
+
+print(response.json())`}
+              />
             </div>
           </section>
 

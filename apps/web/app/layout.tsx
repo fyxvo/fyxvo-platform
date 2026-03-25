@@ -64,8 +64,8 @@ export const metadata: Metadata = {
     images: [webEnv.socialImageUrl]
   },
   robots: {
-    index: webEnv.allowIndexing,
-    follow: webEnv.allowIndexing
+    index: true,
+    follow: true
   },
   category: "technology"
 };

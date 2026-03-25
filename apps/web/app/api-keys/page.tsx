@@ -145,17 +145,37 @@ export default function ApiKeysPage() {
               </span>
             ) : null}
           </p>
-          {portal.selectedProject ? (
-            <div className="mt-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => router.push(`/projects/${portal.selectedProject!.slug}?tab=endpoints`)}
-              >
-                Done — set up your endpoint
-              </Button>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Next step 1</p>
+              <p className="mt-1 text-sm text-[var(--fyxvo-text)]">Copy a live curl example</p>
+              <div className="mt-2">
+                <CopyButton value={standardRequest} label="Copy curl example" />
+              </div>
             </div>
-          ) : null}
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Next step 2</p>
+              <p className="mt-1 text-sm text-[var(--fyxvo-text)]">Open playground with this key selected</p>
+              <div className="mt-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => router.push("/playground")}
+                >
+                  Open playground
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Next step 3</p>
+              <p className="mt-1 text-sm text-[var(--fyxvo-text)]">Keep quickstart instructions nearby while you test</p>
+              <div className="mt-2">
+                <Button variant="secondary" size="sm" onClick={() => router.push("/docs#quickstart")}>
+                  Open docs quickstart
+                </Button>
+              </div>
+            </div>
+          </div>
         </Notice>
       ) : null}
 

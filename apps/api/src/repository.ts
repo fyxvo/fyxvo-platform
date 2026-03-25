@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import {
   ApiKeyStatus,
   Prisma,
@@ -8,6 +8,8 @@ import {
 } from "@fyxvo/database";
 import type {
   ActivityLogItem,
+  AssistantConversationDetail,
+  AssistantConversationSummary,
   AdminOverviewBase,
   AdminStats,
   AnalyticsOverview,
@@ -117,6 +119,24 @@ function toJsonValue(value: Record<string, unknown>): PrismaNamespace.InputJsonV
       typeof candidate === "bigint" ? candidate.toString() : candidate
     )
   ) as PrismaNamespace.InputJsonValue;
+}
+
+function mapAssistantConversationSummary(row: {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastMessageAt: Date;
+  _count?: { messages?: number };
+}): AssistantConversationSummary {
+  return {
+    id: row.id,
+    title: row.title,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    lastMessageAt: row.lastMessageAt.toISOString(),
+    messageCount: row._count?.messages ?? 0,
+  };
 }
 
 export class PrismaApiRepository implements ApiRepository {
@@ -1254,6 +1274,46 @@ export class PrismaApiRepository implements ApiRepository {
     }));
   }
 
+  async createIncident(input: { serviceName: string; severity: string; description: string }): Promise<IncidentItem> {
+    const row = await this.prisma.incident.create({
+      data: {
+        serviceName: input.serviceName,
+        severity: input.severity,
+        description: input.description,
+      },
+    });
+    return {
+      id: row.id,
+      serviceName: row.serviceName,
+      severity: row.severity,
+      description: row.description,
+      startedAt: row.startedAt.toISOString(),
+      resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+    };
+  }
+
+  async updateIncident(
+    id: string,
+    input: { severity?: string; description?: string; resolvedAt?: Date | null }
+  ): Promise<IncidentItem> {
+    const row = await this.prisma.incident.update({
+      where: { id },
+      data: {
+        ...(input.severity !== undefined ? { severity: input.severity } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.resolvedAt !== undefined ? { resolvedAt: input.resolvedAt } : {}),
+      },
+    });
+    return {
+      id: row.id,
+      serviceName: row.serviceName,
+      severity: row.severity,
+      description: row.description,
+      startedAt: row.startedAt.toISOString(),
+      resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+    };
+  }
+
   async getReferralStats(userId: string): Promise<ReferralStats> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1514,21 +1574,158 @@ export class PrismaApiRepository implements ApiRepository {
   async getActiveAnnouncement(): Promise<SystemAnnouncementItem | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
+    const now = new Date();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ann: any = await db.systemAnnouncement.findFirst({
-      where: { active: true },
-      orderBy: { createdAt: "desc" },
+      where: {
+        active: true,
+        OR: [
+          { startAt: null, endAt: null },
+          { startAt: null, endAt: { gte: now } },
+          { startAt: { lte: now }, endAt: null },
+          { startAt: { lte: now }, endAt: { gte: now } },
+        ],
+      },
+      orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
     });
     if (!ann) return null;
-    return { id: ann.id as string, message: ann.message as string, severity: ann.severity as string, active: ann.active as boolean, createdAt: (ann.createdAt as Date).toISOString() };
+    return {
+      id: ann.id as string,
+      message: ann.message as string,
+      severity: ann.severity as string,
+      active: ann.active as boolean,
+      startAt: ann.startAt ? (ann.startAt as Date).toISOString() : null,
+      endAt: ann.endAt ? (ann.endAt as Date).toISOString() : null,
+      createdAt: (ann.createdAt as Date).toISOString(),
+    };
   }
 
-  async upsertAnnouncement(input: { message: string; severity: string }): Promise<void> {
+  async upsertAnnouncement(input: { message: string; severity: string; startAt?: Date | null; endAt?: Date | null }): Promise<void> {
     // Deactivate existing announcements and create a new one
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
     await db.systemAnnouncement.updateMany({ where: { active: true }, data: { active: false } });
-    await db.systemAnnouncement.create({ data: { message: input.message, severity: input.severity, active: true } });
+    await db.systemAnnouncement.create({
+      data: {
+        message: input.message,
+        severity: input.severity,
+        active: true,
+        startAt: input.startAt ?? null,
+        endAt: input.endAt ?? null,
+      }
+    });
+  }
+
+  async listAssistantConversations(userId: string, limit = 20): Promise<AssistantConversationSummary[]> {
+    const rows = await this.prisma.assistantConversation.findMany({
+      where: { userId },
+      orderBy: { lastMessageAt: "desc" },
+      take: limit,
+      include: { _count: { select: { messages: true } } },
+    });
+    return rows.map((row: {
+      id: string;
+      title: string;
+      createdAt: Date;
+      updatedAt: Date;
+      lastMessageAt: Date;
+      _count: { messages: number };
+    }) => mapAssistantConversationSummary(row));
+  }
+
+  async getAssistantConversation(userId: string, conversationId: string): Promise<AssistantConversationDetail | null> {
+    const row = await this.prisma.assistantConversation.findFirst({
+      where: { id: conversationId, userId },
+      include: {
+        _count: { select: { messages: true } },
+        messages: { orderBy: { createdAt: "asc" }, take: 50 },
+      },
+    });
+    if (!row) return null;
+    return {
+      ...mapAssistantConversationSummary(row),
+      messages: row.messages.map((message: {
+        id: string;
+        role: string;
+        content: string;
+        createdAt: Date;
+      }) => ({
+        id: message.id,
+        role: message.role as "user" | "assistant",
+        content: message.content,
+        createdAt: message.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async createAssistantConversation(input: { userId: string; title: string }): Promise<AssistantConversationSummary> {
+    const row = await this.prisma.assistantConversation.create({
+      data: {
+        userId: input.userId,
+        title: input.title.slice(0, 80),
+      },
+      include: { _count: { select: { messages: true } } },
+    });
+    return mapAssistantConversationSummary(row);
+  }
+
+  async saveAssistantConversationMessages(input: {
+    userId: string;
+    conversationId?: string;
+    titleFromFirstUserMessage?: string;
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+  }): Promise<AssistantConversationDetail> {
+    const titleSource =
+      input.titleFromFirstUserMessage?.trim() ||
+      input.messages.find((message) => message.role === "user")?.content?.trim() ||
+      "New conversation";
+    const title = titleSource.length > 80 ? `${titleSource.slice(0, 77).trimEnd()}...` : titleSource;
+
+    const conversation = input.conversationId
+      ? await this.prisma.assistantConversation.findFirst({
+          where: { id: input.conversationId, userId: input.userId },
+        })
+      : null;
+
+    const conversationId = conversation?.id ?? (await this.prisma.assistantConversation.create({
+      data: {
+        userId: input.userId,
+        title,
+      },
+      select: { id: true },
+    })).id;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.assistantMessage.deleteMany({ where: { conversationId } });
+      if (input.messages.length > 0) {
+        await tx.assistantMessage.createMany({
+          data: input.messages.slice(-50).map((message) => ({
+            conversationId,
+            role: message.role,
+            content: message.content,
+          })),
+        });
+      }
+      await tx.assistantConversation.update({
+        where: { id: conversationId },
+        data: {
+          title,
+          lastMessageAt: new Date(),
+        },
+      });
+    });
+
+    const detail = await this.getAssistantConversation(input.userId, conversationId);
+    if (!detail) {
+      throw new Error("Assistant conversation could not be loaded after save.");
+    }
+    return detail;
+  }
+
+  async clearAssistantConversation(userId: string, conversationId: string): Promise<void> {
+    await this.prisma.assistantConversation.deleteMany({
+      where: { id: conversationId, userId },
+    });
   }
 
   async getWhatsNew(userId: string): Promise<WhatsNewItem | null> {
@@ -1568,10 +1765,12 @@ export class PrismaApiRepository implements ApiRepository {
         eventType: input.eventType,
         payload: input.payload as object,
         attemptNumber: input.attemptNumber,
+        status: input.success ? "delivered" : input.nextRetryAt ? "pending_retry" : "failed",
         responseStatus: input.responseStatus ?? null,
         responseBody: input.responseBody ? input.responseBody.slice(0, 1000) : null,
         success: input.success,
         nextRetryAt: input.nextRetryAt ?? null,
+        deliveredAt: input.success ? new Date() : null,
       },
       select: { id: true },
     });
@@ -1585,12 +1784,41 @@ export class PrismaApiRepository implements ApiRepository {
       where: { webhookId },
       orderBy: { attemptedAt: "desc" },
       take: limit,
-      select: { id: true, webhookId: true, eventType: true, success: true, responseStatus: true, attemptNumber: true, attemptedAt: true },
+      select: {
+        id: true,
+        webhookId: true,
+        eventType: true,
+        success: true,
+        status: true,
+        responseStatus: true,
+        responseBody: true,
+        attemptNumber: true,
+        nextRetryAt: true,
+        deliveredAt: true,
+        payload: true,
+        attemptedAt: true,
+      },
     }) as WebhookDeliveryRecord[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (rows as any[]).map((r: { attemptedAt: Date | string } & Record<string, unknown>) => ({
+    return (rows as any[]).map((r: {
+      attemptedAt: Date | string;
+      nextRetryAt?: Date | string | null;
+      deliveredAt?: Date | string | null;
+      payload?: Record<string, unknown> | null;
+    } & Record<string, unknown>) => ({
       ...r,
       attemptedAt: r.attemptedAt instanceof Date ? r.attemptedAt.toISOString() : String(r.attemptedAt),
+      nextRetryAt: r.nextRetryAt
+        ? r.nextRetryAt instanceof Date
+          ? r.nextRetryAt.toISOString()
+          : String(r.nextRetryAt)
+        : null,
+      deliveredAt: r.deliveredAt
+        ? r.deliveredAt instanceof Date
+          ? r.deliveredAt.toISOString()
+          : String(r.deliveredAt)
+        : null,
+      payload: (r.payload as Record<string, unknown> | null) ?? null,
     })) as WebhookDeliveryRecord[];
   }
 
@@ -1610,10 +1838,12 @@ export class PrismaApiRepository implements ApiRepository {
     await db.webhookDelivery.update({
       where: { id },
       data: {
+        status: data.success ? "delivered" : data.nextRetryAt ? "pending_retry" : "failed",
         responseStatus: data.responseStatus ?? null,
         responseBody: data.responseBody ? data.responseBody.slice(0, 1000) : null,
         success: data.success,
         nextRetryAt: data.nextRetryAt ?? null,
+        deliveredAt: data.success ? new Date() : null,
       },
     });
   }
@@ -1761,14 +1991,21 @@ export class PrismaApiRepository implements ApiRepository {
   async listSupportTickets(userId: string): Promise<SupportTicketRecord[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
-    const rows = await db.supportTicket.findMany({ where: { userId }, orderBy: { createdAt: "desc" } });
+    const rows = await db.supportTicket.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: { project: { select: { name: true, slug: true } } },
+    });
     return rows.map((r: unknown) => this._mapTicket(r));
   }
 
   async getSupportTicket(id: string, userId: string): Promise<SupportTicketRecord | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
-    const row = await db.supportTicket.findFirst({ where: { id, userId } });
+    const row = await db.supportTicket.findFirst({
+      where: { id, userId },
+      include: { project: { select: { name: true, slug: true } } },
+    });
     return row ? this._mapTicket(row) : null;
   }
 
@@ -1776,7 +2013,12 @@ export class PrismaApiRepository implements ApiRepository {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = this.prisma as any;
     const where = status ? { status } : {};
-    const rows = await db.supportTicket.findMany({ where, orderBy: { createdAt: "desc" }, take: 100 });
+    const rows = await db.supportTicket.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { project: { select: { name: true, slug: true } } },
+    });
     return rows.map((r: unknown) => this._mapTicket(r));
   }
 
@@ -1785,7 +2027,13 @@ export class PrismaApiRepository implements ApiRepository {
     const db = this.prisma as any;
     const row = await db.supportTicket.update({
       where: { id },
-      data: { adminResponse: response, status, resolvedAt: status === "resolved" ? new Date() : null },
+      data: {
+        adminResponse: response,
+        adminRespondedAt: new Date(),
+        status,
+        resolvedAt: status === "resolved" ? new Date() : status === "closed" ? new Date() : null,
+      },
+      include: { project: { select: { name: true, slug: true } } },
     });
     return this._mapTicket(row);
   }
@@ -1796,12 +2044,19 @@ export class PrismaApiRepository implements ApiRepository {
       id: r.id as string,
       userId: r.userId as string,
       projectId: (r.projectId as string | null) ?? null,
+      projectName: (r.project?.name as string | undefined) ?? null,
+      projectSlug: (r.project?.slug as string | undefined) ?? null,
       category: r.category as string,
       priority: r.priority as string,
       subject: r.subject as string,
       description: r.description as string,
       status: r.status as string,
       adminResponse: (r.adminResponse as string | null) ?? null,
+      adminRespondedAt: r.adminRespondedAt
+        ? r.adminRespondedAt instanceof Date
+          ? (r.adminRespondedAt as Date).toISOString()
+          : String(r.adminRespondedAt)
+        : null,
       createdAt: r.createdAt instanceof Date ? (r.createdAt as Date).toISOString() : String(r.createdAt),
       updatedAt: r.updatedAt instanceof Date ? (r.updatedAt as Date).toISOString() : String(r.updatedAt),
       resolvedAt: r.resolvedAt ? (r.resolvedAt instanceof Date ? (r.resolvedAt as Date).toISOString() : String(r.resolvedAt)) : null,
@@ -2036,7 +2291,7 @@ export class PrismaApiRepository implements ApiRepository {
       where: { projectId, requestId: traceId },
       select: {
         id: true, requestId: true, method: true, durationMs: true,
-        statusCode: true, route: true, service: true, createdAt: true,
+        statusCode: true, route: true, service: true, createdAt: true, upstreamNode: true, region: true,
       },
     });
     if (!log) return null;
@@ -2136,7 +2391,12 @@ export class PrismaApiRepository implements ApiRepository {
     eventType: string;
     status: string;
     responseStatus: number | null;
+    responseBody: string | null;
     attemptNumber: number;
+    nextRetryAt: string | null;
+    permanentlyFailed: boolean;
+    payload: Record<string, unknown> | null;
+    signature: string;
     createdAt: string;
   }>> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2151,9 +2411,12 @@ export class PrismaApiRepository implements ApiRepository {
         eventType: true,
         status: true,
         responseStatus: true,
+        responseBody: true,
         attemptNumber: true,
+        nextRetryAt: true,
         createdAt: true,
-        webhook: { select: { url: true, events: true } },
+        payload: true,
+        webhook: { select: { url: true, events: true, secret: true } },
       },
     }) as Array<{
       id: string;
@@ -2161,9 +2424,12 @@ export class PrismaApiRepository implements ApiRepository {
       eventType: string;
       status: string;
       responseStatus: number | null;
+      responseBody: string | null;
       attemptNumber: number;
+      nextRetryAt: Date | string | null;
       createdAt: Date | string;
-      webhook: { url: string; events: unknown };
+      payload: Record<string, unknown> | null;
+      webhook: { url: string; events: unknown; secret: string };
     }>;
     return rows.map((r) => ({
       id: r.id,
@@ -2173,7 +2439,18 @@ export class PrismaApiRepository implements ApiRepository {
       eventType: r.eventType,
       status: r.status,
       responseStatus: r.responseStatus,
+      responseBody: r.responseBody,
       attemptNumber: r.attemptNumber,
+      nextRetryAt: r.nextRetryAt
+        ? r.nextRetryAt instanceof Date
+          ? r.nextRetryAt.toISOString()
+          : String(r.nextRetryAt)
+        : null,
+      permanentlyFailed: r.status === "failed" && !r.nextRetryAt,
+      payload: r.payload,
+      signature: createHmac("sha256", r.webhook.secret)
+        .update(JSON.stringify(r.payload ?? {}))
+        .digest("hex"),
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
     }));
   }

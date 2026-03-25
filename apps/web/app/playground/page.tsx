@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
@@ -375,6 +376,32 @@ function computeStats(arr: number[]): { min: number; max: number; avg: number; m
   return { min, max, avg, median, p95 };
 }
 
+function parseTraceLookup(raw: string): null | {
+  method?: string;
+  route?: string;
+  statusCode?: number;
+  durationMs?: number;
+  service?: string;
+  upstreamNode?: string | null;
+  region?: string | null;
+  createdAt?: string;
+} {
+  try {
+    return JSON.parse(raw) as {
+      method?: string;
+      route?: string;
+      statusCode?: number;
+      durationMs?: number;
+      service?: string;
+      upstreamNode?: string | null;
+      region?: string | null;
+      createdAt?: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -445,6 +472,7 @@ function PlaygroundContent() {
   const selectedProjectId = portal.selectedProject?.id ?? null;
 
   const initializedFromUrl = useRef(false);
+  const [assistantInsertNotice, setAssistantInsertNotice] = useState<string | null>(null);
 
   // On mount, restore state from URL search params
   useEffect(() => {
@@ -463,6 +491,26 @@ function PlaygroundContent() {
     }
     setParamValues(params);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem("fyxvo.playground.assistantInsert");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as { method?: string; params?: Record<string, string>; snippet?: string };
+      if (!parsed.method) return;
+      const found = RPC_METHODS.find((method) => method.method === parsed.method);
+      if (!found) return;
+      setSelectedMethod(found);
+      setSelectedCategory(found.category);
+      setParamValues(parsed.params ?? {});
+      setAssistantInsertNotice(parsed.snippet ?? `Inserted ${parsed.method} from the assistant.`);
+    } catch {
+      // ignore malformed cache
+    } finally {
+      window.sessionStorage.removeItem("fyxvo.playground.assistantInsert");
+    }
+  }, []);
 
   const selectMethod = useCallback((m: RpcMethod) => {
     setSelectedMethod(m);
@@ -534,6 +582,7 @@ function PlaygroundContent() {
     portal.apiKeys.find((k) => k.status === "ACTIVE");
 
   const gatewayBase = webEnv.apiBaseUrl.replace("/api", "").replace(":3001", ":3002");
+  const traceLookupDetails = selectedMethod.isTraceLookup && response ? parseTraceLookup(response) : null;
 
   function copyShareLink() {
     const params = new URLSearchParams({ method: selectedMethod.method });
@@ -782,6 +831,17 @@ function PlaygroundContent() {
           The playground works best with an API key from your project. Connect to get started.
         </Notice>
       )}
+
+      {assistantInsertNotice ? (
+        <Notice tone="success" title="Assistant example inserted">
+          <div className="space-y-2">
+            <p>The request builder was prefilled from the assistant response.</p>
+            <pre className="max-h-32 overflow-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs text-[var(--fyxvo-text)]">
+              <code>{assistantInsertNotice}</code>
+            </pre>
+          </div>
+        </Notice>
+      ) : null}
 
       <div className="grid gap-6 grid-cols-1 xl:grid-cols-[300px_1fr_260px]">
         {/* Left: Method selector */}
@@ -1386,6 +1446,34 @@ function PlaygroundContent() {
                           <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{errorExplanation.explanation}</p>
                         </div>
                       )}
+                      {selectedMethod.isTraceLookup && traceLookupDetails ? (
+                        <div className="mt-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => void navigator.clipboard.writeText(response ?? "")}
+                              className="text-xs text-[var(--fyxvo-brand)] hover:text-brand-600"
+                            >
+                              Copy raw trace JSON
+                            </button>
+                            {portal.selectedProject ? (
+                              <Link
+                                href={`/projects/${portal.selectedProject.slug}`}
+                                className="text-xs text-[var(--fyxvo-brand)] hover:text-brand-600"
+                              >
+                                Open related project request log entry
+                              </Link>
+                            ) : null}
+                          </div>
+                          <div className="grid gap-2 text-xs text-[var(--fyxvo-text-muted)] sm:grid-cols-2">
+                            <div>Route: <span className="font-mono text-[var(--fyxvo-text)]">{traceLookupDetails.route ?? "—"}</span></div>
+                            <div>Method: <span className="font-mono text-[var(--fyxvo-text)]">{traceLookupDetails.method ?? "—"}</span></div>
+                            <div>Upstream node: <span className="text-[var(--fyxvo-text)]">{traceLookupDetails.upstreamNode ?? "Managed routing"}</span></div>
+                            <div>Region: <span className="text-[var(--fyxvo-text)]">{traceLookupDetails.region ?? "Default region"}</span></div>
+                            <div>Cache hit: <span className="text-[var(--fyxvo-text)]">Not recorded for this request log</span></div>
+                            <div>Simulated: <span className="text-[var(--fyxvo-text)]">{traceLookupDetails.route?.includes("simulate") ? "Yes" : "No"}</span></div>
+                          </div>
+                        </div>
+                      ) : null}
                     </>
                   )}
                 </CardContent>

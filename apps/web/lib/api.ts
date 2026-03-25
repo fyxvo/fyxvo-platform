@@ -522,7 +522,73 @@ export async function updateNotificationPreferences(
 }
 
 export async function getAssistantRateLimitStatus(token: string) {
-  return requestApi<{ messagesUsedThisHour: number; messagesRemainingThisHour: number; limit: number; windowResetAt: string }>("/v1/assistant/rate-limit-status", undefined, token);
+  return requestApi<{
+    messagesUsedThisHour: number;
+    messagesRemainingThisHour: number;
+    limit: number;
+    windowResetAt: string;
+    resetAt: string;
+    model: string;
+    assistantAvailable: boolean;
+  }>("/v1/assistant/rate-limit-status", undefined, token);
+}
+
+export async function listAssistantConversations(token: string) {
+  return requestApi<{
+    items: Array<{
+      id: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+      lastMessageAt: string;
+      messageCount: number;
+    }>;
+  }>("/v1/assistant/conversations", undefined, token);
+}
+
+export async function getLatestAssistantConversation(token: string) {
+  return requestApi<{
+    item: {
+      id: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+      lastMessageAt: string;
+      messageCount: number;
+      messages: Array<{ id: string; role: "user" | "assistant"; content: string; createdAt: string }>;
+    } | null;
+  }>("/v1/assistant/conversations/latest", undefined, token);
+}
+
+export async function getAssistantConversation(conversationId: string, token: string) {
+  return requestApi<{
+    item: {
+      id: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+      lastMessageAt: string;
+      messageCount: number;
+      messages: Array<{ id: string; role: "user" | "assistant"; content: string; createdAt: string }>;
+    };
+  }>(`/v1/assistant/conversations/${conversationId}`, undefined, token);
+}
+
+export async function createAssistantConversation(title: string | undefined, token: string) {
+  return requestApi<{
+    item: {
+      id: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+      lastMessageAt: string;
+      messageCount: number;
+    };
+  }>("/v1/assistant/conversations", { method: "POST", body: JSON.stringify({ title }) }, token);
+}
+
+export async function clearAssistantConversation(conversationId: string, token: string) {
+  return requestApi<void>(`/v1/assistant/conversations/${conversationId}`, { method: "DELETE" }, token);
 }
 
 export async function listWebhooks(projectId: string, token: string) {
@@ -568,7 +634,17 @@ export async function getProjectActivity(projectId: string, token: string) {
 }
 
 export async function getActiveAnnouncement() {
-  return requestApi<{ announcement: { id: string; message: string; severity: string; active: boolean; createdAt: string } | null }>("/v1/announcements/active");
+  return requestApi<{
+    announcement: {
+      id: string;
+      message: string;
+      severity: string;
+      active: boolean;
+      startAt: string | null;
+      endAt: string | null;
+      createdAt: string;
+    } | null;
+  }>("/v1/announcements/active");
 }
 
 export async function getWhatsNew(token: string) {

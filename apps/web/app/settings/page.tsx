@@ -214,7 +214,13 @@ export default function SettingsPage() {
     eventType: string;
     webhookUrl: string;
     status: "delivered" | "failed" | "pending";
-    responseCode: number | null;
+    responseStatus: number | null;
+    responseBody: string | null;
+    attemptNumber: number;
+    nextRetryAt: string | null;
+    permanentlyFailed: boolean;
+    payload: Record<string, unknown> | null;
+    signature: string;
     createdAt: string;
   }>>([]);
   const [webhookEventsLoaded, setWebhookEventsLoaded] = useState(false);
@@ -379,7 +385,7 @@ export default function SettingsPage() {
     })
       .then(async (res) => {
         if (!res.ok) return;
-        const body = await res.json() as { items: Array<{ id: string; eventType: string; webhookUrl: string; status: "delivered" | "failed" | "pending"; responseCode: number | null; createdAt: string }> };
+        const body = await res.json() as { items: Array<{ id: string; eventType: string; webhookUrl: string; status: "delivered" | "failed" | "pending"; responseStatus: number | null; responseBody: string | null; attemptNumber: number; nextRetryAt: string | null; permanentlyFailed: boolean; payload: Record<string, unknown> | null; signature: string; createdAt: string }> };
         setWebhookEvents(body.items ?? []);
       })
       .catch(() => undefined)
@@ -1381,6 +1387,8 @@ export default function SettingsPage() {
                         <th className="px-3 py-2 text-left font-medium text-[var(--fyxvo-text-muted)]">Webhook URL</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--fyxvo-text-muted)]">Status</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--fyxvo-text-muted)]">Code</th>
+                        <th className="px-3 py-2 text-left font-medium text-[var(--fyxvo-text-muted)]">Attempt</th>
+                        <th className="px-3 py-2 text-left font-medium text-[var(--fyxvo-text-muted)]">Next retry</th>
                         <th className="px-3 py-2 text-left font-medium text-[var(--fyxvo-text-muted)]">When</th>
                         <th className="px-3 py-2" />
                       </tr>
@@ -1400,24 +1408,49 @@ export default function SettingsPage() {
                                   : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                               }`}
                             >
-                              {ev.status}
+                              {ev.permanentlyFailed ? "permanently failed" : ev.status}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-[var(--fyxvo-text-muted)]">{ev.responseCode ?? "—"}</td>
+                          <td className="px-3 py-2 text-[var(--fyxvo-text-muted)]">{ev.responseStatus ?? "—"}</td>
+                          <td className="px-3 py-2 text-[var(--fyxvo-text-muted)]">#{ev.attemptNumber}</td>
+                          <td className="px-3 py-2 text-[var(--fyxvo-text-muted)] whitespace-nowrap">
+                            {ev.nextRetryAt ? new Date(ev.nextRetryAt).toLocaleString() : ev.permanentlyFailed ? "No more retries" : "—"}
+                          </td>
                           <td className="px-3 py-2 text-[var(--fyxvo-text-muted)] whitespace-nowrap">
                             {new Date(ev.createdAt).toLocaleDateString()}
                           </td>
                           <td className="px-3 py-2">
-                            {ev.status === "failed" ? (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="text-xs"
-                                disabled={redelivering === ev.id}
-                                onClick={() => void handleRedeliver(ev.id)}
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="text-xs text-[var(--fyxvo-brand)] hover:underline"
+                                onClick={() => void navigator.clipboard.writeText(JSON.stringify(ev.payload ?? {}, null, 2))}
                               >
-                                {redelivering === ev.id ? "…" : "Retry"}
-                              </Button>
+                                Copy payload
+                              </button>
+                              <button
+                                type="button"
+                                className="text-xs text-[var(--fyxvo-brand)] hover:underline"
+                                onClick={() => void navigator.clipboard.writeText(ev.signature)}
+                              >
+                                Copy signature
+                              </button>
+                              {ev.status === "failed" ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="text-xs"
+                                  disabled={redelivering === ev.id}
+                                  onClick={() => void handleRedeliver(ev.id)}
+                                >
+                                  {redelivering === ev.id ? "…" : "Retry"}
+                                </Button>
+                              ) : null}
+                            </div>
+                            {ev.responseBody ? (
+                              <p className="mt-2 max-w-[18rem] truncate text-[10px] text-[var(--fyxvo-text-muted)]">
+                                {ev.responseBody}
+                              </p>
                             ) : null}
                           </td>
                         </tr>

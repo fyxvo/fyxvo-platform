@@ -135,8 +135,17 @@ export default function FundingPage() {
         <div>
           <h3 className="text-base font-semibold text-[var(--fyxvo-text)]">Get Devnet SOL</h3>
           <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-            Devnet SOL is free test currency. Your wallet must have devnet SOL before you can fund a project.
+            Devnet SOL is test currency for the current alpha evaluation flow. It is not real SOL, but it does validate the real request-accounting and usage path that the product will carry forward.
           </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Notice tone="neutral" title="Current stage">
+            Funding on devnet is the honest live path today. It lets teams validate project funding, request accounting, and gateway usage before mainnet.
+          </Notice>
+          <Notice tone="neutral" title="Why fund on devnet?">
+            Funding on devnet proves the end-to-end flow: wallet signs, project treasury receives credits, gateway usage is charged, and analytics reflect real usage without asking teams to risk real capital yet.
+          </Notice>
         </div>
 
         {portal.walletPhase === "authenticated" && portal.walletAddress ? (
@@ -213,8 +222,7 @@ await connection.requestAirdrop(pubkey, 2 * LAMPORTS_PER_SOL);`}</pre>
 
             {!webEnv.enableUsdc ? (
               <Notice tone="neutral" title="SOL is the live funding path">
-                USDC stays configuration-gated until the devnet mint and treasury vault are
-                explicitly enabled.
+                SOL on devnet is the live alpha funding path today. Real-SOL and USDC expansion still matter, but they are not being overstated before they are live.
               </Notice>
             ) : null}
 
