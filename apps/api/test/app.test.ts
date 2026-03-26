@@ -31,6 +31,7 @@ import { Keypair, PublicKey, SystemProgram, VersionedTransaction } from "@solana
 import nacl from "tweetnacl";
 import { buildApiApp } from "../src/app.js";
 import { SolanaBlockchainClient } from "../src/blockchain.js";
+import { PrismaApiRepository } from "../src/repository.js";
 import type {
   AdminObservabilitySummary,
   AdminOverview,
@@ -1767,6 +1768,49 @@ afterEach(async () => {
 });
 
 describe("Fyxvo API service", () => {
+  it("stores performance metrics using the pathname column", async () => {
+    const create = vi.fn().mockResolvedValue(undefined);
+    const repository = new PrismaApiRepository({
+      performanceMetric: { create },
+    } as never);
+
+    await repository.recordPerformanceMetric({
+      page: "/assistant",
+      fcp: 123,
+      lcp: 456,
+      tti: null,
+      ua: "mobile",
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        pathname: "/assistant",
+        fcp: 123,
+        lcp: 456,
+        tti: null,
+        ua: "mobile",
+      },
+    });
+  });
+
+  it("groups performance summaries by pathname while returning page labels", async () => {
+    let capturedQuery = "";
+    const repository = new PrismaApiRepository({
+      $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => {
+        capturedQuery = String.raw({ raw: strings }, ...values.map(() => "?"));
+        return Promise.resolve([{ page: "/assistant", avgFcp: 120, avgLcp: 240, sampleCount: BigInt(2) }]);
+      },
+    } as never);
+
+    const rows = await repository.getPerformanceMetricSummary(7);
+
+    expect(capturedQuery).toContain("SELECT pathname as page");
+    expect(capturedQuery).toContain("GROUP BY pathname");
+    expect(rows).toEqual([
+      { page: "/assistant", avgFcp: 120, avgLcp: 240, sampleCount: 2 },
+    ]);
+  });
+
   it("reports health, status, and rate limits traffic", async () => {
     const healthyContext = await createTestApp();
     appsToClose.add(healthyContext.app);

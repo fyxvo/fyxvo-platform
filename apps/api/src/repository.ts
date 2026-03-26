@@ -2663,7 +2663,7 @@ export class PrismaApiRepository implements ApiRepository {
     const db = this.prisma as any;
     await db.performanceMetric.create({
       data: {
-        page: input.page.slice(0, 200),
+        pathname: input.page.slice(0, 200),
         fcp: input.fcp ?? null,
         lcp: input.lcp ?? null,
         tti: input.tti ?? null,
@@ -2675,10 +2675,10 @@ export class PrismaApiRepository implements ApiRepository {
   async getPerformanceMetricSummary(days = 7): Promise<{ page: string; avgFcp: number | null; avgLcp: number | null; sampleCount: number }[]> {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const rows = await this.prisma.$queryRaw<{ page: string; avgFcp: number | null; avgLcp: number | null; sampleCount: bigint }[]>`
-      SELECT page, AVG(fcp) as "avgFcp", AVG(lcp) as "avgLcp", COUNT(*) as "sampleCount"
+      SELECT pathname as page, AVG(fcp) as "avgFcp", AVG(lcp) as "avgLcp", COUNT(*) as "sampleCount"
       FROM "PerformanceMetric"
       WHERE "createdAt" >= ${cutoff}
-      GROUP BY page
+      GROUP BY pathname
       ORDER BY "sampleCount" DESC
       LIMIT 20
     `;
