@@ -35,6 +35,16 @@ class GatewayHttpError extends Error {
   }
 }
 
+function getRuntimeCommitSha() {
+  const commit =
+    process.env.RAILWAY_GIT_COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    process.env.GIT_COMMIT_SHA ??
+    process.env.COMMIT_SHA;
+
+  return typeof commit === "string" && commit.trim().length > 0 ? commit.trim() : null;
+}
+
 function getClientApiKey(request: FastifyRequest): string {
   const headerKey = request.headers["x-api-key"];
   if (typeof headerKey === "string" && headerKey.length > 0) {
@@ -952,6 +962,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
 
   app.get("/health", async (_request, reply) => {
     const uptimeMs = Date.now() - STARTUP_TIME_MS;
+    const commit = getRuntimeCommitSha();
 
     const redisStart = Date.now();
     const redis = await input.stateStore.ping().catch(() => false);
@@ -995,6 +1006,9 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
     reply.status(ok ? 200 : 503).send({
       status: ok ? "ok" : "degraded",
       service: "gateway",
+      version: "v1",
+      commit,
+      environment: input.env.FYXVO_ENV,
       region: gatewayRegion,
       uptime: Math.floor(uptimeMs / 1000),
       solanaCluster: input.env.SOLANA_CLUSTER,
@@ -1034,7 +1048,11 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
     ]);
 
     return {
+      status: "ok",
       service: "fyxvo-gateway",
+      version: "v1",
+      commit: getRuntimeCommitSha(),
+      timestamp: new Date().toISOString(),
       environment: input.env.FYXVO_ENV,
       region: gatewayRegion,
       solanaCluster: input.env.SOLANA_CLUSTER,

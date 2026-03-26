@@ -20,3 +20,8 @@ Object.defineProperty(navigator, "clipboard", {
     writeText: async () => undefined
   }
 });
+
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+  writable: true,
+  value: () => undefined
+});

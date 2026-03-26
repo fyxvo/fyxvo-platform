@@ -21,7 +21,7 @@ import { getFundingHistory } from "../../lib/api";
 import { webEnv } from "../../lib/env";
 import { formatRelativeDate, formatSol } from "../../lib/format";
 import type { FundingHistoryItem } from "../../lib/types";
-import { PRICING_LAMPORTS } from "@fyxvo/config";
+import { PRICING_LAMPORTS } from "@fyxvo/config/pricing";
 
 const STD_PRICE_LAMPORTS = BigInt(PRICING_LAMPORTS.standard);
 const CH_PRICE_LAMPORTS = BigInt(PRICING_LAMPORTS.computeHeavy);

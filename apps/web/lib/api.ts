@@ -4,6 +4,7 @@ import type {
   AssistantConversationSummary,
   AssistantMessageFeedback,
   AssistantRateLimitStatus,
+  AdminDeploymentReadiness,
   AdminOverview,
   AdminStats,
   AnalyticsOverview,
@@ -30,7 +31,8 @@ import type {
   PortalServiceStatus,
   PortalUser,
   ProjectAnalytics,
-  ProjectChecklist
+  ProjectChecklist,
+  WebDeploymentStatus
 } from "./types";
 import { webEnv } from "./env";
 
@@ -101,6 +103,13 @@ export async function fetchGatewayStatus() {
     cache: "no-store"
   });
   return parseResponse<PortalServiceStatus>(response);
+}
+
+export async function fetchWebDeploymentStatus() {
+  const response = await fetch("/api/deployment-status", {
+    cache: "no-store"
+  });
+  return parseResponse<WebDeploymentStatus>(response);
 }
 
 export async function createAuthChallenge(walletAddress: string) {
@@ -579,6 +588,10 @@ export async function submitAssistantFeedback(
 
 export async function getAdminAssistantStats(token: string) {
   return requestApi<{ item: AssistantAdminStats }>("/v1/admin/assistant/stats", undefined, token);
+}
+
+export async function getAdminDeploymentReadiness(token: string) {
+  return requestApi<{ item: AdminDeploymentReadiness }>("/v1/admin/deployment-readiness", undefined, token);
 }
 
 export async function listWebhooks(projectId: string, token: string) {

@@ -39,10 +39,27 @@ import { OnboardingChecklist } from "../../components/onboarding-checklist";
 import { TosModal } from "../../components/tos-modal";
 import { FirstRequestCelebration } from "../../components/first-request-celebration";
 import { QuickstartLauncher } from "../../components/quickstart-launcher";
-import type { AdminOverview, NetworkStats, PortalProject } from "../../lib/types";
+import type {
+  AdminDeploymentReadiness,
+  AdminOverview,
+  NetworkStats,
+  PortalProject,
+  PortalServiceStatus,
+  WebDeploymentStatus
+} from "../../lib/types";
 import { webEnv } from "../../lib/env";
 import { liveDevnetState } from "../../lib/live-state";
-import { getNetworkStats, getActiveAnnouncement, getWhatsNew, dismissWhatsNew, listProjectMembers } from "../../lib/api";
+import {
+  dismissWhatsNew,
+  fetchApiStatus,
+  fetchGatewayStatus,
+  fetchWebDeploymentStatus,
+  getActiveAnnouncement,
+  getAdminDeploymentReadiness,
+  getNetworkStats,
+  getWhatsNew,
+  listProjectMembers
+} from "../../lib/api";
 
 interface ProjectHealthInput {
   activated: boolean;
@@ -195,6 +212,11 @@ function formatLamportStringAsSol(value: string | null) {
   } catch {
     return value;
   }
+}
+
+function formatCommitSha(value: string | null | undefined) {
+  if (!value) return "Unavailable";
+  return value.slice(0, 7);
 }
 
 function OpsTimeline({
@@ -401,8 +423,16 @@ export default function DashboardPage() {
   const [cspViolations, setCspViolations] = useState<
     Array<{ blockedUri: string; violatedDirective: string; timestamp: string; receivedAt: string }>
   >([]);
+  const [webDeploymentStatus, setWebDeploymentStatus] = useState<WebDeploymentStatus | null>(null);
+  const [apiDeploymentStatus, setApiDeploymentStatus] = useState<PortalServiceStatus | null>(null);
+  const [gatewayDeploymentStatus, setGatewayDeploymentStatus] = useState<PortalServiceStatus | null>(null);
+  const [deploymentReadiness, setDeploymentReadiness] = useState<AdminDeploymentReadiness | null>(null);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const celebrationProjectId = celebrationProject?.id ?? null;
+  const isAdminAuthorityWallet =
+    portal.walletPhase === "authenticated" &&
+    portal.walletAddress === liveDevnetState.adminAuthority &&
+    Boolean(portal.token);
 
   useEffect(() => {
     void getNetworkStats().then(setNetworkStats).catch(() => {});
@@ -547,6 +577,44 @@ export default function DashboardPage() {
   }, [portal.adminOverview, portal.token]);
 
   useEffect(() => {
+    if (!isAdminAuthorityWallet || !portal.token) {
+      setWebDeploymentStatus(null);
+      setApiDeploymentStatus(null);
+      setGatewayDeploymentStatus(null);
+      setDeploymentReadiness(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    Promise.allSettled([
+      fetchWebDeploymentStatus(),
+      fetchApiStatus(),
+      fetchGatewayStatus(),
+      getAdminDeploymentReadiness(portal.token)
+    ])
+      .then(([webResult, apiResult, gatewayResult, readinessResult]) => {
+        if (cancelled) return;
+
+        setWebDeploymentStatus(webResult.status === "fulfilled" ? webResult.value : null);
+        setApiDeploymentStatus(apiResult.status === "fulfilled" ? apiResult.value : null);
+        setGatewayDeploymentStatus(gatewayResult.status === "fulfilled" ? gatewayResult.value : null);
+        setDeploymentReadiness(readinessResult.status === "fulfilled" ? readinessResult.value.item : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWebDeploymentStatus(null);
+        setApiDeploymentStatus(null);
+        setGatewayDeploymentStatus(null);
+        setDeploymentReadiness(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminAuthorityWallet, portal.token]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
       if (e.key === "n" || e.key === "N") {
@@ -633,11 +701,6 @@ export default function DashboardPage() {
   -H "x-api-key: ${portal.lastGeneratedApiKey ?? "YOUR_API_KEY"}" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
   const opsItems = useMemo(() => buildOpsItems(portal.adminOverview), [portal.adminOverview]);
-  const isAdminAuthorityWallet =
-    portal.walletPhase === "authenticated" &&
-    portal.walletAddress === liveDevnetState.adminAuthority &&
-    Boolean(portal.token);
-
   async function saveAnnouncementSchedule() {
     if (!portal.token || !announcementDraft.trim()) return;
     setAnnouncementSaving(true);
@@ -1765,6 +1828,125 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </section>
+
+          {isAdminAuthorityWallet ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Deployment readiness</CardTitle>
+                <CardDescription>
+                  Lightweight release checks for commit lineage, assistant health, and production
+                  migration drift.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      label: "Frontend commit",
+                      value: formatCommitSha(webDeploymentStatus?.commit),
+                      detail: webDeploymentStatus?.environment ?? "Environment unavailable"
+                    },
+                    {
+                      label: "API commit",
+                      value: formatCommitSha(apiDeploymentStatus?.commit ?? deploymentReadiness?.commit),
+                      detail: apiDeploymentStatus?.version ?? deploymentReadiness?.version ?? "Version unavailable"
+                    },
+                    {
+                      label: "Gateway commit",
+                      value: formatCommitSha(gatewayDeploymentStatus?.commit),
+                      detail: gatewayDeploymentStatus?.environment ?? "Environment unavailable"
+                    },
+                    {
+                      label: "Checked at",
+                      value: formatRelativeDate(deploymentReadiness?.timestamp ?? new Date().toISOString()),
+                      detail: deploymentReadiness?.environment ?? "Environment unavailable"
+                    }
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-4"
+                    >
+                      <div className="text-xs uppercase tracking-[0.14em] text-[color:var(--fyxvo-text-muted)]">
+                        {item.label}
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-[color:var(--fyxvo-text)]">{item.value}</div>
+                      <div className="mt-1 text-xs text-[color:var(--fyxvo-text-muted)]">{item.detail}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={(apiDeploymentStatus?.assistantAvailable ?? deploymentReadiness?.assistantAvailable) ? "success" : "warning"}>
+                        {(apiDeploymentStatus?.assistantAvailable ?? deploymentReadiness?.assistantAvailable)
+                          ? "Assistant available"
+                          : "Assistant unavailable"}
+                      </Badge>
+                      <Badge tone={deploymentReadiness?.pendingMigrations.detected ? "warning" : "success"}>
+                        {deploymentReadiness?.pendingMigrations.detected
+                          ? `${deploymentReadiness.pendingMigrations.count} migration${deploymentReadiness.pendingMigrations.count === 1 ? "" : "s"} pending`
+                          : "No pending migrations"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm text-[color:var(--fyxvo-text-muted)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>API environment</span>
+                        <span className="font-medium text-[color:var(--fyxvo-text)]">
+                          {apiDeploymentStatus?.environment ?? deploymentReadiness?.environment ?? "Unavailable"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Gateway region</span>
+                        <span className="font-medium text-[color:var(--fyxvo-text)]">
+                          {gatewayDeploymentStatus?.region ?? "Unavailable"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Migration check</span>
+                        <span className="font-medium text-[color:var(--fyxvo-text)]">
+                          {deploymentReadiness?.pendingMigrations.checkedAt
+                            ? formatRelativeDate(deploymentReadiness.pendingMigrations.checkedAt)
+                            : "Unavailable"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-4">
+                    <div className="text-xs uppercase tracking-[0.14em] text-[color:var(--fyxvo-text-muted)]">
+                      Migration notes
+                    </div>
+                    {deploymentReadiness?.pendingMigrations.error ? (
+                      <p className="mt-3 text-sm leading-6 text-[color:var(--fyxvo-text-muted)]">
+                        Prisma migration status could not be confirmed: {deploymentReadiness.pendingMigrations.error}
+                      </p>
+                    ) : deploymentReadiness?.pendingMigrations.names.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {deploymentReadiness.pendingMigrations.names.slice(0, 4).map((name) => (
+                          <Badge key={name} tone="warning">
+                            {name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-[color:var(--fyxvo-text-muted)]">
+                        Production schema matches the committed Prisma migrations.
+                      </p>
+                    )}
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Button asChild size="sm" variant="secondary">
+                        <Link href="/status">Open status page</Link>
+                      </Button>
+                      <Button asChild size="sm" variant="secondary">
+                        <Link href="/assistant">Open assistant</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {cspViolations.length > 0 ? (
             <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">

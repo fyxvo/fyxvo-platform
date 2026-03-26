@@ -123,6 +123,8 @@ export interface PortalHealth {
   readonly status: string;
   readonly service: string;
   readonly version?: string;
+  readonly commit?: string | null;
+  readonly environment?: string;
   readonly timestamp: string;
   readonly assistantAvailable?: boolean;
   readonly database?: boolean;
@@ -168,8 +170,10 @@ export interface PortalServiceStatus {
   readonly status?: string;
   readonly service: string;
   readonly version?: string;
+  readonly commit?: string | null;
   readonly timestamp?: string;
   readonly environment?: string;
+  readonly region?: string;
   readonly assistantAvailable?: boolean;
   readonly solanaCluster?: string;
   readonly adminAuthority?: string;
@@ -679,5 +683,30 @@ export interface AssistantAdminStats {
       readonly conversationId: string;
       readonly messageId: string;
     }>;
+  };
+}
+
+export interface WebDeploymentStatus {
+  readonly status: string;
+  readonly service: string;
+  readonly version: string;
+  readonly commit: string | null;
+  readonly environment: string;
+  readonly timestamp: string;
+}
+
+export interface AdminDeploymentReadiness {
+  readonly service: string;
+  readonly version: string;
+  readonly commit: string | null;
+  readonly environment: string;
+  readonly timestamp: string;
+  readonly assistantAvailable: boolean;
+  readonly pendingMigrations: {
+    readonly checkedAt: string;
+    readonly detected: boolean;
+    readonly count: number;
+    readonly names: readonly string[];
+    readonly error: string | null;
   };
 }

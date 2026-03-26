@@ -4,7 +4,7 @@ import { PageHeader } from "../../components/page-header";
 import { InterestCaptureForm } from "../../components/interest-capture-form";
 import { AdvancedPricingEstimator, PricingEstimator } from "../../components/pricing-estimator";
 import { TrackedLinkButton } from "../../components/tracked-link-button";
-import { PRICING_LAMPORTS, PRICING_USDC, VOLUME_DISCOUNT, FREE_TIER_REQUESTS, REVENUE_SPLIT_BPS } from "@fyxvo/config";
+import { PRICING_LAMPORTS, PRICING_USDC, VOLUME_DISCOUNT, FREE_TIER_REQUESTS, REVENUE_SPLIT_BPS } from "@fyxvo/config/pricing";
 import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {

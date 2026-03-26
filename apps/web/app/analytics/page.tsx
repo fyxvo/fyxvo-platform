@@ -28,7 +28,7 @@ interface NodeDistributionEntry {
   readonly requestCount: number;
   readonly avgLatencyMs: number;
 }
-import { PRICING_LAMPORTS, COMPUTE_HEAVY_METHODS, WRITE_METHODS } from "@fyxvo/config";
+import { PRICING_LAMPORTS, COMPUTE_HEAVY_METHODS, WRITE_METHODS } from "@fyxvo/config/pricing";
 import { webEnv } from "../../lib/env";
 import { CopyButton } from "../../components/copy-button";
 

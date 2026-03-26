@@ -7,7 +7,7 @@ import { PageHeader } from "../../components/page-header";
 import { SocialLinkButtons } from "../../components/social-links";
 import { ApiExplorer } from "../../components/api-explorer";
 import { webEnv } from "../../lib/env";
-import { PRICING_LAMPORTS } from "@fyxvo/config";
+import { PRICING_LAMPORTS } from "@fyxvo/config/pricing";
 
 const NAV_SECTIONS = [
   { id: "introduction", label: "Introduction", keywords: "overview what is fyxvo devnet rpc relay product" },

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Badge, Button, Notice, cn } from "@fyxvo/ui";
-import { FREE_TIER_REQUESTS, PRICING_LAMPORTS } from "@fyxvo/config";
+import { FREE_TIER_REQUESTS, PRICING_LAMPORTS } from "@fyxvo/config/pricing";
 import { BrandLogo } from "./brand-logo";
 import { WalletConnectButton } from "./wallet-connect-button";
 import { usePortal } from "./portal-provider";
@@ -57,6 +57,8 @@ const HISTORY_KEY = "fyxvo.assistant.cache";
 const PLAYGROUND_INSERT_KEY = "fyxvo.playground.assistantInsert";
 const PLAYGROUND_RETURN_KEY = "fyxvo.assistant.returnNotice";
 const DEBUG_MODE_KEY = "fyxvo.assistant.debug";
+const FOCUS_RING_CLASS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fyxvo-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--fyxvo-panel)]";
 
 const PROMPT_GROUPS = [
   {
@@ -373,16 +375,19 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
             {language}
           </span>
           <span className="rounded-full bg-[var(--fyxvo-panel)] px-2 py-1 text-[11px] text-[var(--fyxvo-text-muted)]">
-            {wrap ? "Wrapped" : "Scrollable"}
+            {wrap ? "Wrap on" : "Scroll on"}
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <button
             type="button"
             onClick={() => setWrap((current) => !current)}
-            className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
+            className={cn(
+              "rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]",
+              FOCUS_RING_CLASS
+            )}
           >
-            {wrap ? "Disable wrap" : "Wrap lines"}
+            {wrap ? "Use horizontal scroll" : "Wrap long lines"}
           </button>
           <button
             type="button"
@@ -391,7 +396,10 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
               setCopied(true);
               window.setTimeout(() => setCopied(false), 2000);
             }}
-            className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
+            className={cn(
+              "rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]",
+              FOCUS_RING_CLASS
+            )}
           >
             {copied ? "Copied!" : "Copy"}
           </button>
@@ -399,7 +407,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       </div>
       <pre
         className={cn(
-          "overflow-x-auto px-4 py-4 font-mono text-[13px] leading-6",
+          "select-text overflow-x-auto px-4 py-4 font-mono text-[13px] leading-6",
           wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"
         )}
       >
@@ -614,7 +622,10 @@ function AssistantActionPill({
   href?: string;
 }) {
   const className =
-    "inline-flex items-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-1.5 text-xs font-medium text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]";
+    cn(
+      "inline-flex items-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-1.5 text-xs font-medium text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]",
+      FOCUS_RING_CLASS
+    );
 
   if (href) {
     return (
@@ -645,7 +656,10 @@ function ToolCard({
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4 transition hover:border-brand-500/30 hover:bg-brand-500/5"
+      className={cn(
+        "group rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4 transition hover:border-brand-500/30 hover:bg-brand-500/5",
+        FOCUS_RING_CLASS
+      )}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-[var(--fyxvo-brand)]">
@@ -1491,7 +1505,10 @@ export function AssistantWorkspace() {
     <div className="-mx-4 -mt-8 min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_24%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))] sm:-mx-6 lg:-mx-8">
       <div className="mx-auto h-full max-w-[1800px] px-3 pb-4 pt-3 sm:px-5 lg:px-6">
         <div className="grid h-full gap-4 xl:grid-cols-[320px,minmax(0,1fr),320px]">
-          <aside className="hidden xl:flex xl:min-h-0 xl:flex-col xl:rounded-[2rem] xl:border xl:border-[var(--fyxvo-border)] xl:bg-[var(--fyxvo-panel)] xl:shadow-[0_20px_70px_rgba(15,23,42,0.08)]">
+          <aside
+            className="hidden xl:flex xl:min-h-0 xl:flex-col xl:rounded-[2rem] xl:border xl:border-[var(--fyxvo-border)] xl:bg-[var(--fyxvo-panel)] xl:shadow-[0_20px_70px_rgba(15,23,42,0.08)]"
+            aria-label="Assistant conversations"
+          >
             <div className="border-b border-[var(--fyxvo-border)] px-5 py-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -1516,8 +1533,10 @@ export function AssistantWorkspace() {
                       key={conversation.id}
                       type="button"
                       onClick={() => void loadConversation(conversation.id)}
+                      aria-current={activeConversationId === conversation.id ? "page" : undefined}
                       className={cn(
                         "w-full rounded-[1.35rem] border px-4 py-4 text-left transition",
+                        FOCUS_RING_CLASS,
                         activeConversationId === conversation.id
                           ? "border-brand-500/30 bg-brand-500/10"
                           : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] hover:border-brand-500/20"
@@ -1536,7 +1555,7 @@ export function AssistantWorkspace() {
           </aside>
 
           <div className="flex min-h-0 flex-col rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_20px_70px_rgba(15,23,42,0.08)]">
-            <div className="border-b border-[var(--fyxvo-border)] px-4 pb-4 pt-4 sm:px-6 sm:pt-5">
+            <div className="sticky top-0 z-20 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-4 pt-4 backdrop-blur sm:px-6 sm:pt-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="mb-3 flex items-center gap-2 xl:hidden">
@@ -1630,7 +1649,7 @@ export function AssistantWorkspace() {
 
             <div className="xl:hidden">
               <details className="border-b border-[var(--fyxvo-border)]">
-                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--fyxvo-text)] sm:px-6">
+                <summary className={cn("cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--fyxvo-text)] sm:px-6", FOCUS_RING_CLASS)}>
                   Workspace context and quick actions
                 </summary>
                 <div className="px-4 pb-4 sm:px-6">{rightPanel}</div>
@@ -1638,7 +1657,13 @@ export function AssistantWorkspace() {
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+              <div
+                className="flex-1 overflow-y-auto px-4 py-5 sm:px-6"
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions text"
+                aria-label="Assistant conversation thread"
+              >
                 {loadingConversation ? (
                   <div className="mx-auto max-w-3xl space-y-3">
                     {[0, 1, 2].map((item) => (
@@ -1689,7 +1714,10 @@ export function AssistantWorkspace() {
                                     setComposer((current) => ({ ...current, input: prompt }));
                                   }
                                 }}
-                                className="w-full rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]"
+                                className={cn(
+                                  "w-full rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
+                                  FOCUS_RING_CLASS
+                                )}
                               >
                                 {prompt}
                               </button>
@@ -1700,10 +1728,10 @@ export function AssistantWorkspace() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mx-auto max-w-4xl space-y-8">
+                  <div className="mx-auto max-w-4xl space-y-7 sm:space-y-8">
                     {messages.map((message, index) => (
                       <div key={`${message.id}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                        <div className={cn("max-w-[95%] space-y-3 sm:max-w-[88%]", message.role === "user" ? "items-end" : "items-start")}>
+                        <div className={cn("max-w-[95%] space-y-2.5 sm:max-w-[88%]", message.role === "user" ? "items-end" : "items-start")}>
                           <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
                             <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
                             {message.createdAt ? <span>•</span> : null}
@@ -1758,7 +1786,10 @@ export function AssistantWorkspace() {
                       <button
                         type="button"
                         disabled
-                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] opacity-70"
+                        className={cn(
+                          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] opacity-70",
+                          FOCUS_RING_CLASS
+                        )}
                         aria-label="Attachments coming soon"
                         title="Attachments coming soon"
                       >
@@ -1769,6 +1800,7 @@ export function AssistantWorkspace() {
                       <div className="min-w-0 flex-1">
                         <textarea
                           ref={textareaRef}
+                          aria-label="Message Fyxvo Assistant"
                           value={composer.input}
                           onChange={(event) => setComposer((current) => ({ ...current, input: event.target.value }))}
                           onKeyDown={(event) => {
@@ -1786,7 +1818,10 @@ export function AssistantWorkspace() {
                           }
                           disabled={!isAuthenticated || composer.isStreaming || isAssistantUnavailable}
                           rows={1}
-                          className="max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-1 py-2 text-sm leading-6 text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] disabled:opacity-60"
+                          className={cn(
+                            "max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-1 py-2 text-sm leading-6 text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] disabled:opacity-60",
+                            FOCUS_RING_CLASS
+                          )}
                         />
                         <div className="flex flex-wrap items-center gap-2 px-1 pb-1 text-[11px] text-[var(--fyxvo-text-muted)]">
                           <span>Attachment support is coming soon.</span>
@@ -1797,7 +1832,7 @@ export function AssistantWorkspace() {
                         size="sm"
                         onClick={() => void sendMessage(composer.input)}
                         disabled={!composer.input.trim() || !isAuthenticated || composer.isStreaming || isAssistantUnavailable}
-                        className="h-11 shrink-0 rounded-2xl px-5"
+                        className={cn("h-11 shrink-0 rounded-2xl px-5", FOCUS_RING_CLASS)}
                       >
                         {composer.isStreaming ? "Streaming…" : "Send"}
                       </Button>
@@ -1815,7 +1850,7 @@ export function AssistantWorkspace() {
 
         <div
           className={cn(
-            "fixed inset-0 z-[70] xl:hidden transition-opacity",
+            "fixed inset-0 z-[70] xl:hidden transition-opacity duration-200 ease-out",
             sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
           )}
         >
@@ -1825,14 +1860,14 @@ export function AssistantWorkspace() {
             onClick={() => setSidebarOpen(false)}
             className="absolute inset-0 bg-black/45"
           />
-          <aside className={cn("absolute inset-y-0 left-0 w-[min(86vw,22rem)] bg-[var(--fyxvo-bg)] shadow-2xl transition-transform", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
+          <aside className={cn("absolute inset-y-0 left-0 w-[min(86vw,22rem)] bg-[var(--fyxvo-bg)] shadow-2xl transition-transform duration-200 ease-out", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
             <div className="flex h-full flex-col px-4 pb-[env(safe-area-inset-bottom)] pt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Conversations</div>
                   <div className="text-xs text-[var(--fyxvo-text-muted)]">Your saved assistant threads</div>
                 </div>
-                <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close" className="rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]">
+                <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close" className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}>
                   <CloseIcon className="h-4 w-4" />
                 </button>
               </div>
@@ -1848,8 +1883,10 @@ export function AssistantWorkspace() {
                       key={conversation.id}
                       type="button"
                       onClick={() => void loadConversation(conversation.id)}
+                      aria-current={activeConversationId === conversation.id ? "page" : undefined}
                       className={cn(
                         "w-full rounded-2xl border px-4 py-4 text-left",
+                        FOCUS_RING_CLASS,
                         activeConversationId === conversation.id
                           ? "border-brand-500/30 bg-brand-500/10"
                           : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
@@ -1867,7 +1904,7 @@ export function AssistantWorkspace() {
 
         <div
           className={cn(
-            "fixed inset-0 z-[70] lg:hidden transition-opacity",
+            "fixed inset-0 z-[70] lg:hidden transition-opacity duration-200 ease-out",
             contextDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
           )}
         >
@@ -1877,14 +1914,14 @@ export function AssistantWorkspace() {
             onClick={() => setContextDrawerOpen(false)}
             className="absolute inset-0 bg-black/45"
           />
-          <aside className={cn("absolute inset-y-0 right-0 w-[min(88vw,24rem)] bg-[var(--fyxvo-bg)] shadow-2xl transition-transform", contextDrawerOpen ? "translate-x-0" : "translate-x-full")}>
+          <aside className={cn("absolute inset-y-0 right-0 w-[min(88vw,24rem)] bg-[var(--fyxvo-bg)] shadow-2xl transition-transform duration-200 ease-out", contextDrawerOpen ? "translate-x-0" : "translate-x-full")}>
             <div className="flex h-full flex-col px-4 pb-[env(safe-area-inset-bottom)] pt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant context</div>
                   <div className="text-xs text-[var(--fyxvo-text-muted)]">Usage, project state, and quick actions</div>
                 </div>
-                <button type="button" onClick={() => setContextDrawerOpen(false)} aria-label="Close" className="rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]">
+                <button type="button" onClick={() => setContextDrawerOpen(false)} aria-label="Close" className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}>
                   <CloseIcon className="h-4 w-4" />
                 </button>
               </div>

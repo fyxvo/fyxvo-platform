@@ -583,12 +583,16 @@ describe("Fyxvo gateway", () => {
     expect(healthResponse.json()).toMatchObject({
       status: "ok",
       service: "gateway",
+      version: "v1",
+      environment: "test",
       database: true,
       dependencies: {
         redis: { ok: true },
         upstream: { ok: true, nodeCount: 1 }
       }
     });
+    expect(typeof healthResponse.json().commit === "string" || healthResponse.json().commit === null).toBe(true);
+    expect(healthResponse.json().timestamp).toEqual(expect.any(String));
 
     const statusResponse = await app.inject({
       method: "GET",
@@ -596,7 +600,10 @@ describe("Fyxvo gateway", () => {
     });
     expect(statusResponse.statusCode).toBe(200);
     expect(statusResponse.json()).toMatchObject({
+      status: "ok",
       service: "fyxvo-gateway",
+      version: "v1",
+      environment: "test",
       nodeCount: 1,
       scopeEnforcement: {
         enabled: true,
@@ -608,6 +615,8 @@ describe("Fyxvo gateway", () => {
         priority: 400
       }
     });
+    expect(typeof statusResponse.json().commit === "string" || statusResponse.json().commit === null).toBe(true);
+    expect(statusResponse.json().timestamp).toEqual(expect.any(String));
   });
 
   it("decodes the on-chain project funding layout", async () => {

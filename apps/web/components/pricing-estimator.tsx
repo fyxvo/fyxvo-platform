@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@fyxvo/ui";
-import { PRICING_LAMPORTS, VOLUME_DISCOUNT, FREE_TIER_REQUESTS, applyVolumeDiscount } from "@fyxvo/config";
+import { PRICING_LAMPORTS, VOLUME_DISCOUNT, FREE_TIER_REQUESTS, applyVolumeDiscount } from "@fyxvo/config/pricing";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
 

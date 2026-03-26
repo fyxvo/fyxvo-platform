@@ -1,4 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
@@ -57,6 +59,67 @@ class HttpError extends Error {
 }
 
 const API_STATUS_VERSION = "v1";
+
+function getRuntimeCommitSha() {
+  const commit =
+    process.env.RAILWAY_GIT_COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    process.env.GIT_COMMIT_SHA ??
+    process.env.COMMIT_SHA;
+
+  return typeof commit === "string" && commit.trim().length > 0 ? commit.trim() : null;
+}
+
+async function detectPendingPrismaMigrations(prisma?: PrismaClientType) {
+  const checkedAt = new Date().toISOString();
+
+  if (!prisma) {
+    return {
+      checkedAt,
+      detected: false,
+      count: 0,
+      names: [] as string[],
+      error: "Prisma client is not available in this runtime."
+    };
+  }
+
+  try {
+    const migrationsDir = path.resolve(process.cwd(), "packages/database/prisma/migrations");
+    const entries = await readdir(migrationsDir, { withFileTypes: true });
+    const expectedNames = entries
+      .filter((entry) => entry.isDirectory() && /^\d{14}_/.test(entry.name))
+      .map((entry) => entry.name)
+      .sort();
+
+    const appliedRows = await prisma.$queryRaw<Array<{ migration_name: string }>>`
+      SELECT "migration_name"
+      FROM "_prisma_migrations"
+      WHERE "finished_at" IS NOT NULL
+    `;
+    const appliedNames = new Set(
+      appliedRows
+        .map((row) => row.migration_name)
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+    );
+    const pendingNames = expectedNames.filter((name) => !appliedNames.has(name));
+
+    return {
+      checkedAt,
+      detected: pendingNames.length > 0,
+      count: pendingNames.length,
+      names: pendingNames,
+      error: null
+    };
+  } catch (error) {
+    return {
+      checkedAt,
+      detected: false,
+      count: 0,
+      names: [] as string[],
+      error: error instanceof Error ? error.message : "Unable to inspect Prisma migration state."
+    };
+  }
+}
 
 const challengeSchema = z.object({
   walletAddress: z.string().trim().min(32)
@@ -690,6 +753,7 @@ export async function buildApiApp(input: {
   readonly repository: ApiRepository;
   readonly blockchain: BlockchainClient;
   readonly healthcheck?: () => Promise<boolean>;
+  readonly prisma?: PrismaClientType;
   readonly logger?: boolean;
 }) {
   const cspViolations: Array<{ blockedUri: string; violatedDirective: string; timestamp: string; receivedAt: string }> = [];
@@ -884,6 +948,7 @@ export async function buildApiApp(input: {
   app.get("/health", async () => {
     const startTime = process.hrtime.bigint();
     const uptime = process.uptime();
+    const commit = getRuntimeCommitSha();
 
     // Check database
     const dbStart = Date.now();
@@ -931,6 +996,8 @@ export async function buildApiApp(input: {
       status: overallOk ? "ok" : "degraded",
       service: "fyxvo-api",
       version: API_STATUS_VERSION,
+      environment: input.env.FYXVO_ENV,
+      commit,
       uptime: Math.round(uptime),
       assistantAvailable: isAssistantConfigured(input.env),
       dependencies: {
@@ -945,6 +1012,7 @@ export async function buildApiApp(input: {
   app.get("/v1/status", async () => {
     const network = getSolanaNetworkConfig(input.env.SOLANA_CLUSTER);
     const readiness = await input.blockchain.getProtocolReadiness().catch(() => null);
+    const commit = getRuntimeCommitSha();
     const authorityPlan = resolveAuthorityPlan({
       source: process.env,
       protocolAuthorityFallback: input.env.FYXVO_ADMIN_AUTHORITY
@@ -954,6 +1022,7 @@ export async function buildApiApp(input: {
       status: overallStatus,
       service: "fyxvo-api",
       version: API_STATUS_VERSION,
+      commit,
       timestamp: new Date().toISOString(),
       environment: input.env.FYXVO_ENV,
       region: process.env.GATEWAY_REGION ?? 'us-east-1',
@@ -2047,6 +2116,23 @@ export async function buildApiApp(input: {
     const user = requireUser(request);
     requireAdmin(user);
     return { item: await input.repository.getAssistantStats() };
+  });
+
+  app.get("/v1/admin/deployment-readiness", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+
+    return {
+      item: {
+        service: "fyxvo-api",
+        version: API_STATUS_VERSION,
+        commit: getRuntimeCommitSha(),
+        environment: input.env.FYXVO_ENV,
+        timestamp: new Date().toISOString(),
+        assistantAvailable: isAssistantConfigured(input.env),
+        pendingMigrations: await detectPendingPrismaMigrations(input.prisma)
+      }
+    };
   });
 
   // POST /v1/assistant/chat — AI developer assistant (streaming SSE)
@@ -3562,6 +3648,7 @@ export async function buildProductionApiApp(input: {
     env: input.env,
     repository: new PrismaApiRepository(input.prisma),
     blockchain,
+    prisma: input.prisma,
     healthcheck: () => databaseHealthcheck(input.prisma),
     logger: true
   });

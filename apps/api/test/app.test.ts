@@ -1465,9 +1465,11 @@ describe("Fyxvo API service", () => {
       status: "ok",
       service: "fyxvo-api",
       version: "v1",
+      environment: "test",
       assistantAvailable: false
     });
     expect(healthResponse.json().timestamp).toEqual(expect.any(String));
+    expect(typeof healthResponse.json().commit === "string" || healthResponse.json().commit === null).toBe(true);
 
     const statusResponse = await healthyContext.app.inject({
       method: "GET",
@@ -1488,6 +1490,7 @@ describe("Fyxvo API service", () => {
       }
     });
     expect(statusResponse.json().timestamp).toEqual(expect.any(String));
+    expect(typeof statusResponse.json().commit === "string" || statusResponse.json().commit === null).toBe(true);
 
     const limitedContext = await createTestApp({
       rateLimitMax: 1
@@ -1547,6 +1550,7 @@ describe("Fyxvo API service", () => {
     expect(healthResponse.json()).toMatchObject({
       service: "fyxvo-api",
       version: "v1",
+      environment: "test",
       assistantAvailable: true
     });
 
@@ -2331,6 +2335,27 @@ describe("Fyxvo API service", () => {
     expect(overviewBody.item.launchFunnel.counts.landingCtaClicks).toBe(0);
     expect(overviewBody.item.recentProjectActivity).toEqual([]);
     expect(overviewBody.item.recentFundingEvents).toEqual([]);
+
+    const readiness = await context.app.inject({
+      method: "GET",
+      url: "/v1/admin/deployment-readiness",
+      headers: {
+        authorization: `Bearer ${admin.token}`
+      }
+    });
+    expect(readiness.statusCode).toBe(200);
+    expect(readiness.json()).toMatchObject({
+      item: {
+        service: "fyxvo-api",
+        version: "v1",
+        environment: "test",
+        assistantAvailable: false,
+        pendingMigrations: {
+          detected: false,
+          count: 0
+        }
+      }
+    });
   });
 
   it("enforces API key scope dependencies when creating keys", async () => {

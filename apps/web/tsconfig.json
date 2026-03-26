@@ -12,6 +12,7 @@
     "noEmit": true,
     "paths": {
       "@fyxvo/config": ["../../packages/config/dist/index.js"],
+      "@fyxvo/config/pricing": ["../../packages/config/dist/pricing.js"],
       "@fyxvo/sdk": ["../../packages/sdk/src/index.ts"],
       "@fyxvo/ui": ["../../packages/ui/src/index.tsx"]
     }

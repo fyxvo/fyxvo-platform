@@ -9,7 +9,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   outputFileTracingRoot: workspaceRoot,
   turbopack: {
-    root: workspaceRoot
+    root: workspaceRoot,
+    resolveAlias: {
+      "@solana-mobile/wallet-adapter-mobile": "./apps/web/lib/solana-mobile-wallet-shim.ts",
+      "whatwg-fetch": "./apps/web/lib/whatwg-fetch-shim.ts"
+    }
   },
   async headers() {
     // Content Security Policy allows Fyxvo domains and blocks unauthorized external requests.
