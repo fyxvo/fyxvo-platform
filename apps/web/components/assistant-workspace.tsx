@@ -1537,433 +1537,479 @@ export function AssistantWorkspace() {
   );
 
   return (
-    <div className="-mx-4 -mt-8 min-h-[calc(100dvh-4rem)] bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_24%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))] sm:-mx-6 lg:-mx-8">
-      <div className="mx-auto h-full max-w-[1800px] px-3 pb-4 pt-3 sm:px-5 lg:px-6">
-        <div className="grid h-full gap-4 xl:grid-cols-[320px,minmax(0,1fr),320px]">
-          <aside
-            className="hidden xl:flex xl:min-h-0 xl:flex-col xl:rounded-2xl xl:border xl:border-[var(--fyxvo-border)] xl:bg-[var(--fyxvo-panel)] xl:shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
-            aria-label="Conversation history"
-          >
-            <div className="border-b border-[var(--fyxvo-border)] px-5 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Conversations</p>
+    <div className="flex flex-1 flex-col bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_24%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))]">
+
+      {/* ── Mobile top bar (lg:hidden) ─────────────────────────────── */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 px-3 py-2 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open conversation list"
+          className={cn(
+            "flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm font-medium text-[var(--fyxvo-text-muted)]",
+            "transition-colors duration-150 hover:text-[var(--fyxvo-text)]",
+            FOCUS_RING_CLASS
+          )}
+        >
+          <MenuIcon className="h-4 w-4 shrink-0" />
+          <span>Conversations</span>
+        </button>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setContextDrawerOpen(true)}
+          aria-label="Open assistant context"
+          className={cn(
+            "flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm font-medium text-[var(--fyxvo-text-muted)]",
+            "transition-colors duration-150 hover:text-[var(--fyxvo-text)] xl:hidden",
+            FOCUS_RING_CLASS
+          )}
+        >
+          <SparklesIcon className="h-4 w-4 shrink-0" />
+          <span>Context</span>
+        </button>
+      </div>
+
+      {/* ── Three-column body ─────────────────────────────────────── */}
+      <div className="flex flex-1 min-h-0 gap-3 p-3 lg:gap-4 lg:p-4">
+
+        {/* LEFT — conversation sidebar (lg+) */}
+        <aside
+          className="hidden lg:flex lg:w-64 xl:w-72 shrink-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
+          aria-label="Conversation history"
+        >
+          <div className="shrink-0 border-b border-[var(--fyxvo-border)] px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Conversations</p>
+              <Button size="sm" variant="secondary" onClick={() => void handleCreateConversation()}>New</Button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+            {conversations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5">
+                <p className="text-sm font-medium text-[var(--fyxvo-text)]">No conversations yet</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">Start a new thread and your history will appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {conversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => void loadConversation(conversation.id)}
+                    aria-current={activeConversationId === conversation.id ? "page" : undefined}
+                    className={cn(
+                      "w-full rounded-xl border px-3.5 py-3 text-left transition-colors duration-150",
+                      FOCUS_RING_CLASS,
+                      activeConversationId === conversation.id
+                        ? "border-brand-500/25 bg-brand-500/8"
+                        : "border-transparent hover:border-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel-soft)]"
+                    )}
+                  >
+                    <div className="line-clamp-2 text-sm font-medium text-[var(--fyxvo-text)]">{conversation.title}</div>
+                    <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--fyxvo-text-muted)]">
+                      <span>{conversation.messageCount} msg</span>
+                      <span>{shortRelative(conversation.lastMessageAt, isHydrated)}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* CENTER — main chat panel */}
+        <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]">
+
+          {/* Header */}
+          <div className="shrink-0 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 py-4 backdrop-blur-xl sm:px-6 sm:py-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <BrandLogo href="/assistant" iconClassName="h-12 w-12" className="gap-3" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
+                        Fyxvo Assistant
+                      </h1>
+                      <Badge tone="neutral" className="normal-case tracking-normal">
+                        {rateLimitStatus?.model ?? "Claude"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-[var(--fyxvo-text-muted)] sm:block">
+                      Workspace-aware help for onboarding, Solana RPC examples, debugging, docs, and live Fyxvo project state.
+                    </p>
+                  </div>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => void handleCreateConversation()}>
-                  New
-                </Button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={assistantAvailable === false ? "warning" : "success"} className="normal-case tracking-normal">
+                  {assistantAvailable === false ? "Unavailable" : "Available"}
+                </Badge>
+                <Badge tone="neutral" className="normal-case tracking-normal">
+                  {usageRemaining ?? "—"} left
+                </Badge>
+                {messages.length > 0 || activeConversationId ? (
+                  <Button size="sm" variant="secondary" onClick={() => void handleClearConversation()}>Clear</Button>
+                ) : null}
+                <Button size="sm" onClick={() => void handleCreateConversation()}>New</Button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 py-3">
-              {conversations.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5 text-sm text-[var(--fyxvo-text-muted)]">
-                  <p className="font-medium text-[var(--fyxvo-text)]">No conversations yet</p>
-                  <p className="mt-1 text-xs leading-5">Start a new thread and your history will appear here.</p>
+
+            {assistantStatusMessage ? (
+              <div className="mt-4">
+                <Notice tone={isAssistantUnavailable ? "warning" : "neutral"} title={isAssistantUnavailable ? "Assistant availability" : "Assistant status"}>
+                  <span>{assistantStatusMessage}</span>
+                </Notice>
+              </div>
+            ) : null}
+
+            {showOnboardingBanner ? (
+              <div className="mt-4 rounded-xl border border-brand-500/20 bg-brand-500/8 px-4 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="max-w-2xl">
+                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">What the assistant can help with</div>
+                    <div className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+                      It can explain Fyxvo and Solana RPC workflows, use real project context when available, and prepare examples for docs or playground. Every response should be tested before production use.
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={dismissOnboardingBanner}>Dismiss</Button>
                 </div>
-              ) : (
-                <div className="space-y-1">
-                  {conversations.map((conversation) => (
-                    <button
-                      key={conversation.id}
-                      type="button"
-                      onClick={() => void loadConversation(conversation.id)}
-                      aria-current={activeConversationId === conversation.id ? "page" : undefined}
-                      className={cn(
-                        "w-full rounded-xl border px-3.5 py-3 text-left transition-colors duration-150",
-                        FOCUS_RING_CLASS,
-                        activeConversationId === conversation.id
-                          ? "border-brand-500/25 bg-brand-500/8"
-                          : "border-transparent hover:border-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel-soft)]"
-                      )}
-                    >
-                      <div className="line-clamp-2 text-sm font-medium text-[var(--fyxvo-text)]">{conversation.title}</div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--fyxvo-text-muted)]">
-                        <span>{conversation.messageCount} msg</span>
-                        <span>{shortRelative(conversation.lastMessageAt, isHydrated)}</span>
+              </div>
+            ) : null}
+
+            {returnBanner ? (
+              <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
+                Returned from Playground with your prepared request ready.
+              </div>
+            ) : null}
+
+            {!isAuthenticated ? (
+              <div className="mt-4">
+                <Notice tone="neutral" title="Connect your wallet to use the assistant">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span>You need an active wallet session before sending assistant messages.</span>
+                    <WalletConnectButton compact />
+                  </div>
+                </Notice>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Thread — scrolls independently */}
+          <div
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-6"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+            aria-label="Assistant conversation thread"
+          >
+            {loadingConversation ? (
+              <div className="mx-auto max-w-3xl space-y-3">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="h-24 animate-pulse rounded-[1.75rem] bg-[var(--fyxvo-panel-soft)]" />
+                ))}
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="mx-auto max-w-4xl space-y-6">
+                <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-10 text-center shadow-[0_4px_20px_rgba(15,23,42,0.05)]">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/8 text-[var(--fyxvo-brand)]">
+                    <SparklesIcon className="h-5 w-5" />
+                  </div>
+                  <h2 className="mt-5 font-display text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
+                    Ask about onboarding, debugging, relay behavior, or live project state
+                  </h2>
+                  <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
+                    The assistant can help you reach first traffic faster, explain current platform behavior honestly, and prepare examples you can send straight into the playground.
+                  </p>
+                </div>
+
+                {isAssistantUnavailable ? (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-5 py-5">
+                    <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant temporarily unavailable</h3>
+                    <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+                      Your previous conversations are still available. You can keep using docs, playground, and analytics while the assistant service recovers.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <AssistantActionPill href="/docs">Open docs</AssistantActionPill>
+                      <AssistantActionPill href="/playground">Open playground</AssistantActionPill>
+                      <AssistantActionPill href="/analytics">Open analytics</AssistantActionPill>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {PROMPT_GROUPS.map((group) => (
+                    <section key={group.title} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-5 py-4">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">{group.title}</div>
+                      <div className="mt-3 space-y-1.5">
+                        {group.items.map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => {
+                              if (isAuthenticated && !isAssistantUnavailable) {
+                                void sendMessage(prompt);
+                              } else {
+                                setComposer((current) => ({ ...current, input: prompt }));
+                              }
+                            }}
+                            className={cn(
+                              "w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)]",
+                              "transition-colors duration-150 hover:border-brand-500/25 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
+                              FOCUS_RING_CLASS
+                            )}
+                          >
+                            {prompt}
+                          </button>
+                        ))}
                       </div>
-                    </button>
+                    </section>
                   ))}
                 </div>
-              )}
-            </div>
-          </aside>
-
-          <div className="flex min-h-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]">
-            <div className="sticky top-0 z-20 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-4 pt-4 backdrop-blur-xl sm:px-6 sm:pt-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="mb-3 flex items-center gap-2 xl:hidden">
-                    <Button size="sm" variant="secondary" onClick={() => setSidebarOpen(true)}>
-                      <MenuIcon className="h-4 w-4" />
-                      Conversations
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => setContextDrawerOpen(true)} className="lg:hidden">
-                      <SparklesIcon className="h-4 w-4" />
-                      Context
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <BrandLogo href="/assistant" iconClassName="h-12 w-12" className="gap-3" />
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
-                          Fyxvo Assistant
-                        </h1>
-                        <Badge tone="neutral" className="normal-case tracking-normal">
-                          {rateLimitStatus?.model ?? "Claude"}
-                        </Badge>
-                      </div>
-                      <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                        Workspace-aware help for onboarding, Solana RPC examples, debugging, docs, and live Fyxvo project state.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={assistantAvailable === false ? "warning" : "success"} className="normal-case tracking-normal">
-                    {assistantAvailable === false ? "Unavailable" : "Available"}
-                  </Badge>
-                  <Badge tone="neutral" className="normal-case tracking-normal">
-                    {usageRemaining ?? "—"} messages left
-                  </Badge>
-                  {messages.length > 0 || activeConversationId ? (
-                    <Button size="sm" variant="secondary" onClick={() => void handleClearConversation()}>
-                      Clear
-                    </Button>
-                  ) : null}
-                  <Button size="sm" onClick={() => void handleCreateConversation()}>
-                    New conversation
-                  </Button>
-                </div>
               </div>
-
-              {assistantStatusMessage ? (
-                <div className="mt-4">
-                  <Notice tone={isAssistantUnavailable ? "warning" : "neutral"} title={isAssistantUnavailable ? "Assistant availability" : "Assistant status"}>
-                    <span>{assistantStatusMessage}</span>
-                  </Notice>
-                </div>
-              ) : null}
-
-              {showOnboardingBanner ? (
-                <div className="mt-4 rounded-xl border border-brand-500/20 bg-brand-500/8 px-4 py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="max-w-2xl">
-                      <div className="text-sm font-semibold text-[var(--fyxvo-text)]">What the assistant can help with</div>
-                      <div className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                        It can explain Fyxvo and Solana RPC workflows, use real project context when available, and prepare examples for docs or playground. Every response should be tested before production use.
+            ) : (
+              <div className="mx-auto max-w-4xl space-y-7 sm:space-y-8">
+                {messages.map((message, index) => (
+                  <div key={`${message.id}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                    <div className={cn("max-w-[95%] space-y-2.5 sm:max-w-[88%]", message.role === "user" ? "items-end" : "items-start")}>
+                      <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
+                        <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
+                        {message.createdAt ? <span>•</span> : null}
+                        {message.createdAt ? <span>{formatTimestamp(message.createdAt, isHydrated)}</span> : null}
                       </div>
-                    </div>
-                    <Button size="sm" variant="ghost" onClick={dismissOnboardingBanner}>
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
 
-              {returnBanner ? (
-                <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
-                  Returned from Playground with your prepared request ready.
-                </div>
-              ) : null}
-
-              {!isAuthenticated ? (
-                <div className="mt-4">
-                  <Notice tone="neutral" title="Connect your wallet to use the assistant">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span>You need an active wallet session before sending assistant messages.</span>
-                      <WalletConnectButton compact />
-                    </div>
-                  </Notice>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="xl:hidden">
-              <details className="border-b border-[var(--fyxvo-border)]">
-                <summary className={cn("cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--fyxvo-text)] sm:px-6", FOCUS_RING_CLASS)}>
-                  Workspace context and quick actions
-                </summary>
-                <div className="px-4 pb-4 sm:px-6">{rightPanel}</div>
-              </details>
-            </div>
-
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div
-                className="flex-1 overflow-y-auto px-4 py-5 sm:px-6"
-                role="log"
-                aria-live="polite"
-                aria-relevant="additions text"
-                aria-label="Assistant conversation thread"
-              >
-                {loadingConversation ? (
-                  <div className="mx-auto max-w-3xl space-y-3">
-                    {[0, 1, 2].map((item) => (
-                      <div key={item} className="h-24 animate-pulse rounded-[1.75rem] bg-[var(--fyxvo-panel-soft)]" />
-                    ))}
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="mx-auto max-w-4xl space-y-6">
-                    <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-10 text-center shadow-[0_4px_20px_rgba(15,23,42,0.05)]">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/8 text-[var(--fyxvo-brand)]">
-                        <SparklesIcon className="h-5 w-5" />
-                      </div>
-                      <h2 className="mt-5 font-display text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
-                        Ask about onboarding, debugging, relay behavior, or live project state
-                      </h2>
-                      <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
-                        The assistant can help you reach first traffic faster, explain current platform behavior honestly, and prepare examples you can send straight into the playground.
-                      </p>
-                    </div>
-
-                    {isAssistantUnavailable ? (
-                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-5 py-5">
-                        <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant temporarily unavailable</h3>
-                        <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                          Your previous conversations are still available. You can keep using docs, playground, and analytics while the assistant service recovers.
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <AssistantActionPill href="/docs">Open docs</AssistantActionPill>
-                          <AssistantActionPill href="/playground">Open playground</AssistantActionPill>
-                          <AssistantActionPill href="/analytics">Open analytics</AssistantActionPill>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="grid gap-4 lg:grid-cols-2">
-                      {PROMPT_GROUPS.map((group) => (
-                        <section key={group.title} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-5 py-4">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">{group.title}</div>
-                          <div className="mt-3 space-y-1.5">
-                            {group.items.map((prompt) => (
-                              <button
-                                key={prompt}
-                                type="button"
-                                onClick={() => {
-                                  if (isAuthenticated && !isAssistantUnavailable) {
-                                    void sendMessage(prompt);
-                                  } else {
-                                    setComposer((current) => ({ ...current, input: prompt }));
-                                  }
-                                }}
-                                className={cn(
-                                  "w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)]",
-                                  "transition-colors duration-150 hover:border-brand-500/25 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
-                                  FOCUS_RING_CLASS
-                                )}
-                              >
-                                {prompt}
-                              </button>
-                            ))}
-                          </div>
-                        </section>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mx-auto max-w-4xl space-y-7 sm:space-y-8">
-                    {messages.map((message, index) => (
-                      <div key={`${message.id}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                        <div className={cn("max-w-[95%] space-y-2.5 sm:max-w-[88%]", message.role === "user" ? "items-end" : "items-start")}>
-                          <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
-                            <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
-                            {message.createdAt ? <span>•</span> : null}
-                            {message.createdAt ? <span>{formatTimestamp(message.createdAt, isHydrated)}</span> : null}
-                          </div>
-
-                          {composer.isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
-                            <ThinkingBubble />
-                          ) : (
-                            <div
-                              className={cn(
-                                "rounded-2xl px-5 py-4",
-                                message.role === "user"
-                                  ? "rounded-tr-sm bg-[linear-gradient(145deg,var(--fyxvo-brand),#ea580c)] text-white shadow-[0_8px_24px_rgba(249,115,22,0.22)]"
-                                  : "rounded-tl-sm border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
-                              )}
-                            >
-                              {message.role === "assistant" ? (
-                                <MarkdownContent content={message.content} />
-                              ) : (
-                                <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
-                              )}
-                            </div>
-                          )}
-
-                          {renderMessageActions(message)}
-                        </div>
-                      </div>
-                    ))}
-                    <div ref={threadBottomRef} />
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 backdrop-blur sm:px-6">
-                <div className="mx-auto max-w-4xl">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--fyxvo-text-muted)]">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span>
-                        {rateLimitStatus ? `${rateLimitStatus.messagesUsedThisHour}/${rateLimitStatus.limit} used this hour` : "Usage window unavailable"}
-                      </span>
-                      <span>Enter to send · Shift+Enter for newline</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span>{usageRemaining ?? "—"} messages remaining</span>
-                      <span>{rateLimitReset ? `Resets ${shortRelative(rateLimitReset, isHydrated)}` : "Reset time unavailable"}</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color] duration-150 focus-within:border-[var(--fyxvo-border-strong)]">
-                    <div className="flex items-end gap-3">
-                      <button
-                        type="button"
-                        disabled
-                        className={cn(
-                          "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] opacity-70",
-                          FOCUS_RING_CLASS
-                        )}
-                        aria-label="Attachments coming soon"
-                        title="Attachments coming soon"
-                      >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M21.4 11.1l-8.6 8.6a5 5 0 11-7.1-7.1l9.2-9.2a3.5 3.5 0 015 5L9.8 18.5a2 2 0 11-2.8-2.8l8.5-8.5" />
-                        </svg>
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <textarea
-                          ref={textareaRef}
-                          aria-label="Message Fyxvo Assistant"
-                          value={composer.input}
-                          onChange={(event) => setComposer((current) => ({ ...current, input: event.target.value }))}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" && !event.shiftKey) {
-                              event.preventDefault();
-                              void sendMessage(composer.input);
-                            }
-                          }}
-                          placeholder={
-                            isAssistantUnavailable
-                              ? "The AI assistant is temporarily unavailable"
-                              : isAuthenticated
-                                ? "Ask about Fyxvo, Solana RPC, debugging, funding, or analytics…"
-                                : "Connect wallet to chat"
-                          }
-                          disabled={!isAuthenticated || composer.isStreaming || isAssistantUnavailable}
-                          rows={1}
+                      {composer.isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
+                        <ThinkingBubble />
+                      ) : (
+                        <div
                           className={cn(
-                            "max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-1 py-2 text-sm leading-6 text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] disabled:opacity-60",
-                            FOCUS_RING_CLASS
+                            "rounded-2xl px-5 py-4",
+                            message.role === "user"
+                              ? "rounded-tr-sm bg-[linear-gradient(145deg,var(--fyxvo-brand),#ea580c)] text-white shadow-[0_8px_24px_rgba(249,115,22,0.22)]"
+                              : "rounded-tl-sm border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
                           )}
-                        />
-                        <div className="flex flex-wrap items-center gap-2 px-1 pb-1 text-[11px] text-[var(--fyxvo-text-muted)]">
-                          <span>Attachment support is coming soon.</span>
-                          {!selectedProject ? <span>No project context selected yet.</span> : null}
+                        >
+                          {message.role === "assistant" ? (
+                            <MarkdownContent content={message.content} />
+                          ) : (
+                            <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
+                          )}
                         </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => void sendMessage(composer.input)}
-                        disabled={!composer.input.trim() || !isAuthenticated || composer.isStreaming || isAssistantUnavailable}
-                        className={cn("h-11 shrink-0 rounded-2xl px-5", FOCUS_RING_CLASS)}
-                      >
-                        {composer.isStreaming ? "Streaming…" : "Send"}
-                      </Button>
+                      )}
+
+                      {renderMessageActions(message)}
                     </div>
                   </div>
+                ))}
+                <div ref={threadBottomRef} />
+              </div>
+            )}
+          </div>
+
+          {/* Composer — pinned to bottom of center column */}
+          <div className="shrink-0 border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:px-6">
+            <div className="mx-auto max-w-4xl">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--fyxvo-text-muted)]">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span>
+                    {rateLimitStatus ? `${rateLimitStatus.messagesUsedThisHour}/${rateLimitStatus.limit} used this hour` : "Usage window unavailable"}
+                  </span>
+                  <span className="hidden sm:inline">Enter to send · Shift+Enter for newline</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span>{usageRemaining ?? "—"} remaining</span>
+                  <span className="hidden sm:inline">{rateLimitReset ? `Resets ${shortRelative(rateLimitReset, isHydrated)}` : "Reset time unavailable"}</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color] duration-150 focus-within:border-[var(--fyxvo-border-strong)]">
+                <div className="flex items-end gap-3">
+                  <button
+                    type="button"
+                    disabled
+                    className={cn(
+                      "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] opacity-70",
+                      FOCUS_RING_CLASS
+                    )}
+                    aria-label="Attachments coming soon"
+                    title="Attachments coming soon"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M21.4 11.1l-8.6 8.6a5 5 0 11-7.1-7.1l9.2-9.2a3.5 3.5 0 015 5L9.8 18.5a2 2 0 11-2.8-2.8l8.5-8.5" />
+                    </svg>
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <textarea
+                      ref={textareaRef}
+                      aria-label="Message Fyxvo Assistant"
+                      value={composer.input}
+                      onChange={(event) => setComposer((current) => ({ ...current, input: event.target.value }))}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void sendMessage(composer.input);
+                        }
+                      }}
+                      placeholder={
+                        isAssistantUnavailable
+                          ? "The AI assistant is temporarily unavailable"
+                          : isAuthenticated
+                            ? "Ask about Fyxvo, Solana RPC, debugging, funding, or analytics…"
+                            : "Connect wallet to chat"
+                      }
+                      disabled={!isAuthenticated || composer.isStreaming || isAssistantUnavailable}
+                      rows={2}
+                      className={cn(
+                        "max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-1 py-2 text-sm leading-6 text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] disabled:opacity-60",
+                        FOCUS_RING_CLASS
+                      )}
+                    />
+                    <div className="flex flex-wrap items-center gap-2 px-1 pb-1 text-[11px] text-[var(--fyxvo-text-muted)]">
+                      <span>Attachment support is coming soon.</span>
+                      {!selectedProject ? <span>No project context selected yet.</span> : null}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => void sendMessage(composer.input)}
+                    disabled={!composer.input.trim() || !isAuthenticated || composer.isStreaming || isAssistantUnavailable}
+                    className={cn("h-11 w-11 shrink-0 rounded-2xl px-0 sm:w-auto sm:px-5", FOCUS_RING_CLASS)}
+                    aria-label="Send"
+                  >
+                    {composer.isStreaming ? (
+                      <span className="hidden sm:inline">Streaming…</span>
+                    ) : (
+                      <>
+                        <span className="hidden sm:inline">Send</span>
+                        <svg viewBox="0 0 16 16" fill="currentColor" className="h-4 w-4 sm:hidden" aria-hidden="true">
+                          <path d="M14.5 8l-12 7V1l12 7z" />
+                        </svg>
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
-
-          <aside className="hidden xl:block">
-            <div className="sticky top-6 max-h-[calc(100dvh-7rem)] overflow-y-auto pr-1">{rightPanel}</div>
-          </aside>
         </div>
 
-        <div
+        {/* RIGHT — context panel (xl+) */}
+        <aside
+          className="hidden xl:flex xl:w-72 shrink-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
+          aria-label="Assistant context"
+        >
+          <div className="shrink-0 border-b border-[var(--fyxvo-border)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Workspace context</p>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            {rightPanel}
+          </div>
+        </aside>
+
+      </div>
+
+      {/* ── Left drawer — conversations (mobile / tablet) ─────────── */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[70] lg:hidden transition-opacity duration-200 ease-out",
+          sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        )}
+      >
+        <button
+          type="button"
+          aria-label="Close conversation list"
+          onClick={() => setSidebarOpen(false)}
+          className="absolute inset-0 bg-black/45"
+        />
+        <aside
           className={cn(
-            "fixed inset-0 z-[70] xl:hidden transition-opacity duration-200 ease-out",
-            sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+            "absolute inset-y-0 left-0 w-[min(86vw,22rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <button
-            type="button"
-            aria-label="Close conversation list"
-            onClick={() => setSidebarOpen(false)}
-            className="absolute inset-0 bg-black/45"
-          />
-          <aside className={cn("absolute inset-y-0 left-0 w-[min(86vw,22rem)] bg-[var(--fyxvo-bg)] shadow-2xl transition-transform duration-200 ease-out", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
-            <div className="flex h-full flex-col px-4 pb-[env(safe-area-inset-bottom)] pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Conversations</div>
-                  <div className="text-xs text-[var(--fyxvo-text-muted)]">Your saved assistant threads</div>
-                </div>
-                <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close" className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}>
-                  <CloseIcon className="h-4 w-4" />
-                </button>
+          <div className="flex h-full flex-col px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Conversations</div>
+                <div className="text-xs text-[var(--fyxvo-text-muted)]">Your saved assistant threads</div>
               </div>
-              <div className="mt-4">
-                <Button size="sm" onClick={() => void handleCreateConversation()}>
-                  New conversation
-                </Button>
-              </div>
-              <div className="mt-4 flex-1 overflow-y-auto">
-                <div className="space-y-2">
-                  {conversations.map((conversation) => (
-                    <button
-                      key={conversation.id}
-                      type="button"
-                      onClick={() => void loadConversation(conversation.id)}
-                      aria-current={activeConversationId === conversation.id ? "page" : undefined}
-                      className={cn(
-                        "w-full rounded-2xl border px-4 py-4 text-left",
-                        FOCUS_RING_CLASS,
-                        activeConversationId === conversation.id
-                          ? "border-brand-500/30 bg-brand-500/10"
-                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
-                      )}
-                    >
-                      <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
-                      <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt, isHydrated)}</div>
-                    </button>
-                  ))}
-                </div>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close"
+                className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4">
+              <Button size="sm" onClick={() => void handleCreateConversation()}>New conversation</Button>
+            </div>
+            <div className="mt-4 flex-1 min-h-0 overflow-y-auto">
+              <div className="space-y-2">
+                {conversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => void loadConversation(conversation.id)}
+                    aria-current={activeConversationId === conversation.id ? "page" : undefined}
+                    className={cn(
+                      "w-full min-h-[44px] rounded-2xl border px-4 py-3 text-left",
+                      FOCUS_RING_CLASS,
+                      activeConversationId === conversation.id
+                        ? "border-brand-500/30 bg-brand-500/10"
+                        : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
+                    )}
+                  >
+                    <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
+                    <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt, isHydrated)}</div>
+                  </button>
+                ))}
               </div>
             </div>
-          </aside>
-        </div>
+          </div>
+        </aside>
+      </div>
 
-        <div
+      {/* ── Right drawer — context (mobile / tablet) ──────────────── */}
+      <div
+        className={cn(
+          "fixed inset-0 z-[70] xl:hidden transition-opacity duration-200 ease-out",
+          contextDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        )}
+      >
+        <button
+          type="button"
+          aria-label="Close assistant context"
+          onClick={() => setContextDrawerOpen(false)}
+          className="absolute inset-0 bg-black/45"
+        />
+        <aside
           className={cn(
-            "fixed inset-0 z-[70] lg:hidden transition-opacity duration-200 ease-out",
-            contextDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+            "absolute inset-y-0 right-0 w-[min(88vw,24rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
+            contextDrawerOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
-          <button
-            type="button"
-            aria-label="Close assistant context"
-            onClick={() => setContextDrawerOpen(false)}
-            className="absolute inset-0 bg-black/45"
-          />
-          <aside className={cn("absolute inset-y-0 right-0 w-[min(88vw,24rem)] bg-[var(--fyxvo-bg)] shadow-2xl transition-transform duration-200 ease-out", contextDrawerOpen ? "translate-x-0" : "translate-x-full")}>
-            <div className="flex h-full flex-col px-4 pb-[env(safe-area-inset-bottom)] pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant context</div>
-                  <div className="text-xs text-[var(--fyxvo-text-muted)]">Usage, project state, and quick actions</div>
-                </div>
-                <button type="button" onClick={() => setContextDrawerOpen(false)} aria-label="Close" className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}>
-                  <CloseIcon className="h-4 w-4" />
-                </button>
+          <div className="flex h-full flex-col px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant context</div>
+                <div className="text-xs text-[var(--fyxvo-text-muted)]">Usage, project state, and quick actions</div>
               </div>
-              <div className="mt-4 flex-1 overflow-y-auto">{rightPanel}</div>
+              <button
+                type="button"
+                onClick={() => setContextDrawerOpen(false)}
+                aria-label="Close"
+                className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
             </div>
-          </aside>
-        </div>
+            <div className="mt-4 flex-1 min-h-0 overflow-y-auto">{rightPanel}</div>
+          </div>
+        </aside>
       </div>
     </div>
   );

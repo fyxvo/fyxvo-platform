@@ -32,5 +32,5 @@ export const metadata: Metadata = {
 };
 
 export default function AssistantLayout({ children }: { readonly children: ReactNode }) {
-  return <DashShell>{children}</DashShell>;
+  return <DashShell fullbleed hideBottomNav>{children}</DashShell>;
 }

@@ -286,7 +286,15 @@ function SidebarContent({
   );
 }
 
-export function DashShell({ children }: { readonly children: React.ReactNode }) {
+export function DashShell({
+  children,
+  fullbleed = false,
+  hideBottomNav = false,
+}: {
+  readonly children: React.ReactNode;
+  readonly fullbleed?: boolean;
+  readonly hideBottomNav?: boolean;
+}) {
   const pathname = usePathname();
   const portal = usePortal();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -297,7 +305,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
   }, [pathname]);
 
   return (
-    <div className="relative flex min-h-screen">
+    <div className={cn("relative flex", fullbleed ? "h-dvh overflow-hidden" : "min-h-screen")}>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-[var(--fyxvo-border)] lg:bg-[var(--fyxvo-bg)]">
         <SidebarContent pathname={pathname} onOpenShortcuts={() => setShortcutsOpen(true)} />
@@ -371,14 +379,26 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
           </div>
         </header>
 
-        <main id="main-content" className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 lg:px-8 lg:pb-8">
-            {children}
-          </div>
+        <main
+          id="main-content"
+          className={cn(
+            fullbleed
+              ? "flex flex-1 flex-col overflow-hidden"
+              : "flex-1 overflow-y-auto"
+          )}
+        >
+          {fullbleed ? (
+            children
+          ) : (
+            <div className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 lg:px-8 lg:pb-8">
+              {children}
+            </div>
+          )}
         </main>
       </div>
 
       {/* Mobile bottom navigation */}
+      {hideBottomNav ? null : (
       <nav
         className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 backdrop-blur lg:hidden"
         aria-label="Mobile navigation"
@@ -410,6 +430,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
           );
         })}
       </nav>
+      )}
 
       <CommandPalette />
       <KeyboardShortcuts open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
