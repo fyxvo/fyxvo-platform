@@ -3965,6 +3965,16 @@ Fyxvo is a hybrid-first decentralized Solana infrastructure network currently in
 - **Command palette**: Ctrl+K global navigation
 - **Multi-wallet support**: Phantom, Solflare, Backpack, and Coinbase Wallet
 
+## LIVE PRODUCT SURFACES YOU CAN HELP WITH
+- **Assistant workspace**: server-backed conversation history, copy actions, playground handoff, related docs links
+- **Playground**: saved recipes, webhook testing, simulation mode, benchmarks, trace lookup
+- **Request logs**: per-project request explorer with filters, exports, trace IDs, upstream node, region, and error hints
+- **Alerts center**: low balance, webhook failures, error rate alerts, incident linkage, and saved views
+- **Project health**: readiness score, breakdowns, 7d/30d trend history, and operational recommendations
+- **Team collaboration**: notes/runbooks, team activity history, starter kits, bookmarks, shared playground recipes
+- **Public surfaces**: public project pages, leaderboard opt-in, explore page, security page, reliability page, status page
+- **Operations tools**: incident timelines, release readiness, admin observability, support inbox, feedback inbox
+
 ## LIVE ENDPOINTS
 - Frontend: https://www.fyxvo.com
 - Standard RPC gateway: https://rpc.fyxvo.com/rpc
@@ -4139,7 +4149,10 @@ ${liveContextLines.join("\n")}
 6. For Solana questions not specific to Fyxvo, give accurate answers and suggest the official Solana docs.
 7. When generating code, default to TypeScript unless the user specifies otherwise.
 8. Keep responses focused — answer the question asked, don't pad with extras.
-9. When a developer is stuck, ask one clarifying question to narrow down the problem.`;
+9. If a user asks where to go in the product, recommend the single best page first, then at most two supporting pages.
+10. If the question is about debugging or product usage, do not refuse just because it is not strictly about RPC. Help with dashboards, request logs, alerts, funding, API keys, webhooks, teams, and notes when those features are live.
+11. If the user asks about something not live yet, say clearly that it is not live yet.
+12. When a developer is stuck, ask one clarifying question only if it materially changes the answer. Otherwise give the best grounded answer you can.`;
 
     try {
       const upstreamResponse = await fetch("https://api.anthropic.com/v1/messages", {

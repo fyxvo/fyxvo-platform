@@ -16,7 +16,6 @@ import {
   KeyIcon,
   MenuIcon,
   SparklesIcon,
-  SupportIcon,
 } from "./icons";
 import { webEnv } from "../lib/env";
 import {
@@ -1210,72 +1209,6 @@ export function AssistantWorkspace() {
     }
   }
 
-  function toolCardsForMessage(message: AssistantConversationMessage) {
-    const actions = inferActionLinks(
-      message.content,
-      message.suggestedActions,
-      detectDocsSection(message.content, message.matchedDocsSection),
-      detectPlaygroundInsert(message.content, message.playgroundPayload)
-    );
-
-    const cards: ReactNode[] = [];
-    for (const action of actions.slice(0, 4)) {
-      if (action.kind === "api_keys") {
-        cards.push(
-          <ToolCard
-            key={action.id}
-            title="Create or manage API keys"
-            description="Open API key controls for the current project and keep gateway credentials scoped."
-            href={action.href}
-            icon={<KeyIcon className="h-4 w-4" />}
-          />
-        );
-      } else if (action.kind === "funding") {
-        cards.push(
-          <ToolCard
-            key={action.id}
-            title="Fund your project"
-            description="Move into the funding flow to top up devnet SOL and unlock relay traffic."
-            href={action.href}
-            icon={<FundingIcon className="h-4 w-4" />}
-          />
-        );
-      } else if (action.kind === "playground") {
-        cards.push(
-          <ToolCard
-            key={action.id}
-            title="Open playground"
-            description="Use the playground to send or simulate the next request with the assistant-prepared context."
-            href={action.href}
-            icon={<BeakerIcon className="h-4 w-4" />}
-          />
-        );
-      } else if (action.kind === "analytics") {
-        cards.push(
-          <ToolCard
-            key={action.id}
-            title="View analytics"
-            description="Jump into request volume, latency, and recent traces for the active project."
-            href={action.href}
-            icon={<ChartIcon className="h-4 w-4" />}
-          />
-        );
-      } else if (action.kind === "invite") {
-        cards.push(
-          <ToolCard
-            key={action.id}
-            title="Invite teammate"
-            description="Open team settings and add another wallet to this project workspace."
-            href={action.href}
-            icon={<SupportIcon className="h-4 w-4" />}
-          />
-        );
-      }
-    }
-
-    return cards;
-  }
-
   function renderMessageActions(message: AssistantConversationMessage) {
     if (!message.content || message.role !== "assistant") return null;
 
@@ -1285,43 +1218,106 @@ export function AssistantWorkspace() {
     const curlSnippet = extractCurlSnippet(message.content);
     const jsSnippet = extractJavaScriptSnippet(message.content);
     const actions = inferActionLinks(message.content, message.suggestedActions, docsSection, playgroundInsert);
-    const toolCards = toolCardsForMessage(message);
     const feedbackId = message.id;
+    const copyActions = [
+      {
+        id: `copy-${feedbackId}`,
+        label: copiedActionId === `copy-${feedbackId}` ? "Copied!" : "Copy reply",
+        onClick: () => copyWithToast(message.content, `copy-${feedbackId}`),
+      },
+      {
+        id: `markdown-${feedbackId}`,
+        label: copiedActionId === `markdown-${feedbackId}` ? "Markdown copied!" : "Copy as markdown",
+        onClick: () => copyWithToast(message.content, `markdown-${feedbackId}`),
+      },
+      ...(curlSnippet
+        ? [{
+            id: `curl-${feedbackId}`,
+            label: copiedActionId === `curl-${feedbackId}` ? "curl copied!" : "Copy curl",
+            onClick: () => copyWithToast(curlSnippet, `curl-${feedbackId}`),
+          }]
+        : []),
+      ...(jsSnippet
+        ? [{
+            id: `js-${feedbackId}`,
+            label: copiedActionId === `js-${feedbackId}` ? "JS copied!" : "Copy JS example",
+            onClick: () => copyWithToast(jsSnippet, `js-${feedbackId}`),
+          }]
+        : []),
+    ];
+    const navigationActions: Array<{ id: string; label: string; href?: string; onClick?: () => void }> = [
+      ...(playgroundInsert
+        ? [{ id: `playground-${feedbackId}`, label: "Open in playground", onClick: () => insertIntoPlayground(message) }]
+        : []),
+      ...(docsLink ? [{ id: `docs-${feedbackId}`, label: docsLink.label, href: docsLink.href }] : []),
+      ...actions
+        .filter((action) => !docsLink || action.href !== docsLink.href)
+        .slice(0, 3)
+        .map((action) => ({
+          id: action.id,
+          label: action.label,
+          href: action.href,
+        })),
+    ];
+    const hasUtilitySection = copyActions.length > 0 || navigationActions.length > 0;
 
     return (
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <AssistantActionPill onClick={() => copyWithToast(message.content, `copy-${feedbackId}`)}>
-            {copiedActionId === `copy-${feedbackId}` ? "Copied!" : "Copy"}
-          </AssistantActionPill>
-          <AssistantActionPill onClick={() => copyWithToast(message.content, `markdown-${feedbackId}`)}>
-            {copiedActionId === `markdown-${feedbackId}` ? "Markdown copied!" : "Copy as markdown"}
-          </AssistantActionPill>
-          {curlSnippet ? (
-            <AssistantActionPill onClick={() => copyWithToast(curlSnippet, `curl-${feedbackId}`)}>
-              {copiedActionId === `curl-${feedbackId}` ? "curl copied!" : "Copy curl"}
-            </AssistantActionPill>
-          ) : null}
-          {jsSnippet ? (
-            <AssistantActionPill onClick={() => copyWithToast(jsSnippet, `js-${feedbackId}`)}>
-              {copiedActionId === `js-${feedbackId}` ? "JS copied!" : "Copy JS example"}
-            </AssistantActionPill>
-          ) : null}
-          {playgroundInsert ? (
-            <AssistantActionPill onClick={() => insertIntoPlayground(message)}>Open in playground</AssistantActionPill>
-          ) : null}
-          {docsLink ? <AssistantActionPill href={docsLink.href}>{docsLink.label}</AssistantActionPill> : null}
-          {actions
-            .filter((action) => !docsLink || action.href !== docsLink.href)
-            .slice(0, 3)
-            .map((action) => (
-              <AssistantActionPill key={action.id} href={action.href}>
-                {action.label}
-              </AssistantActionPill>
-            ))}
-        </div>
+        {hasUtilitySection ? (
+          <details className="group overflow-hidden rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-[var(--fyxvo-text)]">
+              <div>
+                <div>Helpful actions</div>
+                <div className="mt-1 text-xs font-normal text-[var(--fyxvo-text-muted)]">
+                  Open the right page or copy examples without covering the answer.
+                </div>
+              </div>
+              <span className="text-xs text-[var(--fyxvo-text-muted)] transition group-open:rotate-180">▾</span>
+            </summary>
+            <div className="border-t border-[var(--fyxvo-border)] px-4 py-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                {navigationActions.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
+                      Where to go
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {navigationActions.map((action) =>
+                        action.href ? (
+                          <AssistantActionPill key={action.id} href={action.href}>
+                            {action.label}
+                          </AssistantActionPill>
+                        ) : (
+                          <AssistantActionPill
+                            key={action.id}
+                            {...(action.onClick ? { onClick: action.onClick } : {})}
+                          >
+                            {action.label}
+                          </AssistantActionPill>
+                        )
+                      )}
+                    </div>
+                  </div>
+                ) : null}
 
-        {toolCards.length > 0 ? <div className="grid gap-3 md:grid-cols-2">{toolCards}</div> : null}
+                {copyActions.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
+                      Copy and reuse
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {copyActions.map((action) => (
+                        <AssistantActionPill key={action.id} onClick={action.onClick}>
+                          {action.label}
+                        </AssistantActionPill>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </details>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-2.5">
           <div className="flex items-center gap-2 text-xs text-[var(--fyxvo-text-muted)]">
@@ -1987,20 +1983,6 @@ export function AssistantWorkspace() {
 
               <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color] duration-150 focus-within:border-[var(--fyxvo-border-strong)]">
                 <div className="flex items-end gap-3">
-                  <button
-                    type="button"
-                    disabled
-                    className={cn(
-                      "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] opacity-70",
-                      FOCUS_RING_CLASS
-                    )}
-                    aria-label="Attachments unavailable in alpha"
-                    title="Attachments are unavailable in the current alpha"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M21.4 11.1l-8.6 8.6a5 5 0 11-7.1-7.1l9.2-9.2a3.5 3.5 0 015 5L9.8 18.5a2 2 0 11-2.8-2.8l8.5-8.5" />
-                    </svg>
-                  </button>
                   <div className="min-w-0 flex-1">
                     <textarea
                       ref={textareaRef}
@@ -2028,7 +2010,7 @@ export function AssistantWorkspace() {
                       )}
                     />
                     <div className="flex flex-wrap items-center gap-2 px-1 pb-1 text-[11px] text-[var(--fyxvo-text-muted)]">
-                      <span>Attachments are unavailable in the current alpha.</span>
+                      <span>Paste trace IDs, curl examples, error messages, or wallet addresses directly into the chat.</span>
                       {!selectedProject ? <span>No project context selected yet.</span> : null}
                     </div>
                   </div>
