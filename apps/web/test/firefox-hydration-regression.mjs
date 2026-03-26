@@ -9,10 +9,10 @@ const HOST = "127.0.0.1";
 const PORT = 3210;
 const BASE_URL = `http://${HOST}:${PORT}`;
 const PAGES = ["/pricing", "/dashboard", "/assistant"];
-const PAGE_READY_TEXT = {
-  "/pricing": /Pricing/i,
-  "/dashboard": /Dashboard|Connect wallet/i,
-  "/assistant": /Fyxvo Assistant|Connect wallet/i,
+const PAGE_READY_SELECTORS = {
+  "/pricing": ["h1"],
+  "/dashboard": ["h1", 'button[aria-label="Connect wallet"]', 'button:has-text("Connect wallet")'],
+  "/assistant": ["h1", 'textarea[aria-label="Message Fyxvo Assistant"]', 'button:has-text("Connect wallet")'],
 };
 
 const browserEnv = {
@@ -125,10 +125,23 @@ async function run() {
 
         await page.goto(`${BASE_URL}${path}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
         await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
-        await page.getByText(PAGE_READY_TEXT[path], { exact: false }).first().waitFor({
-          state: "visible",
-          timeout: 15_000,
-        });
+        const selectors = PAGE_READY_SELECTORS[path];
+        let ready = false;
+        for (const selector of selectors) {
+          try {
+            await page.locator(selector).first().waitFor({
+              state: "visible",
+              timeout: 5_000,
+            });
+            ready = true;
+            break;
+          } catch {
+            // Try the next route-specific selector.
+          }
+        }
+        if (!ready) {
+          throw new Error(`Timed out waiting for a visible ready selector on ${path}`);
+        }
         await page.waitForTimeout(1_500);
 
         const hydrationConsoleErrors = consoleErrors.filter((message) =>

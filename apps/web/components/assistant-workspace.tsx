@@ -688,6 +688,28 @@ function ToolCard({
   );
 }
 
+function InlineSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-4 shadow-[0_2px_8px_rgba(15,23,42,0.03)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">{title}</h3>
+          {description ? <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">{description}</p> : null}
+        </div>
+      </div>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
 function feedbackTone(feedback: AssistantMessageFeedback | null | undefined) {
   if (!feedback) return "neutral";
   return feedback.rating === "up" ? "success" : "warning";
@@ -706,7 +728,6 @@ export function AssistantWorkspace() {
   const [rateLimitStatus, setRateLimitStatus] = useState<AssistantRateLimitStatus | null>(null);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [contextDrawerOpen, setContextDrawerOpen] = useState(false);
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
   const [returnBanner, setReturnBanner] = useState<string | null>(null);
@@ -735,6 +756,7 @@ export function AssistantWorkspace() {
   const requestsLast7Days = portal.projectAnalytics.totals.requestLogs;
   const usageRemaining = rateLimitStatus?.messagesRemainingThisHour ?? null;
   const rateLimitReset = rateLimitStatus?.resetAt ?? rateLimitStatus?.windowResetAt ?? null;
+  const activeConversationSummary = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
 
   useEffect(() => {
     threadBottomRef.current?.scrollIntoView({ behavior: messages.length > 0 ? "smooth" : "auto" });
@@ -1344,119 +1366,192 @@ export function AssistantWorkspace() {
     );
   }
 
+  const workspaceContextContent = selectedProject ? (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Current project</span>
+        <span className="font-medium text-[var(--fyxvo-text)]">{selectedProject.name}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Activation</span>
+        <Badge tone={projectActivated ? "success" : "warning"}>{projectActivated ? "Activated" : "Needs activation"}</Badge>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Funded SOL</span>
+        <span className="font-medium text-[var(--fyxvo-text)]">{fundedSol.toFixed(4)} SOL</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Requests last 7d</span>
+        <span className="font-medium text-[var(--fyxvo-text)]">{requestsLast7Days.toLocaleString()}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Latest API key</span>
+        <span className="font-mono text-xs text-[var(--fyxvo-text)]">{latestApiKeyMasked}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Gateway status</span>
+        <Badge tone={assistantAvailable === false ? "warning" : "success"}>{assistantAvailable === false ? "Unavailable" : "Operational"}</Badge>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Simulation mode</span>
+        <span className="font-medium text-[var(--fyxvo-text)]">Available in Playground</span>
+      </div>
+    </div>
+  ) : (
+    <div className="rounded-2xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4 text-sm text-[var(--fyxvo-text-muted)]">
+      No project context is selected. The assistant can still help with docs, RPC examples, and platform guidance.
+    </div>
+  );
+
+  const usageAvailabilityContent = (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Model</span>
+        <span className="font-mono text-xs text-[var(--fyxvo-text)]">{rateLimitStatus?.model ?? "Claude"}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Availability</span>
+        <Badge tone={assistantAvailable === false ? "warning" : "success"}>
+          {assistantAvailable === false ? "Unavailable" : "Available"}
+        </Badge>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Messages remaining</span>
+        <span className="font-medium text-[var(--fyxvo-text)]">{usageRemaining ?? "—"}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[var(--fyxvo-text-muted)]">Window reset</span>
+        <span className="text-[var(--fyxvo-text)]">{rateLimitReset ? shortRelative(rateLimitReset, isHydrated) : "—"}</span>
+      </div>
+      <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-xs text-[var(--fyxvo-text-muted)]">
+        Pricing now: {PRICING_LAMPORTS.standard.toLocaleString()} lamports standard,{" "}
+        {PRICING_LAMPORTS.priority.toLocaleString()} priority, plus {FREE_TIER_REQUESTS.toLocaleString()} free starter requests per project.
+      </div>
+    </div>
+  );
+
+  const quickActionsContent = (
+    <div className="grid gap-3">
+      <ToolCard
+        title="Open playground"
+        description="Run or simulate gateway requests with your current project selected."
+        href="/playground"
+        icon={<BeakerIcon className="h-4 w-4" />}
+      />
+      <ToolCard
+        title="Manage API keys"
+        description="Review or create scoped gateway credentials for your project."
+        href="/api-keys"
+        icon={<KeyIcon className="h-4 w-4" />}
+      />
+      <ToolCard
+        title="Review funding"
+        description="Check devnet SOL balance and continue the funding flow if needed."
+        href="/funding"
+        icon={<FundingIcon className="h-4 w-4" />}
+      />
+      <ToolCard
+        title="View analytics"
+        description="Trace recent request volume, latency, and error spikes."
+        href="/analytics"
+        icon={<ChartIcon className="h-4 w-4" />}
+      />
+    </div>
+  );
+
+  const relatedDocsContent = (
+    <div className="grid gap-2">
+      {Object.entries(DOC_LINKS).map(([key, item]) => (
+        <Link
+          key={key}
+          href={item.href}
+          className="flex items-center justify-between rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-sm text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
+        >
+          <span>{item.label}</span>
+          <BookIcon className="h-4 w-4" />
+        </Link>
+      ))}
+    </div>
+  );
+
+  const developerDebugContent = (
+    <div className="space-y-3 text-xs text-[var(--fyxvo-text-muted)]">
+      <div className="flex items-center justify-between gap-3">
+        <span>Current project context</span>
+        <span className="text-[var(--fyxvo-text)]">{selectedProject ? selectedProject.name : "None"}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span>Latest docs match</span>
+        <span className="text-[var(--fyxvo-text)]">
+          {activeAssistantMessage?.matchedDocsSection ?? detectDocsSection(activeAssistantMessage?.content ?? "") ?? "None"}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span>Inferred actions</span>
+        <span className="text-[var(--fyxvo-text)]">
+          {(activeAssistantMessage?.suggestedActions ?? []).map((action) => action.label).join(", ") || "None"}
+        </span>
+      </div>
+    </div>
+  );
+
+  const adminAssistantInsightSection = adminAssistantStats ? (
+    <SectionCard title="Admin assistant insight" description="Assistant usage and feedback summary for admin sessions.">
+      <div className="space-y-3 text-sm">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Requests today</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.requestsToday}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Avg response</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.averageResponseTimeMs}ms</div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Feedback</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Badge tone="success">{adminAssistantStats.feedback.positive} helpful</Badge>
+            <Badge tone="warning">{adminAssistantStats.feedback.negative} needs work</Badge>
+            <Badge tone="neutral">{adminAssistantStats.feedback.withNotes} notes</Badge>
+          </div>
+          {adminAssistantStats.feedback.recent.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {adminAssistantStats.feedback.recent.slice(0, 3).map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-3 text-xs text-[var(--fyxvo-text-muted)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <Badge tone={entry.rating === "up" ? "success" : "warning"}>{entry.rating === "up" ? "up" : "down"}</Badge>
+                    <span>{shortRelative(entry.createdAt, isHydrated)}</span>
+                  </div>
+                  {entry.note ? <p className="mt-2 leading-5 text-[var(--fyxvo-text)]">{entry.note}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </SectionCard>
+  ) : null;
+
   const rightPanel = (
     <div className="space-y-4">
       <SectionCard
         title="Workspace context"
         description="Grounded project information used to keep assistant answers specific to your current setup."
       >
-        {selectedProject ? (
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Current project</span>
-              <span className="font-medium text-[var(--fyxvo-text)]">{selectedProject.name}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Activation</span>
-              <Badge tone={projectActivated ? "success" : "warning"}>{projectActivated ? "Activated" : "Needs activation"}</Badge>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Funded SOL</span>
-              <span className="font-medium text-[var(--fyxvo-text)]">{fundedSol.toFixed(4)} SOL</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Requests last 7d</span>
-              <span className="font-medium text-[var(--fyxvo-text)]">{requestsLast7Days.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Latest API key</span>
-              <span className="font-mono text-xs text-[var(--fyxvo-text)]">{latestApiKeyMasked}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Gateway status</span>
-              <Badge tone={assistantAvailable === false ? "warning" : "success"}>{assistantAvailable === false ? "Unavailable" : "Operational"}</Badge>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[var(--fyxvo-text-muted)]">Simulation mode</span>
-              <span className="font-medium text-[var(--fyxvo-text)]">Available in Playground</span>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4 text-sm text-[var(--fyxvo-text-muted)]">
-            No project context is selected. The assistant can still help with docs, RPC examples, and platform guidance.
-          </div>
-        )}
+        {workspaceContextContent}
       </SectionCard>
 
       <SectionCard title="Usage and availability" description="Current model, capacity window, and live gateway context.">
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--fyxvo-text-muted)]">Model</span>
-            <span className="font-mono text-xs text-[var(--fyxvo-text)]">{rateLimitStatus?.model ?? "Claude"}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--fyxvo-text-muted)]">Availability</span>
-            <Badge tone={assistantAvailable === false ? "warning" : "success"}>
-              {assistantAvailable === false ? "Unavailable" : "Available"}
-            </Badge>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--fyxvo-text-muted)]">Messages remaining</span>
-            <span className="font-medium text-[var(--fyxvo-text)]">{usageRemaining ?? "—"}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--fyxvo-text-muted)]">Window reset</span>
-            <span className="text-[var(--fyxvo-text)]">{rateLimitReset ? shortRelative(rateLimitReset, isHydrated) : "—"}</span>
-          </div>
-          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-xs text-[var(--fyxvo-text-muted)]">
-            Pricing now: {PRICING_LAMPORTS.standard.toLocaleString()} lamports standard,{" "}
-            {PRICING_LAMPORTS.priority.toLocaleString()} priority, plus {FREE_TIER_REQUESTS.toLocaleString()} free starter requests per project.
-          </div>
-        </div>
+        {usageAvailabilityContent}
       </SectionCard>
 
       <SectionCard title="Quick actions" description="Jump straight into the next developer task.">
-        <div className="grid gap-3">
-          <ToolCard
-            title="Open playground"
-            description="Run or simulate gateway requests with your current project selected."
-            href="/playground"
-            icon={<BeakerIcon className="h-4 w-4" />}
-          />
-          <ToolCard
-            title="Manage API keys"
-            description="Review or create scoped gateway credentials for your project."
-            href="/api-keys"
-            icon={<KeyIcon className="h-4 w-4" />}
-          />
-          <ToolCard
-            title="Review funding"
-            description="Check devnet SOL balance and continue the funding flow if needed."
-            href="/funding"
-            icon={<FundingIcon className="h-4 w-4" />}
-          />
-          <ToolCard
-            title="View analytics"
-            description="Trace recent request volume, latency, and error spikes."
-            href="/analytics"
-            icon={<ChartIcon className="h-4 w-4" />}
-          />
-        </div>
+        {quickActionsContent}
       </SectionCard>
 
       <SectionCard title="Related docs" description="Stable section links the assistant can target directly.">
-        <div className="grid gap-2">
-          {Object.entries(DOC_LINKS).map(([key, item]) => (
-            <Link
-              key={key}
-              href={item.href}
-              className="flex items-center justify-between rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-sm text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
-            >
-              <span>{item.label}</span>
-              <BookIcon className="h-4 w-4" />
-            </Link>
-          ))}
-        </div>
+        {relatedDocsContent}
       </SectionCard>
 
       <SectionCard
@@ -1477,71 +1572,18 @@ export function AssistantWorkspace() {
           </button>
         }
       >
-        <div className="space-y-3 text-xs text-[var(--fyxvo-text-muted)]">
-          <div className="flex items-center justify-between gap-3">
-            <span>Current project context</span>
-            <span className="text-[var(--fyxvo-text)]">{selectedProject ? selectedProject.name : "None"}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span>Latest docs match</span>
-            <span className="text-[var(--fyxvo-text)]">
-              {activeAssistantMessage?.matchedDocsSection ?? detectDocsSection(activeAssistantMessage?.content ?? "") ?? "None"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span>Inferred actions</span>
-            <span className="text-[var(--fyxvo-text)]">
-              {(activeAssistantMessage?.suggestedActions ?? []).map((action) => action.label).join(", ") || "None"}
-            </span>
-          </div>
-        </div>
+        {developerDebugContent}
       </SectionCard>
 
-      {adminAssistantStats ? (
-        <SectionCard title="Admin assistant insight" description="Assistant usage and feedback summary for admin sessions.">
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Requests today</div>
-                <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.requestsToday}</div>
-              </div>
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Avg response</div>
-                <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.averageResponseTimeMs}ms</div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
-              <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Feedback</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Badge tone="success">{adminAssistantStats.feedback.positive} helpful</Badge>
-                <Badge tone="warning">{adminAssistantStats.feedback.negative} needs work</Badge>
-                <Badge tone="neutral">{adminAssistantStats.feedback.withNotes} notes</Badge>
-              </div>
-              {adminAssistantStats.feedback.recent.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {adminAssistantStats.feedback.recent.slice(0, 3).map((entry) => (
-                    <div key={entry.id} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-3 text-xs text-[var(--fyxvo-text-muted)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <Badge tone={entry.rating === "up" ? "success" : "warning"}>{entry.rating === "up" ? "up" : "down"}</Badge>
-                        <span>{shortRelative(entry.createdAt, isHydrated)}</span>
-                      </div>
-                      {entry.note ? <p className="mt-2 leading-5 text-[var(--fyxvo-text)]">{entry.note}</p> : null}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </SectionCard>
-      ) : null}
+      {adminAssistantInsightSection}
     </div>
   );
 
   return (
-    <div className="flex flex-1 flex-col bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_24%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))]">
+    <div className="flex min-h-[100dvh] flex-1 flex-col bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_24%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))]">
 
-      {/* ── Mobile top bar (lg:hidden) ─────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 px-3 py-2 lg:hidden">
+      {/* ── Mobile top bar (md:hidden) ─────────────────────────────── */}
+      <div className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 px-3 py-2 backdrop-blur md:hidden">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -1555,28 +1597,23 @@ export function AssistantWorkspace() {
           <MenuIcon className="h-4 w-4 shrink-0" />
           <span>Conversations</span>
         </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => setContextDrawerOpen(true)}
-          aria-label="Open assistant context"
-          className={cn(
-            "flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm font-medium text-[var(--fyxvo-text-muted)]",
-            "transition-colors duration-150 hover:text-[var(--fyxvo-text)] xl:hidden",
-            FOCUS_RING_CLASS
-          )}
-        >
-          <SparklesIcon className="h-4 w-4 shrink-0" />
-          <span>Context</span>
-        </button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-[var(--fyxvo-text)]">
+            {activeConversationSummary?.title ?? "Fyxvo Assistant"}
+          </div>
+          <div className="text-[11px] text-[var(--fyxvo-text-muted)]">
+            {usageRemaining ?? "—"} left this hour
+          </div>
+        </div>
+        <Button size="sm" onClick={() => void handleCreateConversation()}>New</Button>
       </div>
 
       {/* ── Three-column body ─────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 gap-3 p-3 lg:gap-4 lg:p-4">
+      <div className="flex flex-1 min-h-0 gap-3 p-3 md:gap-4 md:p-4">
 
-        {/* LEFT — conversation sidebar (lg+) */}
+        {/* LEFT — conversation sidebar (md+) */}
         <aside
-          className="hidden lg:flex lg:w-64 xl:w-72 shrink-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
+          className="hidden md:flex md:w-72 lg:w-80 xl:w-72 shrink-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
           aria-label="Conversation history"
         >
           <div className="shrink-0 border-b border-[var(--fyxvo-border)] px-5 py-4">
@@ -1585,7 +1622,7 @@ export function AssistantWorkspace() {
               <Button size="sm" variant="secondary" onClick={() => void handleCreateConversation()}>New</Button>
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3">
             {conversations.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5">
                 <p className="text-sm font-medium text-[var(--fyxvo-text)]">No conversations yet</p>
@@ -1620,14 +1657,14 @@ export function AssistantWorkspace() {
         </aside>
 
         {/* CENTER — main chat panel */}
-        <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]">
+        <div className="flex min-w-0 flex-1 min-h-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]">
 
           {/* Header */}
           <div className="shrink-0 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 py-4 backdrop-blur-xl sm:px-6 sm:py-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-3">
-                  <BrandLogo href="/assistant" iconClassName="h-12 w-12" className="gap-3" />
+                  <BrandLogo href="/assistant" iconClassName="h-10 w-10 sm:h-11 sm:w-11" className="gap-3" />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
@@ -1640,6 +1677,14 @@ export function AssistantWorkspace() {
                     <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-[var(--fyxvo-text-muted)] sm:block">
                       Workspace-aware help for onboarding, Solana RPC examples, debugging, docs, and live Fyxvo project state.
                     </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--fyxvo-text-muted)] md:hidden">
+                      <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2.5 py-1">
+                        {activeConversationSummary?.messageCount ?? messages.length} messages
+                      </span>
+                      <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2.5 py-1">
+                        {selectedProject ? selectedProject.name : "No project selected"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1696,11 +1741,31 @@ export function AssistantWorkspace() {
                 </Notice>
               </div>
             ) : null}
+
+            <div className="mt-4 grid gap-3 xl:hidden lg:grid-cols-2">
+              <InlineSection
+                title="Current context"
+                description={selectedProject ? "Live project state used to ground assistant answers." : "No project selected yet."}
+              >
+                {workspaceContextContent}
+              </InlineSection>
+              <InlineSection title="Usage and quick actions" description="Keep limits, links, and next steps in reach while you chat.">
+                <div className="space-y-4">
+                  {usageAvailabilityContent}
+                  {quickActionsContent}
+                </div>
+              </InlineSection>
+              <div className="lg:col-span-2">
+                <InlineSection title="Related docs" description="Jump straight to the exact product surface or reference section.">
+                  {relatedDocsContent}
+                </InlineSection>
+              </div>
+            </div>
           </div>
 
           {/* Thread — scrolls independently */}
           <div
-            className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-6"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth px-4 py-5 sm:px-6"
             role="log"
             aria-live="polite"
             aria-relevant="additions text"
@@ -1774,7 +1839,7 @@ export function AssistantWorkspace() {
               <div className="mx-auto max-w-4xl space-y-7 sm:space-y-8">
                 {messages.map((message, index) => (
                   <div key={`${message.id}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div className={cn("max-w-[95%] space-y-2.5 sm:max-w-[88%]", message.role === "user" ? "items-end" : "items-start")}>
+                    <div className={cn("max-w-full space-y-2.5 sm:max-w-[92%] lg:max-w-[86%] xl:max-w-[82%]", message.role === "user" ? "items-end" : "items-start")}>
                       <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
                         <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
                         {message.createdAt ? <span>•</span> : null}
@@ -1904,17 +1969,17 @@ export function AssistantWorkspace() {
           <div className="shrink-0 border-b border-[var(--fyxvo-border)] px-5 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Workspace context</p>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
             {rightPanel}
           </div>
         </aside>
 
       </div>
 
-      {/* ── Left drawer — conversations (mobile / tablet) ─────────── */}
+      {/* ── Left drawer — conversations (mobile) ─────────────────── */}
       <div
         className={cn(
-          "fixed inset-0 z-[70] lg:hidden transition-opacity duration-200 ease-out",
+          "fixed inset-0 z-[70] md:hidden transition-opacity duration-200 ease-out",
           sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         )}
       >
@@ -1926,7 +1991,7 @@ export function AssistantWorkspace() {
         />
         <aside
           className={cn(
-            "absolute inset-y-0 left-0 w-[min(86vw,22rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
+            "absolute inset-y-0 left-0 w-[min(88vw,22rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -1948,67 +2013,34 @@ export function AssistantWorkspace() {
             <div className="mt-4">
               <Button size="sm" onClick={() => void handleCreateConversation()}>New conversation</Button>
             </div>
-            <div className="mt-4 flex-1 min-h-0 overflow-y-auto">
-              <div className="space-y-2">
-                {conversations.map((conversation) => (
-                  <button
-                    key={conversation.id}
-                    type="button"
-                    onClick={() => void loadConversation(conversation.id)}
-                    aria-current={activeConversationId === conversation.id ? "page" : undefined}
-                    className={cn(
-                      "w-full min-h-[44px] rounded-2xl border px-4 py-3 text-left",
-                      FOCUS_RING_CLASS,
-                      activeConversationId === conversation.id
-                        ? "border-brand-500/30 bg-brand-500/10"
-                        : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
-                    )}
-                  >
-                    <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
-                    <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt, isHydrated)}</div>
-                  </button>
-                ))}
-              </div>
+            <div className="mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              {conversations.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-5 text-sm text-[var(--fyxvo-text-muted)]">
+                  Start a new conversation and it will appear here.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {conversations.map((conversation) => (
+                    <button
+                      key={conversation.id}
+                      type="button"
+                      onClick={() => void loadConversation(conversation.id)}
+                      aria-current={activeConversationId === conversation.id ? "page" : undefined}
+                      className={cn(
+                        "w-full min-h-[44px] rounded-2xl border px-4 py-3 text-left",
+                        FOCUS_RING_CLASS,
+                        activeConversationId === conversation.id
+                          ? "border-brand-500/30 bg-brand-500/10"
+                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
+                      )}
+                    >
+                      <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
+                      <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt, isHydrated)}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        </aside>
-      </div>
-
-      {/* ── Right drawer — context (mobile / tablet) ──────────────── */}
-      <div
-        className={cn(
-          "fixed inset-0 z-[70] xl:hidden transition-opacity duration-200 ease-out",
-          contextDrawerOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-        )}
-      >
-        <button
-          type="button"
-          aria-label="Close assistant context"
-          onClick={() => setContextDrawerOpen(false)}
-          className="absolute inset-0 bg-black/45"
-        />
-        <aside
-          className={cn(
-            "absolute inset-y-0 right-0 w-[min(88vw,24rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
-            contextDrawerOpen ? "translate-x-0" : "translate-x-full"
-          )}
-        >
-          <div className="flex h-full flex-col px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant context</div>
-                <div className="text-xs text-[var(--fyxvo-text-muted)]">Usage, project state, and quick actions</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setContextDrawerOpen(false)}
-                aria-label="Close"
-                className={cn("rounded-full border border-[var(--fyxvo-border)] p-2 text-[var(--fyxvo-text-muted)]", FOCUS_RING_CLASS)}
-              >
-                <CloseIcon className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-4 flex-1 min-h-0 overflow-y-auto">{rightPanel}</div>
           </div>
         </aside>
       </div>
