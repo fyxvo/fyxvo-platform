@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { existsSync } from "node:fs";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { firefox } from "@playwright/test";
@@ -46,6 +47,38 @@ function spawnCommand(args) {
   });
 }
 
+async function ensureFirefoxBrowser() {
+  let executablePath = "";
+
+  try {
+    executablePath = firefox.executablePath();
+  } catch {
+    executablePath = "";
+  }
+
+  if (executablePath && existsSync(executablePath)) {
+    return;
+  }
+
+  const install = spawnCommand(["exec", "playwright", "install", "firefox"]);
+  let installOutput = "";
+  install.stdout.on("data", (chunk) => {
+    installOutput += chunk.toString();
+  });
+  install.stderr.on("data", (chunk) => {
+    installOutput += chunk.toString();
+  });
+
+  const [installCode] = await once(install, "close");
+  if (installCode !== 0) {
+    throw new Error(`Firefox browser install failed:\n${installOutput}`);
+  }
+
+  if (!existsSync(firefox.executablePath())) {
+    throw new Error("Firefox browser install completed without a usable executable");
+  }
+}
+
 async function run() {
   const build = spawnCommand(["--filter", "@fyxvo/web", "build"]);
   let buildOutput = "";
@@ -67,6 +100,7 @@ async function run() {
 
   try {
     await waitForServer(`${BASE_URL}/pricing`);
+    await ensureFirefoxBrowser();
 
     const browser = await firefox.launch({ headless: true });
     try {
