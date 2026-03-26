@@ -3,6 +3,7 @@ import {
   ApiKeyStatus,
   NodeNetwork,
   NodeStatus,
+  Prisma,
   type Node as DatabaseNode,
   type PrismaClientType
 } from "@fyxvo/database";
@@ -115,8 +116,16 @@ export class PrismaGatewayRepository implements GatewayRepository {
     readonly projectId?: string;
     readonly ipAddress?: string;
     readonly userAgent?: string;
+    readonly region?: string;
+    readonly requestSize?: number;
+    readonly responseSize?: number;
+    readonly upstreamNode?: string;
+    readonly mode?: "standard" | "priority";
+    readonly simulated?: boolean;
+    readonly cacheHit?: boolean;
+    readonly fyxvoHint?: unknown;
   }): Promise<void> {
-    const data = {
+    const data: Prisma.RequestLogUncheckedCreateInput = {
       route: input.route,
       method: input.method,
       statusCode: input.statusCode,
@@ -126,7 +135,22 @@ export class PrismaGatewayRepository implements GatewayRepository {
       ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}),
       ...(input.projectId ? { projectId: input.projectId } : {}),
       ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
-      ...(input.userAgent ? { userAgent: input.userAgent } : {})
+      ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+      ...(input.region ? { region: input.region } : {}),
+      ...(typeof input.requestSize === "number" ? { requestSize: input.requestSize } : {}),
+      ...(typeof input.responseSize === "number" ? { responseSize: input.responseSize } : {}),
+      ...(input.upstreamNode ? { upstreamNode: input.upstreamNode } : {}),
+      ...(input.mode ? { mode: input.mode } : {}),
+      ...(typeof input.simulated === "boolean" ? { simulated: input.simulated } : {}),
+      ...(typeof input.cacheHit === "boolean" ? { cacheHit: input.cacheHit } : {}),
+      ...(input.fyxvoHint !== undefined
+        ? {
+            fyxvoHint:
+              input.fyxvoHint === null
+                ? Prisma.JsonNull
+                : (input.fyxvoHint as Prisma.InputJsonValue),
+          }
+        : {})
     };
 
     if (input.requestId) {

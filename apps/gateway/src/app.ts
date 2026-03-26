@@ -229,6 +229,34 @@ function injectSolanaErrorHint(body: unknown): unknown {
   };
 }
 
+function extractFyxvoHint(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return undefined;
+  }
+
+  const rpcBody = body as Record<string, unknown>;
+  const error = rpcBody["error"];
+  if (typeof error !== "object" || error === null || Array.isArray(error)) {
+    return undefined;
+  }
+
+  return (error as Record<string, unknown>)["fyxvo_hint"];
+}
+
+function summarizeRpcRoute(payload: JsonRpcPayload): string {
+  const items = Array.isArray(payload) ? payload : [payload];
+  const methods = [...new Set(items.map((entry) => entry.method.trim()).filter((entry) => entry.length > 0))];
+  if (methods.length === 0) {
+    return "unknown";
+  }
+  if (methods.length === 1) {
+    return methods[0]!;
+  }
+
+  const preview = methods.slice(0, 3).join(", ");
+  return methods.length > 3 ? `batch:${preview} +${methods.length - 3}` : `batch:${preview}`;
+}
+
 // ---------------------------------------------------------------------------
 // In-memory circuit breaker (per upstream URL)
 // ---------------------------------------------------------------------------
@@ -294,14 +322,25 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
 
   async function handleRpcRequest(mode: RoutingMode, request: FastifyRequest, reply: FastifyReply) {
     const startedAt = Date.now();
-    const route = request.routeOptions.url ?? request.url;
+    const requestPath = request.routeOptions.url ?? request.url;
+    let rpcRoute = requestPath;
     let projectId: string | undefined;
     let apiKeyId: string | undefined;
     let statusCode = 500;
     let upstreamNodes: RoutedRpcNode[] = [];
+    let requestSize: number | undefined;
+    let responseSize: number | undefined;
+    let upstreamNode: string | undefined;
+    let upstreamRegion: string | undefined;
+    let simulated = false;
+    let cacheHit: boolean | undefined;
+    let fyxvoHint: unknown;
 
     try {
       const payload = parseJsonRpcPayload(request.body);
+      rpcRoute = summarizeRpcRoute(payload);
+      const serializedPayload = serializeRpcPayload(payload);
+      requestSize = Buffer.byteLength(serializedPayload, "utf8");
       const apiKey = getClientApiKey(request);
       const projectAccess = await input.repository.findProjectAccessByApiKey(apiKey);
       if (!projectAccess) {
@@ -321,10 +360,13 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           const cached = await input.stateStore.getCached(cacheKey).catch(() => null);
           if (cached !== null) {
             statusCode = 200;
+            cacheHit = true;
+            responseSize = Buffer.byteLength(cached, "utf8");
             reply.header("x-fyxvo-cache", "hit");
             reply.status(200).send(JSON.parse(cached));
             return;
           }
+          cacheHit = false;
           // Cache miss — proceed normally, store result after upstream call
           const requiredScopes = gatewayRequiredApiKeyScopes(mode);
           const missingScopes = getMissingApiKeyScopes({
@@ -544,6 +586,10 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
             ]);
             // Store in cache on success
             const responseBody = injectSolanaErrorHint(routed.body);
+            responseSize = Buffer.byteLength(JSON.stringify(responseBody), "utf8");
+            fyxvoHint = extractFyxvoHint(responseBody);
+            upstreamNode = routed.node.name;
+            upstreamRegion = routed.node.region;
             await input.stateStore.setCached(cacheKey, JSON.stringify(responseBody), cacheTtl).catch(() => undefined);
           }
 
@@ -645,6 +691,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
 
       const simulateQuery = (request.query as Record<string, string | undefined>)["simulate"];
       const isSimulated = simulateQuery === "true" || simulateQuery === "1";
+      simulated = isSimulated;
 
       if (isSimulated) {
         const firstRequest = Array.isArray(payload) ? payload[0] : payload;
@@ -724,14 +771,16 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           reply.header("x-fyxvo-project-id", projectAccess.project.id);
           reply.header("x-fyxvo-routing-mode", mode);
           statusCode = 200;
-          reply.status(200).send({
+          const body = {
             jsonrpc: "2.0",
             id: reqId,
             error: {
               code: -32600,
               message: "Method not simulated. Remove ?simulate=true to use real data.",
             },
-          });
+          };
+          responseSize = Buffer.byteLength(JSON.stringify(body), "utf8");
+          reply.status(200).send(body);
           return;
         }
 
@@ -739,7 +788,9 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         reply.header("x-fyxvo-project-id", projectAccess.project.id);
         reply.header("x-fyxvo-routing-mode", mode);
         statusCode = 200;
-        reply.status(200).send({ jsonrpc: "2.0", id: reqId, result });
+        const body = { jsonrpc: "2.0", id: reqId, result };
+        responseSize = Buffer.byteLength(JSON.stringify(body), "utf8");
+        reply.status(200).send(body);
         return;
       }
 
@@ -833,6 +884,9 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         "Gateway RPC request completed"
       );
 
+      upstreamNode = routed.node.name;
+      upstreamRegion = routed.node.region;
+      cacheHit = false;
       reply.header("x-fyxvo-project-id", projectAccess.project.id);
       reply.header("x-fyxvo-project-slug", projectAccess.project.slug);
       reply.header("x-fyxvo-upstream-node-id", routed.node.id);
@@ -841,7 +895,10 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       reply.header("x-fyxvo-billed-asset", fundingDecision.asset);
 
       statusCode = routed.statusCode;
-      reply.status(routed.statusCode).send(injectSolanaErrorHint(routed.body));
+      const responseBody = injectSolanaErrorHint(routed.body);
+      responseSize = Buffer.byteLength(JSON.stringify(responseBody), "utf8");
+      fyxvoHint = extractFyxvoHint(responseBody);
+      reply.status(routed.statusCode).send(responseBody);
     } catch (error) {
       const normalizedError = normalizeGatewayRuntimeError(error);
       const durationMs = Date.now() - startedAt;
@@ -896,7 +953,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       try {
         await input.repository.recordRequestLog({
           requestId: request.id,
-          route,
+          route: rpcRoute,
           method: request.method,
           statusCode,
           durationMs,
@@ -905,7 +962,15 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           ...(request.ip ? { ipAddress: request.ip } : {}),
           ...(typeof request.headers["user-agent"] === "string"
             ? { userAgent: request.headers["user-agent"] }
-            : {})
+            : {}),
+          ...(upstreamRegion ? { region: upstreamRegion } : {}),
+          ...(typeof requestSize === "number" ? { requestSize } : {}),
+          ...(typeof responseSize === "number" ? { responseSize } : {}),
+          ...(upstreamNode ? { upstreamNode } : {}),
+          mode,
+          simulated,
+          ...(typeof cacheHit === "boolean" ? { cacheHit } : {}),
+          ...(fyxvoHint !== undefined ? { fyxvoHint } : {})
         });
       } catch (error) {
         requestLogger(app, error);

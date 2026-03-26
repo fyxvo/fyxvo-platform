@@ -5,9 +5,11 @@ import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { PageHeader } from "../../components/page-header";
+import { PlaygroundRecipesPanel } from "../../components/playground-recipes-panel";
 import { usePortal } from "../../components/portal-provider";
 import { listWebhooks, testWebhook } from "../../lib/api";
 import { webEnv } from "../../lib/env";
+import type { PlaygroundRecipe } from "../../lib/types";
 
 // ---------------------------------------------------------------------------
 // RPC method catalogue
@@ -490,6 +492,12 @@ function PlaygroundContent() {
       if (val) params[p.name] = val;
     }
     setParamValues(params);
+    if (found.isTraceLookup) {
+      const requestedTraceId = searchParams.get("traceId");
+      if (requestedTraceId) {
+        setTraceId(requestedTraceId);
+      }
+    }
     const requestedMode = searchParams.get("mode");
     if (requestedMode === "standard" || requestedMode === "priority") {
       setMode(requestedMode);
@@ -605,6 +613,25 @@ function PlaygroundContent() {
 
   const gatewayBase = webEnv.apiBaseUrl.replace("/api", "").replace(":3001", ":3002");
   const traceLookupDetails = selectedMethod.isTraceLookup && response ? parseTraceLookup(response) : null;
+
+  const loadRecipe = useCallback((recipe: PlaygroundRecipe) => {
+    const found = RPC_METHODS.find((method) => method.method === recipe.method);
+    if (!found) return;
+    setSelectedMethod(found);
+    setSelectedCategory(found.category);
+    setParamValues(recipe.params);
+    setMode(recipe.mode);
+    setSimulateMode(recipe.simulationEnabled);
+    setTraceId(recipe.method === "traceLookup" ? recipe.params.traceId ?? "" : "");
+    setAssistantInsertNotice(`Loaded saved recipe "${recipe.name}" into the playground.`);
+    setResponse(null);
+    setCompareResponse(null);
+    setError(null);
+    setCompareError(null);
+    setDurationMs(null);
+    setCompareDurationMs(null);
+    setDecodedView(null);
+  }, []);
 
   function copyShareLink() {
     const params = new URLSearchParams({ method: selectedMethod.method });
@@ -1581,50 +1608,66 @@ function PlaygroundContent() {
           )}
         </div>
 
-        {/* Right: Request history */}
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] xl:self-start">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>History</CardTitle>
-              {history.length > 0 && (
-                <button
-                  onClick={() => setHistory([])}
-                  className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {history.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-[var(--fyxvo-text-muted)]">No requests yet</p>
-            ) : (
-              <div className="divide-y divide-[var(--fyxvo-border)]">
-                {history.map((item) => (
+        {/* Right: Recipes + Request history */}
+        <div className="space-y-4 xl:self-start">
+          <PlaygroundRecipesPanel
+            projectId={selectedProjectId}
+            token={portal.token ?? null}
+            currentRecipe={{
+              method: selectedMethod.method,
+              mode,
+              simulationEnabled: simulateMode,
+              params: selectedMethod.isTraceLookup
+                ? { traceId }
+                : paramValues,
+            }}
+            onLoadRecipe={loadRecipe}
+          />
+
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>History</CardTitle>
+                {history.length > 0 && (
                   <button
-                    key={item.id}
-                    onClick={() => {
-                      const m = RPC_METHODS.find((r) => r.method === item.method);
-                      if (m) selectMethod(m);
-                    }}
-                    className="w-full px-4 py-3 text-left transition-colors hover:bg-[var(--fyxvo-panel-soft)]"
+                    onClick={() => setHistory([])}
+                    className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-xs font-medium text-[var(--fyxvo-text)]">{item.method}</span>
-                      <Badge tone={item.statusCode < 300 ? "success" : "warning"}>{item.statusCode}</Badge>
-                    </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-[var(--fyxvo-text-muted)]">
-                      <span>{item.durationMs}ms</span>
-                      <span className="capitalize">{item.mode}</span>
-                      <span>{item.requestedAt}</span>
-                    </div>
+                    Clear
                   </button>
-                ))}
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="p-0">
+              {history.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-[var(--fyxvo-text-muted)]">No requests yet</p>
+              ) : (
+                <div className="divide-y divide-[var(--fyxvo-border)]">
+                  {history.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        const m = RPC_METHODS.find((r) => r.method === item.method);
+                        if (m) selectMethod(m);
+                      }}
+                      className="w-full px-4 py-3 text-left transition-colors hover:bg-[var(--fyxvo-panel-soft)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-mono text-xs font-medium text-[var(--fyxvo-text)]">{item.method}</span>
+                        <Badge tone={item.statusCode < 300 ? "success" : "warning"}>{item.statusCode}</Badge>
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-[var(--fyxvo-text-muted)]">
+                        <span>{item.durationMs}ms</span>
+                        <span className="capitalize">{item.mode}</span>
+                        <span>{item.requestedAt}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

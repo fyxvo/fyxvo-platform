@@ -32,9 +32,11 @@ import nacl from "tweetnacl";
 import { buildApiApp } from "../src/app.js";
 import { SolanaBlockchainClient } from "../src/blockchain.js";
 import type {
+  AdminObservabilitySummary,
   AdminOverview,
   AdminOverviewBase,
   AdminStats,
+  AlertCenterItem,
   AnalyticsOverview,
   ApiKeyRecord,
   ApiRepository,
@@ -55,8 +57,11 @@ import type {
   NotificationItem,
   OperatorSummary,
   PerformanceMetricInput,
+  PlaygroundRecipeRecord,
   ProjectAnalytics,
   ProjectHealthScore,
+  ProjectRequestLogFilters,
+  ProjectRequestLogList,
   ProjectWithOwner,
   RequestLogInput,
   SaveIdempotencyInput,
@@ -102,6 +107,8 @@ class MemoryApiRepository implements ApiRepository {
   private readonly projects = new Map<string, Project>();
   private readonly apiKeys = new Map<string, ApiKey & { plainKeyHash?: string }>();
   private readonly requestLogs = new Map<string, RequestLog>();
+  private readonly notifications = new Map<string, NotificationItem & { userId: string }>();
+  private readonly playgroundRecipes = new Map<string, PlaygroundRecipeRecord>();
   private readonly fundingCoordinates = new Map<string, FundingCoordinate>();
   private readonly interestSubmissions = new Map<string, InterestSubmission>();
   private readonly feedbackSubmissions = new Map<string, FeedbackSubmission>();
@@ -904,9 +911,18 @@ class MemoryApiRepository implements ApiRepository {
     return record;
   }
 
+  async getNotifications(userId: string, projectIds: readonly string[]): Promise<NotificationItem[]> {
+    const projectIdSet = new Set(projectIds);
+    return [...this.notifications.values()]
+      .filter((item) => item.userId === userId && (!item.projectId || projectIdSet.has(item.projectId)))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map(({ userId: _userId, ...item }) => item);
+  }
+
   async createNotification(input: CreateNotificationInput): Promise<NotificationItem> {
-    return {
+    const notification = {
       id: randomUUID(),
+      userId: input.userId,
       type: input.type,
       title: input.title,
       message: input.message,
@@ -915,11 +931,24 @@ class MemoryApiRepository implements ApiRepository {
       projectName: null,
       createdAt: new Date().toISOString()
     };
+    this.notifications.set(notification.id, notification);
+    const { userId: _userId, ...output } = notification;
+    return output;
   }
 
-  async markNotificationRead(_userId: string, _notificationId: string): Promise<void> {}
+  async markNotificationRead(userId: string, notificationId: string): Promise<void> {
+    const existing = this.notifications.get(notificationId);
+    if (!existing || existing.userId !== userId) return;
+    this.notifications.set(notificationId, { ...existing, read: true });
+  }
 
-  async markAllNotificationsRead(_userId: string): Promise<void> {}
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    for (const [notificationId, notification] of this.notifications.entries()) {
+      if (notification.userId === userId) {
+        this.notifications.set(notificationId, { ...notification, read: true });
+      }
+    }
+  }
 
   async getFundingHistory(_userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]> {
     const projectIdSet = new Set(projectIds);
@@ -958,6 +987,14 @@ class MemoryApiRepository implements ApiRepository {
       durationMs: input.durationMs,
       ipAddress: input.ipAddress ?? null,
       userAgent: input.userAgent ?? null,
+      region: input.region ?? null,
+      requestSize: input.requestSize ?? null,
+      responseSize: input.responseSize ?? null,
+      upstreamNode: input.upstreamNode ?? null,
+      mode: input.mode ?? null,
+      simulated: input.simulated ?? false,
+      cacheHit: input.cacheHit ?? null,
+      fyxvoHint: input.fyxvoHint ?? null,
       createdAt: new Date()
     };
 
@@ -1099,6 +1136,152 @@ class MemoryApiRepository implements ApiRepository {
     }
 
     this.assistantConversations.delete(conversationId);
+  }
+
+  async listProjectRequestLogs(projectId: string, filters: ProjectRequestLogFilters): Promise<ProjectRequestLogList> {
+    const page = filters.page;
+    const pageSize = filters.pageSize;
+    const rangeMs =
+      filters.range === "1h" ? 60 * 60 * 1000 :
+      filters.range === "6h" ? 6 * 60 * 60 * 1000 :
+      filters.range === "24h" ? 24 * 60 * 60 * 1000 :
+      filters.range === "7d" ? 7 * 24 * 60 * 60 * 1000 :
+      30 * 24 * 60 * 60 * 1000;
+    const since = new Date(Date.now() - rangeMs);
+    const rows = [...this.requestLogs.values()]
+      .filter((entry) => entry.projectId === projectId && entry.createdAt >= since)
+      .filter((entry) => !filters.method || entry.route === filters.method || entry.method === filters.method)
+      .filter((entry) => !filters.status || (filters.status === "success" ? entry.statusCode < 400 : entry.statusCode >= 400))
+      .filter((entry) => !filters.apiKey || [...this.apiKeys.values()].some((key) => key.id === entry.apiKeyId && key.prefix.includes(filters.apiKey!)))
+      .filter((entry) => !filters.mode || entry.mode === filters.mode)
+      .filter((entry) => !filters.simulatedOnly || entry.simulated)
+      .filter((entry) => !filters.errorsOnly || entry.statusCode >= 400)
+      .filter((entry) => !filters.search || `${entry.route} ${entry.method} ${entry.requestId ?? ""}`.toLowerCase().includes(filters.search.toLowerCase()))
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+    const totalCount = rows.length;
+    const paged = rows.slice((page - 1) * pageSize, page * pageSize);
+    return {
+      items: paged.map((entry) => ({
+        id: entry.id,
+        traceId: entry.requestId,
+        timestamp: entry.createdAt.toISOString(),
+        route: entry.route,
+        httpMethod: entry.method,
+        mode: entry.mode === "priority" ? "priority" : entry.mode === "standard" ? "standard" : null,
+        latencyMs: entry.durationMs,
+        success: entry.statusCode < 400,
+        statusCode: entry.statusCode,
+        apiKeyPrefix: entry.apiKeyId ? [...this.apiKeys.values()].find((key) => key.id === entry.apiKeyId)?.prefix ?? null : null,
+        simulated: entry.simulated,
+        upstreamNode: entry.upstreamNode ?? null,
+        region: entry.region ?? null,
+        requestSize: entry.requestSize ?? null,
+        responseSize: entry.responseSize ?? null,
+        cacheHit: entry.cacheHit ?? null,
+        fyxvoHint: entry.fyxvoHint ?? null,
+        service: entry.service,
+      })),
+      page,
+      pageSize,
+      totalCount,
+      totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    };
+  }
+
+  async getAdminObservability(): Promise<AdminObservabilitySummary> {
+    return {
+      topFailingMethods: [],
+      topWebhookFailureDestinations: [],
+      highestErrorRateProjects: [],
+      lowestRemainingRunwayProjects: [],
+      assistant: { errorRate: 0, averageLatencyMs: 0 },
+      supportCategories: [],
+    };
+  }
+
+  async listPlaygroundRecipes(projectId: string): Promise<PlaygroundRecipeRecord[]> {
+    return [...this.playgroundRecipes.values()]
+      .filter((recipe) => recipe.projectId === projectId)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async createPlaygroundRecipe(input: {
+    readonly projectId: string;
+    readonly name: string;
+    readonly method: string;
+    readonly mode: "standard" | "priority";
+    readonly simulationEnabled: boolean;
+    readonly params: Record<string, string>;
+    readonly notes?: string | null;
+  }): Promise<PlaygroundRecipeRecord> {
+    const now = new Date().toISOString();
+    const recipe: PlaygroundRecipeRecord = {
+      id: randomUUID(),
+      projectId: input.projectId,
+      name: input.name,
+      method: input.method,
+      mode: input.mode,
+      simulationEnabled: input.simulationEnabled,
+      params: input.params,
+      notes: input.notes ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.playgroundRecipes.set(recipe.id, recipe);
+    return recipe;
+  }
+
+  async updatePlaygroundRecipe(
+    recipeId: string,
+    projectId: string,
+    input: {
+      readonly name?: string;
+      readonly method?: string;
+      readonly mode?: "standard" | "priority";
+      readonly simulationEnabled?: boolean;
+      readonly params?: Record<string, string>;
+      readonly notes?: string | null;
+    }
+  ): Promise<PlaygroundRecipeRecord | null> {
+    const existing = this.playgroundRecipes.get(recipeId);
+    if (!existing || existing.projectId !== projectId) return null;
+    const next: PlaygroundRecipeRecord = {
+      ...existing,
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.method !== undefined ? { method: input.method } : {}),
+      ...(input.mode !== undefined ? { mode: input.mode } : {}),
+      ...(input.simulationEnabled !== undefined ? { simulationEnabled: input.simulationEnabled } : {}),
+      ...(input.params !== undefined ? { params: input.params } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    this.playgroundRecipes.set(recipeId, next);
+    return next;
+  }
+
+  async deletePlaygroundRecipe(recipeId: string, projectId: string): Promise<void> {
+    const existing = this.playgroundRecipes.get(recipeId);
+    if (existing?.projectId === projectId) {
+      this.playgroundRecipes.delete(recipeId);
+    }
+  }
+
+  async getAlertCenter(_userId: string, _projectIds: readonly string[], assistantAvailable: boolean): Promise<AlertCenterItem[]> {
+    return assistantAvailable
+      ? []
+      : [
+          {
+            id: "assistant-unavailable",
+            type: "assistant",
+            severity: "warning",
+            projectId: null,
+            projectName: null,
+            title: "Assistant availability issue",
+            description: "Assistant availability is currently degraded.",
+            createdAt: new Date().toISOString(),
+            metadata: null,
+          },
+        ];
   }
 
   // Stubs for new methods not needed in unit tests

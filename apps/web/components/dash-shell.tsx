@@ -22,6 +22,7 @@ import {
   TransactionsIcon,
   SparklesIcon,
   BeakerIcon,
+  AlertIcon,
 } from "./icons";
 import { usePortal } from "./portal-provider";
 import { NotificationBell } from "./notification-bell";
@@ -37,6 +38,7 @@ const navItems = [
   { href: "/funding", label: "Funding", icon: FundingIcon },
   { href: "/transactions", label: "Transactions", icon: TransactionsIcon },
   { href: "/analytics", label: "Analytics", icon: ChartIcon },
+  { href: "/alerts", label: "Alerts", icon: AlertIcon },
   { href: "/operators", label: "Operators", icon: ServerIcon },
   { href: "/playground", label: "Playground", icon: BeakerIcon },
   { href: "/docs", label: "Docs", icon: BookIcon },

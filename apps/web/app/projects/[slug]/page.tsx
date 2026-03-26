@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Badge,
   Button,
@@ -22,6 +23,8 @@ import { GatewayHealthCard } from "../../../components/gateway-health";
 import { SectionErrorBoundary } from "../../../components/section-error-boundary";
 import { OnboardingChecklist } from "../../../components/onboarding-checklist";
 import { PageHeader } from "../../../components/page-header";
+import { ProjectOperationsScorecard } from "../../../components/project-operations-scorecard";
+import { RequestLogExplorer } from "../../../components/request-log-explorer";
 import { AuthGate } from "../../../components/state-panels";
 import { QuickstartLauncher } from "../../../components/quickstart-launcher";
 import { usePortal } from "../../../components/portal-provider";
@@ -70,7 +73,14 @@ export default function ProjectPage({
   readonly params: { slug: string };
 }) {
   const portal = usePortal();
-  const [activeTab, setActiveTab] = useState<"overview" | "activity" | "realtime">("overview");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"overview" | "activity" | "realtime" | "logs">(
+    initialTab === "activity" || initialTab === "realtime" || initialTab === "logs"
+      ? initialTab
+      : "overview"
+  );
   const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; details: Record<string, unknown> | null; actorWallet: string | null; createdAt: string }>>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
   const [healthHistory, setHealthHistory] = useState<number[]>([]);
@@ -109,6 +119,31 @@ export default function ProjectPage({
         }
       });
   }, [portal.token, project?.id]);
+
+  useEffect(() => {
+    const nextTab = searchParams.get("tab");
+    if (
+      nextTab === "overview" ||
+      nextTab === "activity" ||
+      nextTab === "realtime" ||
+      nextTab === "logs"
+    ) {
+      setActiveTab(nextTab);
+      return;
+    }
+    setActiveTab("overview");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (activeTab === "overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", activeTab);
+    }
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    window.history.replaceState(null, "", nextUrl);
+  }, [activeTab, pathname, searchParams]);
 
   if (!project) {
     return (
@@ -251,7 +286,7 @@ export default function ProjectPage({
       {portal.walletPhase === "authenticated" ? <QuickstartLauncher project={project} /> : null}
 
       <div className="flex gap-1 border-b border-[var(--fyxvo-border)]">
-        {(["overview", "activity", "realtime"] as const).map((tab) => (
+        {(["overview", "activity", "realtime", "logs"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -316,6 +351,16 @@ export default function ProjectPage({
         </Card>
       )}
 
+      {activeTab === "logs" && portal.walletPhase === "authenticated" && portal.token ? (
+        <RequestLogExplorer
+          projectId={project.id}
+          token={portal.token}
+          title="Request logs"
+          description="Recent relay traffic for this project with export, pagination, and trace-level detail."
+          queryPrefix="logs"
+        />
+      ) : null}
+
       {activeTab === "overview" && (
       <><section className="grid gap-4">
         {availableSolCredits === 0n ? (
@@ -337,6 +382,15 @@ export default function ProjectPage({
           </Notice>
         ) : null}
       </section>
+
+      {portal.walletPhase === "authenticated" && portal.token ? (
+        <ProjectOperationsScorecard
+          project={project}
+          analytics={portal.projectAnalytics}
+          onchainSnapshot={portal.onchainSnapshot}
+          token={portal.token}
+        />
+      ) : null}
 
       <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">

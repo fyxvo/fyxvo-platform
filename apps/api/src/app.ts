@@ -1924,6 +1924,19 @@ export async function buildApiApp(input: {
     };
   });
 
+  app.get("/v1/alerts", async (request) => {
+    const user = requireUser(request);
+    const projects = await input.repository.listProjects(user);
+    const projectIds = projects.map((project) => project.id);
+    return {
+      items: await input.repository.getAlertCenter(
+        user.id,
+        projectIds,
+        isAssistantConfigured(input.env)
+      ),
+    };
+  });
+
   app.post("/v1/notifications/:notificationId/read", async (request) => {
     const user = requireUser(request);
     const params = z.object({ notificationId: z.string().uuid() }).parse(request.params);
@@ -2004,6 +2017,121 @@ export async function buildApiApp(input: {
     reply.header("content-type", "text/csv");
     reply.header("content-disposition", `attachment; filename="analytics-${project.slug}-${query.range ?? "7d"}.csv"`);
     return reply.send(csv);
+  });
+
+  app.get("/v1/projects/:projectId/requests", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({
+      range: z.enum(["1h", "6h", "24h", "7d", "30d"]).optional(),
+      method: z.string().trim().min(1).max(120).optional(),
+      status: z.enum(["success", "error"]).optional(),
+      apiKey: z.string().trim().min(1).max(64).optional(),
+      mode: z.enum(["standard", "priority"]).optional(),
+      simulatedOnly: z.coerce.boolean().optional(),
+      errorsOnly: z.coerce.boolean().optional(),
+      search: z.string().trim().min(1).max(120).optional(),
+      page: z.coerce.number().int().min(1).optional(),
+      pageSize: z.coerce.number().int().min(10).max(1000).optional(),
+    }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    return await input.repository.listProjectRequestLogs(params.projectId, {
+      ...(query.range ? { range: query.range } : {}),
+      ...(query.method ? { method: query.method } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.apiKey ? { apiKey: query.apiKey } : {}),
+      ...(query.mode ? { mode: query.mode } : {}),
+      ...(typeof query.simulatedOnly === "boolean" ? { simulatedOnly: query.simulatedOnly } : {}),
+      ...(typeof query.errorsOnly === "boolean" ? { errorsOnly: query.errorsOnly } : {}),
+      ...(query.search ? { search: query.search } : {}),
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+    });
+  });
+
+  app.get("/v1/projects/:projectId/requests/export", async (request, reply) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({
+      format: z.enum(["csv", "json"]).default("csv"),
+      range: z.enum(["1h", "6h", "24h", "7d", "30d"]).optional(),
+      method: z.string().trim().min(1).max(120).optional(),
+      status: z.enum(["success", "error"]).optional(),
+      apiKey: z.string().trim().min(1).max(64).optional(),
+      mode: z.enum(["standard", "priority"]).optional(),
+      simulatedOnly: z.coerce.boolean().optional(),
+      errorsOnly: z.coerce.boolean().optional(),
+      search: z.string().trim().min(1).max(120).optional(),
+    }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const logs = await input.repository.listProjectRequestLogs(params.projectId, {
+      ...(query.range ? { range: query.range } : {}),
+      ...(query.method ? { method: query.method } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.apiKey ? { apiKey: query.apiKey } : {}),
+      ...(query.mode ? { mode: query.mode } : {}),
+      ...(typeof query.simulatedOnly === "boolean" ? { simulatedOnly: query.simulatedOnly } : {}),
+      ...(typeof query.errorsOnly === "boolean" ? { errorsOnly: query.errorsOnly } : {}),
+      ...(query.search ? { search: query.search } : {}),
+      page: 1,
+      pageSize: 1000,
+    });
+
+    if (query.format === "json") {
+      reply.header("content-type", "application/json");
+      reply.header("content-disposition", `attachment; filename="request-logs-${project.slug}.json"`);
+      return reply.send(JSON.stringify(logs.items, null, 2));
+    }
+
+    const header = [
+      "timestamp",
+      "method",
+      "httpMethod",
+      "mode",
+      "latencyMs",
+      "success",
+      "statusCode",
+      "apiKeyPrefix",
+      "traceId",
+      "simulated",
+      "upstreamNode",
+      "region",
+      "requestSize",
+      "responseSize",
+      "cacheHit",
+    ].join(",");
+    const rows = logs.items.map((item) =>
+      [
+        item.timestamp,
+        item.route,
+        item.httpMethod,
+        item.mode ?? "",
+        item.latencyMs,
+        item.success,
+        item.statusCode,
+        item.apiKeyPrefix ?? "",
+        item.traceId ?? "",
+        item.simulated,
+        item.upstreamNode ?? "",
+        item.region ?? "",
+        item.requestSize ?? "",
+        item.responseSize ?? "",
+        item.cacheHit ?? "",
+      ]
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(",")
+    );
+    reply.header("content-type", "text/csv");
+    reply.header("content-disposition", `attachment; filename="request-logs-${project.slug}.csv"`);
+    return reply.send([header, ...rows].join("\n"));
   });
 
   app.get("/v1/projects/:projectId/checklist", async (request, reply) => {
@@ -2116,6 +2244,12 @@ export async function buildApiApp(input: {
     const user = requireUser(request);
     requireAdmin(user);
     return { item: await input.repository.getAssistantStats() };
+  });
+
+  app.get("/v1/admin/observability", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    return { item: await input.repository.getAdminObservability() };
   });
 
   app.get("/v1/admin/deployment-readiness", async (request) => {
@@ -3156,6 +3290,93 @@ ${liveContextLines.join("\n")}
       throw new HttpError(403, "forbidden", "Access denied.");
     }
     return { history: await input.repository.getHealthHistory(projectId) };
+  });
+
+  app.get("/v1/projects/:projectId/playground/recipes", async (request) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "Project not found.");
+    }
+
+    return { items: await input.repository.listPlaygroundRecipes(projectId) };
+  });
+
+  app.post("/v1/projects/:projectId/playground/recipes", async (request, reply) => {
+    const user = requireUser(request);
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      name: z.string().trim().min(1).max(80),
+      method: z.string().trim().min(1).max(120),
+      mode: z.enum(["standard", "priority"]),
+      simulationEnabled: z.boolean().default(false),
+      params: z.record(z.string(), z.string()).default({}),
+      notes: z.string().trim().max(2000).optional().nullable(),
+    }).parse(request.body);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "Project not found.");
+    }
+
+    const item = await input.repository.createPlaygroundRecipe({
+      projectId,
+      name: body.name,
+      method: body.method,
+      mode: body.mode,
+      simulationEnabled: body.simulationEnabled,
+      params: body.params,
+      notes: body.notes ?? null,
+    });
+    return reply.status(201).send({ item });
+  });
+
+  app.patch("/v1/projects/:projectId/playground/recipes/:recipeId", async (request) => {
+    const user = requireUser(request);
+    const { projectId, recipeId } = z.object({
+      projectId: z.string().uuid(),
+      recipeId: z.string().uuid(),
+    }).parse(request.params);
+    const body = z.object({
+      name: z.string().trim().min(1).max(80).optional(),
+      method: z.string().trim().min(1).max(120).optional(),
+      mode: z.enum(["standard", "priority"]).optional(),
+      simulationEnabled: z.boolean().optional(),
+      params: z.record(z.string(), z.string()).optional(),
+      notes: z.string().trim().max(2000).optional().nullable(),
+    }).parse(request.body);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "Project not found.");
+    }
+
+    const item = await input.repository.updatePlaygroundRecipe(recipeId, projectId, {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.method !== undefined ? { method: body.method } : {}),
+      ...(body.mode !== undefined ? { mode: body.mode } : {}),
+      ...(body.simulationEnabled !== undefined ? { simulationEnabled: body.simulationEnabled } : {}),
+      ...(body.params !== undefined ? { params: body.params } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {}),
+    });
+    if (!item) {
+      throw new HttpError(404, "recipe_not_found", "Recipe not found.");
+    }
+    return { item };
+  });
+
+  app.delete("/v1/projects/:projectId/playground/recipes/:recipeId", async (request, reply) => {
+    const user = requireUser(request);
+    const { projectId, recipeId } = z.object({
+      projectId: z.string().uuid(),
+      recipeId: z.string().uuid(),
+    }).parse(request.params);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "Project not found.");
+    }
+
+    await input.repository.deletePlaygroundRecipe(recipeId, projectId);
+    return reply.status(204).send();
   });
 
   // ── Webhook deliveries ────────────────────────────────────────────────────

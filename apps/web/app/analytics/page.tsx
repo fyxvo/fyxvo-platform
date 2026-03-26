@@ -16,6 +16,7 @@ const BarChartCard = dynamic(() => import("../../components/charts").then((m) =>
 const LineChartCard = dynamic(() => import("../../components/charts").then((m) => ({ default: m.LineChartCard })), { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-2xl bg-[var(--fyxvo-panel-soft)]" /> });
 import { MetricCard, DeltaBadge } from "../../components/metric-card";
 import { PageHeader } from "../../components/page-header";
+import { RequestLogExplorer } from "../../components/request-log-explorer";
 import { AuthGate } from "../../components/state-panels";
 import { usePortal } from "../../components/portal-provider";
 import { getProjectAnalytics, downloadAnalyticsExport, getErrorLog, getMethodBreakdown } from "../../lib/api";
@@ -815,6 +816,18 @@ export default function AnalyticsPage() {
           </Card>
         </section>
       )}
+
+      {isAuthenticated && selectedProject && portal.token ? (
+        <section>
+          <RequestLogExplorer
+            projectId={selectedProject.id}
+            token={portal.token}
+            title="Request log explorer"
+            description="Drill into recent requests with the same filters your team uses during debugging, triage, and performance review."
+            queryPrefix="analytics-logs"
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

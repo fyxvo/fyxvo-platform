@@ -41,6 +41,7 @@ import { FirstRequestCelebration } from "../../components/first-request-celebrat
 import { QuickstartLauncher } from "../../components/quickstart-launcher";
 import type {
   AdminDeploymentReadiness,
+  AdminObservability,
   AdminOverview,
   NetworkStats,
   PortalProject,
@@ -55,6 +56,7 @@ import {
   fetchGatewayStatus,
   fetchWebDeploymentStatus,
   getActiveAnnouncement,
+  getAdminObservability,
   getAdminDeploymentReadiness,
   getNetworkStats,
   getWhatsNew,
@@ -427,6 +429,7 @@ export default function DashboardPage() {
   const [apiDeploymentStatus, setApiDeploymentStatus] = useState<PortalServiceStatus | null>(null);
   const [gatewayDeploymentStatus, setGatewayDeploymentStatus] = useState<PortalServiceStatus | null>(null);
   const [deploymentReadiness, setDeploymentReadiness] = useState<AdminDeploymentReadiness | null>(null);
+  const [adminObservability, setAdminObservability] = useState<AdminObservability | null>(null);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const celebrationProjectId = celebrationProject?.id ?? null;
   const isAdminAuthorityWallet =
@@ -582,6 +585,7 @@ export default function DashboardPage() {
       setApiDeploymentStatus(null);
       setGatewayDeploymentStatus(null);
       setDeploymentReadiness(null);
+      setAdminObservability(null);
       return;
     }
 
@@ -609,6 +613,28 @@ export default function DashboardPage() {
         setDeploymentReadiness(null);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminAuthorityWallet, portal.token]);
+
+  useEffect(() => {
+    if (!isAdminAuthorityWallet || !portal.token) {
+      setAdminObservability(null);
+      return;
+    }
+    let cancelled = false;
+    getAdminObservability(portal.token)
+      .then((data) => {
+        if (!cancelled) {
+          setAdminObservability(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAdminObservability(null);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -1944,6 +1970,70 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isAdminAuthorityWallet && adminObservability ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Admin observability</CardTitle>
+                <CardDescription>
+                  Operational hotspots across failing methods, webhook destinations, project error posture, runway risk, assistant health, and support categories.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 xl:grid-cols-3">
+                {[
+                  {
+                    label: "Top failing RPC methods",
+                    items: adminObservability.topFailingMethods.map((item) => `${item.route} · ${item.count}`),
+                  },
+                  {
+                    label: "Top webhook failure destinations",
+                    items: adminObservability.topWebhookFailureDestinations.map((item) => `${item.url} · ${item.failures}`),
+                  },
+                  {
+                    label: "Projects with highest error rate",
+                    items: adminObservability.highestErrorRateProjects.map(
+                      (item) => `${item.projectName} · ${formatPercent(item.errorRate * 100)}`
+                    ),
+                  },
+                  {
+                    label: "Lowest remaining runway",
+                    items: adminObservability.lowestRemainingRunwayProjects.map(
+                      (item) => `${item.projectName} · ${item.requestCount7d.toLocaleString()} req / 7d`
+                    ),
+                  },
+                  {
+                    label: "Assistant reliability",
+                    items: [
+                      `Error rate · ${formatPercent(adminObservability.assistant.errorRate * 100)}`,
+                      `Average latency · ${formatDuration(adminObservability.assistant.averageLatencyMs)}`,
+                    ],
+                  },
+                  {
+                    label: "Support categories",
+                    items: adminObservability.supportCategories.map(
+                      (item) => `${item.category.replace(/_/g, " ").toLowerCase()} · ${item.count}`
+                    ),
+                  },
+                ].map((section) => (
+                  <div
+                    key={section.label}
+                    className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
+                  >
+                    <div className="text-xs uppercase tracking-[0.14em] text-[color:var(--fyxvo-text-muted)]">
+                      {section.label}
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm text-[color:var(--fyxvo-text-soft)]">
+                      {section.items.length > 0 ? (
+                        section.items.slice(0, 5).map((item) => <div key={item}>{item}</div>)
+                      ) : (
+                        <div>No signals yet.</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ) : null}

@@ -130,6 +130,14 @@ export interface GatewayRepository {
     readonly projectId?: string;
     readonly ipAddress?: string;
     readonly userAgent?: string;
+    readonly region?: string;
+    readonly requestSize?: number;
+    readonly responseSize?: number;
+    readonly upstreamNode?: string;
+    readonly mode?: RoutingMode;
+    readonly simulated?: boolean;
+    readonly cacheHit?: boolean;
+    readonly fyxvoHint?: unknown;
   }): Promise<void>;
   ping(): Promise<boolean>;
 }

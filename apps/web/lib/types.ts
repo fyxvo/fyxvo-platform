@@ -287,6 +287,62 @@ export interface ProjectAnalytics {
   }>;
 }
 
+export type RequestLogRange = "1h" | "6h" | "24h" | "7d" | "30d";
+
+export interface ProjectRequestLogItem {
+  readonly id: string;
+  readonly traceId: string | null;
+  readonly timestamp: string;
+  readonly route: string;
+  readonly httpMethod: string;
+  readonly mode: "standard" | "priority" | null;
+  readonly latencyMs: number;
+  readonly success: boolean;
+  readonly statusCode: number;
+  readonly apiKeyPrefix: string | null;
+  readonly simulated: boolean;
+  readonly upstreamNode: string | null;
+  readonly region: string | null;
+  readonly requestSize: number | null;
+  readonly responseSize: number | null;
+  readonly cacheHit: boolean | null;
+  readonly fyxvoHint: unknown;
+  readonly service: string;
+}
+
+export interface ProjectRequestLogList {
+  readonly items: ProjectRequestLogItem[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalCount: number;
+  readonly totalPages: number;
+}
+
+export interface PlaygroundRecipe {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly method: string;
+  readonly mode: "standard" | "priority";
+  readonly simulationEnabled: boolean;
+  readonly params: Record<string, string>;
+  readonly notes: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface AlertCenterItem {
+  readonly id: string;
+  readonly type: "low_balance" | "daily_cost" | "error_rate" | "webhook_failure" | "assistant" | "incident" | "notification";
+  readonly severity: "info" | "warning" | "critical";
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly title: string;
+  readonly description: string;
+  readonly createdAt: string;
+  readonly metadata?: Record<string, unknown> | null;
+}
+
 export interface OnChainProjectSnapshot {
   readonly projectPda: string;
   readonly treasuryPda: string;
@@ -485,6 +541,18 @@ export interface AdminOverview {
       readonly interestSubmitted: number;
     };
   };
+}
+
+export interface AdminObservability {
+  readonly topFailingMethods: Array<{ readonly route: string; readonly count: number }>;
+  readonly topWebhookFailureDestinations: Array<{ readonly url: string; readonly failures: number }>;
+  readonly highestErrorRateProjects: Array<{ readonly projectId: string; readonly projectName: string; readonly slug: string; readonly errorRate: number; readonly totalRequests: number }>;
+  readonly lowestRemainingRunwayProjects: Array<{ readonly projectId: string; readonly projectName: string; readonly slug: string; readonly treasurySol: number | null; readonly requestCount7d: number }>;
+  readonly assistant: {
+    readonly errorRate: number;
+    readonly averageLatencyMs: number;
+  };
+  readonly supportCategories: Array<{ readonly category: string; readonly count: number }>;
 }
 
 export interface OperatorSummary {

@@ -24,6 +24,7 @@ const NAV_SECTIONS = [
   { id: "webhooks", label: "Webhooks", keywords: "webhook http callback post event funding apikey hmac signature" },
   { id: "team-collaboration", label: "Team Collaboration", keywords: "team member invite wallet collaboration owner role" },
   { id: "playground", label: "Playground", keywords: "playground rpc methods test compare mode schema panel share url examples" },
+  { id: "operations-guide", label: "Operations Guide", keywords: "operations monitoring alerts traces webhooks latency success rate cache hit request logs" },
   { id: "public-profiles", label: "Public Project Pages", keywords: "public profile page slug badge readme status latency" },
   { id: "sdk-reference", label: "SDK Reference", keywords: "sdk library reference types api endpoint paths" },
   { id: "rate-limits", label: "Rate Limits", keywords: "rate limit 429 throttle bandwidth quota scope" },
@@ -1214,6 +1215,64 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
                 <h3 className="mb-2 text-sm font-semibold text-[var(--fyxvo-text)]">Shareable URLs</h3>
                 <p className="text-xs leading-5 text-[var(--fyxvo-text-muted)]">Click Share to encode the current method and parameters into the URL. Send the link to a colleague and they will land on the same request configuration.</p>
               </div>
+            </div>
+          </section>
+
+          <section id="operations-guide">
+            <SectionHeading
+              id="operations-guide"
+              eyebrow="Runbook"
+              title="Operations Guide"
+              description="Use these habits and product surfaces to operate a real integration day to day."
+            />
+            <div className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                {[
+                  {
+                    title: "Monitor gateway health",
+                    body: `Watch ${webEnv.siteUrl}/status for API and gateway condition, then compare that signal with your project-level request log explorer when an integration starts failing.`,
+                  },
+                  {
+                    title: "Read status page signals",
+                    body: "Treat incidents and component changes as broad infrastructure signals. Treat project analytics, request logs, and alert center entries as your integration-specific signal.",
+                  },
+                  {
+                    title: "Investigate webhook failures",
+                    body: "Start in Settings or the alert center, inspect the delivery attempt, compare the next retry time, and replay with the playground webhook tester before changing server code.",
+                  },
+                  {
+                    title: "Use trace IDs",
+                    body: "Copy the X-Fyxvo-Trace-Id header from a request response, then open Trace Lookup in the playground or the request log explorer to inspect upstream node, region, latency, and status.",
+                  },
+                  {
+                    title: "Interpret latency, success rate, and cache hit rate",
+                    body: "Latency trends tell you when standard routing is enough, success rate tells you whether the integration is healthy, and cache hits show when repeated reads are being served efficiently.",
+                  },
+                  {
+                    title: "Debug balance-related issues",
+                    body: "If traffic stops unexpectedly, check spendable SOL credits first, then funding history, then request logs for 402-style or gateway funding errors before assuming the RPC itself is down.",
+                  },
+                  {
+                    title: "Use simulation mode safely",
+                    body: "Simulation mode is ideal for payload validation, teammate onboarding, and reproducing read-only examples without burning funded credits. Switch it off before validating real throughput or funding posture.",
+                  },
+                  {
+                    title: "Use request logs and the alert center together",
+                    body: "Use the alert center to spot what changed, then jump into request logs filtered by method, key, status, or mode to isolate the exact project traffic behind the alert.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
+                  >
+                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
+                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+                  </div>
+                ))}
+              </div>
+              <Notice tone="neutral" title="Good operator loop">
+                Start with status, confirm the project and time range, inspect request logs, follow a trace when needed, verify funding posture, then replay or simulate the request in the playground before making code changes.
+              </Notice>
             </div>
           </section>
 

@@ -13,8 +13,10 @@ import type {
   AssistantPlaygroundPayload,
   AssistantSuggestedAction,
   AssistantConversationSummary,
+  AdminObservabilitySummary,
   AdminOverviewBase,
   AdminStats,
+  AlertCenterItem,
   AnalyticsOverview,
   ApiKeyAnalyticsItem,
   ApiKeyRecord,
@@ -38,8 +40,11 @@ import type {
   NotificationPrefsUpdate,
   OperatorSummary,
   ProjectAnalytics,
+  ProjectRequestLogFilters,
+  ProjectRequestLogList,
   ProjectMemberItem,
   ProjectWithOwner,
+  PlaygroundRecipeRecord,
   RequestLogInput,
   SaveIdempotencyInput,
   ServiceHealthHistory,
@@ -73,6 +78,23 @@ type PrismaProject = PrismaNamespace.ProjectGetPayload<{
     };
   };
 }>;
+
+function rangeToMs(range: ProjectRequestLogFilters["range"]) {
+  switch (range) {
+    case "1h":
+      return 60 * 60 * 1000;
+    case "6h":
+      return 6 * 60 * 60 * 1000;
+    case "24h":
+      return 24 * 60 * 60 * 1000;
+    case "7d":
+      return 7 * 24 * 60 * 60 * 1000;
+    case "30d":
+      return 30 * 24 * 60 * 60 * 1000;
+    default:
+      return 24 * 60 * 60 * 1000;
+  }
+}
 
 function mapUser(user: {
   id: string;
@@ -1221,7 +1243,107 @@ export class PrismaApiRepository implements ApiRepository {
     }));
   }
 
+  async listProjectRequestLogs(projectId: string, filters: ProjectRequestLogFilters): Promise<ProjectRequestLogList> {
+    const page = Math.max(1, filters.page);
+    const pageSize = Math.min(1000, Math.max(10, filters.pageSize));
+    const since = filters.range ? new Date(Date.now() - rangeToMs(filters.range)) : undefined;
+    const where: Prisma.RequestLogWhereInput = {
+      projectId,
+      ...(since ? { createdAt: { gte: since } } : {}),
+      ...(filters.method ? { route: { equals: filters.method, mode: "insensitive" } } : {}),
+      ...(filters.apiKey ? { apiKey: { prefix: { equals: filters.apiKey, mode: "insensitive" } } } : {}),
+      ...(filters.mode ? { mode: filters.mode } : {}),
+      ...(filters.simulatedOnly ? { simulated: true } : {}),
+      ...(filters.errorsOnly ? { statusCode: { gte: 400 } } : {}),
+      ...(filters.status === "success" ? { statusCode: { lt: 400 } } : {}),
+      ...(filters.status === "error" ? { statusCode: { gte: 400 } } : {}),
+      ...(filters.search
+        ? {
+            OR: [
+              { route: { contains: filters.search, mode: "insensitive" } },
+              { requestId: { contains: filters.search, mode: "insensitive" } },
+              { upstreamNode: { contains: filters.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const [totalCount, rows] = await Promise.all([
+      this.prisma.requestLog.count({ where }),
+      this.prisma.requestLog.findMany({
+        where,
+        include: {
+          apiKey: {
+            select: {
+              prefix: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        traceId: row.requestId ?? null,
+        timestamp: row.createdAt.toISOString(),
+        route: row.route,
+        httpMethod: row.method,
+        mode: row.mode === "standard" || row.mode === "priority" ? row.mode : null,
+        latencyMs: row.durationMs,
+        success: row.statusCode < 400,
+        statusCode: row.statusCode,
+        apiKeyPrefix: row.apiKey?.prefix ?? null,
+        simulated: row.simulated,
+        upstreamNode: row.upstreamNode ?? null,
+        region: row.region ?? null,
+        requestSize: row.requestSize ?? null,
+        responseSize: row.responseSize ?? null,
+        cacheHit: row.cacheHit ?? null,
+        fyxvoHint: row.fyxvoHint ?? null,
+        service: row.service,
+      })),
+      page,
+      pageSize,
+      totalCount,
+      totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
+    };
+  }
+
   async recordRequestLog(input: RequestLogInput) {
+    const data: Prisma.RequestLogUncheckedCreateInput = {
+      route: input.route,
+      method: input.method,
+      statusCode: input.statusCode,
+      durationMs: input.durationMs,
+      service: input.service,
+      ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
+      ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
+      ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+      ...(input.requestId ? { requestId: input.requestId } : {}),
+      ...(input.region ? { region: input.region } : {}),
+      ...(typeof input.requestSize === "number" ? { requestSize: input.requestSize } : {}),
+      ...(typeof input.responseSize === "number" ? { responseSize: input.responseSize } : {}),
+      ...(input.upstreamNode ? { upstreamNode: input.upstreamNode } : {}),
+      ...(input.mode ? { mode: input.mode } : {}),
+      ...(typeof input.simulated === "boolean" ? { simulated: input.simulated } : {}),
+      ...(typeof input.cacheHit === "boolean" ? { cacheHit: input.cacheHit } : {}),
+      ...(input.fyxvoHint !== undefined
+        ? {
+            fyxvoHint:
+              input.fyxvoHint === null
+                ? Prisma.JsonNull
+                : (input.fyxvoHint as PrismaNamespace.InputJsonValue),
+          }
+        : {}),
+    };
+
     if (input.requestId) {
       const existingRequest = await this.prisma.requestLog.findUnique({
         where: {
@@ -1233,7 +1355,7 @@ export class PrismaApiRepository implements ApiRepository {
       });
 
       if (existingRequest) {
-        const { requestId: _requestId, ...withoutRequestId } = input;
+        const { requestId: _requestId, ...withoutRequestId } = data;
         await this.prisma.requestLog.create({
           data: withoutRequestId
         });
@@ -1242,7 +1364,7 @@ export class PrismaApiRepository implements ApiRepository {
     }
 
     await this.prisma.requestLog.create({
-      data: input
+      data
     });
   }
 
@@ -1444,6 +1566,153 @@ export class PrismaApiRepository implements ApiRepository {
           messageId: row.messageId,
         })),
       },
+    };
+  }
+
+  async getAdminObservability(): Promise<AdminObservabilitySummary> {
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const assistantRoute = "/v1/assistant/chat";
+
+    const [
+      topFailingMethods,
+      topWebhookFailureDestinations,
+      errorProjects,
+      runwayProjects,
+      assistantAggregate,
+      assistantFailures,
+      supportCategories,
+    ] = await Promise.all([
+      this.prisma.requestLog.groupBy({
+        by: ["route"],
+        where: {
+          service: "gateway",
+          statusCode: { gte: 400 },
+          createdAt: { gte: since24h },
+        },
+        _count: { route: true },
+        orderBy: { _count: { route: "desc" } },
+        take: 5,
+      }),
+      this.prisma.webhookDelivery.groupBy({
+        by: ["webhookId"],
+        where: {
+          status: { in: ["failed", "permanent_failure"] },
+          createdAt: { gte: since24h },
+        },
+        _count: { webhookId: true },
+        orderBy: { _count: { webhookId: "desc" } },
+        take: 5,
+      }),
+      this.prisma.project.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          requestLogs: {
+            where: { createdAt: { gte: since24h } },
+            select: { statusCode: true },
+          },
+        },
+      }),
+      this.prisma.project.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          requestLogs: {
+            where: { createdAt: { gte: since7d } },
+            select: { id: true },
+          },
+          fundingRequests: {
+            where: { confirmedAt: { not: null } },
+            select: { amount: true },
+          },
+        },
+      }),
+      this.prisma.requestLog.aggregate({
+        where: {
+          route: assistantRoute,
+          createdAt: { gte: since24h },
+        },
+        _avg: { durationMs: true },
+      }),
+      this.prisma.requestLog.findMany({
+        where: {
+          route: assistantRoute,
+          createdAt: { gte: since24h },
+        },
+        select: { statusCode: true },
+      }),
+      this.prisma.supportTicket.groupBy({
+        by: ["category"],
+        _count: { category: true },
+        orderBy: { _count: { category: "desc" } },
+        take: 5,
+      }),
+    ]);
+
+    const webhookIds = topWebhookFailureDestinations.map((entry) => entry.webhookId);
+    const webhookLookup = webhookIds.length > 0
+      ? await this.prisma.webhook.findMany({
+          where: { id: { in: webhookIds } },
+          select: { id: true, url: true },
+        })
+      : [];
+    const webhookUrlById = new Map(webhookLookup.map((item) => [item.id, item.url]));
+
+    return {
+      topFailingMethods: topFailingMethods.map((entry) => ({
+        route: entry.route,
+        count: entry._count.route,
+      })),
+      topWebhookFailureDestinations: topWebhookFailureDestinations.map((entry) => ({
+        url: webhookUrlById.get(entry.webhookId) ?? entry.webhookId,
+        failures: entry._count.webhookId,
+      })),
+      highestErrorRateProjects: errorProjects
+        .map((project) => {
+          const totalRequests = project.requestLogs.length;
+          const errorCount = project.requestLogs.filter((row) => row.statusCode >= 400).length;
+          return {
+            projectId: project.id,
+            projectName: project.name,
+            slug: project.slug,
+            errorRate: totalRequests > 0 ? errorCount / totalRequests : 0,
+            totalRequests,
+          };
+        })
+        .filter((project) => project.totalRequests > 0)
+        .sort((left, right) => right.errorRate - left.errorRate || right.totalRequests - left.totalRequests)
+        .slice(0, 5),
+      lowestRemainingRunwayProjects: runwayProjects
+        .map((project) => {
+          const fundedLamports = project.fundingRequests.reduce((sum, row) => sum + Number(row.amount), 0);
+          return {
+            projectId: project.id,
+            projectName: project.name,
+            slug: project.slug,
+            treasurySol: fundedLamports > 0 ? fundedLamports / 1_000_000_000 : null,
+            requestCount7d: project.requestLogs.length,
+          };
+        })
+        .sort((left, right) => {
+          const leftRunway = left.treasurySol ?? Number.POSITIVE_INFINITY;
+          const rightRunway = right.treasurySol ?? Number.POSITIVE_INFINITY;
+          return leftRunway - rightRunway || right.requestCount7d - left.requestCount7d;
+        })
+        .slice(0, 5),
+      assistant: {
+        errorRate:
+          assistantFailures.length > 0
+            ? assistantFailures.filter((row) => row.statusCode >= 400).length / assistantFailures.length
+            : 0,
+        averageLatencyMs: Math.round(assistantAggregate._avg.durationMs ?? 0),
+      },
+      supportCategories: supportCategories.map((entry) => ({
+        category: entry.category,
+        count: entry._count.category,
+      })),
     };
   }
 
@@ -2573,6 +2842,7 @@ export class PrismaApiRepository implements ApiRepository {
       select: {
         id: true, requestId: true, method: true, durationMs: true,
         statusCode: true, route: true, service: true, createdAt: true, upstreamNode: true, region: true,
+        requestSize: true, responseSize: true, cacheHit: true, simulated: true, mode: true, fyxvoHint: true,
       },
     });
     if (!log) return null;
@@ -2580,6 +2850,246 @@ export class PrismaApiRepository implements ApiRepository {
       ...log,
       createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt),
     };
+  }
+
+  async listPlaygroundRecipes(projectId: string): Promise<PlaygroundRecipeRecord[]> {
+    const rows = await this.prisma.playgroundRecipe.findMany({
+      where: { projectId },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      method: row.method,
+      mode: row.mode === "priority" ? "priority" : "standard",
+      simulationEnabled: row.simulationEnabled,
+      params: (row.params as Record<string, string>) ?? {},
+      notes: row.notes ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  }
+
+  async createPlaygroundRecipe(input: {
+    readonly projectId: string;
+    readonly name: string;
+    readonly method: string;
+    readonly mode: "standard" | "priority";
+    readonly simulationEnabled: boolean;
+    readonly params: Record<string, string>;
+    readonly notes?: string | null;
+  }): Promise<PlaygroundRecipeRecord> {
+    const row = await this.prisma.playgroundRecipe.create({
+      data: {
+        projectId: input.projectId,
+        name: input.name,
+        method: input.method,
+        mode: input.mode,
+        simulationEnabled: input.simulationEnabled,
+        params: input.params,
+        notes: input.notes ?? null,
+      },
+    });
+
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      method: row.method,
+      mode: row.mode === "priority" ? "priority" : "standard",
+      simulationEnabled: row.simulationEnabled,
+      params: (row.params as Record<string, string>) ?? {},
+      notes: row.notes ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  async updatePlaygroundRecipe(
+    recipeId: string,
+    projectId: string,
+    input: {
+      readonly name?: string;
+      readonly method?: string;
+      readonly mode?: "standard" | "priority";
+      readonly simulationEnabled?: boolean;
+      readonly params?: Record<string, string>;
+      readonly notes?: string | null;
+    }
+  ): Promise<PlaygroundRecipeRecord | null> {
+    const existing = await this.prisma.playgroundRecipe.findFirst({
+      where: { id: recipeId, projectId },
+    });
+    if (!existing) {
+      return null;
+    }
+
+    const row = await this.prisma.playgroundRecipe.update({
+      where: { id: recipeId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.method !== undefined ? { method: input.method } : {}),
+        ...(input.mode !== undefined ? { mode: input.mode } : {}),
+        ...(input.simulationEnabled !== undefined ? { simulationEnabled: input.simulationEnabled } : {}),
+        ...(input.params !== undefined ? { params: input.params } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      },
+    });
+
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      method: row.method,
+      mode: row.mode === "priority" ? "priority" : "standard",
+      simulationEnabled: row.simulationEnabled,
+      params: (row.params as Record<string, string>) ?? {},
+      notes: row.notes ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  async deletePlaygroundRecipe(recipeId: string, projectId: string): Promise<void> {
+    await this.prisma.playgroundRecipe.deleteMany({
+      where: { id: recipeId, projectId },
+    });
+  }
+
+  async getAlertCenter(userId: string, projectIds: readonly string[], assistantAvailable: boolean): Promise<AlertCenterItem[]> {
+    const [notifications, webhookFailures, incidents, projects] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { userId, OR: [{ projectId: null }, { projectId: { in: [...projectIds] } }] },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: { project: { select: { id: true, name: true } } },
+      }),
+      this.prisma.webhookDelivery.findMany({
+        where: {
+          webhook: { projectId: { in: [...projectIds] } },
+          status: { in: ["failed", "permanent_failure"] },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          webhook: {
+            select: {
+              id: true,
+              url: true,
+              project: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.incident.findMany({
+        where: { resolvedAt: null },
+        orderBy: { startedAt: "desc" },
+        take: 10,
+      }),
+      this.prisma.project.findMany({
+        where: { id: { in: [...projectIds] } },
+        select: {
+          id: true,
+          name: true,
+          lowBalanceThresholdSol: true,
+          requestLogs: {
+            where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+            select: { statusCode: true },
+          },
+        },
+      }),
+    ]);
+
+    const items: AlertCenterItem[] = [];
+
+    for (const notification of notifications) {
+      const severity =
+        /low balance|high error|failed|warning/i.test(`${notification.title} ${notification.message}`)
+          ? "warning"
+          : "info";
+      items.push({
+        id: notification.id,
+        type: "notification",
+        severity,
+        projectId: notification.projectId ?? null,
+        projectName: notification.project?.name ?? null,
+        title: notification.title,
+        description: notification.message,
+        createdAt: notification.createdAt.toISOString(),
+        metadata: typeof notification.metadata === "object" && notification.metadata !== null
+          ? (notification.metadata as Record<string, unknown>)
+          : null,
+      });
+    }
+
+    for (const failure of webhookFailures) {
+      items.push({
+        id: failure.id,
+        type: "webhook_failure",
+        severity: failure.status === "permanent_failure" ? "critical" : "warning",
+        projectId: failure.webhook.project.id,
+        projectName: failure.webhook.project.name,
+        title: "Webhook delivery failed",
+        description: `${failure.webhook.url} returned ${failure.responseStatus ?? "no response"} for ${failure.eventType}.`,
+        createdAt: failure.createdAt.toISOString(),
+        metadata: {
+          webhookId: failure.webhook.id,
+          responseStatus: failure.responseStatus,
+          eventType: failure.eventType,
+          attemptNumber: failure.attemptNumber,
+        },
+      });
+    }
+
+    for (const project of projects) {
+      const total = project.requestLogs.length;
+      const errors = project.requestLogs.filter((row) => row.statusCode >= 400).length;
+      if (total > 0 && errors / total >= 0.25) {
+        items.push({
+          id: `error-rate:${project.id}`,
+          type: "error_rate",
+          severity: "warning",
+          projectId: project.id,
+          projectName: project.name,
+          title: "Error rate elevated",
+          description: `${Math.round((errors / total) * 100)}% of requests returned errors in the last 24 hours.`,
+          createdAt: new Date().toISOString(),
+          metadata: { errorRate: errors / total, totalRequests: total },
+        });
+      }
+    }
+
+    for (const incident of incidents) {
+      items.push({
+        id: incident.id,
+        type: "incident",
+        severity: incident.severity === "critical" ? "critical" : "warning",
+        projectId: null,
+        projectName: null,
+        title: `${incident.serviceName} incident`,
+        description: incident.description,
+        createdAt: incident.startedAt.toISOString(),
+        metadata: { serviceName: incident.serviceName },
+      });
+    }
+
+    if (!assistantAvailable) {
+      items.push({
+        id: "assistant-unavailable",
+        type: "assistant",
+        severity: "warning",
+        projectId: null,
+        projectName: null,
+        title: "Assistant availability issue",
+        description: "The assistant is currently unavailable. Docs, playground, and analytics remain available.",
+        createdAt: new Date().toISOString(),
+        metadata: null,
+      });
+    }
+
+    return items.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
   }
 
   async getFirstSuccessfulProjectRequest(projectId: string): Promise<{

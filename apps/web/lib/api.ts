@@ -5,8 +5,10 @@ import type {
   AssistantMessageFeedback,
   AssistantRateLimitStatus,
   AdminDeploymentReadiness,
+  AdminObservability,
   AdminOverview,
   AdminStats,
+  AlertCenterItem,
   AnalyticsOverview,
   AnalyticsRange,
   ApiKeyAnalytics,
@@ -32,6 +34,9 @@ import type {
   PortalUser,
   ProjectAnalytics,
   ProjectChecklist,
+  PlaygroundRecipe,
+  ProjectRequestLogList,
+  RequestLogRange,
   WebDeploymentStatus
 } from "./types";
 import { webEnv } from "./env";
@@ -372,6 +377,65 @@ export async function getErrorLog(projectId: string, token: string) {
   return response.items;
 }
 
+export async function getProjectRequestLogs(
+  projectId: string,
+  token: string,
+  query: Partial<{
+    range: RequestLogRange;
+    method: string;
+    status: "success" | "error";
+    apiKey: string;
+    mode: "standard" | "priority";
+    simulatedOnly: boolean;
+    errorsOnly: boolean;
+    search: string;
+    page: number;
+    pageSize: number;
+  }> = {}
+) {
+  const url = new URL(`/v1/projects/${projectId}/requests`, webEnv.apiBaseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue;
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  return parseResponse<ProjectRequestLogList>(response);
+}
+
+export async function downloadProjectRequestLogs(
+  projectId: string,
+  token: string,
+  format: "csv" | "json",
+  query: Partial<{
+    range: RequestLogRange;
+    method: string;
+    status: "success" | "error";
+    apiKey: string;
+    mode: "standard" | "priority";
+    simulatedOnly: boolean;
+    errorsOnly: boolean;
+    search: string;
+  }> = {}
+) {
+  const url = new URL(`/v1/projects/${projectId}/requests/export`, webEnv.apiBaseUrl);
+  url.searchParams.set("format", format);
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue;
+    url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Request log export failed: ${response.status}`);
+  }
+  return response.blob();
+}
+
 export async function downloadAnalyticsExport(projectId: string, range: AnalyticsRange, token: string): Promise<Blob> {
   const url = new URL(`/v1/projects/${projectId}/analytics/export?range=${range}`, webEnv.apiBaseUrl);
   const response = await fetch(url, {
@@ -450,6 +514,11 @@ export async function getAdminOverview(token: string) {
   return response.item;
 }
 
+export async function getAdminObservability(token: string) {
+  const response = await requestApi<{ item: AdminObservability }>("/v1/admin/observability", undefined, token);
+  return response.item;
+}
+
 export async function getOperators(token: string) {
   const response = await requestApi<{ items: OperatorSummary[] }>("/v1/admin/operators", undefined, token);
   return response.items;
@@ -517,6 +586,11 @@ export async function getNotificationPreferences(token: string) {
     notifyWeeklySummary: boolean;
     notifyReferralConversion: boolean;
   }>("/v1/notifications/preferences", undefined, token);
+}
+
+export async function getAlertCenter(token: string) {
+  const response = await requestApi<{ items: AlertCenterItem[] }>("/v1/alerts", undefined, token);
+  return response.items;
 }
 
 export async function updateNotificationPreferences(
@@ -596,6 +670,58 @@ export async function getAdminDeploymentReadiness(token: string) {
 
 export async function listWebhooks(projectId: string, token: string) {
   return requestApi<{ items: Array<{ id: string; url: string; events: string[]; secret: string; active: boolean; lastTriggeredAt: string | null; createdAt: string }> }>(`/v1/projects/${projectId}/webhooks`, undefined, token);
+}
+
+export async function listPlaygroundRecipes(projectId: string, token: string) {
+  const response = await requestApi<{ items: PlaygroundRecipe[] }>(`/v1/projects/${projectId}/playground/recipes`, undefined, token);
+  return response.items;
+}
+
+export async function createPlaygroundRecipe(
+  projectId: string,
+  input: {
+    readonly name: string;
+    readonly method: string;
+    readonly mode: "standard" | "priority";
+    readonly simulationEnabled: boolean;
+    readonly params: Record<string, string>;
+    readonly notes?: string | null;
+  },
+  token: string
+) {
+  return requestApi<{ item: PlaygroundRecipe }>(
+    `/v1/projects/${projectId}/playground/recipes`,
+    { method: "POST", body: JSON.stringify(input) },
+    token
+  );
+}
+
+export async function updatePlaygroundRecipe(
+  projectId: string,
+  recipeId: string,
+  input: Partial<{
+    readonly name: string;
+    readonly method: string;
+    readonly mode: "standard" | "priority";
+    readonly simulationEnabled: boolean;
+    readonly params: Record<string, string>;
+    readonly notes: string | null;
+  }>,
+  token: string
+) {
+  return requestApi<{ item: PlaygroundRecipe }>(
+    `/v1/projects/${projectId}/playground/recipes/${recipeId}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+    token
+  );
+}
+
+export async function deletePlaygroundRecipe(projectId: string, recipeId: string, token: string) {
+  return requestApi<void>(
+    `/v1/projects/${projectId}/playground/recipes/${recipeId}`,
+    { method: "DELETE" },
+    token
+  );
 }
 
 export async function createWebhook(projectId: string, input: { url: string; events: string[] }, token: string) {
