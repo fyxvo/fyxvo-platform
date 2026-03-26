@@ -383,26 +383,23 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const [wrap, setWrap] = useState(false);
 
   return (
-    <div className="my-4 overflow-hidden rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] shadow-[0_0_0_1px_rgba(0,0,0,0.02)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
+    <div className="my-4 overflow-hidden rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)]">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
             {language}
           </span>
-          <span className="rounded-full bg-[var(--fyxvo-panel)] px-2 py-1 text-[11px] text-[var(--fyxvo-text-muted)]">
-            {wrap ? "Wrap on" : "Scroll on"}
-          </span>
         </div>
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-1.5 text-xs">
           <button
             type="button"
             onClick={() => setWrap((current) => !current)}
             className={cn(
-              "rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]",
+              "rounded-md border border-[var(--fyxvo-border)] px-2.5 py-1 text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:border-brand-500/25 hover:text-[var(--fyxvo-text)]",
               FOCUS_RING_CLASS
             )}
           >
-            {wrap ? "Use horizontal scroll" : "Wrap long lines"}
+            {wrap ? "Scroll" : "Wrap"}
           </button>
           <button
             type="button"
@@ -412,11 +409,11 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
               window.setTimeout(() => setCopied(false), 2000);
             }}
             className={cn(
-              "rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]",
+              "rounded-md border border-[var(--fyxvo-border)] px-2.5 py-1 text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:border-brand-500/25 hover:text-[var(--fyxvo-text)]",
               FOCUS_RING_CLASS
             )}
           >
-            {copied ? "Copied!" : "Copy"}
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
       </div>
@@ -581,21 +578,21 @@ function MarkdownContent({ content }: { content: string }) {
 
 function ThinkingBubble() {
   return (
-    <div className="rounded-[1.75rem] rounded-tl-lg border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-5 py-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+    <div className="rounded-2xl rounded-tl-sm border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-center gap-3">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1">
           {[0, 1, 2].map((dot) => (
             <span
               key={dot}
-              className="inline-block h-2.5 w-2.5 animate-bounce rounded-full bg-[var(--fyxvo-brand)]/75"
-              style={{ animationDelay: `${dot * 0.16}s` }}
+              className="inline-block h-2 w-2 animate-bounce rounded-full bg-[var(--fyxvo-brand)]/60"
+              style={{ animationDelay: `${dot * 0.15}s`, animationDuration: "0.9s" }}
             />
           ))}
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="h-2.5 w-24 animate-pulse rounded-full bg-[var(--fyxvo-border)]" />
-          <div className="h-2.5 w-full animate-pulse rounded-full bg-[var(--fyxvo-border)]/80" />
-          <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-[var(--fyxvo-border)]/70" />
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="h-2 w-20 animate-pulse rounded-full bg-[var(--fyxvo-border)]" />
+          <div className="h-2 w-full animate-pulse rounded-full bg-[var(--fyxvo-border)]/70" />
+          <div className="h-2 w-3/5 animate-pulse rounded-full bg-[var(--fyxvo-border)]/50" />
         </div>
       </div>
     </div>
@@ -614,7 +611,7 @@ function SectionCard({
   action?: ReactNode;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+    <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">{title}</h3>
@@ -638,7 +635,9 @@ function AssistantActionPill({
 }) {
   const className =
     cn(
-      "inline-flex items-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-1.5 text-xs font-medium text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]",
+      "inline-flex items-center rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-1.5",
+      "text-xs font-medium text-[var(--fyxvo-text-muted)]",
+      "transition-colors duration-150 hover:border-brand-500/25 hover:text-[var(--fyxvo-text)]",
       FOCUS_RING_CLASS
     );
 
@@ -672,12 +671,12 @@ function ToolCard({
     <Link
       href={href}
       className={cn(
-        "group rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4 transition hover:border-brand-500/30 hover:bg-brand-500/5",
+        "group rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3.5 transition-colors duration-150 hover:border-brand-500/25 hover:bg-brand-500/5",
         FOCUS_RING_CLASS
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-[var(--fyxvo-brand)]">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-500/15 bg-brand-500/8 text-[var(--fyxvo-brand)]">
           {icon}
         </div>
         <div className="min-w-0">
@@ -1253,40 +1252,56 @@ export function AssistantWorkspace() {
 
         {toolCards.length > 0 ? <div className="grid gap-3 md:grid-cols-2">{toolCards}</div> : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-2.5">
           <div className="flex items-center gap-2 text-xs text-[var(--fyxvo-text-muted)]">
-            <span>Response feedback</span>
+            <span>Feedback</span>
             {message.feedback ? <Badge tone={feedbackTone(message.feedback)}>{message.feedback.rating === "up" ? "Helpful" : "Needs work"}</Badge> : null}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              aria-label="Thumbs up"
+              aria-label="Mark as helpful"
               onClick={() => setFeedbackDraft({ messageId: message.id, rating: "up", note: message.feedback?.note ?? "" })}
-              className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-xs text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors duration-150",
+                FOCUS_RING_CLASS,
+                feedbackDraft?.messageId === message.id && feedbackDraft.rating === "up"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+                  : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:border-emerald-500/30 hover:text-emerald-500"
+              )}
             >
-              👍
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M5 7V13M5 7L7.5 2C8.5 2 9.5 2.5 9.5 4V6H13C13.5 6 14 6.5 13.8 7L12.5 12C12.3 12.7 11.7 13 11 13H5M5 7H3C2.4 7 2 7.4 2 8V12C2 12.6 2.4 13 3 13H5" />
+              </svg>
             </button>
             <button
               type="button"
-              aria-label="Thumbs down"
+              aria-label="Mark as needing improvement"
               onClick={() => setFeedbackDraft({ messageId: message.id, rating: "down", note: message.feedback?.note ?? "" })}
-              className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1.5 text-xs text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors duration-150",
+                FOCUS_RING_CLASS,
+                feedbackDraft?.messageId === message.id && feedbackDraft.rating === "down"
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+                  : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:border-amber-500/30 hover:text-amber-500"
+              )}
             >
-              👎
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true">
+                <path d="M11 9V3M11 9L8.5 14C7.5 14 6.5 13.5 6.5 12V10H3C2.5 10 2 9.5 2.2 9L3.5 4C3.7 3.3 4.3 3 5 3H11M11 9H13C13.6 9 14 8.6 14 8V4C14 3.4 13.6 3 13 3H11" />
+              </svg>
             </button>
           </div>
         </div>
 
         {feedbackDraft?.messageId === message.id ? (
-          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4">
+          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--fyxvo-text)]">
                   {feedbackDraft.rating === "up" ? "What worked well?" : "What should be better?"}
                 </div>
                 <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-                  Optional note for assistant quality review. No hidden reasoning is exposed.
+                  Optional note for assistant quality review.
                 </div>
               </div>
               <Badge tone={feedbackDraft.rating === "up" ? "success" : "warning"}>
@@ -1298,7 +1313,7 @@ export function AssistantWorkspace() {
               onChange={(event) => setFeedbackDraft((current) => (current ? { ...current, note: event.target.value } : current))}
               rows={3}
               placeholder="Optional note"
-              className="mt-3 w-full rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] focus:border-brand-500/40"
+              className="mt-3 w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] transition-colors duration-150 focus:border-brand-500/40"
             />
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setFeedbackDraft(null)}>
@@ -1526,28 +1541,27 @@ export function AssistantWorkspace() {
       <div className="mx-auto h-full max-w-[1800px] px-3 pb-4 pt-3 sm:px-5 lg:px-6">
         <div className="grid h-full gap-4 xl:grid-cols-[320px,minmax(0,1fr),320px]">
           <aside
-            className="hidden xl:flex xl:min-h-0 xl:flex-col xl:rounded-[2rem] xl:border xl:border-[var(--fyxvo-border)] xl:bg-[var(--fyxvo-panel)] xl:shadow-[0_20px_70px_rgba(15,23,42,0.08)]"
-            aria-label="Assistant conversations"
+            className="hidden xl:flex xl:min-h-0 xl:flex-col xl:rounded-2xl xl:border xl:border-[var(--fyxvo-border)] xl:bg-[var(--fyxvo-panel)] xl:shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
+            aria-label="Conversation history"
           >
-            <div className="border-b border-[var(--fyxvo-border)] px-5 py-5">
-              <div className="flex items-start justify-between gap-3">
+            <div className="border-b border-[var(--fyxvo-border)] px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Conversations</p>
-                  <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">Server-backed history for the latest 50 messages.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Conversations</p>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => void handleCreateConversation()}>
                   New
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="flex-1 overflow-y-auto px-3 py-3">
               {conversations.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5 text-sm text-[var(--fyxvo-text-muted)]">
-                  <p className="font-medium text-[var(--fyxvo-text)]">No saved conversations yet</p>
-                  <p className="mt-1">Start a new thread and Fyxvo will keep it available across refreshes.</p>
+                <div className="rounded-xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5 text-sm text-[var(--fyxvo-text-muted)]">
+                  <p className="font-medium text-[var(--fyxvo-text)]">No conversations yet</p>
+                  <p className="mt-1 text-xs leading-5">Start a new thread and your history will appear here.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {conversations.map((conversation) => (
                     <button
                       key={conversation.id}
@@ -1555,16 +1569,16 @@ export function AssistantWorkspace() {
                       onClick={() => void loadConversation(conversation.id)}
                       aria-current={activeConversationId === conversation.id ? "page" : undefined}
                       className={cn(
-                        "w-full rounded-[1.35rem] border px-4 py-4 text-left transition",
+                        "w-full rounded-xl border px-3.5 py-3 text-left transition-colors duration-150",
                         FOCUS_RING_CLASS,
                         activeConversationId === conversation.id
-                          ? "border-brand-500/30 bg-brand-500/10"
-                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] hover:border-brand-500/20"
+                          ? "border-brand-500/25 bg-brand-500/8"
+                          : "border-transparent hover:border-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel-soft)]"
                       )}
                     >
-                      <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
-                      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--fyxvo-text-muted)]">
-                        <span>{conversation.messageCount} messages</span>
+                      <div className="line-clamp-2 text-sm font-medium text-[var(--fyxvo-text)]">{conversation.title}</div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--fyxvo-text-muted)]">
+                        <span>{conversation.messageCount} msg</span>
                         <span>{shortRelative(conversation.lastMessageAt, isHydrated)}</span>
                       </div>
                     </button>
@@ -1574,8 +1588,8 @@ export function AssistantWorkspace() {
             </div>
           </aside>
 
-          <div className="flex min-h-0 flex-col rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_20px_70px_rgba(15,23,42,0.08)]">
-            <div className="sticky top-0 z-20 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-4 pt-4 backdrop-blur sm:px-6 sm:pt-5">
+          <div className="flex min-h-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]">
+            <div className="sticky top-0 z-20 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-4 pt-4 backdrop-blur-xl sm:px-6 sm:pt-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="mb-3 flex items-center gap-2 xl:hidden">
@@ -1634,12 +1648,12 @@ export function AssistantWorkspace() {
               ) : null}
 
               {showOnboardingBanner ? (
-                <div className="mt-4 rounded-[1.5rem] border border-brand-500/20 bg-brand-500/10 px-4 py-4">
+                <div className="mt-4 rounded-xl border border-brand-500/20 bg-brand-500/8 px-4 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="max-w-2xl">
                       <div className="text-sm font-semibold text-[var(--fyxvo-text)]">What the assistant can help with</div>
                       <div className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                        It can explain Fyxvo and Solana RPC workflows, use real project context when available, and prepare examples for docs or playground. It cannot guarantee code correctness, and every response should be tested before production use.
+                        It can explain Fyxvo and Solana RPC workflows, use real project context when available, and prepare examples for docs or playground. Every response should be tested before production use.
                       </div>
                     </div>
                     <Button size="sm" variant="ghost" onClick={dismissOnboardingBanner}>
@@ -1650,7 +1664,7 @@ export function AssistantWorkspace() {
               ) : null}
 
               {returnBanner ? (
-                <div className="mt-4 rounded-[1.5rem] border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
+                <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
                   Returned from Playground with your prepared request ready.
                 </div>
               ) : null}
@@ -1692,20 +1706,20 @@ export function AssistantWorkspace() {
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="mx-auto max-w-4xl space-y-6">
-                    <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-8 text-center shadow-[0_20px_60px_rgba(15,23,42,0.05)]">
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-brand-500/10 text-[var(--fyxvo-brand)]">
-                        <SparklesIcon className="h-6 w-6" />
+                    <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-10 text-center shadow-[0_4px_20px_rgba(15,23,42,0.05)]">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/8 text-[var(--fyxvo-brand)]">
+                        <SparklesIcon className="h-5 w-5" />
                       </div>
-                      <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+                      <h2 className="mt-5 font-display text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
                         Ask about onboarding, debugging, relay behavior, or live project state
                       </h2>
-                      <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
+                      <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
                         The assistant can help you reach first traffic faster, explain current platform behavior honestly, and prepare examples you can send straight into the playground.
                       </p>
                     </div>
 
                     {isAssistantUnavailable ? (
-                      <div className="rounded-[1.75rem] border border-amber-500/20 bg-amber-500/10 px-5 py-5">
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-5 py-5">
                         <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant temporarily unavailable</h3>
                         <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
                           Your previous conversations are still available. You can keep using docs, playground, and analytics while the assistant service recovers.
@@ -1720,9 +1734,9 @@ export function AssistantWorkspace() {
 
                     <div className="grid gap-4 lg:grid-cols-2">
                       {PROMPT_GROUPS.map((group) => (
-                        <section key={group.title} className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-5 py-5">
-                          <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">{group.title}</div>
-                          <div className="mt-4 space-y-2">
+                        <section key={group.title} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-5 py-4">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">{group.title}</div>
+                          <div className="mt-3 space-y-1.5">
                             {group.items.map((prompt) => (
                               <button
                                 key={prompt}
@@ -1735,7 +1749,8 @@ export function AssistantWorkspace() {
                                   }
                                 }}
                                 className={cn(
-                                  "w-full rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
+                                  "w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)]",
+                                  "transition-colors duration-150 hover:border-brand-500/25 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
                                   FOCUS_RING_CLASS
                                 )}
                               >
@@ -1763,10 +1778,10 @@ export function AssistantWorkspace() {
                           ) : (
                             <div
                               className={cn(
-                                "rounded-[1.85rem] px-5 py-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)]",
+                                "rounded-2xl px-5 py-4",
                                 message.role === "user"
-                                  ? "rounded-tr-lg bg-[linear-gradient(180deg,var(--fyxvo-brand),#ea580c)] text-white"
-                                  : "rounded-tl-lg border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))]"
+                                  ? "rounded-tr-sm bg-[linear-gradient(145deg,var(--fyxvo-brand),#ea580c)] text-white shadow-[0_8px_24px_rgba(249,115,22,0.22)]"
+                                  : "rounded-tl-sm border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
                               )}
                             >
                               {message.role === "assistant" ? (
@@ -1801,7 +1816,7 @@ export function AssistantWorkspace() {
                     </div>
                   </div>
 
-                  <div className="rounded-[1.85rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+                  <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color] duration-150 focus-within:border-[var(--fyxvo-border-strong)]">
                     <div className="flex items-end gap-3">
                       <button
                         type="button"

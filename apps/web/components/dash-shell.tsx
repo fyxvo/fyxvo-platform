@@ -33,7 +33,7 @@ import { shortenAddress } from "../lib/format";
 import { listBookmarks } from "../lib/api";
 import type { BookmarkRecord } from "../lib/types";
 
-const navItems = [
+const primaryNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: GaugeIcon },
   { href: "/projects", label: "Projects", icon: FolderIcon },
   { href: "/api-keys", label: "API Keys", icon: KeyIcon },
@@ -41,13 +41,19 @@ const navItems = [
   { href: "/transactions", label: "Transactions", icon: TransactionsIcon },
   { href: "/analytics", label: "Analytics", icon: ChartIcon },
   { href: "/alerts", label: "Alerts", icon: AlertIcon },
+] as const;
+
+const toolsNavItems = [
   { href: "/operators", label: "Operators", icon: ServerIcon },
   { href: "/playground", label: "Playground", icon: BeakerIcon },
+  { href: "/assistant", label: "Assistant", icon: SparklesIcon },
+] as const;
+
+const supportNavItems = [
   { href: "/docs", label: "Docs", icon: BookIcon },
   { href: "/status", label: "Status", icon: PulseIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
   { href: "/support", label: "Support", icon: SupportIcon },
-  { href: "/assistant", label: "Assistant", icon: SparklesIcon },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -74,20 +80,38 @@ function NavItem({
       href={href}
       {...(onClick ? { onClick } : {})}
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
+        "transition-colors duration-150",
         active
-          ? "border border-brand-500/20 bg-brand-500/10 text-[var(--fyxvo-text)]"
+          ? "border border-brand-500/15 bg-brand-500/8 text-[var(--fyxvo-text)]"
           : "border border-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
       )}
     >
       <Icon
         className={cn(
           "h-4 w-4 shrink-0",
-          active ? "text-[var(--fyxvo-brand)] dark:text-brand-400" : "text-[var(--fyxvo-text-muted)]"
+          active ? "text-[var(--fyxvo-brand)]" : "text-[var(--fyxvo-text-muted)]"
         )}
       />
       {label}
     </Link>
+  );
+}
+
+function NavGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+        {label}
+      </p>
+      <div className="space-y-0.5">{children}</div>
+    </div>
   );
 }
 
@@ -123,6 +147,7 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
+      {/* Header */}
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--fyxvo-border)] px-4">
         <BrandLogo priority />
         <div className="flex items-center gap-1.5">
@@ -130,7 +155,11 @@ function SidebarContent({
             type="button"
             onClick={onOpenShortcuts}
             aria-label="Keyboard shortcuts"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--fyxvo-border)] bg-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)] transition"
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--fyxvo-border)]",
+              "bg-transparent text-[var(--fyxvo-text-muted)]",
+              "transition-colors duration-150 hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+            )}
             title="Keyboard shortcuts (?)"
           >
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
@@ -147,10 +176,11 @@ function SidebarContent({
         </div>
       </div>
 
+      {/* Active project */}
       {portal.walletPhase === "authenticated" && portal.selectedProject ? (
         <div className="border-b border-[var(--fyxvo-border)] px-4 py-3">
-          <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-            Project
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+            Active project
           </p>
           <p className="mt-1 truncate text-sm font-medium text-[var(--fyxvo-text)]">
             {portal.selectedProject.name}
@@ -158,18 +188,19 @@ function SidebarContent({
         </div>
       ) : null}
 
+      {/* Quick access bookmarks */}
       {visibleBookmarks.length > 0 ? (
         <div className="border-b border-[var(--fyxvo-border)] px-4 py-3">
-          <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
             Quick access
           </p>
-          <div className="mt-2 space-y-1.5">
+          <div className="space-y-0.5">
             {visibleBookmarks.map((bookmark) => (
               <Link
                 key={bookmark.id}
                 href={bookmark.href}
                 {...(onNavigate ? { onClick: onNavigate } : {})}
-                className="block rounded-md px-2 py-1.5 text-sm text-[var(--fyxvo-text-muted)] transition hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+                className="block rounded-lg px-2 py-1.5 text-sm text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
               >
                 {bookmark.label}
               </Link>
@@ -178,22 +209,52 @@ function SidebarContent({
         </div>
       ) : null}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {navItems.map((item) => (
-          <NavItem
-            key={item.href}
-            href={item.href === "/projects" ? projectHref : item.href}
-            label={item.label}
-            icon={item.icon}
-            active={isActive(pathname, item.href)}
-            {...(onNavigate ? { onClick: onNavigate } : {})}
-          />
-        ))}
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5" aria-label="Primary navigation">
+        <NavGroup label="Workspace">
+          {primaryNavItems.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href === "/projects" ? projectHref : item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isActive(pathname, item.href)}
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+            />
+          ))}
+        </NavGroup>
+
+        <NavGroup label="Tools">
+          {toolsNavItems.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isActive(pathname, item.href)}
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+            />
+          ))}
+        </NavGroup>
+
+        <NavGroup label="Support">
+          {supportNavItems.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isActive(pathname, item.href)}
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+            />
+          ))}
+        </NavGroup>
       </nav>
 
+      {/* Footer */}
       <div className="shrink-0 space-y-3 border-t border-[var(--fyxvo-border)] px-4 py-4">
         {portal.walletPhase === "authenticated" && portal.walletAddress ? (
-          <div className="rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2.5">
+          <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2.5">
             <div className="flex items-center justify-between">
               <p className="text-xs text-[var(--fyxvo-text-muted)]">
                 {portal.walletName ?? "Wallet"}
@@ -231,45 +292,53 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  // Close the mobile drawer whenever the route changes
   useEffect(() => {
     startTransition(() => setSidebarOpen(false));
   }, [pathname]);
 
   return (
     <div className="relative flex min-h-screen">
+      {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-[var(--fyxvo-border)] lg:bg-[var(--fyxvo-bg)]">
         <SidebarContent pathname={pathname} onOpenShortcuts={() => setShortcutsOpen(true)} />
       </aside>
 
-      {/* Mobile drawer — always rendered, animated in/out via translate */}
+      {/* Mobile drawer */}
       <div
         className={cn(
           "fixed inset-0 z-50 lg:hidden transition-opacity duration-200",
           sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         )}
       >
-        {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
-        {/* Drawer panel */}
         <aside
           className={cn(
-            "fixed left-0 top-0 h-full w-72 border-r border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-200 ease-in-out",
+            "fixed left-0 top-0 h-full w-72 border-r border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)]",
+            "shadow-2xl transition-transform duration-250 ease-out",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          <SidebarContent pathname={pathname} onNavigate={() => setSidebarOpen(false)} onOpenShortcuts={() => setShortcutsOpen(true)} />
+          <SidebarContent
+            pathname={pathname}
+            onNavigate={() => setSidebarOpen(false)}
+            onOpenShortcuts={() => setShortcutsOpen(true)}
+          />
         </aside>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile header */}
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/90 px-4 backdrop-blur lg:hidden">
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center rounded-lg",
+              "border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]",
+              "text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:text-[var(--fyxvo-text)]"
+            )}
             onClick={() => setSidebarOpen(true)}
             aria-label="Open sidebar"
           >
@@ -281,7 +350,11 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
               type="button"
               onClick={() => setShortcutsOpen(true)}
               aria-label="Keyboard shortcuts"
-              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--fyxvo-border)] bg-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)] transition"
+              className={cn(
+                "hidden sm:flex h-8 w-8 items-center justify-center rounded-lg",
+                "border border-[var(--fyxvo-border)] bg-transparent",
+                "text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+              )}
               title="Keyboard shortcuts (?)"
             >
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
@@ -305,8 +378,11 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
         </main>
       </div>
 
-      {/* Mobile bottom navigation bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 backdrop-blur lg:hidden">
+      {/* Mobile bottom navigation */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 backdrop-blur lg:hidden"
+        aria-label="Mobile navigation"
+      >
         {([
           { href: "/dashboard", label: "Dashboard", icon: GaugeIcon },
           { href: "/projects", label: "Projects", icon: FolderIcon },
@@ -322,7 +398,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
               key={item.href}
               href={href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors",
+                "flex flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors duration-150",
                 active
                   ? "text-[var(--fyxvo-brand)]"
                   : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
@@ -335,10 +411,7 @@ export function DashShell({ children }: { readonly children: React.ReactNode }) 
         })}
       </nav>
 
-      {/* Command palette — fixed position, renders on top of everything */}
       <CommandPalette />
-
-      {/* Keyboard shortcuts modal */}
       <KeyboardShortcuts open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );

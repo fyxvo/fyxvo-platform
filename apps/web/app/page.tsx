@@ -33,18 +33,18 @@ export default async function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="border-b border-[var(--fyxvo-border)] py-20 lg:py-28">
+      <section className="border-b border-[var(--fyxvo-border)] py-24 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 lg:items-center">
+          <div className="grid gap-16 lg:grid-cols-2 lg:gap-20 lg:items-center">
             <div>
-              <div className="mb-6 inline-flex items-center gap-2 rounded-md border border-brand-500/25 bg-brand-500/10 px-3 py-1.5 text-sm text-brand-700 dark:text-brand-300">
+              <div className="mb-8 inline-flex items-center gap-2 rounded-lg border border-brand-500/20 bg-brand-500/8 px-3 py-1.5 text-sm font-medium text-brand-600 dark:text-brand-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
                 Solana devnet · Private alpha
               </div>
 
-              <h1 className="font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl lg:text-5xl xl:text-6xl">
-                Funded RPC access for{" "}
-                <span className="fyxvo-text-gradient">Solana developers.</span>
+              <h1 className="font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl xl:text-7xl">
+                Funded RPC access{" "}
+                <span className="fyxvo-text-gradient">for Solana teams.</span>
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--fyxvo-text-muted)]">
@@ -52,7 +52,7 @@ export default async function HomePage() {
                 devnet traffic through a managed relay. One flow. No mock endpoints.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-10 flex flex-wrap gap-3">
                 <TrackedLinkButton
                   href="/dashboard"
                   eventName="landing_cta_clicked"
@@ -80,12 +80,11 @@ export default async function HomePage() {
                   Talk to the founder
                 </TrackedLinkButton>
               </div>
-              <p className="mt-3 text-sm text-[var(--fyxvo-text-muted)]">
-                Get your first response in under 5 minutes.
+              <p className="mt-4 text-sm text-[var(--fyxvo-text-muted)]">
+                First response in under 5 minutes.
               </p>
             </div>
 
-            {/* Animated terminal */}
             <div className="hidden lg:block">
               <AnimatedTerminal />
             </div>
@@ -94,85 +93,65 @@ export default async function HomePage() {
       </section>
 
       {/* Live network status strip */}
-      <section className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)]/50">
+      <section className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)]/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 py-4">
-            <span className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 py-3.5">
+            <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
               Live network
             </span>
             <div className="flex items-center gap-2">
-              <span
-                className={`h-2 w-2 rounded-full ${apiOk ? "bg-emerald-400" : "bg-amber-400"}`}
-              />
+              <span className={`h-1.5 w-1.5 rounded-full ${apiOk ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="text-sm text-[var(--fyxvo-text-soft)]">
                 API{" "}
-                <span
-                  className={
-                    apiOk ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
-                  }
-                >
+                <span className={apiOk ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
                   {apiOk ? "operational" : "degraded"}
                 </span>
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className={`h-2 w-2 rounded-full ${gatewayOk ? "bg-emerald-400" : "bg-amber-400"}`}
-              />
+              <span className={`h-1.5 w-1.5 rounded-full ${gatewayOk ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="text-sm text-[var(--fyxvo-text-soft)]">
                 Gateway{" "}
-                <span
-                  className={
-                    gatewayOk ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
-                  }
-                >
+                <span className={gatewayOk ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
                   {gatewayOk ? "operational" : "degraded"}
                 </span>
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className={`h-2 w-2 rounded-full ${protocolReady ? "bg-emerald-400" : "bg-amber-400"}`}
-              />
+              <span className={`h-1.5 w-1.5 rounded-full ${protocolReady ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="text-sm text-[var(--fyxvo-text-soft)]">
                 Protocol{" "}
-                <span
-                  className={
-                    protocolReady ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
-                  }
-                >
+                <span className={protocolReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
                   {protocolReady ? "ready" : "attention"}
                 </span>
               </span>
             </div>
             {typeof gatewayLatency === "number" && gatewayLatency > 0 ? (
-              <div className="text-sm text-[var(--fyxvo-text-muted)]">
-                {formatDuration(gatewayLatency)} avg latency
-              </div>
+              <span className="text-sm text-[var(--fyxvo-text-muted)]">{formatDuration(gatewayLatency)} avg latency</span>
             ) : null}
             {totalRequests > 0 ? (
-              <div className="text-sm text-[var(--fyxvo-text-muted)]">
-                <AnimatedStat value={totalRequests} /> requests served
-              </div>
+              <span className="text-sm text-[var(--fyxvo-text-muted)]">
+                <AnimatedStat value={totalRequests} /> requests
+              </span>
             ) : null}
             {totalProjects > 0 ? (
-              <div className="text-sm text-[var(--fyxvo-text-muted)]">
+              <span className="text-sm text-[var(--fyxvo-text-muted)]">
                 <AnimatedStat value={totalProjects} /> {totalProjects === 1 ? "project" : "projects"}
-              </div>
+              </span>
             ) : null}
             {totalApiKeys > 0 ? (
-              <div className="text-sm text-[var(--fyxvo-text-muted)]">
+              <span className="text-sm text-[var(--fyxvo-text-muted)]">
                 <AnimatedStat value={totalApiKeys} /> API {totalApiKeys === 1 ? "key" : "keys"}
-              </div>
+              </span>
             ) : null}
             {totalSolFees !== null && totalSolFees > 0 ? (
-              <div className="text-sm text-[var(--fyxvo-text-muted)]">
+              <span className="text-sm text-[var(--fyxvo-text-muted)]">
                 <AnimatedStat value={totalSolFees} formatter={(n) => `${n.toFixed(4)} SOL`} /> collected
-              </div>
+              </span>
             ) : null}
             <Link
               href="/status"
-              className="ml-auto text-xs text-[var(--fyxvo-brand)] dark:text-brand-400 transition-colors hover:text-brand-600 dark:hover:text-brand-300"
+              className="ml-auto text-xs font-medium text-[var(--fyxvo-brand)] transition-colors hover:text-brand-400 dark:hover:text-brand-300"
             >
               Full status
             </Link>
@@ -180,14 +159,17 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Product value */}
-      <section id="features" className="py-20">
+      {/* Product capabilities */}
+      <section id="features" className="py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+          <div className="mb-14">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Capabilities
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
               What Fyxvo gives you
             </h2>
-            <p className="mt-3 max-w-2xl text-base text-[var(--fyxvo-text-muted)]">
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
               Four capabilities in one product, connected to a single on-chain funding source.
             </p>
           </div>
@@ -221,7 +203,7 @@ export default async function HomePage() {
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5"
+                className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-display text-base font-semibold text-[var(--fyxvo-text)]">
@@ -229,7 +211,7 @@ export default async function HomePage() {
                   </p>
                   <Badge tone={item.badgeTone}>{item.badge}</Badge>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+                <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
                   {item.body}
                 </p>
               </div>
@@ -238,34 +220,21 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Built for developers */}
-      <section className="border-t border-[var(--fyxvo-border)] py-16">
+      {/* Developer workflows */}
+      <section className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-              Built for Solana teams moving fast on devnet
+          <div className="mb-14 max-w-2xl">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Built for real workflows
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+              From setup to verification without guessing
             </h2>
             <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              If your team is integrating Solana, testing transaction flows, or validating on-chain mechanics before mainnet — Fyxvo gives you a funded RPC path with real request logging and analytics from day one.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-[var(--fyxvo-border)] py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-10 max-w-2xl">
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-              Built for real developer workflows
-            </p>
-            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-              Built for real developer workflows
-            </h2>
-            <p className="mt-3 text-base text-[var(--fyxvo-text-muted)]">
               Calm, technical surfaces that help teams move from setup to verification without guessing what happens next.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-3">
             {[
               {
                 title: "Project-based API keys",
@@ -282,9 +251,9 @@ export default async function HomePage() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5"
+                className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
               >
-                <h3 className="text-lg font-semibold text-[var(--fyxvo-text)]">{item.title}</h3>
+                <h3 className="font-display text-base font-semibold text-[var(--fyxvo-text)]">{item.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">{item.body}</p>
               </div>
             ))}
@@ -292,54 +261,58 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Use Cases */}
-      <section id="use-cases" className="border-t border-[var(--fyxvo-border)] py-20">
+      {/* Use cases */}
+      <section id="use-cases" className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+          <div className="mb-14">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Use cases
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
               Who is building on Fyxvo
             </h2>
-            <p className="mt-3 max-w-2xl text-base text-[var(--fyxvo-text-muted)]">
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
               Teams running real devnet traffic with a need for funded, observable, and controllable RPC access.
             </p>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                icon: "🏦",
                 title: "DeFi protocols",
                 body: "Validate swap, lending, and liquidation flows against devnet before mainnet deployment. Priority relay keeps latency-sensitive transactions on the fast path.",
               },
               {
-                icon: "🎮",
                 title: "Gaming studios",
                 body: "Test high-frequency asset minting, trade matching, and on-chain state transitions at realistic load without burning mainnet SOL.",
               },
               {
-                icon: "🔧",
                 title: "Tooling developers",
                 body: "Build wallets, explorers, and dashboards against a reliable, authenticated devnet RPC with structured request logs and error breakdowns.",
               },
               {
-                icon: "🤖",
                 title: "Agent frameworks",
                 body: "Run autonomous Solana agents with a funded API key that enforces scopes. Track every RPC call the agent makes in the analytics view.",
               },
               {
-                icon: "📱",
                 title: "Mobile dApps",
                 body: "Point your mobile client at a managed relay with rate limiting built in. No shared rate cap, no surprise throttles mid-demo.",
               },
               {
-                icon: "🧪",
                 title: "QA and staging",
                 body: "Separate staging and production projects with distinct funded balances and API keys. Different environment labels, same control surface.",
               },
-            ].map((item) => (
-              <div key={item.title} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-                <div className="mb-3 text-2xl">{item.icon}</div>
+            ].map((item, index) => (
+              <div
+                key={item.title}
+                className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
+              >
+                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg border border-brand-500/20 bg-brand-500/10">
+                  <span className="font-display text-sm font-semibold text-[var(--fyxvo-brand)]">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </div>
                 <p className="font-display text-base font-semibold text-[var(--fyxvo-text)]">{item.title}</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">{item.body}</p>
+                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">{item.body}</p>
               </div>
             ))}
           </div>
@@ -347,13 +320,16 @@ export default async function HomePage() {
       </section>
 
       {/* Interactive demo */}
-      <section id="demo" className="border-t border-[var(--fyxvo-border)] py-20">
+      <section id="demo" className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-10">
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+          <div className="mb-12">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Interactive walkthrough
+            </p>
+            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
               See how it works
             </h2>
-            <p className="mt-3 max-w-2xl text-base text-[var(--fyxvo-text-muted)]">
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
               Walk through the five steps from project creation to live analytics.
             </p>
           </div>
@@ -362,17 +338,20 @@ export default async function HomePage() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="border-t border-[var(--fyxvo-border)] py-20">
+      <section id="how-it-works" className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2">
+          <div className="grid gap-16 lg:grid-cols-2">
             <div>
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                How the live path works
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Live path
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+                How it works
               </h2>
-              <p className="mt-3 text-base text-[var(--fyxvo-text-muted)]">
+              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
                 Six steps from nothing to real relay traffic. Every step is real. Nothing is mocked.
               </p>
-              <div className="mt-8 space-y-4">
+              <ol className="mt-10 space-y-4">
                 {[
                   "Connect a Solana wallet and prove ownership with a signed challenge.",
                   "Create a project. Sign the on-chain activation transaction in your wallet.",
@@ -381,19 +360,19 @@ export default async function HomePage() {
                   "Send a JSON-RPC request to the gateway with your API key.",
                   "Watch request logs, latency, and balance update in analytics.",
                 ].map((step, i) => (
-                  <div key={step} className="flex gap-4">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-brand-500/30 bg-brand-500/10 font-display text-sm font-semibold text-brand-700 dark:text-brand-300">
+                  <li key={step} className="flex gap-4">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-500/25 bg-brand-500/8 font-display text-xs font-semibold text-[var(--fyxvo-brand)]">
                       {i + 1}
                     </div>
-                    <p className="pt-1 text-sm leading-7 text-[var(--fyxvo-text-soft)]">{step}</p>
-                  </div>
+                    <p className="pt-0.5 text-sm leading-7 text-[var(--fyxvo-text-soft)]">{step}</p>
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+                <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                   Trust surface
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -403,11 +382,11 @@ export default async function HomePage() {
                     { label: "Operators", value: "Managed by Fyxvo" },
                     { label: "Authority", value: "Single-signer" },
                   ].map((item) => (
-                    <div key={item.label} className="rounded-md border border-[var(--fyxvo-border)] p-3">
-                      <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+                    <div key={item.label} className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
                         {item.label}
                       </p>
-                      <p className="mt-1 text-sm font-medium text-[var(--fyxvo-text)]">
+                      <p className="mt-1.5 text-sm font-medium text-[var(--fyxvo-text)]">
                         {item.value}
                       </p>
                     </div>
@@ -428,41 +407,44 @@ export default async function HomePage() {
       </section>
 
       {/* Developer quickstart */}
-      <section id="developer-flow" className="border-t border-[var(--fyxvo-border)] py-20">
+      <section id="developer-flow" className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
+          <div className="grid gap-16 lg:grid-cols-[1fr_1fr]">
             <div>
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Quickstart
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
                 First request in minutes
               </h2>
-              <p className="mt-3 text-base text-[var(--fyxvo-text-muted)]">
+              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
                 The gateway accepts standard JSON-RPC requests with an API key in the header.
               </p>
 
-              <div className="mt-6 overflow-hidden rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
+              <div className="mt-8 overflow-hidden rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
                 <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2.5">
-                  <span className="text-xs text-[var(--fyxvo-text-muted)]">Standard RPC · curl</span>
+                  <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">Standard RPC · curl</span>
                   <CopyButton value={curlExample} label="Copy" />
                 </div>
-                <pre className="overflow-x-auto p-4 text-xs leading-6 text-[var(--fyxvo-text-soft)]">
+                <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-[var(--fyxvo-text-soft)]">
                   <code>{curlExample}</code>
                 </pre>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-5 flex flex-wrap gap-2">
                 <CopyButton value="https://rpc.fyxvo.com/rpc" label="Copy RPC endpoint" />
                 <CopyButton value="https://rpc.fyxvo.com/priority" label="Copy priority endpoint" />
                 <Button asChild size="sm" variant="secondary">
                   <Link href="/docs">Full quickstart</Link>
                 </Button>
                 <Button asChild size="sm">
-                  <Link href="/playground?method=getHealth">Try it in the Playground</Link>
+                  <Link href="/playground?method=getHealth">Try in Playground</Link>
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                 Endpoints
               </p>
               {[
@@ -473,10 +455,10 @@ export default async function HomePage() {
               ].map(({ label, value }) => (
                 <div
                   key={label}
-                  className="flex items-center justify-between gap-4 rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
                 >
                   <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+                    <p className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
                       {label}
                     </p>
                     <p className="mt-0.5 font-mono text-sm text-[var(--fyxvo-text)]">{value}</p>
@@ -490,18 +472,21 @@ export default async function HomePage() {
       </section>
 
       {/* Node operator section */}
-      <section id="operators" className="border-t border-[var(--fyxvo-border)] py-20">
+      <section id="operators" className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
+          <div className="grid gap-16 lg:grid-cols-[1fr_1fr]">
             <div>
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Infrastructure
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
                 Managed operator infrastructure
               </h2>
-              <p className="mt-3 text-base text-[var(--fyxvo-text-muted)]">
+              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
                 Fyxvo launches with a single managed operator so routing quality stays predictable
                 while the product matures. This is not an open marketplace claim.
               </p>
-              <div className="mt-6 space-y-3">
+              <div className="mt-8 space-y-3">
                 {[
                   {
                     label: "Managed operator wallet",
@@ -518,9 +503,9 @@ export default async function HomePage() {
                 ].map((item) => (
                   <div
                     key={item.label}
-                    className="rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                    className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
                   >
-                    <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+                    <p className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
                       {item.label}
                     </p>
                     <p className="mt-1 break-all font-mono text-xs text-[var(--fyxvo-text-soft)]">
@@ -532,26 +517,26 @@ export default async function HomePage() {
             </div>
 
             <div className="space-y-4">
-              <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
                 <p className="font-display text-base font-semibold text-[var(--fyxvo-text)]">
                   Program ID
                 </p>
                 <p className="mt-2 break-all font-mono text-sm text-[var(--fyxvo-text-soft)]">
                   {liveDevnetState.programId}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <CopyButton value={liveDevnetState.programId} label="Copy program ID" />
                   <Link
                     href={`https://explorer.solana.com/address/${liveDevnetState.programId}?cluster=devnet`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2.5 py-1.5 text-xs text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]"
                   >
                     View on Explorer &#8599;
                   </Link>
                 </div>
               </div>
-              <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
                 <p className="font-display text-base font-semibold text-[var(--fyxvo-text)]">
                   Admin authority
                 </p>
@@ -568,24 +553,27 @@ export default async function HomePage() {
       </section>
 
       {/* Community */}
-      <section id="community" className="border-t border-[var(--fyxvo-border)] py-20">
+      <section id="community" className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-10 lg:grid-cols-[1fr_1fr]">
+          <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
             <div>
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Community
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
                 Join the launch channels
               </h2>
-              <p className="mt-3 max-w-lg text-base text-[var(--fyxvo-text-muted)]">
+              <p className="mt-4 max-w-lg text-base leading-7 text-[var(--fyxvo-text-muted)]">
                 X for launch updates. Discord for product questions. Telegram for quick coordination
                 during devnet rollout. Direct founder support is available through the contact form.
               </p>
-              <div className="mt-6">
+              <div className="mt-8">
                 <SocialLinkButtons />
               </div>
             </div>
             <div className="space-y-4">
-              <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                   Who this is for
                 </p>
                 <p className="mt-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">

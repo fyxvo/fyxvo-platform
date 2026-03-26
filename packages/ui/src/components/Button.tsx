@@ -6,19 +6,19 @@ type ButtonSize = "sm" | "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-brand-500 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_14px_30px_rgba(249,115,22,0.25)] hover:bg-brand-400",
+    "bg-brand-500 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_10px_24px_rgba(249,115,22,0.22)] hover:bg-brand-400 active:bg-brand-600 active:scale-[0.98]",
   secondary:
-    "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)] ring-1 ring-inset ring-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel)]",
+    "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)] ring-1 ring-inset ring-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel)] hover:ring-[var(--fyxvo-border-strong)] active:scale-[0.98]",
   ghost:
     "bg-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]",
   danger:
-    "bg-rose-500/90 text-white shadow-[0_14px_30px_rgba(244,63,94,0.25)] hover:bg-rose-400",
+    "bg-rose-500/90 text-white shadow-[0_10px_24px_rgba(244,63,94,0.22)] hover:bg-rose-400 active:bg-rose-600 active:scale-[0.98]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-sm",
-  md: "h-11 px-4 text-sm",
-  lg: "h-12 px-5 text-base",
+  sm: "h-9 px-3.5 text-sm rounded-xl gap-1.5",
+  md: "h-11 px-4 text-sm rounded-xl gap-2",
+  lg: "h-12 px-5 text-base rounded-xl gap-2",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -43,7 +43,10 @@ export function Button({
   ...props
 }: ButtonProps) {
   const classes = cn(
-    "inline-flex items-center justify-center gap-2 rounded-2xl text-center font-semibold leading-tight whitespace-normal transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--fyxvo-bg)] disabled:cursor-not-allowed disabled:opacity-60",
+    "inline-flex items-center justify-center text-center font-semibold leading-tight whitespace-normal",
+    "transition duration-150 ease-out",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--fyxvo-bg)]",
+    "disabled:cursor-not-allowed disabled:opacity-50",
     variantClasses[variant],
     sizeClasses[size],
     className

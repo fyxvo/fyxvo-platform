@@ -43,13 +43,19 @@ export function Modal({ open, onClose, title, description, children, footer }: M
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-md"
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center px-4",
+        "bg-black/55 backdrop-blur-md",
+        "animate-in fade-in duration-200"
+      )}
       onClick={onClose}
       role="presentation"
     >
       <Card
         className={cn(
-          "w-full max-w-2xl max-h-[90vh] overflow-y-auto border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)]"
+          "w-full max-w-2xl max-h-[90vh] overflow-y-auto",
+          "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)]",
+          "animate-in zoom-in-95 slide-in-from-bottom-2 duration-200"
         )}
         onClick={(event) => event.stopPropagation()}
         role="dialog"

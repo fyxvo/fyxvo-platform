@@ -28,13 +28,26 @@ export const fyxvoTailwindPreset = {
           "IBM Plex Sans",
           "ui-sans-serif",
           "sans-serif"
+        ],
+        mono: [
+          "var(--font-mono)",
+          "IBM Plex Mono",
+          "Fira Code",
+          "ui-monospace",
+          "Courier New",
+          "monospace"
         ]
       },
       boxShadow: {
-        glow: "0 20px 60px rgba(249, 115, 22, 0.22)"
+        glow: "0 20px 60px rgba(249, 115, 22, 0.22)",
+        "glow-sm": "0 8px 24px rgba(249, 115, 22, 0.16)"
       },
       borderRadius: {
         "4xl": "2rem"
+      },
+      transitionDuration: {
+        "150": "150ms",
+        "250": "250ms"
       }
     }
   }
