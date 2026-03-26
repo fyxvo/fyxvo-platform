@@ -111,7 +111,21 @@ const DOC_LINKS = {
 
 type DocsSectionKey = keyof typeof DOC_LINKS;
 
-function shortRelative(value: string): string {
+function stableTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  }).format(date);
+}
+
+function shortRelative(value: string, hydrated: boolean): string {
+  if (!hydrated) return stableTimestamp(value);
   const diffMs = Date.now() - new Date(value).getTime();
   if (diffMs < 60_000) return "just now";
   if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
@@ -119,8 +133,9 @@ function shortRelative(value: string): string {
   return `${Math.floor(diffMs / 86_400_000)}d ago`;
 }
 
-function formatTimestamp(value: string | undefined): string {
+function formatTimestamp(value: string | undefined, hydrated: boolean): string {
   if (!value) return "";
+  if (!hydrated) return stableTimestamp(value);
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
@@ -700,6 +715,7 @@ export function AssistantWorkspace() {
   const [adminAssistantStats, setAdminAssistantStats] = useState<AssistantAdminStats | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState<{ messageId: string; rating: "up" | "down"; note: string } | null>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const isAuthenticated = portal.walletPhase === "authenticated";
   const isAssistantUnavailable = assistantAvailable === false;
@@ -724,6 +740,10 @@ export function AssistantWorkspace() {
   useEffect(() => {
     threadBottomRef.current?.scrollIntoView({ behavior: messages.length > 0 ? "smooth" : "auto" });
   }, [messages]);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     const storedDebugMode = typeof window !== "undefined" ? window.localStorage.getItem(DEBUG_MODE_KEY) : null;
@@ -1370,7 +1390,7 @@ export function AssistantWorkspace() {
           </div>
           <div className="flex items-center justify-between gap-3">
             <span className="text-[var(--fyxvo-text-muted)]">Window reset</span>
-            <span className="text-[var(--fyxvo-text)]">{rateLimitReset ? shortRelative(rateLimitReset) : "—"}</span>
+            <span className="text-[var(--fyxvo-text)]">{rateLimitReset ? shortRelative(rateLimitReset, isHydrated) : "—"}</span>
           </div>
           <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-xs text-[var(--fyxvo-text-muted)]">
             Pricing now: {PRICING_LAMPORTS.standard.toLocaleString()} lamports standard,{" "}
@@ -1487,7 +1507,7 @@ export function AssistantWorkspace() {
                     <div key={entry.id} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-3 text-xs text-[var(--fyxvo-text-muted)]">
                       <div className="flex items-center justify-between gap-3">
                         <Badge tone={entry.rating === "up" ? "success" : "warning"}>{entry.rating === "up" ? "up" : "down"}</Badge>
-                        <span>{shortRelative(entry.createdAt)}</span>
+                        <span>{shortRelative(entry.createdAt, isHydrated)}</span>
                       </div>
                       {entry.note ? <p className="mt-2 leading-5 text-[var(--fyxvo-text)]">{entry.note}</p> : null}
                     </div>
@@ -1545,7 +1565,7 @@ export function AssistantWorkspace() {
                       <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
                       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--fyxvo-text-muted)]">
                         <span>{conversation.messageCount} messages</span>
-                        <span>{shortRelative(conversation.lastMessageAt)}</span>
+                        <span>{shortRelative(conversation.lastMessageAt, isHydrated)}</span>
                       </div>
                     </button>
                   ))}
@@ -1735,7 +1755,7 @@ export function AssistantWorkspace() {
                           <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
                             <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
                             {message.createdAt ? <span>•</span> : null}
-                            {message.createdAt ? <span>{formatTimestamp(message.createdAt)}</span> : null}
+                            {message.createdAt ? <span>{formatTimestamp(message.createdAt, isHydrated)}</span> : null}
                           </div>
 
                           {composer.isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
@@ -1777,7 +1797,7 @@ export function AssistantWorkspace() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <span>{usageRemaining ?? "—"} messages remaining</span>
-                      <span>{rateLimitReset ? `Resets ${shortRelative(rateLimitReset)}` : "Reset time unavailable"}</span>
+                      <span>{rateLimitReset ? `Resets ${shortRelative(rateLimitReset, isHydrated)}` : "Reset time unavailable"}</span>
                     </div>
                   </div>
 
@@ -1893,7 +1913,7 @@ export function AssistantWorkspace() {
                       )}
                     >
                       <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
-                      <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt)}</div>
+                      <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt, isHydrated)}</div>
                     </button>
                   ))}
                 </div>
