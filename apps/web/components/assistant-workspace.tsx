@@ -13,9 +13,11 @@ import {
   ChartIcon,
   CloseIcon,
   FundingIcon,
+  HomeIcon,
   KeyIcon,
   MenuIcon,
   SparklesIcon,
+  SupportIcon,
 } from "./icons";
 import { webEnv } from "../lib/env";
 import {
@@ -52,6 +54,8 @@ type ComposerState = {
   input: string;
   isStreaming: boolean;
 };
+
+type AssistantTab = "home" | "messages" | "help";
 
 const HISTORY_KEY = "fyxvo.assistant.cache";
 const PLAYGROUND_INSERT_KEY = "fyxvo.playground.assistantInsert";
@@ -688,28 +692,6 @@ function ToolCard({
   );
 }
 
-function InlineSection({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-4 shadow-[0_2px_8px_rgba(15,23,42,0.03)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">{title}</h3>
-          {description ? <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">{description}</p> : null}
-        </div>
-      </div>
-      <div className="mt-3">{children}</div>
-    </section>
-  );
-}
-
 function feedbackTone(feedback: AssistantMessageFeedback | null | undefined) {
   if (!feedback) return "neutral";
   return feedback.rating === "up" ? "success" : "warning";
@@ -733,6 +715,7 @@ export function AssistantWorkspace() {
   const [conversationRenamingId, setConversationRenamingId] = useState<string | null>(null);
   const [conversationRenameValue, setConversationRenameValue] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AssistantTab>("home");
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
   const [returnBanner, setReturnBanner] = useState<string | null>(null);
@@ -778,6 +761,12 @@ export function AssistantWorkspace() {
   useEffect(() => {
     threadBottomRef.current?.scrollIntoView({ behavior: messages.length > 0 ? "smooth" : "auto" });
   }, [messages]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setActiveTab("messages");
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -950,6 +939,7 @@ export function AssistantWorkspace() {
       const data = await getAssistantConversation(conversationId, portal.token);
       setMessages([...data.item.messages]);
       setActiveConversationId(conversationId);
+      setActiveTab("messages");
       setSidebarOpen(false);
     } finally {
       setLoadingConversation(false);
@@ -966,6 +956,7 @@ export function AssistantWorkspace() {
     setConversations((current) => [data.item, ...current.filter((item) => item.id !== data.item.id)]);
     setActiveConversationId(data.item.id);
     setMessages([]);
+    setActiveTab("messages");
     setSidebarOpen(false);
     setReturnBanner(null);
     setFeedbackDraft(null);
@@ -1099,6 +1090,7 @@ export function AssistantWorkspace() {
 
   async function sendMessage(content: string) {
     if (!content.trim() || composer.isStreaming || !portal.token) return;
+    setActiveTab("messages");
 
     let conversationId = activeConversationId;
 
@@ -1859,122 +1851,253 @@ export function AssistantWorkspace() {
     </div>
   );
 
-  return (
-    <div className="flex min-h-[100dvh] flex-1 flex-col bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_24%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))]">
-
-      {/* ── Mobile top bar (md:hidden) ─────────────────────────────── */}
-      <div className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 px-3 py-2 backdrop-blur md:hidden">
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open conversation list"
-          className={cn(
-            "flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm font-medium text-[var(--fyxvo-text-muted)]",
-            "transition-colors duration-150 hover:text-[var(--fyxvo-text)]",
-            FOCUS_RING_CLASS
-          )}
-        >
-          <MenuIcon className="h-4 w-4 shrink-0" />
-          <span>Conversations</span>
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-[var(--fyxvo-text)]">
-            {activeConversationSummary?.title ?? "Fyxvo Assistant"}
+  const homePanel = (
+    <div className="grid h-full min-h-0 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="rounded-[1.75rem] bg-[linear-gradient(160deg,rgba(249,115,22,0.18),rgba(15,23,42,0.06)_45%,rgba(255,255,255,0.02))] p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)] ring-1 ring-white/10">
+        <div className="max-w-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+            <SparklesIcon className="h-3.5 w-3.5 text-[var(--fyxvo-brand)]" />
+            Guided support
           </div>
-          <div className="text-[11px] text-[var(--fyxvo-text-muted)]">
-            {usageRemaining ?? "—"} left this hour
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+            Ask Fyxvo about setup, funding, relay flow, or live project state.
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-[var(--fyxvo-text-muted)] sm:text-base">
+            A calmer, more guided assistant experience for real developer work. Start with a prompt, jump to the right tool,
+            or open an existing conversation when you want to continue.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/70 px-4 py-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Availability</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
+              {assistantAvailable === false ? "Unavailable" : "Operational"}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/70 px-4 py-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Messages left</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{usageRemaining ?? "—"}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/70 px-4 py-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Current project</div>
+            <div className="mt-2 truncate text-lg font-semibold text-[var(--fyxvo-text)]">{selectedProject?.name ?? "None selected"}</div>
           </div>
         </div>
-        <Button size="sm" onClick={() => void handleCreateConversation()}>New</Button>
-      </div>
 
-      {/* ── Three-column body ─────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 gap-3 p-3 md:gap-4 md:p-4">
-
-        {/* LEFT — conversation sidebar (md+) */}
-        <aside
-          className="hidden md:flex md:w-72 lg:w-80 xl:w-72 shrink-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
-          aria-label="Conversation history"
-        >
-          <div className="shrink-0 border-b border-[var(--fyxvo-border)] px-5 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Conversations</p>
-              <Button size="sm" variant="secondary" onClick={() => void handleCreateConversation()}>New</Button>
-            </div>
-            <div className="mt-3">
-              <input
-                type="search"
-                value={conversationQuery}
-                onChange={(event) => setConversationQuery(event.target.value)}
-                placeholder="Search conversations"
-                aria-label="Search assistant conversations"
-                className={cn(
-                  "h-10 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 text-sm text-[var(--fyxvo-text)] outline-none transition-colors placeholder:text-[var(--fyxvo-text-muted)]",
-                  "focus:border-brand-500/40",
-                  FOCUS_RING_CLASS
-                )}
-              />
-            </div>
+        <div className="mt-8">
+          <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Suggested ways to start</div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {PROMPT_GROUPS.map((group) => (
+              <section key={group.title} className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/70 px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">{group.title}</div>
+                <div className="mt-3 space-y-2">
+                  {group.items.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => {
+                        setComposer((current) => ({ ...current, input: prompt }));
+                        setActiveTab("messages");
+                      }}
+                      className={cn(
+                        "w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)] transition",
+                        "hover:border-brand-500/30 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
+                        FOCUS_RING_CLASS
+                      )}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3">
-            {conversationSearchLoading ? (
-              <div className="rounded-xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5">
-                <p className="text-sm font-medium text-[var(--fyxvo-text)]">Searching conversations…</p>
-              </div>
-            ) : conversations.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-5">
-                <p className="text-sm font-medium text-[var(--fyxvo-text)]">
-                  {conversationQuery.trim() ? "No matching conversations" : "No conversations yet"}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">
-                  {conversationQuery.trim()
-                    ? "Try a different title, keyword, or docs topic."
-                    : "Start a new thread and your history will appear here."}
-                </p>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-5 py-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Recent conversations</div>
+              <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">Open a thread fast, or start a new one.</div>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => void handleCreateConversation()}>
+              New
+            </Button>
+          </div>
+          <div className="mt-4 space-y-3">
+            {conversations.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-6 text-sm text-[var(--fyxvo-text-muted)]">
+                No conversations yet. Start with a guided prompt or ask your own question below.
               </div>
             ) : (
-              <div className="space-y-4">
-                {renderConversationSection("Pinned", pinnedConversations)}
-                {renderConversationSection(conversationQuery.trim() ? "Matching conversations" : "Recent", recentConversations)}
-                {renderConversationSection("Archived", archivedConversations)}
-              </div>
+              <>
+                {renderConversationSection("Pinned", pinnedConversations, true)}
+                {renderConversationSection("Recent", recentConversations.slice(0, 4), true)}
+              </>
             )}
           </div>
-        </aside>
+        </div>
 
-        {/* CENTER — main chat panel */}
-        <div className="flex min-w-0 flex-1 min-h-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]">
+        <div className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-5 py-5">
+          <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Helpful destinations</div>
+          <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">Jump straight into the product surface that matches the question.</div>
+          <div className="mt-4 grid gap-3">
+            {quickActionsContent}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 
-          {/* Header */}
-          <div className="shrink-0 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 py-4 backdrop-blur-xl sm:px-6 sm:py-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-3">
-                  <BrandLogo href="/assistant" iconClassName="h-10 w-10 sm:h-11 sm:w-11" className="gap-3" />
+  const messagesPanel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--fyxvo-border)] px-4 py-3 sm:px-5">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-[var(--fyxvo-text)]">
+            {activeConversationSummary?.title ?? "New conversation"}
+          </div>
+          <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+            {activeConversationSummary?.messageCount ?? messages.length} messages
+            {rateLimitReset ? ` • Resets ${shortRelative(rateLimitReset, isHydrated)}` : ""}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setSidebarOpen(true)}>
+            History
+          </Button>
+          {(messages.length > 0 || activeConversationId) ? (
+            <Button size="sm" variant="ghost" onClick={() => void handleClearConversation()}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="Assistant conversation thread"
+      >
+        {loadingConversation ? (
+          <div className="mx-auto max-w-3xl space-y-3">
+            {[0, 1, 2].map((item) => (
+              <div key={item} className="h-24 animate-pulse rounded-[1.75rem] bg-[var(--fyxvo-panel-soft)]" />
+            ))}
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="mx-auto max-w-3xl space-y-6">
+            <div className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-10 text-center shadow-[0_4px_20px_rgba(15,23,42,0.05)]">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/8 text-[var(--fyxvo-brand)]">
+                <SparklesIcon className="h-5 w-5" />
+              </div>
+              <h2 className="mt-5 text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
+                Ask about onboarding, debugging, relay behavior, or live project state
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
+                Start with one focused question. Fyxvo Assistant keeps the reply readable first, then gives you the next useful action.
+              </p>
+            </div>
+
+            {isAssistantUnavailable ? (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-5 py-5">
+                <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant temporarily unavailable</h3>
+                <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+                  Your previous conversations are still available. You can keep using docs, playground, and analytics while the assistant service recovers.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <AssistantActionPill href="/docs">Open docs</AssistantActionPill>
+                  <AssistantActionPill href="/playground">Open playground</AssistantActionPill>
+                  <AssistantActionPill href="/analytics">Open analytics</AssistantActionPill>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mx-auto max-w-4xl space-y-7 sm:space-y-8">
+            {messages.map((message, index) => (
+              <div key={`${message.id}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                <div className={cn("max-w-full space-y-2.5 sm:max-w-[92%] lg:max-w-[86%] xl:max-w-[82%]", message.role === "user" ? "items-end" : "items-start")}>
+                  <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
+                    <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
+                    {message.createdAt ? <span>•</span> : null}
+                    {message.createdAt ? <span>{formatTimestamp(message.createdAt, isHydrated)}</span> : null}
+                  </div>
+
+                  {composer.isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
+                    <ThinkingBubble />
+                  ) : (
+                    <div
+                      className={cn(
+                        "rounded-2xl px-5 py-4",
+                        message.role === "user"
+                          ? "rounded-tr-sm bg-[linear-gradient(145deg,var(--fyxvo-brand),#ea580c)] text-white shadow-[0_8px_24px_rgba(249,115,22,0.22)]"
+                          : "rounded-tl-sm border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
+                      )}
+                    >
+                      {message.role === "assistant" ? (
+                        <MarkdownContent content={message.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {renderMessageActions(message)}
+                </div>
+              </div>
+            ))}
+            <div ref={threadBottomRef} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const helpPanel = (
+    <div className="h-full min-h-0 overflow-y-auto px-4 py-4 sm:px-6">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <div className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[linear-gradient(160deg,rgba(249,115,22,0.14),rgba(15,23,42,0.04))] px-6 py-6">
+          <h2 className="text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]">Help and context</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
+            Use project context, docs links, and product shortcuts when you need to move from an answer into action.
+          </p>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {rightPanel}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.14),transparent_24%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.08),transparent_18%),linear-gradient(180deg,var(--fyxvo-bg),var(--fyxvo-bg-elevated))] px-3 py-3 sm:px-5 sm:py-5">
+      <div className="mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-[1100px] items-center justify-center sm:min-h-[calc(100dvh-2.5rem)]">
+        <div className="flex h-[min(900px,calc(100dvh-1.5rem))] w-full flex-col overflow-hidden rounded-[2rem] border border-[var(--fyxvo-border)] bg-[color:var(--fyxvo-panel)] shadow-[0_28px_90px_rgba(15,23,42,0.24)] sm:h-[min(900px,calc(100dvh-2.5rem))]">
+          <div className="border-b border-[var(--fyxvo-border)] bg-[linear-gradient(145deg,rgba(249,115,22,0.22),rgba(15,23,42,0.08)_55%,rgba(255,255,255,0.04))] px-4 py-4 sm:px-6 sm:py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <BrandLogo href="/dashboard" iconClassName="h-9 w-9 sm:h-10 sm:w-10" className="gap-0" />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
+                      <h1 className="truncate text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
                         Fyxvo Assistant
                       </h1>
                       <Badge tone="neutral" className="normal-case tracking-normal">
                         {rateLimitStatus?.model ?? "Claude"}
                       </Badge>
                     </div>
-                    <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-[var(--fyxvo-text-muted)] sm:block">
-                      Workspace-aware help for onboarding, Solana RPC examples, debugging, docs, and live Fyxvo project state.
+                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                      Guided help for setup, RPC examples, debugging, and live project context.
                     </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--fyxvo-text-muted)] md:hidden">
-                      <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2.5 py-1">
-                        {activeConversationSummary?.messageCount ?? messages.length} messages
-                      </span>
-                      <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-2.5 py-1">
-                        {selectedProject ? selectedProject.name : "No project selected"}
-                      </span>
-                    </div>
                   </div>
                 </div>
               </div>
-
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={assistantAvailable === false ? "warning" : "success"} className="normal-case tracking-normal">
                   {assistantAvailable === false ? "Unavailable" : "Available"}
@@ -1982,9 +2105,10 @@ export function AssistantWorkspace() {
                 <Badge tone="neutral" className="normal-case tracking-normal">
                   {usageRemaining ?? "—"} left
                 </Badge>
-                {messages.length > 0 || activeConversationId ? (
-                  <Button size="sm" variant="secondary" onClick={() => void handleClearConversation()}>Clear</Button>
-                ) : null}
+                <Button size="sm" variant="secondary" onClick={() => setSidebarOpen(true)}>
+                  <MenuIcon className="mr-2 h-4 w-4" />
+                  History
+                </Button>
                 <Button size="sm" onClick={() => void handleCreateConversation()}>New</Button>
               </div>
             </div>
@@ -1998,12 +2122,12 @@ export function AssistantWorkspace() {
             ) : null}
 
             {showOnboardingBanner ? (
-              <div className="mt-4 rounded-xl border border-brand-500/20 bg-brand-500/8 px-4 py-4">
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="max-w-2xl">
-                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">What the assistant can help with</div>
+                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">What the assistant can do</div>
                     <div className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                      It can explain Fyxvo and Solana RPC workflows, use real project context when available, and prepare examples for docs or playground. Every response should be tested before production use.
+                      It can explain live Fyxvo behavior, use project context when available, and point you to the right product area without overloading the page.
                     </div>
                   </div>
                   <Button size="sm" variant="ghost" onClick={dismissOnboardingBanner}>Dismiss</Button>
@@ -2012,7 +2136,7 @@ export function AssistantWorkspace() {
             ) : null}
 
             {returnBanner ? (
-              <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
+              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
                 Returned from Playground with your prepared request ready.
               </div>
             ) : null}
@@ -2027,141 +2151,13 @@ export function AssistantWorkspace() {
                 </Notice>
               </div>
             ) : null}
-
-            <div className="mt-4 grid gap-3 xl:hidden lg:grid-cols-2">
-              <InlineSection
-                title="Current context"
-                description={selectedProject ? "Live project state used to ground assistant answers." : "No project selected yet."}
-              >
-                {workspaceContextContent}
-              </InlineSection>
-              <InlineSection title="Usage and quick actions" description="Keep limits, links, and next steps in reach while you chat.">
-                <div className="space-y-4">
-                  {usageAvailabilityContent}
-                  {quickActionsContent}
-                </div>
-              </InlineSection>
-              <div className="lg:col-span-2">
-                <InlineSection title="Related docs" description="Jump straight to the exact product surface or reference section.">
-                  {relatedDocsContent}
-                </InlineSection>
-              </div>
-            </div>
           </div>
 
-          {/* Thread — scrolls independently */}
-          <div
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth px-4 py-5 sm:px-6"
-            role="log"
-            aria-live="polite"
-            aria-relevant="additions text"
-            aria-label="Assistant conversation thread"
-          >
-            {loadingConversation ? (
-              <div className="mx-auto max-w-3xl space-y-3">
-                {[0, 1, 2].map((item) => (
-                  <div key={item} className="h-24 animate-pulse rounded-[1.75rem] bg-[var(--fyxvo-panel-soft)]" />
-                ))}
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="mx-auto max-w-4xl space-y-6">
-                <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-10 text-center shadow-[0_4px_20px_rgba(15,23,42,0.05)]">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/8 text-[var(--fyxvo-brand)]">
-                    <SparklesIcon className="h-5 w-5" />
-                  </div>
-                  <h2 className="mt-5 font-display text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
-                    Ask about onboarding, debugging, relay behavior, or live project state
-                  </h2>
-                  <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[var(--fyxvo-text-muted)]">
-                    The assistant can help you reach first traffic faster, explain current platform behavior honestly, and prepare examples you can send straight into the playground.
-                  </p>
-                </div>
-
-                {isAssistantUnavailable ? (
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 px-5 py-5">
-                    <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Assistant temporarily unavailable</h3>
-                    <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                      Your previous conversations are still available. You can keep using docs, playground, and analytics while the assistant service recovers.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <AssistantActionPill href="/docs">Open docs</AssistantActionPill>
-                      <AssistantActionPill href="/playground">Open playground</AssistantActionPill>
-                      <AssistantActionPill href="/analytics">Open analytics</AssistantActionPill>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {PROMPT_GROUPS.map((group) => (
-                    <section key={group.title} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-5 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">{group.title}</div>
-                      <div className="mt-3 space-y-1.5">
-                        {group.items.map((prompt) => (
-                          <button
-                            key={prompt}
-                            type="button"
-                            onClick={() => {
-                              if (isAuthenticated && !isAssistantUnavailable) {
-                                void sendMessage(prompt);
-                              } else {
-                                setComposer((current) => ({ ...current, input: prompt }));
-                              }
-                            }}
-                            className={cn(
-                              "w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)]",
-                              "transition-colors duration-150 hover:border-brand-500/25 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
-                              FOCUS_RING_CLASS
-                            )}
-                          >
-                            {prompt}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="mx-auto max-w-4xl space-y-7 sm:space-y-8">
-                {messages.map((message, index) => (
-                  <div key={`${message.id}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                    <div className={cn("max-w-full space-y-2.5 sm:max-w-[92%] lg:max-w-[86%] xl:max-w-[82%]", message.role === "user" ? "items-end" : "items-start")}>
-                      <div className={cn("flex items-center gap-2 px-1 text-xs text-[var(--fyxvo-text-muted)]", message.role === "user" ? "justify-end" : "justify-start")}>
-                        <span>{message.role === "user" ? "You" : "Fyxvo Assistant"}</span>
-                        {message.createdAt ? <span>•</span> : null}
-                        {message.createdAt ? <span>{formatTimestamp(message.createdAt, isHydrated)}</span> : null}
-                      </div>
-
-                      {composer.isStreaming && index === messages.length - 1 && message.role === "assistant" && message.content === "" ? (
-                        <ThinkingBubble />
-                      ) : (
-                        <div
-                          className={cn(
-                            "rounded-2xl px-5 py-4",
-                            message.role === "user"
-                              ? "rounded-tr-sm bg-[linear-gradient(145deg,var(--fyxvo-brand),#ea580c)] text-white shadow-[0_8px_24px_rgba(249,115,22,0.22)]"
-                              : "rounded-tl-sm border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
-                          )}
-                        >
-                          {message.role === "assistant" ? (
-                            <MarkdownContent content={message.content} />
-                          ) : (
-                            <p className="whitespace-pre-wrap text-sm leading-7">{message.content}</p>
-                          )}
-                        </div>
-                      )}
-
-                      {renderMessageActions(message)}
-                    </div>
-                  </div>
-                ))}
-                <div ref={threadBottomRef} />
-              </div>
-            )}
+          <div className="min-h-0 flex-1">
+            {activeTab === "home" ? homePanel : activeTab === "messages" ? messagesPanel : helpPanel}
           </div>
 
-          {/* Composer — pinned to bottom of center column */}
-          <div className="shrink-0 border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:px-6">
+          <div className="border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]/96 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:px-6">
             <div className="mx-auto max-w-4xl">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--fyxvo-text-muted)]">
                 <div className="flex flex-wrap items-center gap-3">
@@ -2172,11 +2168,11 @@ export function AssistantWorkspace() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <span>{usageRemaining ?? "—"} remaining</span>
-                  <span className="hidden sm:inline">{rateLimitReset ? `Resets ${shortRelative(rateLimitReset, isHydrated)}` : "Reset time unavailable"}</span>
+                  <span className="hidden sm:inline">{selectedProject ? selectedProject.name : "No project selected"}</span>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-[border-color] duration-150 focus-within:border-[var(--fyxvo-border-strong)]">
+              <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 shadow-[0_6px_20px_rgba(15,23,42,0.06)] transition-[border-color] duration-150 focus-within:border-[var(--fyxvo-border-strong)]">
                 <div className="flex items-end gap-3">
                   <div className="min-w-0 flex-1">
                     <textarea
@@ -2206,7 +2202,6 @@ export function AssistantWorkspace() {
                     />
                     <div className="flex flex-wrap items-center gap-2 px-1 pb-1 text-[11px] text-[var(--fyxvo-text-muted)]">
                       <span>Paste trace IDs, curl examples, error messages, or wallet addresses directly into the chat.</span>
-                      {!selectedProject ? <span>No project context selected yet.</span> : null}
                     </div>
                   </div>
                   <Button
@@ -2229,29 +2224,43 @@ export function AssistantWorkspace() {
                   </Button>
                 </div>
               </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {[
+                  { id: "home", label: "Home", icon: HomeIcon },
+                  { id: "messages", label: "Messages", icon: SparklesIcon },
+                  { id: "help", label: "Help", icon: SupportIcon },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const selected = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id as AssistantTab)}
+                      className={cn(
+                        "flex min-h-[52px] items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition",
+                        FOCUS_RING_CLASS,
+                        selected
+                          ? "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-brand)]"
+                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
-
-        {/* RIGHT — context panel (xl+) */}
-        <aside
-          className="hidden xl:flex xl:w-72 shrink-0 flex-col rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-[0_8px_32px_rgba(15,23,42,0.08)]"
-          aria-label="Assistant context"
-        >
-          <div className="shrink-0 border-b border-[var(--fyxvo-border)] px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Workspace context</p>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
-            {rightPanel}
-          </div>
-        </aside>
-
       </div>
 
       {/* ── Left drawer — conversations (mobile) ─────────────────── */}
       <div
         className={cn(
-          "fixed inset-0 z-[70] md:hidden transition-opacity duration-200 ease-out",
+          "fixed inset-0 z-[70] transition-opacity duration-200 ease-out",
           sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         )}
       >
@@ -2263,7 +2272,7 @@ export function AssistantWorkspace() {
         />
         <aside
           className={cn(
-            "absolute inset-y-0 left-0 w-[min(88vw,22rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
+            "absolute inset-y-0 left-0 w-[min(88vw,24rem)] bg-[var(--fyxvo-bg-elevated)] shadow-2xl transition-transform duration-250 ease-out",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
