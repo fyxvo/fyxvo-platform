@@ -7,7 +7,7 @@ import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitl
 import { PageHeader } from "../../components/page-header";
 import { usePortal } from "../../components/portal-provider";
 import { AuthGate } from "../../components/state-panels";
-import { getAlertCenter } from "../../lib/api";
+import { getAlertCenter, updateAlertState } from "../../lib/api";
 import { formatRelativeDate } from "../../lib/format";
 import type { AlertCenterItem } from "../../lib/types";
 
@@ -66,6 +66,10 @@ function quickActions(item: AlertCenterItem) {
   return actions;
 }
 
+function stateTone(state: AlertCenterItem["state"]) {
+  return state === "resolved" ? "success" : state === "acknowledged" ? "warning" : "neutral";
+}
+
 export default function AlertsPage() {
   const portal = usePortal();
   const pathname = usePathname();
@@ -116,6 +120,12 @@ export default function AlertsPage() {
       return true;
     });
   }, [dismissedIds, items, projectFilter, typeFilter]);
+
+  async function mutateAlertState(item: AlertCenterItem, state: AlertCenterItem["state"]) {
+    if (!portal.token) return;
+    await updateAlertState({ alertKey: item.alertKey, state, projectId: item.projectId }, portal.token);
+    setItems((current) => current.map((entry) => entry.alertKey === item.alertKey ? { ...entry, state } : entry));
+  }
 
   function updateUrl(nextType: AlertTypeFilter, nextProject: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -234,11 +244,18 @@ export default function AlertsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={toneForSeverity(item.severity)}>{item.severity}</Badge>
                       <Badge tone="neutral">{labelForType(item.type)}</Badge>
+                      <Badge tone={stateTone(item.state)}>{item.state}</Badge>
                       {item.projectName ? <Badge tone="brand">{item.projectName}</Badge> : null}
+                      {item.groupCount && item.groupCount > 1 ? <Badge tone="neutral">{item.groupCount} grouped</Badge> : null}
                     </div>
                     <div>
                       <h2 className="text-base font-semibold text-[var(--fyxvo-text)]">{item.title}</h2>
                       <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.description}</p>
+                      {item.relatedIncident ? (
+                        <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
+                          May be related to the ongoing {item.relatedIncident.serviceName} incident.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="text-xs text-[var(--fyxvo-text-muted)]">{formatRelativeDate(item.createdAt)}</div>
@@ -249,6 +266,21 @@ export default function AlertsPage() {
                       <Link href={action.href}>{action.label}</Link>
                     </Button>
                   ))}
+                  {item.relatedIncident ? (
+                    <Button asChild size="sm" variant="secondary">
+                      <Link href="/status">Related incident</Link>
+                    </Button>
+                  ) : null}
+                  {item.state !== "acknowledged" ? (
+                    <Button size="sm" variant="ghost" onClick={() => void mutateAlertState(item, "acknowledged")}>
+                      Acknowledge
+                    </Button>
+                  ) : null}
+                  {item.state !== "resolved" ? (
+                    <Button size="sm" variant="ghost" onClick={() => void mutateAlertState(item, "resolved")}>
+                      Resolve
+                    </Button>
+                  ) : null}
                   <Button
                     size="sm"
                     variant="ghost"

@@ -22,7 +22,7 @@ const NAV_SECTIONS = [
   { id: "public-stats", label: "Public Stats API", keywords: "public stats api curl node python fetch x-api-key backend service" },
   { id: "api-explorer", label: "API Explorer", keywords: "try it interactive request curl live test endpoint" },
   { id: "webhooks", label: "Webhooks", keywords: "webhook http callback post event funding apikey hmac signature" },
-  { id: "team-collaboration", label: "Team Collaboration", keywords: "team member invite wallet collaboration owner role" },
+  { id: "team-collaboration", label: "Team Workflows", keywords: "team member invite wallet collaboration owner role notes runbook recipes alerts health archive restore" },
   { id: "playground", label: "Playground", keywords: "playground rpc methods test compare mode schema panel share url examples" },
   { id: "operations-guide", label: "Operations Guide", keywords: "operations monitoring alerts traces webhooks latency success rate cache hit request logs" },
   { id: "public-profiles", label: "Public Project Pages", keywords: "public profile page slug badge readme status latency" },
@@ -1169,6 +1169,39 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
                 code={`curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/members \\
   -H "authorization: Bearer YOUR_JWT"`}
               />
+              <div className="grid gap-4 md:grid-cols-2">
+                {[
+                  {
+                    title: "Use notes as the runbook",
+                    body: "Keep overview, owner notes, runbook steps, known issues, and links in Project settings so the whole team shares the same operational handbook.",
+                  },
+                  {
+                    title: "Share playground recipes safely",
+                    body: "Use saved recipes for debugging, benchmarks, balance checks, or webhooks, then share the project-scoped recipe link with teammates who already belong to the project.",
+                  },
+                  {
+                    title: "Operate from alerts",
+                    body: "Treat the alert center as a shared inbox: acknowledge an alert when someone is investigating it, resolve it when the condition clears, and keep the history visible for later review.",
+                  },
+                  {
+                    title: "Interpret health honestly",
+                    body: "The project health score is a readiness checklist, not a vanity score. Use the breakdown and weekly trend to see whether activation, funding, keys, traffic, webhook health, and team setup are improving.",
+                  },
+                  {
+                    title: "Manage API keys safely",
+                    body: "Label keys clearly, add expiries when a client should have a bounded lifetime, rotate compromised keys immediately, and export metadata instead of sharing raw secrets.",
+                  },
+                  {
+                    title: "Archive and restore deliberately",
+                    body: "Archive a project when traffic has stopped or ownership has changed. Restore it when the team is ready to operate it again, and let the activity timeline capture that handoff.",
+                  },
+                ].map((item) => (
+                  <div key={item.title} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
+                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
 

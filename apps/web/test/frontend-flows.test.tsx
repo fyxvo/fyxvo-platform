@@ -427,6 +427,7 @@ describe("frontend flows", () => {
       projectId: previewProjects[0]!.id,
       token: "session-token",
       label: "Priority relay",
+      colorTag: "violet",
       scopes: ["project:read", "rpc:request", "priority:relay"]
     });
   });

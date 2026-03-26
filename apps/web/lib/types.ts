@@ -25,6 +25,8 @@ export interface PortalProject {
   readonly environment: "development" | "staging" | "production";
   readonly starred: boolean;
   readonly notes: string | null;
+  readonly notesUpdatedAt?: string | null;
+  readonly notesEditedByWallet?: string | null;
   readonly githubUrl: string | null;
   readonly isPublic: boolean;
   readonly publicSlug: string | null;
@@ -62,10 +64,13 @@ export interface PortalApiKey {
   readonly projectId: string;
   readonly createdById: string;
   readonly label: string;
+  readonly colorTag?: string | null;
   readonly prefix: string;
   readonly status: string;
   readonly scopes: readonly string[];
   readonly lastUsedAt: string | null;
+  readonly lastUsedRegion?: string | null;
+  readonly lastUsedUpstreamNode?: string | null;
   readonly expiresAt: string | null;
   readonly revokedAt: string | null;
   readonly createdAt: string;
@@ -327,20 +332,49 @@ export interface PlaygroundRecipe {
   readonly simulationEnabled: boolean;
   readonly params: Record<string, string>;
   readonly notes: string | null;
+  readonly tags: readonly string[];
+  readonly pinned: boolean;
+  readonly lastUsedAt: string | null;
+  readonly sharedToken: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
 export interface AlertCenterItem {
+  readonly alertKey: string;
   readonly id: string;
   readonly type: "low_balance" | "daily_cost" | "error_rate" | "webhook_failure" | "assistant" | "incident" | "notification";
   readonly severity: "info" | "warning" | "critical";
+  readonly state: "new" | "acknowledged" | "resolved";
   readonly projectId: string | null;
   readonly projectName: string | null;
   readonly title: string;
   readonly description: string;
   readonly createdAt: string;
+  readonly groupCount?: number;
+  readonly relatedIncident?: { readonly id: string; readonly serviceName: string; readonly description: string } | null;
   readonly metadata?: Record<string, unknown> | null;
+}
+
+export interface ProjectHealthScore {
+  readonly score: number;
+  readonly activated: boolean;
+  readonly hasFunding: boolean;
+  readonly hasApiKeys: boolean;
+  readonly hasTraffic: boolean;
+  readonly successRate: number | null;
+  readonly breakdown?: Array<{
+    readonly key: string;
+    readonly label: string;
+    readonly value: number;
+    readonly max: number;
+    readonly summary: string;
+  }>;
+  readonly weeklyChange?: {
+    readonly direction: "up" | "flat" | "down";
+    readonly delta: number;
+    readonly reason: string;
+  };
 }
 
 export interface OnChainProjectSnapshot {

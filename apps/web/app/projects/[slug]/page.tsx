@@ -31,7 +31,7 @@ import { usePortal } from "../../../components/portal-provider";
 import { fundingTrend } from "../../../lib/sample-data";
 import { formatDuration, formatInteger, shortenAddress } from "../../../lib/format";
 import { webEnv } from "../../../lib/env";
-import { getProjectActivity } from "../../../lib/api";
+import { createPlaygroundRecipe, getProjectActivity, updateProject } from "../../../lib/api";
 import { RealtimeFeed } from "./realtime-feed";
 import type { ProjectAnalytics } from "../../../lib/types";
 
@@ -67,6 +67,132 @@ const requestColumns: readonly TableColumn<ProjectAnalytics["recentRequests"][nu
   },
 ];
 
+type ActivityFilter = "all" | "team" | "security" | "webhooks" | "project";
+
+function activityCategory(action: string): ActivityFilter {
+  if (/member|ownership/.test(action)) return "team";
+  if (/apikey/.test(action)) return "security";
+  if (/webhook/.test(action)) return "webhooks";
+  if (/project\./.test(action)) return "project";
+  return "all";
+}
+
+function describeActivity(entry: { action: string; details: Record<string, unknown> | null }) {
+  const details = entry.details ?? {};
+  switch (entry.action) {
+    case "member.invited":
+      return { title: "Member invited", summary: `Sent a project invite${details.walletAddress ? ` to ${String(details.walletAddress)}` : ""}.` };
+    case "member.accepted":
+      return { title: "Invite accepted", summary: "A teammate accepted their project invitation." };
+    case "member.declined":
+      return { title: "Invite declined", summary: "A pending team invitation was declined." };
+    case "member.removed":
+      return { title: "Member removed", summary: "A teammate was removed from the project." };
+    case "ownership.transferred":
+      return { title: "Ownership transferred", summary: "Project ownership moved to another accepted member." };
+    case "project.archived":
+      return { title: "Project archived", summary: "The project was archived and removed from active workflows." };
+    case "project.restored":
+      return { title: "Project restored", summary: "The project was restored to the active workspace." };
+    case "project.public_enabled":
+      return { title: "Project made public", summary: details.publicSlug ? `Public page is live at /p/${String(details.publicSlug)}.` : "Public sharing was enabled." };
+    case "project.public_disabled":
+      return { title: "Project made private", summary: "Public sharing was disabled." };
+    case "project.notes_updated":
+      return { title: "Runbook notes updated", summary: "Internal project notes were updated for the team." };
+    case "webhook.created":
+      return { title: "Webhook created", summary: "A project webhook destination was added." };
+    case "webhook.deleted":
+      return { title: "Webhook deleted", summary: "A project webhook destination was removed." };
+    case "apikey.created":
+      return { title: "API key created", summary: details.label ? `Created the "${String(details.label)}" API key.` : "A new API key was issued." };
+    case "apikey.rotated":
+      return { title: "API key rotated", summary: details.label ? `Rotated the "${String(details.label)}" API key.` : "An API key was rotated." };
+    case "apikey.revoked":
+      return { title: "API key revoked", summary: "An API key was revoked." };
+    default:
+      return { title: entry.action.replace(/\./g, " "), summary: "A project activity event was recorded." };
+  }
+}
+
+function starterKitForTemplate(templateType: string | null, projectSlug: string, rpcEndpoint: string) {
+  const shared = {
+    docs: [
+      { label: "Quickstart", href: "/docs#quickstart" },
+      { label: "Operations Guide", href: "/docs#operations-guide" },
+    ],
+    alerts: [
+      "Low balance threshold: 0.25 SOL",
+      "Daily request alert: 5,000 requests",
+    ],
+    projectNotesTemplate: `# Overview\nProject: ${projectSlug}\n\n# Use case\nDescribe the integration and production boundary.\n\n# Owner notes\nList the primary owner, escalation path, and launch caveats.\n\n# Runbook\n- Confirm project activation\n- Confirm funding\n- Confirm active API key\n- Confirm first request\n\n# Known issues\n- Add current limitations and open questions here.\n\n# Links\n- Docs: https://www.fyxvo.com/docs\n- Status: https://status.fyxvo.com`,
+  };
+
+  if (templateType === "defi") {
+    return {
+      title: "DeFi trading starter kit",
+      endpoint: "getLatestBlockhash",
+      fundingAmount: "0.50 SOL",
+      scopes: ["rpc:request", "priority:relay", "project:read"],
+      recipe: {
+        name: "Priority getLatestBlockhash",
+        method: "getLatestBlockhash",
+        mode: "priority" as const,
+        simulationEnabled: false,
+        params: { commitment: "confirmed" },
+        tags: ["transactions", "debugging"],
+        notes: `POST ${rpcEndpoint} with priority relay enabled to warm up trading flows.`,
+      },
+      docs: [...shared.docs, { label: "Priority relay", href: "/docs#priority-relay" }],
+      alerts: ["Error rate alert: 3%", "Low balance threshold: 0.50 SOL", "Daily request alert: 15,000 requests"],
+      webhooks: ["funding.confirmed", "apikey.revoked", "balance.low"],
+      projectNotesTemplate: `${shared.projectNotesTemplate}\n- Priority relay should be tested before live swaps.\n- Keep a dedicated trading key separate from analytics keys.`,
+    };
+  }
+
+  if (templateType === "indexing") {
+    return {
+      title: "Data indexing starter kit",
+      endpoint: "getProgramAccounts",
+      fundingAmount: "0.35 SOL",
+      scopes: ["rpc:request", "project:read"],
+      recipe: {
+        name: "Indexer getProgramAccounts",
+        method: "getProgramAccounts",
+        mode: "standard" as const,
+        simulationEnabled: true,
+        params: { programId: "YOUR_PROGRAM_ID", encoding: "jsonParsed" },
+        tags: ["balance", "debugging"],
+        notes: `Use simulation first, then move to live ${rpcEndpoint} traffic once payloads are stable.`,
+      },
+      docs: [...shared.docs, { label: "Request logs", href: "/docs#operations-guide" }],
+      alerts: ["Error rate alert: 5%", "Daily request alert: 20,000 requests"],
+      webhooks: ["webhook.delivery_failed", "balance.low"],
+      projectNotesTemplate: `${shared.projectNotesTemplate}\n- Document the indexed programs and decode assumptions here.\n- Record replay or backfill procedures before launch.`,
+    };
+  }
+
+  return {
+    title: "Blank starter kit",
+    endpoint: "getSlot",
+    fundingAmount: "0.20 SOL",
+    scopes: ["rpc:request", "project:read"],
+    recipe: {
+      name: "First request getSlot",
+      method: "getSlot",
+      mode: "standard" as const,
+      simulationEnabled: false,
+      params: {},
+      tags: ["debugging"],
+      notes: `Use this first request against ${rpcEndpoint} to confirm auth, funding, and request logging.`,
+    },
+    docs: shared.docs,
+    alerts: shared.alerts,
+    webhooks: ["balance.low", "apikey.created"],
+    projectNotesTemplate: shared.projectNotesTemplate,
+  };
+}
+
 export default function ProjectPage({
   params,
 }: {
@@ -83,10 +209,12 @@ export default function ProjectPage({
   );
   const [activityLog, setActivityLog] = useState<Array<{ id: string; action: string; details: Record<string, unknown> | null; actorWallet: string | null; createdAt: string }>>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [healthHistory, setHealthHistory] = useState<number[]>([]);
   const [embedTheme, setEmbedTheme] = useState<"dark" | "light" | "auto">("dark");
   const [embedSize, setEmbedSize] = useState<"small" | "medium" | "large">("medium");
   const [embedCompact, setEmbedCompact] = useState(false);
+  const [applyingStarterKit, setApplyingStarterKit] = useState(false);
 
   const project =
     portal.projects.find((item) => item.slug === params.slug) ??
@@ -177,6 +305,11 @@ export default function ProjectPage({
   );
   const projectUrl = `${webEnv.siteUrl}/projects/${project.slug}`;
   const rpcEndpoint = `${webEnv.gatewayBaseUrl}/rpc`;
+  const starterKit = starterKitForTemplate(project.templateType ?? "blank", project.slug, rpcEndpoint);
+  const filteredActivity =
+    activityFilter === "all"
+      ? activityLog
+      : activityLog.filter((entry) => activityCategory(entry.action) === activityFilter);
 
   const projectReadyStates = [
     {
@@ -200,6 +333,24 @@ export default function ProjectPage({
       body: "Request logs are already landing, so analytics and status surfaces are reacting.",
     },
   ] as const;
+
+  async function applyStarterKit() {
+    if (!portal.token || !project) return;
+    setApplyingStarterKit(true);
+    try {
+      await updateProject({
+        projectId: project.id,
+        token: portal.token,
+        lowBalanceThresholdSol: project.lowBalanceThresholdSol ?? parseFloat(starterKit.fundingAmount),
+        dailyRequestAlertThreshold: project.dailyRequestAlertThreshold ?? (project.templateType === "defi" ? 15000 : project.templateType === "indexing" ? 20000 : 5000),
+        notes: project.notes && project.notes.trim().length > 0 ? project.notes : starterKit.projectNotesTemplate,
+      });
+      await createPlaygroundRecipe(project.id, starterKit.recipe, portal.token).catch(() => undefined);
+      await portal.refresh();
+    } finally {
+      setApplyingStarterKit(false);
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -304,34 +455,54 @@ export default function ProjectPage({
       {activeTab === "activity" && (
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Activity Log</CardTitle>
-            <CardDescription>Recent actions across this project</CardDescription>
+            <CardTitle>Team activity</CardTitle>
+            <CardDescription>A collaboration timeline across team changes, security events, webhooks, and project state changes.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {(["all", "team", "security", "webhooks", "project"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setActivityFilter(filter)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    activityFilter === filter
+                      ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"
+                  }`}
+                >
+                  {filter === "all" ? "All activity" : `${filter} actions`}
+                </button>
+              ))}
+            </div>
             {!activityLoaded ? (
               <p className="text-sm text-[var(--fyxvo-text-muted)]">Loading…</p>
-            ) : activityLog.length === 0 ? (
+            ) : filteredActivity.length === 0 ? (
               <p className="text-sm text-[var(--fyxvo-text-muted)]">No activity yet.</p>
             ) : (
               <div className="relative pl-6">
                 <div className="absolute left-2 top-0 bottom-0 w-px bg-[var(--fyxvo-border)]" />
                 <div className="space-y-4">
-                  {activityLog.map((entry) => (
+                  {filteredActivity.map((entry) => {
+                    const description = describeActivity(entry);
+                    return (
                     <div key={entry.id} className="relative">
                       <div className="absolute -left-4 top-1 h-2 w-2 rounded-full bg-brand-500" />
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-[var(--fyxvo-text)]">{entry.action.replace(/\./g, " ")}</span>
+                          <span className="text-sm font-medium text-[var(--fyxvo-text)]">{description.title}</span>
+                          <Badge tone="neutral">{activityCategory(entry.action) === "all" ? "activity" : activityCategory(entry.action)}</Badge>
                           {entry.actorWallet && (
                             <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">{entry.actorWallet}</span>
                           )}
                         </div>
+                        <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">{description.summary}</p>
                         <span className="text-xs text-[var(--fyxvo-text-muted)]">
                           {new Date(entry.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               </div>
             )}
@@ -613,6 +784,71 @@ export default function ProjectPage({
       </section>
 
       {/* Template-specific getting started */}
+      <section>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>{starterKit.title}</CardTitle>
+            <CardDescription>
+              Safe defaults for this project template: endpoint, alerts, notes, docs, and a reusable playground recipe your team can build from.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Recommended first endpoint</div>
+                  <div className="mt-2 font-medium text-[var(--fyxvo-text)]">{starterKit.endpoint}</div>
+                </div>
+                <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Recommended funding</div>
+                  <div className="mt-2 font-medium text-[var(--fyxvo-text)]">{starterKit.fundingAmount}</div>
+                </div>
+              </div>
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Recommended API key scopes</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {starterKit.scopes.map((scope) => <Badge key={scope} tone="neutral">{scope}</Badge>)}
+                </div>
+              </div>
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Recommended docs and alerts</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {starterKit.docs.map((doc) => (
+                    <Link key={doc.href} href={doc.href} className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1 text-xs text-[var(--fyxvo-text)] hover:border-brand-500/40 hover:bg-brand-500/10">
+                      {doc.label}
+                    </Link>
+                  ))}
+                </div>
+                <ul className="mt-4 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                  {starterKit.alerts.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Default recipe</div>
+                <div className="mt-2 font-medium text-[var(--fyxvo-text)]">{starterKit.recipe.name}</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{starterKit.recipe.notes}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge tone="neutral">{starterKit.recipe.method}</Badge>
+                  <Badge tone={starterKit.recipe.mode === "priority" ? "warning" : "neutral"}>{starterKit.recipe.mode}</Badge>
+                  {starterKit.recipe.simulationEnabled ? <Badge tone="warning">simulation</Badge> : null}
+                </div>
+              </div>
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Suggested webhook subscriptions</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {starterKit.webhooks.map((item) => <Badge key={item} tone="neutral">{item}</Badge>)}
+                </div>
+              </div>
+              <Button onClick={() => void applyStarterKit()} disabled={applyingStarterKit || portal.walletPhase !== "authenticated"}>
+                {applyingStarterKit ? "Applying starter settings…" : "Apply starter settings"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
       {project.templateType ? (
         <section>
           <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">

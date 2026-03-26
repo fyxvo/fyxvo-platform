@@ -28,6 +28,7 @@ import type {
   PortalApiKey,
   PortalHealth,
   PortalProject,
+  ProjectHealthScore,
   ProjectActivationPreparation,
   ProjectActivationVerification,
   PortalServiceStatus,
@@ -283,6 +284,7 @@ export async function createApiKey(input: {
   readonly projectId: string;
   readonly token: string;
   readonly label: string;
+  readonly colorTag?: string;
   readonly scopes: readonly string[];
   readonly expiresAt?: string;
 }) {
@@ -292,6 +294,7 @@ export async function createApiKey(input: {
       method: "POST",
       body: JSON.stringify({
         label: input.label,
+        ...(input.colorTag ? { colorTag: input.colorTag } : {}),
         scopes: input.scopes,
         ...(input.expiresAt ? { expiresAt: input.expiresAt } : {})
       })
@@ -593,6 +596,23 @@ export async function getAlertCenter(token: string) {
   return response.items;
 }
 
+export async function updateAlertState(
+  input: { readonly alertKey: string; readonly state: "new" | "acknowledged" | "resolved"; readonly projectId?: string | null },
+  token: string
+) {
+  return requestApi<{ ok: true }>(
+    `/v1/alerts/${encodeURIComponent(input.alertKey)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        state: input.state,
+        ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+      }),
+    },
+    token
+  );
+}
+
 export async function updateNotificationPreferences(
   prefs: Partial<{
     email: string | null;
@@ -686,6 +706,8 @@ export async function createPlaygroundRecipe(
     readonly simulationEnabled: boolean;
     readonly params: Record<string, string>;
     readonly notes?: string | null;
+    readonly tags?: readonly string[];
+    readonly pinned?: boolean;
   },
   token: string
 ) {
@@ -706,6 +728,10 @@ export async function updatePlaygroundRecipe(
     readonly simulationEnabled: boolean;
     readonly params: Record<string, string>;
     readonly notes: string | null;
+    readonly tags: readonly string[];
+    readonly pinned: boolean;
+    readonly share: boolean;
+    readonly touchLastUsedAt: boolean;
   }>,
   token: string
 ) {
@@ -720,6 +746,22 @@ export async function deletePlaygroundRecipe(projectId: string, recipeId: string
   return requestApi<void>(
     `/v1/projects/${projectId}/playground/recipes/${recipeId}`,
     { method: "DELETE" },
+    token
+  );
+}
+
+export async function getSharedPlaygroundRecipe(sharedToken: string, token: string) {
+  return requestApi<{ item: PlaygroundRecipe }>(`/v1/playground/recipes/shared/${sharedToken}`, undefined, token);
+}
+
+export async function getProjectHealth(projectId: string, token: string) {
+  return requestApi<{ health: ProjectHealthScore }>(`/v1/projects/${projectId}/health`, undefined, token);
+}
+
+export async function getProjectHealthHistory(projectId: string, token: string, range: "7d" | "30d" = "7d") {
+  return requestApi<{ history: Array<{ date: string; score: number }> }>(
+    `/v1/projects/${projectId}/health/history?range=${range}`,
+    undefined,
     token
   );
 }

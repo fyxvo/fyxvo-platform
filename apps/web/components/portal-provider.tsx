@@ -116,7 +116,7 @@ interface PortalContextValue {
     readonly name: string;
     readonly description?: string;
   }): Promise<void>;
-  createApiKey(input: { readonly label: string; readonly scopes: readonly string[]; readonly expiresAt?: string }): Promise<void>;
+  createApiKey(input: { readonly label: string; readonly colorTag?: string; readonly scopes: readonly string[]; readonly expiresAt?: string }): Promise<void>;
   revokeApiKey(apiKeyId: string): Promise<void>;
   prepareFunding(input: {
     readonly asset: "SOL" | "USDC";
@@ -621,6 +621,7 @@ export function PortalProvider({ children }: PropsWithChildren) {
 
   async function createApiKey(input: {
     readonly label: string;
+    readonly colorTag?: string;
     readonly scopes: readonly string[];
     readonly expiresAt?: string;
   }) {
@@ -633,6 +634,7 @@ export function PortalProvider({ children }: PropsWithChildren) {
       projectId: selectedProject.id,
       token,
       label: input.label,
+      ...(input.colorTag ? { colorTag: input.colorTag } : {}),
       scopes: input.scopes,
       ...(input.expiresAt ? { expiresAt: input.expiresAt } : {})
     });

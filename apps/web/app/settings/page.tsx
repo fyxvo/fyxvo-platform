@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Badge,
   Button,
@@ -19,6 +19,32 @@ import { ThemeToggle } from "../../components/theme-toggle";
 import { shortenAddress } from "../../lib/format";
 import { webEnv } from "../../lib/env";
 import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember } from "../../lib/api";
+
+function buildProjectNotesTemplate(projectName: string) {
+  return `# Overview
+${projectName}
+
+# Use case
+Describe what this project is doing and which environments matter.
+
+# Owner notes
+- Primary owner:
+- Escalation path:
+
+# Runbook
+- Activate the project
+- Confirm funding
+- Generate or review the active API key
+- Send a first request and confirm request logs
+
+# Known issues
+- Add current limitations, caveats, and open questions here.
+
+# Links
+- Docs:
+- Status:
+- Repo:`;
+}
 
 function SettingRow({
   label,
@@ -150,6 +176,8 @@ export default function SettingsPage() {
   const [projectPublicSlug, setProjectPublicSlug] = useState(portal.selectedProject?.publicSlug ?? "");
   const [projectLeaderboardVisible, setProjectLeaderboardVisible] = useState(portal.selectedProject?.leaderboardVisible ?? false);
   const [projectFieldsSaving, setProjectFieldsSaving] = useState(false);
+  const [notesPreview, setNotesPreview] = useState(false);
+  const [notesSaveState, setNotesSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Rename project
   const [renamingProject, setRenamingProject] = useState<string | null>(null);
@@ -252,15 +280,48 @@ export default function SettingsPage() {
   const [transferSuccess, setTransferSuccess] = useState(false);
 
   const isAuthenticated = portal.walletPhase === "authenticated";
+  const selectedProject = portal.selectedProject;
+  const refreshPortal = portal.refresh;
 
-  async function patchProject(projectId: string, patch: Record<string, unknown>) {
+  useEffect(() => {
+    setProjectEnvironment((selectedProject?.environment as "development" | "staging" | "production" | undefined) ?? "development");
+    setProjectNotes(selectedProject?.notes ?? "");
+    setProjectStarred(selectedProject?.starred ?? false);
+    setProjectGithubUrl(selectedProject?.githubUrl ?? "");
+    setProjectIsPublic(selectedProject?.isPublic ?? false);
+    setProjectPublicSlug(selectedProject?.publicSlug ?? "");
+    setProjectLeaderboardVisible(selectedProject?.leaderboardVisible ?? false);
+    setNotesSaveState("idle");
+  }, [selectedProject?.id, selectedProject?.environment, selectedProject?.notes, selectedProject?.starred, selectedProject?.githubUrl, selectedProject?.isPublic, selectedProject?.publicSlug, selectedProject?.leaderboardVisible]);
+
+  const patchProject = useCallback(async (projectId: string, patch: Record<string, unknown>) => {
     if (!portal.token) return;
     await fetch(new URL(`/v1/projects/${projectId}`, webEnv.apiBaseUrl), {
       method: "PATCH",
       headers: { "content-type": "application/json", authorization: `Bearer ${portal.token}` },
       body: JSON.stringify(patch),
     });
-  }
+  }, [portal.token]);
+
+  useEffect(() => {
+    if (!selectedProject || !portal.token) return;
+    if ((selectedProject.notes ?? "") === projectNotes) return;
+    setNotesSaveState("saving");
+    const timeoutId = window.setTimeout(() => {
+      patchProject(selectedProject.id, { notes: projectNotes || null })
+        .then(() => {
+          setNotesSaveState("saved");
+          void refreshPortal();
+        })
+        .catch(() => {
+          setNotesSaveState("error");
+        });
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [patchProject, projectNotes, refreshPortal, selectedProject, portal.token]);
 
   async function saveDisplayName() {
     if (!portal.selectedProject) return;
@@ -1108,15 +1169,47 @@ export default function SettingsPage() {
             </button>
           </SettingRow>
           <SettingRow label="Project notes" description="Internal documentation for your team. Not exposed publicly.">
-            <div className="flex flex-col gap-2 w-full max-w-xs">
-              <textarea
-                value={projectNotes}
-                onChange={(e) => setProjectNotes(e.target.value)}
-                placeholder="Internal notes about this project…"
-                rows={3}
-                maxLength={2000}
-                className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)] resize-none"
-              />
+            <div className="w-full max-w-2xl space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (!projectNotes.trim()) {
+                      setProjectNotes(buildProjectNotesTemplate(portal.selectedProject?.name ?? "Project"));
+                    }
+                  }}
+                >
+                  Insert template
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setNotesPreview((value) => !value)}>
+                  {notesPreview ? "Edit notes" : "Preview notes"}
+                </Button>
+                <CopyButton text={projectNotes} />
+                <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                  {notesSaveState === "saving" ? "Autosaving…" : notesSaveState === "saved" ? "Saved" : notesSaveState === "error" ? "Save failed" : "Idle"}
+                </span>
+              </div>
+              {portal.selectedProject?.notesUpdatedAt ? (
+                <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                  Last edited {new Date(portal.selectedProject.notesUpdatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {portal.selectedProject.notesEditedByWallet ? ` by ${shortenAddress(portal.selectedProject.notesEditedByWallet, 6, 6)}` : ""}
+                </p>
+              ) : null}
+              {notesPreview ? (
+                <div className="min-h-[220px] whitespace-pre-wrap rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm leading-7 text-[var(--fyxvo-text)]">
+                  {projectNotes || "No project notes yet. Add overview, runbook, known issues, and useful links here."}
+                </div>
+              ) : (
+                <textarea
+                  value={projectNotes}
+                  onChange={(e) => setProjectNotes(e.target.value)}
+                  placeholder="Internal notes about this project…"
+                  rows={12}
+                  maxLength={4000}
+                  className="w-full resize-y rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-3 text-sm leading-7 text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)]"
+                />
+              )}
             </div>
           </SettingRow>
           <SettingRow label="GitHub repository" description="Link to the GitHub repo for this project. Shown on the project overview page.">

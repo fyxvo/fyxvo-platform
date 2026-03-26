@@ -22,19 +22,23 @@ export type AuthenticatedUser = Pick<
 
 export type ProjectWithOwner = Project & {
   owner: AuthenticatedUser;
+  memberUserIds?: string[];
   _count?: {
     apiKeys: number;
     requestLogs: number;
     fundingRequests: number;
   };
+  notesUpdatedAt?: Date | null;
+  notesEditedByWallet?: string | null;
 };
 
-export type ApiKeyRecord = Pick<
+export type ApiKeyRecord = Omit<Pick<
   ApiKey,
   | "id"
   | "projectId"
   | "createdById"
   | "label"
+  | "colorTag"
   | "prefix"
   | "status"
   | "scopes"
@@ -43,8 +47,11 @@ export type ApiKeyRecord = Pick<
   | "revokedAt"
   | "createdAt"
   | "updatedAt"
-> & {
+>, "status"> & {
+  status: string;
   createdBy?: AuthenticatedUser;
+  readonly lastUsedRegion?: string | null;
+  readonly lastUsedUpstreamNode?: string | null;
 };
 
 export interface CreateProjectInput {
@@ -68,6 +75,7 @@ export interface UpdateProjectInput {
   readonly environment?: "development" | "staging" | "production";
   readonly starred?: boolean;
   readonly notes?: string | null;
+  readonly notesEditedByWallet?: string | null;
   readonly githubUrl?: string | null;
   readonly isPublic?: boolean;
   readonly publicSlug?: string | null;
@@ -87,11 +95,14 @@ export interface CreateApiKeyInput {
   readonly projectId: string;
   readonly createdById: string;
   readonly label: string;
+  readonly colorTag?: string | null;
   readonly prefix: string;
   readonly keyHash: string;
   readonly scopes: readonly string[];
   readonly expiresAt?: Date | null;
 }
+
+export type AlertStateValue = "new" | "acknowledged" | "resolved";
 
 export interface FundingRecordInput {
   readonly projectId: string;
@@ -338,19 +349,27 @@ export interface PlaygroundRecipeRecord {
   readonly simulationEnabled: boolean;
   readonly params: Record<string, string>;
   readonly notes: string | null;
+  readonly tags: readonly string[];
+  readonly pinned: boolean;
+  readonly lastUsedAt: string | null;
+  readonly sharedToken: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
 export interface AlertCenterItem {
+  readonly alertKey: string;
   readonly id: string;
   readonly type: "low_balance" | "daily_cost" | "error_rate" | "webhook_failure" | "assistant" | "incident" | "notification";
   readonly severity: "info" | "warning" | "critical";
+  readonly state: "new" | "acknowledged" | "resolved";
   readonly projectId: string | null;
   readonly projectName: string | null;
   readonly title: string;
   readonly description: string;
   readonly createdAt: string;
+  readonly groupCount?: number;
+  readonly relatedIncident?: { readonly id: string; readonly serviceName: string; readonly description: string } | null;
   readonly metadata?: Record<string, unknown> | null;
 }
 
@@ -703,6 +722,18 @@ export interface ProjectHealthScore {
   hasApiKeys: boolean;
   hasTraffic: boolean;
   successRate: number | null;
+  breakdown?: Array<{
+    readonly key: string;
+    readonly label: string;
+    readonly value: number;
+    readonly max: number;
+    readonly summary: string;
+  }>;
+  weeklyChange?: {
+    readonly direction: "up" | "flat" | "down";
+    readonly delta: number;
+    readonly reason: string;
+  };
 }
 
 export interface SupportTicketRecord {
@@ -855,6 +886,9 @@ export interface ApiRepository {
     readonly simulationEnabled: boolean;
     readonly params: Record<string, string>;
     readonly notes?: string | null;
+    readonly tags?: readonly string[];
+    readonly pinned?: boolean;
+    readonly sharedToken?: string | null;
   }): Promise<PlaygroundRecipeRecord>;
   updatePlaygroundRecipe(recipeId: string, projectId: string, input: {
     readonly name?: string;
@@ -863,9 +897,15 @@ export interface ApiRepository {
     readonly simulationEnabled?: boolean;
     readonly params?: Record<string, string>;
     readonly notes?: string | null;
+    readonly tags?: readonly string[];
+    readonly pinned?: boolean;
+    readonly sharedToken?: string | null;
+    readonly touchLastUsedAt?: boolean;
   }): Promise<PlaygroundRecipeRecord | null>;
   deletePlaygroundRecipe(recipeId: string, projectId: string): Promise<void>;
+  getPlaygroundRecipeBySharedToken(sharedToken: string): Promise<PlaygroundRecipeRecord | null>;
   getAlertCenter(userId: string, projectIds: readonly string[], assistantAvailable: boolean): Promise<AlertCenterItem[]>;
+  upsertAlertState(input: { userId: string; alertKey: string; state: AlertStateValue; projectId?: string | null }): Promise<void>;
   getFundingHistory(userId: string, projectIds: readonly string[]): Promise<FundingHistoryItem[]>;
   getNetworkStats(): Promise<NetworkStats>;
   getServiceHealthHistory(limitPerService: number): Promise<ServiceHealthHistory>;
@@ -1010,7 +1050,7 @@ export interface ApiRepository {
   }>>;
   redeliverWebhookEvent(deliveryId: string, projectId: string): Promise<void>;
   globalSearch(userId: string, query: string): Promise<SearchResults>;
-  getHealthHistory(projectId: string): Promise<Array<{ date: string; score: number }>>;
+  getHealthHistory(projectId: string, days?: 7 | 30): Promise<Array<{ date: string; score: number }>>;
   generateInviteLink(projectId: string, createdById: string): Promise<{ token: string; expiresAt: string }>;
   lookupInviteToken(token: string): Promise<{ projectId: string; projectName: string; inviterWallet: string } | null>;
   acceptInviteToken(token: string, userId: string): Promise<void>;

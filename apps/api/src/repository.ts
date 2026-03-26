@@ -17,6 +17,7 @@ import type {
   AdminOverviewBase,
   AdminStats,
   AlertCenterItem,
+  AlertStateValue,
   AnalyticsOverview,
   ApiKeyAnalyticsItem,
   ApiKeyRecord,
@@ -69,6 +70,11 @@ import type {
 type PrismaProject = PrismaNamespace.ProjectGetPayload<{
   include: {
     owner: true;
+    members: {
+      select: {
+        userId: true;
+      };
+    };
     _count: {
       select: {
         apiKeys: true;
@@ -130,12 +136,22 @@ function mapProject(project: PrismaProject): ProjectWithOwner {
   return {
     ...project,
     owner: mapUser(project.owner),
+    memberUserIds: project.members
+      .map((member) => member.userId)
+      .filter((value): value is string => Boolean(value)),
     _count: project._count
   };
 }
 
 function shortWallet(walletAddress: string): string {
   return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+}
+
+function effectiveApiKeyStatus(status: ApiKeyStatus, expiresAt: Date | null): string {
+  if (status === ApiKeyStatus.ACTIVE && expiresAt && expiresAt.getTime() <= Date.now()) {
+    return "EXPIRED";
+  }
+  return status;
 }
 
 function toJsonValue(value: Record<string, unknown>): PrismaNamespace.InputJsonValue {
@@ -307,9 +323,19 @@ export class PrismaApiRepository implements ApiRepository {
 
   async listProjects(user: AuthenticatedUser) {
     const projects = await this.prisma.project.findMany({
-      where: user.role === "OWNER" || user.role === "ADMIN" ? {} : { ownerId: user.id },
+      where: user.role === "OWNER" || user.role === "ADMIN"
+        ? {}
+        : {
+            OR: [
+              { ownerId: user.id },
+              { members: { some: { userId: user.id, acceptedAt: { not: null } } } },
+            ],
+          },
       include: {
         owner: true,
+        members: {
+          select: { userId: true },
+        },
         _count: {
           select: {
             apiKeys: true,
@@ -332,6 +358,9 @@ export class PrismaApiRepository implements ApiRepository {
       where: { id: projectId },
       include: {
         owner: true,
+        members: {
+          select: { userId: true },
+        },
         _count: {
           select: {
             apiKeys: true,
@@ -358,6 +387,9 @@ export class PrismaApiRepository implements ApiRepository {
       },
       include: {
         owner: true,
+        members: {
+          select: { userId: true },
+        },
         _count: {
           select: {
             apiKeys: true,
@@ -385,7 +417,13 @@ export class PrismaApiRepository implements ApiRepository {
         ...(input.archivedAt !== undefined ? { archivedAt: input.archivedAt } : {}),
         ...(input.environment !== undefined ? { environment: input.environment } : {}),
         ...(input.starred !== undefined ? { starred: input.starred } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.notes !== undefined
+          ? {
+              notes: input.notes,
+              notesUpdatedAt: new Date(),
+              notesEditedByWallet: input.notesEditedByWallet ?? null,
+            }
+          : {}),
         ...(input.githubUrl !== undefined ? { githubUrl: input.githubUrl } : {}),
         ...(input.isPublic !== undefined ? { isPublic: input.isPublic } : {}),
         ...(input.publicSlug !== undefined ? { publicSlug: input.publicSlug } : {}),
@@ -393,6 +431,9 @@ export class PrismaApiRepository implements ApiRepository {
       },
       include: {
         owner: true,
+        members: {
+          select: { userId: true },
+        },
         _count: {
           select: {
             apiKeys: true,
@@ -411,6 +452,9 @@ export class PrismaApiRepository implements ApiRepository {
       where: { id: projectId },
       include: {
         owner: true,
+        members: {
+          select: { userId: true },
+        },
         _count: {
           select: {
             apiKeys: true,
@@ -425,13 +469,14 @@ export class PrismaApiRepository implements ApiRepository {
   }
 
   async listApiKeys(projectId: string): Promise<ApiKeyRecord[]> {
-    return this.prisma.apiKey.findMany({
+    const rows = await this.prisma.apiKey.findMany({
       where: { projectId },
       select: {
         id: true,
         projectId: true,
         createdById: true,
         label: true,
+        colorTag: true,
         prefix: true,
         status: true,
         scopes: true,
@@ -445,14 +490,42 @@ export class PrismaApiRepository implements ApiRepository {
         createdAt: "desc"
       }
     });
+
+    const latestRequestByKey = new Map<string, { region: string | null; upstreamNode: string | null }>();
+    if (rows.length > 0) {
+      const requestRows = await this.prisma.requestLog.findMany({
+        where: {
+          apiKeyId: { in: rows.map((row) => row.id) },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { apiKeyId: true, region: true, upstreamNode: true },
+        take: rows.length * 5,
+      });
+      for (const request of requestRows) {
+        if (request.apiKeyId && !latestRequestByKey.has(request.apiKeyId)) {
+          latestRequestByKey.set(request.apiKeyId, {
+            region: request.region ?? null,
+            upstreamNode: request.upstreamNode ?? null,
+          });
+        }
+      }
+    }
+
+    return rows.map((row) => ({
+      ...row,
+      status: effectiveApiKeyStatus(row.status, row.expiresAt),
+      lastUsedRegion: latestRequestByKey.get(row.id)?.region ?? null,
+      lastUsedUpstreamNode: latestRequestByKey.get(row.id)?.upstreamNode ?? null,
+    }));
   }
 
   async createApiKey(input: CreateApiKeyInput): Promise<ApiKeyRecord> {
-    return this.prisma.apiKey.create({
+    const row = await this.prisma.apiKey.create({
       data: {
         projectId: input.projectId,
         createdById: input.createdById,
         label: input.label,
+        colorTag: input.colorTag ?? null,
         prefix: input.prefix,
         keyHash: input.keyHash,
         scopes: input.scopes as PrismaNamespace.JsonArray,
@@ -463,6 +536,7 @@ export class PrismaApiRepository implements ApiRepository {
         projectId: true,
         createdById: true,
         label: true,
+        colorTag: true,
         prefix: true,
         status: true,
         scopes: true,
@@ -473,6 +547,7 @@ export class PrismaApiRepository implements ApiRepository {
         updatedAt: true
       }
     });
+    return { ...row, status: effectiveApiKeyStatus(row.status, row.expiresAt), lastUsedRegion: null, lastUsedUpstreamNode: null };
   }
 
   async createInterestSubmission(input: CreateInterestSubmissionInput) {
@@ -531,6 +606,7 @@ export class PrismaApiRepository implements ApiRepository {
         projectId: true,
         createdById: true,
         label: true,
+        colorTag: true,
         prefix: true,
         status: true,
         scopes: true,
@@ -540,7 +616,7 @@ export class PrismaApiRepository implements ApiRepository {
         createdAt: true,
         updatedAt: true
       }
-    });
+    }).then((row) => ({ ...row, status: effectiveApiKeyStatus(row.status, row.expiresAt), lastUsedRegion: null, lastUsedUpstreamNode: null }));
   }
 
   async saveFundingCoordinate(input: FundingRecordInput) {
@@ -1064,6 +1140,9 @@ export class PrismaApiRepository implements ApiRepository {
         where: { id: projectId },
         include: {
           owner: true,
+          members: {
+            select: { userId: true },
+          },
           _count: {
             select: {
               apiKeys: true,
@@ -1979,6 +2058,9 @@ export class PrismaApiRepository implements ApiRepository {
       where: { publicSlug, isPublic: true },
       include: {
         owner: true,
+        members: {
+          select: { userId: true },
+        },
         _count: {
           select: { apiKeys: true, requestLogs: true, fundingRequests: true }
         }
@@ -2446,31 +2528,134 @@ export class PrismaApiRepository implements ApiRepository {
     const project = await db.project.findUnique({
       where: { id: projectId },
       select: {
-        activated: true,
-        balance: true,
-        _count: { select: { apiKeys: true } },
+        archivedAt: true,
+        isPublic: true,
+        publicSlug: true,
+        _count: { select: { apiKeys: true, members: true, webhooks: true } },
+        webhooks: { where: { active: true }, select: { id: true } },
       },
     });
-    if (!project) return { score: 0, activated: false, hasFunding: false, hasApiKeys: false, hasTraffic: false, successRate: null };
+    if (!project) return { score: 0, activated: false, hasFunding: false, hasApiKeys: false, hasTraffic: false, successRate: null, breakdown: [], weeklyChange: { direction: "flat", delta: 0, reason: "Project not found." } };
 
-    const reqCount = await this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } });
-    const successCount = await this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, statusCode: { lt: 400 } } });
+    const [reqCount, successCount, simulatedCount, failedWebhookCount, last7d, previous7d] = await Promise.all([
+      this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
+      this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, statusCode: { lt: 400 } } }),
+      this.prisma.requestLog.count({ where: { projectId, simulated: true, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
+      this.prisma.webhookDelivery.count({
+        where: {
+          webhook: { projectId },
+          status: { in: ["failed", "permanent_failure"] },
+          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+      this.getHealthHistory(projectId, 7),
+      this.getHistoricalHealthWindow(projectId, 7, 7),
+    ]);
 
-    const activated = project.activated as boolean;
-    const balNum = Number(project.balance ?? 0n);
-    const hasFunding = balNum > 1_000_000; // > 0.001 SOL in lamports
+    const activated = !project.archivedAt;
+    const fundingSignals = await this.prisma.fundingCoordinate.count({
+      where: {
+        projectId,
+        OR: [{ confirmedAt: { not: null } }, { transactionSignature: { not: null } }],
+      },
+    });
+    const hasFunding = fundingSignals > 0;
     const hasApiKeys = (project._count?.apiKeys ?? 0) > 0;
     const hasTraffic = reqCount > 0;
     const successRate = reqCount > 0 ? successCount / reqCount : null;
 
-    let score = 0;
-    if (activated) score += 30;
-    if (hasFunding) score += 20;
-    if (hasApiKeys) score += 20;
-    if (hasTraffic) score += 20;
-    if (successRate !== null) score += Math.round(successRate * 10);
+    const breakdown = [
+      {
+        key: "activation",
+        label: "Activation",
+        value: activated ? 15 : 0,
+        max: 15,
+        summary: activated ? "Project is active in the workspace." : "Project still needs to stay active and unarchived.",
+      },
+      {
+        key: "funding",
+        label: "Funding health",
+        value: hasFunding ? 15 : 0,
+        max: 15,
+        summary: hasFunding ? "Funding activity has been confirmed." : "No confirmed funding signal has been recorded yet.",
+      },
+      {
+        key: "api_keys",
+        label: "API key readiness",
+        value: hasApiKeys ? 10 : 0,
+        max: 10,
+        summary: hasApiKeys ? "At least one API key is ready." : "No API keys are ready for this project.",
+      },
+      {
+        key: "traffic",
+        label: "Traffic presence",
+        value: hasTraffic ? 10 : 0,
+        max: 10,
+        summary: hasTraffic ? "Recent request traffic has been observed." : "No recent request traffic has landed.",
+      },
+      {
+        key: "success_rate",
+        label: "Success rate",
+        value: successRate !== null ? Math.round(successRate * 20) : 0,
+        max: 20,
+        summary: successRate !== null ? `${Math.round(successRate * 100)}% of recent requests succeeded.` : "No request sample yet.",
+      },
+      {
+        key: "latency",
+        label: "Latency quality",
+        value: reqCount > 0 ? (successRate !== null && successRate >= 0.97 ? 10 : successRate !== null && successRate >= 0.9 ? 7 : 4) : 0,
+        max: 10,
+        summary: reqCount > 0 ? "Latency quality is inferred from recent successful request samples." : "No latency baseline yet.",
+      },
+      {
+        key: "webhook_health",
+        label: "Webhook health",
+        value: (project.webhooks?.length ?? 0) > 0 ? (failedWebhookCount === 0 ? 8 : 4) : 4,
+        max: 8,
+        summary: (project.webhooks?.length ?? 0) > 0
+          ? failedWebhookCount === 0
+            ? "Webhook deliveries are healthy."
+            : "Webhook failures need attention."
+          : "No active webhooks configured yet.",
+      },
+      {
+        key: "team",
+        label: "Team readiness",
+        value: (project._count?.members ?? 0) > 1 ? 6 : 3,
+        max: 6,
+        summary: (project._count?.members ?? 0) > 1 ? "Multiple collaborators can operate this project." : "This project still looks owner-heavy.",
+      },
+      {
+        key: "visibility",
+        label: "Visibility",
+        value: project.isPublic && project.publicSlug ? 4 : 2,
+        max: 4,
+        summary: project.isPublic && project.publicSlug ? "A public status surface exists." : "This project is still private by default.",
+      },
+      {
+        key: "simulation",
+        label: "Simulation usage",
+        value: simulatedCount > 0 ? 2 : 0,
+        max: 2,
+        summary: simulatedCount > 0 ? "Simulation mode is being used to validate flows safely." : "No recent simulation usage has been seen.",
+      },
+    ];
 
-    return { score: Math.min(100, score), activated, hasFunding, hasApiKeys, hasTraffic, successRate };
+    const score = Math.min(100, breakdown.reduce((sum, item) => sum + item.value, 0));
+    const latest = last7d[last7d.length - 1]?.score ?? score;
+    const previous = previous7d[previous7d.length - 1]?.score ?? latest;
+    const delta = latest - previous;
+    let direction: "up" | "flat" | "down" = "flat";
+    if (delta >= 5) direction = "up";
+    else if (delta <= -5) direction = "down";
+    let reason = "Project posture is stable.";
+    if (direction === "up") {
+      reason = successRate !== null && successRate >= 0.97 ? "Success rate improved." : "Recent traffic and readiness signals improved.";
+    } else if (direction === "down") {
+      reason = failedWebhookCount > 0 ? "Webhook failures increased." : hasTraffic ? "Recent request quality slipped." : "No recent traffic was observed.";
+    }
+
+    return { score, activated, hasFunding, hasApiKeys, hasTraffic, successRate, breakdown, weeklyChange: { direction, delta, reason } };
   }
 
   async getOperatorActivity(limit = 10): Promise<OperatorActivityItem[]> {
@@ -2855,7 +3040,7 @@ export class PrismaApiRepository implements ApiRepository {
   async listPlaygroundRecipes(projectId: string): Promise<PlaygroundRecipeRecord[]> {
     const rows = await this.prisma.playgroundRecipe.findMany({
       where: { projectId },
-      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ pinned: "desc" }, { lastUsedAt: "desc" }, { updatedAt: "desc" }, { createdAt: "desc" }],
     });
 
     return rows.map((row) => ({
@@ -2867,6 +3052,10 @@ export class PrismaApiRepository implements ApiRepository {
       simulationEnabled: row.simulationEnabled,
       params: (row.params as Record<string, string>) ?? {},
       notes: row.notes ?? null,
+      tags: row.tags ?? [],
+      pinned: row.pinned,
+      lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+      sharedToken: row.sharedToken ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }));
@@ -2880,6 +3069,9 @@ export class PrismaApiRepository implements ApiRepository {
     readonly simulationEnabled: boolean;
     readonly params: Record<string, string>;
     readonly notes?: string | null;
+    readonly tags?: readonly string[];
+    readonly pinned?: boolean;
+    readonly sharedToken?: string | null;
   }): Promise<PlaygroundRecipeRecord> {
     const row = await this.prisma.playgroundRecipe.create({
       data: {
@@ -2890,6 +3082,9 @@ export class PrismaApiRepository implements ApiRepository {
         simulationEnabled: input.simulationEnabled,
         params: input.params,
         notes: input.notes ?? null,
+        tags: [...(input.tags ?? [])],
+        pinned: input.pinned ?? false,
+        sharedToken: input.sharedToken ?? null,
       },
     });
 
@@ -2902,6 +3097,10 @@ export class PrismaApiRepository implements ApiRepository {
       simulationEnabled: row.simulationEnabled,
       params: (row.params as Record<string, string>) ?? {},
       notes: row.notes ?? null,
+      tags: row.tags ?? [],
+      pinned: row.pinned,
+      lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+      sharedToken: row.sharedToken ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -2917,6 +3116,10 @@ export class PrismaApiRepository implements ApiRepository {
       readonly simulationEnabled?: boolean;
       readonly params?: Record<string, string>;
       readonly notes?: string | null;
+      readonly tags?: readonly string[];
+      readonly pinned?: boolean;
+      readonly sharedToken?: string | null;
+      readonly touchLastUsedAt?: boolean;
     }
   ): Promise<PlaygroundRecipeRecord | null> {
     const existing = await this.prisma.playgroundRecipe.findFirst({
@@ -2935,6 +3138,10 @@ export class PrismaApiRepository implements ApiRepository {
         ...(input.simulationEnabled !== undefined ? { simulationEnabled: input.simulationEnabled } : {}),
         ...(input.params !== undefined ? { params: input.params } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.tags !== undefined ? { tags: [...input.tags] } : {}),
+        ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
+        ...(input.sharedToken !== undefined ? { sharedToken: input.sharedToken } : {}),
+        ...(input.touchLastUsedAt ? { lastUsedAt: new Date() } : {}),
       },
     });
 
@@ -2947,6 +3154,10 @@ export class PrismaApiRepository implements ApiRepository {
       simulationEnabled: row.simulationEnabled,
       params: (row.params as Record<string, string>) ?? {},
       notes: row.notes ?? null,
+      tags: row.tags ?? [],
+      pinned: row.pinned,
+      lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+      sharedToken: row.sharedToken ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -2958,8 +3169,33 @@ export class PrismaApiRepository implements ApiRepository {
     });
   }
 
+  async getPlaygroundRecipeBySharedToken(sharedToken: string): Promise<PlaygroundRecipeRecord | null> {
+    const row = await this.prisma.playgroundRecipe.findFirst({
+      where: { sharedToken },
+    });
+    if (!row) {
+      return null;
+    }
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      method: row.method,
+      mode: row.mode === "priority" ? "priority" : "standard",
+      simulationEnabled: row.simulationEnabled,
+      params: (row.params as Record<string, string>) ?? {},
+      notes: row.notes ?? null,
+      tags: row.tags ?? [],
+      pinned: row.pinned,
+      lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+      sharedToken: row.sharedToken ?? null,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
   async getAlertCenter(userId: string, projectIds: readonly string[], assistantAvailable: boolean): Promise<AlertCenterItem[]> {
-    const [notifications, webhookFailures, incidents, projects] = await Promise.all([
+    const [notifications, webhookFailures, incidents, projects, alertStates] = await Promise.all([
       this.prisma.notification.findMany({
         where: { userId, OR: [{ projectId: null }, { projectId: { in: [...projectIds] } }] },
         orderBy: { createdAt: "desc" },
@@ -3000,45 +3236,161 @@ export class PrismaApiRepository implements ApiRepository {
           },
         },
       }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.prisma as any).alertState.findMany({
+        where: { userId },
+        select: { alertKey: true, state: true },
+      }) as Promise<Array<{ alertKey: string; state: AlertStateValue }>>,
     ]);
 
+    const stateByKey = new Map(alertStates.map((item) => [item.alertKey, item.state]));
+    const activeIncidents = incidents.filter((incident) => incident.resolvedAt == null);
+    const relatedIncidentForService = (serviceName: string) => {
+      const match = activeIncidents.find((incident) => incident.serviceName.toLowerCase() === serviceName.toLowerCase());
+      return match
+        ? { id: match.id, serviceName: match.serviceName, description: match.description }
+        : null;
+    };
+
     const items: AlertCenterItem[] = [];
+    const groupedNotifications = new Map<string, {
+      latestId: string;
+      type: AlertCenterItem["type"];
+      severity: AlertCenterItem["severity"];
+      projectId: string | null;
+      projectName: string | null;
+      title: string;
+      description: string;
+      createdAt: string;
+      metadata: Record<string, unknown> | null;
+      groupCount: number;
+    }>();
 
     for (const notification of notifications) {
+      const body = `${notification.title} ${notification.message}`.toLowerCase();
+      const inferredType: AlertCenterItem["type"] =
+        body.includes("low balance") ? "low_balance"
+          : body.includes("cost") ? "daily_cost"
+            : "notification";
       const severity =
         /low balance|high error|failed|warning/i.test(`${notification.title} ${notification.message}`)
           ? "warning"
           : "info";
+      const groupKey = `${inferredType}:${notification.projectId ?? "global"}:${notification.title.toLowerCase()}`;
+      const existing = groupedNotifications.get(groupKey);
+      const metadata = typeof notification.metadata === "object" && notification.metadata !== null
+        ? (notification.metadata as Record<string, unknown>)
+        : null;
+      if (!existing) {
+        groupedNotifications.set(groupKey, {
+          latestId: notification.id,
+          type: inferredType,
+          severity,
+          projectId: notification.projectId ?? null,
+          projectName: notification.project?.name ?? null,
+          title: notification.title,
+          description: notification.message,
+          createdAt: notification.createdAt.toISOString(),
+          metadata,
+          groupCount: 1,
+        });
+      } else {
+        existing.groupCount += 1;
+        if (new Date(notification.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+          existing.latestId = notification.id;
+          existing.description = notification.message;
+          existing.createdAt = notification.createdAt.toISOString();
+          existing.metadata = metadata;
+        }
+      }
+    }
+
+    for (const [groupKey, notification] of groupedNotifications.entries()) {
       items.push({
-        id: notification.id,
-        type: "notification",
-        severity,
-        projectId: notification.projectId ?? null,
-        projectName: notification.project?.name ?? null,
+        alertKey: groupKey,
+        id: notification.latestId,
+        type: notification.type,
+        severity: notification.severity,
+        state: stateByKey.get(groupKey) ?? "new",
+        projectId: notification.projectId,
+        projectName: notification.projectName,
         title: notification.title,
-        description: notification.message,
-        createdAt: notification.createdAt.toISOString(),
-        metadata: typeof notification.metadata === "object" && notification.metadata !== null
-          ? (notification.metadata as Record<string, unknown>)
+        description: notification.groupCount > 1
+          ? `${notification.description} (${notification.groupCount} related alerts in this window.)`
+          : notification.description,
+        createdAt: notification.createdAt,
+        groupCount: notification.groupCount,
+        relatedIncident: notification.type === "notification" || notification.type === "low_balance"
+          ? relatedIncidentForService("api")
           : null,
+        metadata: notification.metadata,
       });
     }
 
+    const groupedWebhookFailures = new Map<string, {
+      latestId: string;
+      projectId: string;
+      projectName: string;
+      url: string;
+      createdAt: string;
+      count: number;
+      permanentFailure: boolean;
+      eventType: string;
+      responseStatus: number | null;
+      attemptNumber: number;
+      webhookId: string;
+    }>();
     for (const failure of webhookFailures) {
-      items.push({
-        id: failure.id,
-        type: "webhook_failure",
-        severity: failure.status === "permanent_failure" ? "critical" : "warning",
-        projectId: failure.webhook.project.id,
-        projectName: failure.webhook.project.name,
-        title: "Webhook delivery failed",
-        description: `${failure.webhook.url} returned ${failure.responseStatus ?? "no response"} for ${failure.eventType}.`,
-        createdAt: failure.createdAt.toISOString(),
-        metadata: {
+      const groupKey = `webhook_failure:${failure.webhook.project.id}:${failure.webhook.url}`;
+      const existing = groupedWebhookFailures.get(groupKey);
+      if (!existing) {
+        groupedWebhookFailures.set(groupKey, {
+          latestId: failure.id,
+          projectId: failure.webhook.project.id,
+          projectName: failure.webhook.project.name,
+          url: failure.webhook.url,
+          createdAt: failure.createdAt.toISOString(),
+          count: 1,
+          permanentFailure: failure.status === "permanent_failure",
+          eventType: failure.eventType,
+          responseStatus: failure.responseStatus ?? null,
+          attemptNumber: failure.attemptNumber,
           webhookId: failure.webhook.id,
+        });
+      } else {
+        existing.count += 1;
+        existing.permanentFailure = existing.permanentFailure || failure.status === "permanent_failure";
+        if (new Date(failure.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+          existing.latestId = failure.id;
+          existing.createdAt = failure.createdAt.toISOString();
+          existing.eventType = failure.eventType;
+          existing.responseStatus = failure.responseStatus ?? null;
+          existing.attemptNumber = failure.attemptNumber;
+          existing.webhookId = failure.webhook.id;
+        }
+      }
+    }
+
+    for (const [groupKey, failure] of groupedWebhookFailures.entries()) {
+      items.push({
+        alertKey: groupKey,
+        id: failure.latestId,
+        type: "webhook_failure",
+        severity: failure.permanentFailure ? "critical" : "warning",
+        state: stateByKey.get(groupKey) ?? "new",
+        projectId: failure.projectId,
+        projectName: failure.projectName,
+        title: failure.count > 1 ? "Repeated webhook delivery failures" : "Webhook delivery failed",
+        description: `${failure.url} returned ${failure.responseStatus ?? "no response"} for ${failure.eventType}.${failure.count > 1 ? ` ${failure.count} recent failures were grouped.` : ""}`,
+        createdAt: failure.createdAt,
+        groupCount: failure.count,
+        relatedIncident: relatedIncidentForService("api"),
+        metadata: {
+          webhookId: failure.webhookId,
           responseStatus: failure.responseStatus,
           eventType: failure.eventType,
           attemptNumber: failure.attemptNumber,
+          destination: failure.url,
         },
       });
     }
@@ -3047,49 +3399,87 @@ export class PrismaApiRepository implements ApiRepository {
       const total = project.requestLogs.length;
       const errors = project.requestLogs.filter((row) => row.statusCode >= 400).length;
       if (total > 0 && errors / total >= 0.25) {
+        const alertKey = `error_rate:${project.id}`;
         items.push({
-          id: `error-rate:${project.id}`,
+          alertKey,
+          id: alertKey,
           type: "error_rate",
           severity: "warning",
+          state: stateByKey.get(alertKey) ?? "new",
           projectId: project.id,
           projectName: project.name,
           title: "Error rate elevated",
           description: `${Math.round((errors / total) * 100)}% of requests returned errors in the last 24 hours.`,
           createdAt: new Date().toISOString(),
+          groupCount: 1,
+          relatedIncident: relatedIncidentForService("gateway"),
           metadata: { errorRate: errors / total, totalRequests: total },
         });
       }
     }
 
     for (const incident of incidents) {
+      const alertKey = `incident:${incident.id}`;
       items.push({
+        alertKey,
         id: incident.id,
         type: "incident",
         severity: incident.severity === "critical" ? "critical" : "warning",
+        state: stateByKey.get(alertKey) ?? "new",
         projectId: null,
         projectName: null,
         title: `${incident.serviceName} incident`,
         description: incident.description,
         createdAt: incident.startedAt.toISOString(),
+        groupCount: 1,
+        relatedIncident: { id: incident.id, serviceName: incident.serviceName, description: incident.description },
         metadata: { serviceName: incident.serviceName },
       });
     }
 
     if (!assistantAvailable) {
+      const alertKey = "assistant:availability";
       items.push({
+        alertKey,
         id: "assistant-unavailable",
         type: "assistant",
         severity: "warning",
+        state: stateByKey.get(alertKey) ?? "new",
         projectId: null,
         projectName: null,
         title: "Assistant availability issue",
         description: "The assistant is currently unavailable. Docs, playground, and analytics remain available.",
         createdAt: new Date().toISOString(),
+        groupCount: 1,
+        relatedIncident: relatedIncidentForService("api"),
         metadata: null,
       });
     }
 
     return items.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+  }
+
+  async upsertAlertState(input: { userId: string; alertKey: string; state: AlertStateValue; projectId?: string | null }): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.alertState.upsert({
+      where: {
+        userId_alertKey: {
+          userId: input.userId,
+          alertKey: input.alertKey,
+        },
+      },
+      update: {
+        state: input.state,
+        projectId: input.projectId ?? null,
+      },
+      create: {
+        userId: input.userId,
+        alertKey: input.alertKey,
+        state: input.state,
+        projectId: input.projectId ?? null,
+      },
+    });
   }
 
   async getFirstSuccessfulProjectRequest(projectId: string): Promise<{
@@ -3291,8 +3681,7 @@ export class PrismaApiRepository implements ApiRepository {
     };
   }
 
-  async getHealthHistory(projectId: string): Promise<Array<{ date: string; score: number }>> {
-    const days = 7;
+  async getHealthHistory(projectId: string, days: 7 | 30 = 7): Promise<Array<{ date: string; score: number }>> {
     const results: Array<{ date: string; score: number }> = [];
     for (let i = days - 1; i >= 0; i--) {
       const dayStart = new Date(Date.now() - i * 86_400_000);
@@ -3303,6 +3692,26 @@ export class PrismaApiRepository implements ApiRepository {
         this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: dayStart, lt: dayEnd }, statusCode: { lt: 400 } } }),
       ]);
       let score = 40; // base
+      if (reqCount > 0) score += 30;
+      const rate = reqCount > 0 ? successCount / reqCount : null;
+      if (rate !== null) score += Math.round(rate * 30);
+      results.push({ date: dayStart.toISOString().slice(0, 10), score: Math.min(100, score) });
+    }
+    return results;
+  }
+
+  private async getHistoricalHealthWindow(projectId: string, days: 7 | 30, offsetWindows = 1): Promise<Array<{ date: string; score: number }>> {
+    const results: Array<{ date: string; score: number }> = [];
+    const totalOffsetDays = days * offsetWindows;
+    for (let i = days - 1; i >= 0; i--) {
+      const dayStart = new Date(Date.now() - (i + totalOffsetDays) * 86_400_000);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+      const [reqCount, successCount] = await Promise.all([
+        this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: dayStart, lt: dayEnd } } }),
+        this.prisma.requestLog.count({ where: { projectId, createdAt: { gte: dayStart, lt: dayEnd }, statusCode: { lt: 400 } } }),
+      ]);
+      let score = 40;
       if (reqCount > 0) score += 30;
       const rate = reqCount > 0 ? successCount / reqCount : null;
       if (rate !== null) score += Math.round(rate * 30);

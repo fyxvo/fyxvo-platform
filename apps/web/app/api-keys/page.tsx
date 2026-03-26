@@ -28,6 +28,7 @@ export default function ApiKeysPage() {
   const portal = usePortal();
   const router = useRouter();
   const [label, setLabel] = useState("Priority relay");
+  const [colorTag, setColorTag] = useState("violet");
   const [scopes, setScopes] = useState("project:read, rpc:request, priority:relay");
   const [expiresAt, setExpiresAt] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -112,6 +113,31 @@ export default function ApiKeysPage() {
     }
   })();
 
+  function exportApiKeyMetadata() {
+    const rows = [
+      ["name", "project", "scope", "createdAt", "lastUsedAt", "status", "expiryAt"],
+      ...portal.apiKeys.map((apiKey) => [
+        apiKey.label,
+        portal.selectedProject?.name ?? "",
+        apiKey.scopes.join(" "),
+        apiKey.createdAt,
+        apiKey.lastUsedAt ?? "",
+        apiKey.status,
+        apiKey.expiresAt ?? "",
+      ]),
+    ];
+    const csv = rows
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = "fyxvo-api-key-metadata.csv";
+    anchor.click();
+    URL.revokeObjectURL(href);
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -119,9 +145,14 @@ export default function ApiKeysPage() {
         title="Create project keys with clear scope and predictable usage."
         description="Separate credentials for relay traffic, analytics, and internal tools. Each key carries explicit scopes so access never relies on guesswork."
         actions={
-          <Button onClick={() => setCreateOpen(true)} disabled={portal.walletPhase !== "authenticated"}>
-            Generate key
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={exportApiKeyMetadata} disabled={portal.walletPhase !== "authenticated" || portal.apiKeys.length === 0}>
+              Export metadata
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} disabled={portal.walletPhase !== "authenticated"}>
+              Generate key
+            </Button>
+          </div>
         }
       />
 
@@ -281,8 +312,15 @@ export default function ApiKeysPage() {
                         </td>
                         <td className="px-4 py-4 align-middle">
                           <div className="font-medium text-[var(--fyxvo-text)]">{apiKey.label}</div>
-                          <div className="font-mono text-xs text-[var(--fyxvo-text-muted)]">
-                            {apiKey.prefix}••••••••••••
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <div className="font-mono text-xs text-[var(--fyxvo-text-muted)]">
+                              {apiKey.prefix}••••••••••••
+                            </div>
+                            {apiKey.colorTag ? (
+                              <span className="rounded-full border border-[var(--fyxvo-border)] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                                {apiKey.colorTag}
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-4 py-4 align-middle">
@@ -293,15 +331,30 @@ export default function ApiKeysPage() {
                           </div>
                         </td>
                         <td className="px-4 py-4 align-middle">
-                          <span className="text-[var(--fyxvo-text-muted)]">
-                            {apiKey.lastUsedAt ? formatRelativeDate(apiKey.lastUsedAt) : "Never"}
-                          </span>
+                          <div className="space-y-1">
+                            <span className="text-[var(--fyxvo-text-muted)]">
+                              {apiKey.lastUsedAt ? formatRelativeDate(apiKey.lastUsedAt) : "Never"}
+                            </span>
+                            {apiKey.lastUsedRegion || apiKey.lastUsedUpstreamNode ? (
+                              <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                                {apiKey.lastUsedRegion ?? "unknown region"}{apiKey.lastUsedUpstreamNode ? ` · ${apiKey.lastUsedUpstreamNode}` : ""}
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-4 py-4 align-middle">
                           <span className="text-[var(--fyxvo-text-muted)]">{formatRelativeDate(apiKey.createdAt)}</span>
                         </td>
                         <td className="px-4 py-4 align-middle">
-                          <Badge tone={apiKey.status === "ACTIVE" ? "success" : "danger"}>{apiKey.status}</Badge>
+                          <div className="space-y-1">
+                            <Badge tone={apiKey.status === "ACTIVE" ? "success" : apiKey.status === "EXPIRED" ? "warning" : "danger"}>{apiKey.status}</Badge>
+                            {apiKey.expiresAt ? (
+                              <div className="text-xs text-[var(--fyxvo-text-muted)]">Expires {formatRelativeDate(apiKey.expiresAt)}</div>
+                            ) : null}
+                            {!apiKey.lastUsedAt || new Date(apiKey.lastUsedAt).getTime() < Date.now() - 14 * 24 * 60 * 60 * 1000 ? (
+                              <div className="text-xs text-amber-600 dark:text-amber-400">Dormant 14d+</div>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-4 py-4 align-middle text-right">
                           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -493,6 +546,7 @@ export default function ApiKeysPage() {
               onClick={async () => {
                 await portal.createApiKey({
                   label,
+                  colorTag,
                   scopes: scopes
                     .split(",")
                     .map((scope) => scope.trim())
@@ -509,6 +563,18 @@ export default function ApiKeysPage() {
       >
         <div className="grid gap-4">
           <Input label="Label" value={label} onChange={(event) => setLabel(event.target.value)} />
+          <label className="grid gap-1 text-sm text-[var(--fyxvo-text)]">
+            <span>Color tag</span>
+            <select
+              value={colorTag}
+              onChange={(event) => setColorTag(event.target.value)}
+              className="h-10 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 text-sm text-[var(--fyxvo-text)]"
+            >
+              {["violet", "emerald", "amber", "sky", "rose", "slate"].map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
           <Input
             label="Scopes"
             hint="Comma-separated: project:read, rpc:request, priority:relay. Priority keys must include rpc:request."

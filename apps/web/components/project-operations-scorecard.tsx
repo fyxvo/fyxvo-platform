@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@fyxvo/ui";
-import { getProjectRequestLogs, listProjectMembers, listWebhooks } from "../lib/api";
+import { getProjectHealth, getProjectHealthHistory, getProjectRequestLogs, listProjectMembers, listWebhooks } from "../lib/api";
 import { formatDuration, formatPercent } from "../lib/format";
-import type { OnChainProjectSnapshot, PortalProject, ProjectAnalytics } from "../lib/types";
+import type { OnChainProjectSnapshot, PortalProject, ProjectAnalytics, ProjectHealthScore } from "../lib/types";
 
 type ScorecardItem = {
   label: string;
@@ -35,6 +35,9 @@ export function ProjectOperationsScorecard({
   const [memberCount, setMemberCount] = useState(1);
   const [activeWebhooks, setActiveWebhooks] = useState(0);
   const [simulatedCount, setSimulatedCount] = useState(0);
+  const [health, setHealth] = useState<ProjectHealthScore | null>(null);
+  const [historyRange, setHistoryRange] = useState<"7d" | "30d">("7d");
+  const [history, setHistory] = useState<Array<{ date: string; score: number }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,11 +63,30 @@ export function ProjectOperationsScorecard({
         if (!cancelled) setSimulatedCount(data.totalCount);
       })
       .catch(() => undefined);
+    getProjectHealth(project.id, token)
+      .then((data) => {
+        if (!cancelled) setHealth(data.health);
+      })
+      .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
   }, [project.id, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjectHealthHistory(project.id, token, historyRange)
+      .then((data) => {
+        if (!cancelled) setHistory(data.history);
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [historyRange, project.id, token]);
 
   const requestTotal = analytics.totals.requestLogs;
   const successTotal = analytics.statusCodes
@@ -177,6 +199,84 @@ export function ProjectOperationsScorecard({
           </div>
         ))}
       </CardContent>
+      {health ? (
+        <CardContent className="space-y-5 border-t border-[var(--fyxvo-border)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-[var(--fyxvo-text)]">Health breakdown</div>
+              <p className="text-sm text-[var(--fyxvo-text-soft)]">
+                A real-data breakdown of what is helping or hurting this project’s readiness score.
+              </p>
+            </div>
+            {health.weeklyChange ? (
+              <Badge tone={health.weeklyChange.direction === "up" ? "success" : health.weeklyChange.direction === "down" ? "warning" : "neutral"}>
+                {health.weeklyChange.direction} · {health.weeklyChange.reason}
+              </Badge>
+            ) : null}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {(health.breakdown ?? []).map((item) => (
+              <div key={item.key} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-medium text-[var(--fyxvo-text)]">{item.label}</div>
+                  <Badge tone={item.value >= item.max ? "success" : item.value === 0 ? "warning" : "neutral"}>
+                    {item.value}/{item.max}
+                  </Badge>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.summary}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-medium text-[var(--fyxvo-text)]">Health history</div>
+                <p className="text-sm text-[var(--fyxvo-text-soft)]">See whether the project is improving or drifting over time.</p>
+              </div>
+              <div className="flex gap-2">
+                {(["7d", "30d"] as const).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setHistoryRange(range)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                      historyRange === range
+                        ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                        : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"
+                    }`}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {history.length > 1 ? (
+              <div className="mt-4 overflow-x-auto">
+                <svg viewBox={`0 0 ${Math.max(history.length - 1, 1) * 18 + 12} 48`} className="h-16 w-full min-w-[240px]">
+                  <path
+                    d={history
+                      .map((point, index) => {
+                        const x = 6 + index * 18;
+                        const y = 42 - (point.score / 100) * 36;
+                        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+                      })
+                      .join(" ")}
+                    fill="none"
+                    stroke="var(--fyxvo-brand)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[var(--fyxvo-text-muted)]">Health history will appear once enough daily data points are available.</p>
+            )}
+          </div>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }

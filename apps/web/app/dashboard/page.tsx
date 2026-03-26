@@ -727,6 +727,30 @@ export default function DashboardPage() {
   -H "x-api-key: ${portal.lastGeneratedApiKey ?? "YOUR_API_KEY"}" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
   const opsItems = useMemo(() => buildOpsItems(portal.adminOverview), [portal.adminOverview]);
+  const nextBestAction = (() => {
+    if (!portal.selectedProject) {
+      return { label: "Create a project", reason: "A project is the control point for funding, API keys, alerts, and analytics.", href: "/dashboard" };
+    }
+    if (!portal.onchainSnapshot.projectAccountExists) {
+      return { label: "Activate your project", reason: "Activation makes the project usable for funded request flow.", href: `/projects/${portal.selectedProject.slug}` };
+    }
+    if (!hasFunding) {
+      return { label: "Fund your project", reason: "Spendable SOL credits are still required before real request flow can happen.", href: "/funding" };
+    }
+    if (!hasApiKeys) {
+      return { label: "Create an API key", reason: "A scoped key is the next unlock for real request traffic.", href: "/api-keys" };
+    }
+    if (!hasRelayTraffic) {
+      return { label: "Send the first request", reason: "You have the infrastructure ready; the next proof point is live traffic.", href: "/playground" };
+    }
+    return { label: "Open analytics", reason: "Traffic is landing now, so analytics is the best next place to inspect health and latency.", href: "/analytics" };
+  })();
+  const recentWins = [
+    portal.onchainSnapshot.projectAccountExists ? "Project activated" : null,
+    hasApiKeys ? "API key ready" : null,
+    hasRelayTraffic ? "First request made" : null,
+    portal.selectedProject?.isPublic && portal.selectedProject?.publicSlug ? "Public project shared" : null,
+  ].filter(Boolean) as string[];
   async function saveAnnouncementSchedule() {
     if (!portal.token || !announcementDraft.trim()) return;
     setAnnouncementSaving(true);
@@ -1004,6 +1028,44 @@ export default function DashboardPage() {
       />
 
       <QuickstartLauncher project={portal.selectedProject} />
+
+      {portal.walletPhase === "authenticated" ? (
+        <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>What should I do next?</CardTitle>
+              <CardDescription>One concrete next step based on the current project state, not a generic checklist.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-lg font-semibold text-[var(--fyxvo-text)]">{nextBestAction.label}</div>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--fyxvo-text-soft)]">{nextBestAction.reason}</p>
+              </div>
+              <Button asChild>
+                <Link href={nextBestAction.href}>Do this next</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Recent wins</CardTitle>
+              <CardDescription>Subtle momentum markers from the real current workspace.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recentWins.length > 0 ? recentWins.map((item) => (
+                <div key={item} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)]">
+                  {item}
+                </div>
+              )) : (
+                <Notice tone="neutral" title="Wins will appear as you progress">
+                  Activate a project, fund it, create a key, or send traffic to start building a visible operating history.
+                </Notice>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       {!hasCompletedOnboarding && !bannerDismissed && !portal.loading && portal.user && nextStep ? (
         <div className="mb-4 flex items-center justify-between rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm">
@@ -1975,7 +2037,7 @@ export default function DashboardPage() {
           ) : null}
 
           {isAdminAuthorityWallet && adminObservability ? (
-            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <Card id="admin-observability" className="fyxvo-surface border-[color:var(--fyxvo-border)]">
               <CardHeader>
                 <CardTitle>Admin observability</CardTitle>
                 <CardDescription>
@@ -2038,6 +2100,30 @@ export default function DashboardPage() {
             </Card>
           ) : null}
 
+          {isAdminAuthorityWallet ? (
+            <Card id="admin-actions" className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Admin actions</CardTitle>
+                <CardDescription>Quick operational jumps for the things that usually need attention first.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {[
+                  { label: "View active incidents", href: "/status" },
+                  { label: "View unresolved support tickets", href: "/support" },
+                  { label: "View webhook failure clusters", href: "/alerts?type=webhook_failure" },
+                  { label: "View assistant feedback", href: "/assistant" },
+                  { label: "View lowest-runway projects", href: "/dashboard#admin-observability" },
+                  { label: "View highest-error-rate projects", href: "/dashboard#admin-observability" },
+                  { label: "Create system announcement", href: "/dashboard#announcement-scheduling" },
+                ].map((action) => (
+                  <Button key={action.label} asChild variant="secondary" size="sm">
+                    <Link href={action.href}>{action.label}</Link>
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+
           {cspViolations.length > 0 ? (
             <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
               <CardHeader>
@@ -2069,7 +2155,7 @@ export default function DashboardPage() {
           ) : null}
 
           {isAdminAuthorityWallet ? (
-            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <Card id="announcement-scheduling" className="fyxvo-surface border-[color:var(--fyxvo-border)]">
               <CardHeader>
                 <CardTitle>Announcement scheduling</CardTitle>
                 <CardDescription>

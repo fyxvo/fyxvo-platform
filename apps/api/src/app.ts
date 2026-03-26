@@ -160,7 +160,7 @@ const updateProjectSchema = z.object({
   archivedAt: z.string().datetime().optional().nullable(),
   environment: z.enum(["development", "staging", "production"]).optional(),
   starred: z.boolean().optional(),
-  notes: z.string().trim().max(2000).nullable().optional(),
+  notes: z.string().trim().max(4000).nullable().optional(),
   githubUrl: z.string().url().max(256).nullable().optional(),
   isPublic: z.boolean().optional(),
   publicSlug: z.string().trim().min(3).max(64).regex(/^[a-z0-9-]+$/).nullable().optional(),
@@ -169,6 +169,7 @@ const updateProjectSchema = z.object({
 
 const createApiKeySchema = z.object({
   label: z.string().trim().min(2).max(100),
+  colorTag: z.string().trim().max(24).optional().nullable(),
   scopes: z.array(z.enum(supportedApiKeyScopes)).min(1),
   expiresAt: z.string().datetime().optional()
 });
@@ -281,7 +282,7 @@ function requireAdmin(user: AuthenticatedUser) {
 }
 
 function canAccessProject(user: AuthenticatedUser, project: ProjectWithOwner): boolean {
-  return user.role === "OWNER" || user.role === "ADMIN" || project.ownerId === user.id;
+  return user.role === "OWNER" || user.role === "ADMIN" || project.ownerId === user.id || (project.memberUserIds ?? []).includes(user.id);
 }
 
 function getRoutePattern(request: FastifyRequest): string {
@@ -1529,16 +1530,41 @@ export async function buildApiApp(input: {
       ...(body.archivedAt !== undefined ? { archivedAt: body.archivedAt !== null ? new Date(body.archivedAt) : null } : {}),
       ...(body.environment !== undefined ? { environment: body.environment } : {}),
       ...(body.starred !== undefined ? { starred: body.starred } : {}),
-      ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes, notesEditedByWallet: user.walletAddress } : {}),
       ...(body.githubUrl !== undefined ? { githubUrl: body.githubUrl } : {}),
       ...(body.isPublic !== undefined ? { isPublic: body.isPublic } : {}),
       ...(body.publicSlug !== undefined ? { publicSlug: body.publicSlug } : {}),
       ...(body.leaderboardVisible !== undefined ? { leaderboardVisible: body.leaderboardVisible } : {})
     };
 
-    return {
-      item: await input.repository.updateProject(project.id, updateInput)
-    };
+    const updated = await input.repository.updateProject(project.id, updateInput);
+
+    if (body.archivedAt !== undefined && body.archivedAt !== (project.archivedAt ? new Date(project.archivedAt).toISOString() : null)) {
+      void input.repository.logActivity({
+        projectId: project.id,
+        userId: user.id,
+        action: body.archivedAt ? "project.archived" : "project.restored",
+        details: body.archivedAt ? { reason: updated.archiveReason ?? null } : null,
+      }).catch(() => undefined);
+    }
+    if (body.isPublic !== undefined && body.isPublic !== project.isPublic) {
+      void input.repository.logActivity({
+        projectId: project.id,
+        userId: user.id,
+        action: body.isPublic ? "project.public_enabled" : "project.public_disabled",
+        details: body.isPublic ? { publicSlug: updated.publicSlug ?? null } : null,
+      }).catch(() => undefined);
+    }
+    if (body.notes !== undefined) {
+      void input.repository.logActivity({
+        projectId: project.id,
+        userId: user.id,
+        action: "project.notes_updated",
+        details: { length: body.notes?.length ?? 0 },
+      }).catch(() => undefined);
+    }
+
+    return { item: updated };
   });
 
   app.delete("/v1/projects/:projectId", async (request) => {
@@ -1631,6 +1657,7 @@ export async function buildApiApp(input: {
         projectId: project.id,
         createdById: user.id,
         label: body.label,
+        colorTag: body.colorTag ?? null,
         prefix,
         keyHash: sha256(plainTextKey),
         scopes,
@@ -1721,10 +1748,11 @@ export async function buildApiApp(input: {
       projectId: project.id,
       createdById: user.id,
       label: existing.label,
+      colorTag: existing.colorTag ?? null,
       prefix,
       keyHash: sha256(plainTextKey),
       scopes,
-      expiresAt: null
+      expiresAt: existing.expiresAt ? new Date(existing.expiresAt) : null
     });
 
     void input.repository.createNotification({
@@ -1733,6 +1761,13 @@ export async function buildApiApp(input: {
       title: "API key rotated",
       message: `Key "${existing.label}" was rotated — old key revoked, new key issued for project "${project.name}"`,
       projectId: project.id
+    }).catch(() => undefined);
+
+    void input.repository.logActivity({
+      projectId: project.id,
+      userId: user.id,
+      action: "apikey.rotated",
+      details: { previousKeyId: params.apiKeyId, newKeyId: newKey.id, label: existing.label },
     }).catch(() => undefined);
 
     reply.status(201).send({ item: newKey, plainTextKey });
@@ -1935,6 +1970,22 @@ export async function buildApiApp(input: {
         isAssistantConfigured(input.env)
       ),
     };
+  });
+
+  app.patch("/v1/alerts/:alertKey", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ alertKey: z.string().min(1) }).parse(request.params);
+    const body = z.object({
+      state: z.enum(["new", "acknowledged", "resolved"]),
+      projectId: z.string().uuid().optional().nullable(),
+    }).parse(request.body);
+    await input.repository.upsertAlertState({
+      userId: user.id,
+      alertKey: decodeURIComponent(params.alertKey),
+      state: body.state,
+      projectId: body.projectId ?? null,
+    });
+    return { ok: true };
   });
 
   app.post("/v1/notifications/:notificationId/read", async (request) => {
@@ -3046,6 +3097,12 @@ ${liveContextLines.join("\n")}
     if (!member || member.projectId !== projectId || member.userId !== user.id) throw new HttpError(404, "not_found", "Invitation not found.");
     if (member.acceptedAt) return reply.send({ success: true, message: "Already accepted." });
     await input.repository.acceptProjectMember(memberId);
+    void input.repository.logActivity({
+      projectId,
+      userId: user.id,
+      action: "member.accepted",
+      details: { memberId },
+    }).catch(() => undefined);
     return reply.send({ success: true });
   });
 
@@ -3285,11 +3342,12 @@ ${liveContextLines.join("\n")}
   app.get("/v1/projects/:projectId/health/history", async (request) => {
     const user = requireUser(request);
     const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ range: z.enum(["7d", "30d"]).optional() }).parse(request.query ?? {});
     const project = await input.repository.findProjectById(projectId);
     if (!project || !canAccessProject(user, project)) {
       throw new HttpError(403, "forbidden", "Access denied.");
     }
-    return { history: await input.repository.getHealthHistory(projectId) };
+    return { history: await input.repository.getHealthHistory(projectId, query.range === "30d" ? 30 : 7) };
   });
 
   app.get("/v1/projects/:projectId/playground/recipes", async (request) => {
@@ -3313,6 +3371,8 @@ ${liveContextLines.join("\n")}
       simulationEnabled: z.boolean().default(false),
       params: z.record(z.string(), z.string()).default({}),
       notes: z.string().trim().max(2000).optional().nullable(),
+      tags: z.array(z.string().trim().min(1).max(24)).max(6).optional(),
+      pinned: z.boolean().optional(),
     }).parse(request.body);
     const project = await input.repository.findProjectById(projectId);
     if (!project || !canAccessProject(user, project)) {
@@ -3327,6 +3387,8 @@ ${liveContextLines.join("\n")}
       simulationEnabled: body.simulationEnabled,
       params: body.params,
       notes: body.notes ?? null,
+      tags: body.tags ?? [],
+      pinned: body.pinned ?? false,
     });
     return reply.status(201).send({ item });
   });
@@ -3344,6 +3406,10 @@ ${liveContextLines.join("\n")}
       simulationEnabled: z.boolean().optional(),
       params: z.record(z.string(), z.string()).optional(),
       notes: z.string().trim().max(2000).optional().nullable(),
+      tags: z.array(z.string().trim().min(1).max(24)).max(6).optional(),
+      pinned: z.boolean().optional(),
+      share: z.boolean().optional(),
+      touchLastUsedAt: z.boolean().optional(),
     }).parse(request.body);
     const project = await input.repository.findProjectById(projectId);
     if (!project || !canAccessProject(user, project)) {
@@ -3357,11 +3423,29 @@ ${liveContextLines.join("\n")}
       ...(body.simulationEnabled !== undefined ? { simulationEnabled: body.simulationEnabled } : {}),
       ...(body.params !== undefined ? { params: body.params } : {}),
       ...(body.notes !== undefined ? { notes: body.notes } : {}),
+      ...(body.tags !== undefined ? { tags: body.tags } : {}),
+      ...(body.pinned !== undefined ? { pinned: body.pinned } : {}),
+      ...(body.share !== undefined ? { sharedToken: body.share ? randomBytes(12).toString("base64url") : null } : {}),
+      ...(body.touchLastUsedAt ? { touchLastUsedAt: true } : {}),
     });
     if (!item) {
       throw new HttpError(404, "recipe_not_found", "Recipe not found.");
     }
     return { item };
+  });
+
+  app.get("/v1/playground/recipes/shared/:sharedToken", async (request) => {
+    const user = requireUser(request);
+    const { sharedToken } = z.object({ sharedToken: z.string().min(1) }).parse(request.params);
+    const recipe = await input.repository.getPlaygroundRecipeBySharedToken(sharedToken);
+    if (!recipe) {
+      throw new HttpError(404, "recipe_not_found", "Shared recipe not found.");
+    }
+    const project = await input.repository.findProjectById(recipe.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(403, "forbidden", "You do not have access to this shared recipe.");
+    }
+    return { item: recipe };
   });
 
   app.delete("/v1/projects/:projectId/playground/recipes/:recipeId", async (request, reply) => {
