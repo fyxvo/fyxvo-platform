@@ -8,7 +8,7 @@
     "build": "next build",
     "lint": "eslint app components lib test next.config.ts vitest.config.ts --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests && node ./test/firefox-hydration-regression.mjs"
   },
   "browserslist": [
     "last 2 Chrome versions",
@@ -37,6 +37,7 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",

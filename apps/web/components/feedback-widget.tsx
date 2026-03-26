@@ -35,20 +35,24 @@ export function FeedbackWidget() {
   return (
     <div className="fixed bottom-6 left-4 z-40 sm:left-6">
       {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] px-3 py-1.5 text-xs text-[var(--fyxvo-text-muted)] shadow-sm transition-all hover:border-[var(--fyxvo-border-strong)] hover:text-[var(--fyxvo-text)]"
-          aria-label="Give feedback"
-        >
-          <span>Feedback</span>
+        <div className="flex items-center gap-2 rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] px-2 py-1.5 shadow-sm">
           <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex items-center rounded-full px-2 py-0.5 text-xs text-[var(--fyxvo-text-muted)] transition-all hover:text-[var(--fyxvo-text)]"
+            aria-label="Give feedback"
+          >
+            <span>Feedback</span>
+          </button>
+          <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setDismissed(true); }}
-            className="ml-1 opacity-50 hover:opacity-100"
+            className="rounded-full p-1 text-[var(--fyxvo-text-muted)] opacity-50 transition hover:opacity-100"
             aria-label="Dismiss"
           >
             ✕
           </button>
-        </button>
+        </div>
       ) : (
         <div className="w-64 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] p-4 shadow-xl">
           {submitted ? (
@@ -57,12 +61,13 @@ export function FeedbackWidget() {
             <>
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-xs font-medium text-[var(--fyxvo-text)]">Was this page helpful?</p>
-                <button onClick={() => setOpen(false)} className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]">✕</button>
+                <button type="button" onClick={() => setOpen(false)} className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]">✕</button>
               </div>
               <div className="mb-3 flex gap-2">
                 {(["up", "down"] as const).map((r) => (
                   <button
                     key={r}
+                    type="button"
                     onClick={() => setRating(r)}
                     className={`flex-1 rounded-lg border py-2 text-lg transition-colors ${
                       rating === r
@@ -86,6 +91,7 @@ export function FeedbackWidget() {
                 />
               )}
               <button
+                type="button"
                 onClick={() => void handleSubmit()}
                 disabled={!rating || submitting}
                 className="w-full rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:bg-brand-600 transition-colors"

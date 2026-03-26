@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type PropsWithChildren } from "react";
 
 type Theme = "fyxvo-dark" | "fyxvo-light";
 
@@ -12,10 +12,41 @@ interface ThemeContextValue {
 }
 
 const STORAGE_KEY = "fyxvo.web.theme";
+const THEME_EVENT = "fyxvo:theme-change";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;
+}
+
+function subscribe(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (!event.key || event.key === STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+  const handleThemeChange = () => onStoreChange();
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(THEME_EVENT, handleThemeChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(THEME_EVENT, handleThemeChange);
+  };
+}
+
+function readStoredTheme(defaultTheme: Theme): Theme {
+  if (typeof window === "undefined") {
+    return defaultTheme;
+  }
+
+  const storedTheme = window.localStorage.getItem(STORAGE_KEY);
+  return storedTheme === "fyxvo-light" || storedTheme === "fyxvo-dark" ? storedTheme : defaultTheme;
 }
 
 export function ThemeProvider({
@@ -24,14 +55,11 @@ export function ThemeProvider({
 }: PropsWithChildren<{
   readonly defaultTheme?: Theme;
 }>) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === "undefined") {
-      return defaultTheme;
-    }
-
-    const storedTheme = window.localStorage.getItem(STORAGE_KEY);
-    return storedTheme === "fyxvo-light" || storedTheme === "fyxvo-dark" ? storedTheme : defaultTheme;
-  });
+  const theme = useSyncExternalStore(
+    subscribe,
+    () => readStoredTheme(defaultTheme),
+    () => defaultTheme
+  );
 
   useEffect(() => {
     applyTheme(theme);
@@ -42,17 +70,17 @@ export function ThemeProvider({
       theme,
       resolvedTheme: theme,
       setTheme(nextTheme) {
-        setThemeState(nextTheme);
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, nextTheme);
+          window.dispatchEvent(new Event(THEME_EVENT));
         }
         applyTheme(nextTheme);
       },
       toggleTheme() {
         const nextTheme = theme === "fyxvo-dark" ? "fyxvo-light" : "fyxvo-dark";
-        setThemeState(nextTheme);
         if (typeof window !== "undefined") {
           window.localStorage.setItem(STORAGE_KEY, nextTheme);
+          window.dispatchEvent(new Event(THEME_EVENT));
         }
         applyTheme(nextTheme);
       }

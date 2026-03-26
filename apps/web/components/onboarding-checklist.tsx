@@ -1,12 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Button } from "@fyxvo/ui";
 import type { OnChainProjectSnapshot, PortalApiKey } from "../lib/types";
 import { WelcomeModal } from "./welcome-modal";
 import { updateMe } from "../lib/api";
 import { usePortal } from "./portal-provider";
+
+const WELCOME_SEEN_KEY = "fyxvo-welcome-seen";
+const WELCOME_EVENT = "fyxvo:welcome-dismissed";
+
+function subscribeWelcome(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (!event.key || event.key === WELCOME_SEEN_KEY) {
+      onStoreChange();
+    }
+  };
+  const handleWelcomeDismissed = () => onStoreChange();
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(WELCOME_EVENT, handleWelcomeDismissed);
+
+  return () => {
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(WELCOME_EVENT, handleWelcomeDismissed);
+  };
+}
+
+function hasSeenWelcome() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return Boolean(window.localStorage.getItem(WELCOME_SEEN_KEY));
+}
 
 interface ChecklistStep {
   readonly id: string;
@@ -108,17 +140,12 @@ export function OnboardingChecklist({
   const completedCount = steps.filter((s) => s.done).length;
   const allDone = completedCount === steps.length;
 
-  const [showWelcome, setShowWelcome] = useState(() => {
-    // If already dismissed server-side, never show
-    if (user?.onboardingDismissed) return false;
-    // Show welcome modal once for new users (checked on mount via localStorage)
-    if (typeof window === "undefined") return false;
-    return !localStorage.getItem("fyxvo-welcome-seen");
-  });
+  const welcomeSeen = useSyncExternalStore(subscribeWelcome, hasSeenWelcome, () => false);
+  const showWelcome = !user?.onboardingDismissed && !welcomeSeen;
 
   function dismissWelcome() {
-    localStorage.setItem("fyxvo-welcome-seen", "1");
-    setShowWelcome(false);
+    window.localStorage.setItem(WELCOME_SEEN_KEY, "1");
+    window.dispatchEvent(new Event(WELCOME_EVENT));
     // Sync dismissed state to server
     if (token) {
       void updateMe({ onboardingDismissed: true, token });
