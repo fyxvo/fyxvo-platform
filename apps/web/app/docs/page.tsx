@@ -2133,7 +2133,7 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                   <li>All Solana JSON-RPC methods work identically</li>
                   <li>@solana/web3.js, solana-py, and all standard clients</li>
                   <li>Transaction signing and submission flows</li>
-                  <li>WebSocket subscriptions (coming soon)</li>
+                  <li>WebSocket subscriptions are not part of the hosted alpha surface yet</li>
                 </ul>
               </div>
               <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">

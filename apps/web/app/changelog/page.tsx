@@ -82,7 +82,7 @@ const releases: Release[] = [
       },
       {
         type: "added",
-        text: "Notification preferences: per-user toggles for all seven notification types. Email address storage (delivery coming soon).",
+        text: "Notification preferences: per-user toggles for all seven notification types. Email address storage is live so alert and digest delivery can be enabled without re-collecting account details.",
       },
       {
         type: "added",

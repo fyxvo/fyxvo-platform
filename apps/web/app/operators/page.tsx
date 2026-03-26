@@ -855,7 +855,7 @@ export default function OperatorsPage() {
                   Fyxvo is building toward open operator participation. If you want early access to run infrastructure, join the waitlist and tell us about your setup.
                 </CardDescription>
               </div>
-              <Badge tone="neutral">coming soon</Badge>
+              <Badge tone="neutral">Early access</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

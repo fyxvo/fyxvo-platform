@@ -37,8 +37,8 @@ export function StatusRegions() {
 
   const regions = [
     { id: "us-east-1", label: "us-east-1", status: "active" as const },
-    { id: "eu-west-1", label: "eu-west-1", status: "coming-soon" as const },
-    { id: "ap-southeast-1", label: "ap-southeast-1", status: "coming-soon" as const },
+    { id: "eu-west-1", label: "eu-west-1", status: "planned" as const },
+    { id: "ap-southeast-1", label: "ap-southeast-1", status: "planned" as const },
   ];
 
   return (
@@ -52,7 +52,7 @@ export function StatusRegions() {
       <CardContent className="space-y-3">
         {regions.map((region) => {
           const isActive = region.status === "active" && region.id === activeRegion;
-          const isComingSoon = region.status === "coming-soon";
+          const isPlanned = region.status === "planned";
           return (
             <div
               key={region.id}
@@ -71,12 +71,12 @@ export function StatusRegions() {
                 className={`text-xs font-medium ${
                   isActive
                     ? "text-emerald-600 dark:text-emerald-400"
-                    : isComingSoon
+                    : isPlanned
                       ? "text-[var(--fyxvo-text-muted)]"
                       : "text-[var(--fyxvo-text-muted)]"
                 }`}
               >
-                {isActive ? "Active" : "Coming soon"}
+                {isActive ? "Active" : "Planned"}
               </span>
             </div>
           );

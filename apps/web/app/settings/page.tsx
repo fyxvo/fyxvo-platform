@@ -960,7 +960,7 @@ export default function SettingsPage() {
               <span className="text-sm text-[var(--fyxvo-text-muted)]">Not connected</span>
             )}
           </SettingRow>
-          <SettingRow label="Email address" description="Used for alerts and digest emails. Coming soon — stored but not yet delivered.">
+          <SettingRow label="Email address" description="Used for alerts and digest emails. Saved now and held for operational delivery.">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <Input
@@ -987,11 +987,10 @@ export default function SettingsPage() {
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">Email saved.</p>
               ) : null}
               <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-amber-600 dark:text-amber-400">Coming soon</span>
-                {" "}Email delivery is not yet active.
+                Email delivery is not active yet. Fyxvo stores your address now so alert and digest delivery can be enabled without re-collecting account details.
               </p>
               <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                Email verification will be required for email notifications when that feature launches.
+                Email verification will be required before operational email sending is enabled for your account.
               </p>
             </div>
           </SettingRow>

@@ -1834,8 +1834,8 @@ export function AssistantWorkspace() {
                       "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] opacity-70",
                       FOCUS_RING_CLASS
                     )}
-                    aria-label="Attachments coming soon"
-                    title="Attachments coming soon"
+                    aria-label="Attachments unavailable in alpha"
+                    title="Attachments are unavailable in the current alpha"
                   >
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M21.4 11.1l-8.6 8.6a5 5 0 11-7.1-7.1l9.2-9.2a3.5 3.5 0 015 5L9.8 18.5a2 2 0 11-2.8-2.8l8.5-8.5" />
@@ -1868,7 +1868,7 @@ export function AssistantWorkspace() {
                       )}
                     />
                     <div className="flex flex-wrap items-center gap-2 px-1 pb-1 text-[11px] text-[var(--fyxvo-text-muted)]">
-                      <span>Attachment support is coming soon.</span>
+                      <span>Attachments are unavailable in the current alpha.</span>
                       {!selectedProject ? <span>No project context selected yet.</span> : null}
                     </div>
                   </div>
