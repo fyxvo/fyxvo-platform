@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { COMPUTE_HEAVY_METHODS, PRICING_LAMPORTS, WRITE_METHODS } from "@fyxvo/config";
+import {
+  COMPUTE_HEAVY_METHODS,
+  PRICING_LAMPORTS,
+  WRITE_METHODS,
+  isEmailDeliveryEnabled,
+  sendTransactionalEmail,
+  type WorkerEnv,
+} from "@fyxvo/config";
 import { UserRole, type PrismaClientType } from "@fyxvo/database";
 import type { WorkerLogger } from "../types.js";
 
@@ -269,6 +276,7 @@ function renderDigestTemplate(
 
 export async function generateWeeklyDigests(
   prisma: PrismaClientType,
+  env: WorkerEnv,
   logger: WorkerLogger
 ): Promise<void> {
   try {
@@ -276,86 +284,131 @@ export async function generateWeeklyDigests(
     const template = readFileSync(templatePath, "utf-8");
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
-    const pageSize = 100;
-    let offset = 0;
     let generated = 0;
-
-    for (;;) {
-      const users = await prisma.user.findMany({
-        select: { id: true, displayName: true },
-        skip: offset,
-        take: pageSize,
-      });
-      if (users.length === 0) break;
-
-      for (const user of users) {
-        // Check if digest already generated this week
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const existing = await (prisma as any).digestRecord.findFirst({
-          where: {
-            userId: user.id,
-            generatedAt: { gte: sevenDaysAgo },
+    const deliverEmail = isEmailDeliveryEnabled({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const schedules = await (prisma as any).digestSchedule.findMany({
+      where: {
+        nextSendAt: { lte: new Date() },
+        user: {
+          email: { not: null },
+          emailVerified: true,
+          notifyWeeklySummary: true,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            reputationLevel: true,
           },
-          select: { id: true },
-        });
-        if (existing) continue;
+        },
+      },
+      take: 250,
+    }) as Array<{
+      id: string;
+      userId: string;
+      user: {
+        id: string;
+        displayName: string;
+        email: string;
+        reputationLevel?: string | null;
+      };
+    }>;
 
-        // Gather stats
-        const [totalRequests, successCount, topProjectRows] = await Promise.all([
-          prisma.requestLog.count({
-            where: { project: { ownerId: user.id }, createdAt: { gte: sevenDaysAgo } },
-          }),
-          prisma.requestLog.count({
-            where: { project: { ownerId: user.id }, createdAt: { gte: sevenDaysAgo }, statusCode: { lt: 400 } },
-          }),
-          prisma.project.findMany({
-            where: { ownerId: user.id },
-            select: { id: true, name: true, _count: { select: { requestLogs: true } } },
-            orderBy: { requestLogs: { _count: "desc" } },
-            take: 3,
-          }),
-        ]);
+    for (const schedule of schedules) {
+      const user = schedule.user;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const existing = await (prisma as any).digestRecord.findFirst({
+        where: {
+          userId: user.id,
+          generatedAt: { gte: sevenDaysAgo },
+        },
+        select: { id: true },
+      });
+      if (existing) continue;
 
-        const successRate = totalRequests > 0 ? Math.round((successCount / totalRequests) * 100) : 100;
+      const [totalRequests, successCount, topProjectRows] = await Promise.all([
+        prisma.requestLog.count({
+          where: { project: { ownerId: user.id }, createdAt: { gte: sevenDaysAgo } },
+        }),
+        prisma.requestLog.count({
+          where: { project: { ownerId: user.id }, createdAt: { gte: sevenDaysAgo }, statusCode: { lt: 400 } },
+        }),
+        prisma.project.findMany({
+          where: { ownerId: user.id },
+          select: { id: true, name: true, _count: { select: { requestLogs: true } } },
+          orderBy: { requestLogs: { _count: "desc" } },
+          take: 3,
+        }),
+      ]);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const userRecord = await (prisma as any).user.findUnique({
-          where: { id: user.id },
-          select: { reputationLevel: true },
-        });
-        const reputationLevel = (userRecord as { reputationLevel?: string } | null)?.reputationLevel ?? "Explorer";
+      const successRate = totalRequests > 0 ? Math.round((successCount / totalRequests) * 100) : 100;
+      const reputationLevel = user.reputationLevel ?? "Explorer";
 
-        const topProjectsHtml = topProjectRows.length > 0
-          ? topProjectRows.map((p) =>
-              `<tr><td style="padding:8px 12px;font-size:14px;color:#e2e8f0;">${p.name}</td>` +
-              `<td style="padding:8px 12px;font-size:14px;color:#7c3aed;text-align:right;">${p._count.requestLogs} reqs</td></tr>`
-            ).join("")
-          : `<tr><td colspan="2" style="padding:8px 12px;font-size:14px;color:#64748b;">No projects yet.</td></tr>`;
+      const topProjectsHtml = topProjectRows.length > 0
+        ? topProjectRows.map((p) =>
+            `<tr><td style="padding:8px 12px;font-size:14px;color:#e2e8f0;">${p.name}</td>` +
+            `<td style="padding:8px 12px;font-size:14px;color:#7c3aed;text-align:right;">${p._count.requestLogs} reqs</td></tr>`
+          ).join("")
+        : `<tr><td colspan="2" style="padding:8px 12px;font-size:14px;color:#64748b;">No projects yet.</td></tr>`;
 
-        const topProjectsTable =
-          `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" ` +
-          `style="background-color:#0f1117;border-radius:8px;border:1px solid #2d3148;">` +
-          `${topProjectsHtml}</table>`;
+      const topProjectsTable =
+        `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" ` +
+        `style="background-color:#0f1117;border-radius:8px;border:1px solid #2d3148;">` +
+        `${topProjectsHtml}</table>`;
 
-        const html = renderDigestTemplate(template, {
-          userName: user.displayName,
-          totalRequests: String(totalRequests),
-          successRate: String(successRate),
-          topProjects: topProjectsTable,
-          networkStatus: "Operational",
-          reputationLevel,
-          unsubscribeUrl: `https://www.fyxvo.com/unsubscribe?userId=${user.id}`,
-        });
+      const html = renderDigestTemplate(template, {
+        userName: user.displayName,
+        totalRequests: String(totalRequests),
+        successRate: String(successRate),
+        topProjects: topProjectsTable,
+        networkStatus: "Operational",
+        reputationLevel,
+        unsubscribeUrl: `https://www.fyxvo.com/unsubscribe?userId=${user.id}`,
+      });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma as any).digestRecord.create({
-          data: { userId: user.id, htmlContent: html },
-        });
-        generated += 1;
+      let sent = false;
+      if (deliverEmail) {
+        try {
+          await sendTransactionalEmail(
+            {
+              apiKey: env.RESEND_API_KEY,
+              from: env.EMAIL_FROM,
+              replyTo: env.EMAIL_REPLY_TO,
+              baseUrl: env.EMAIL_DELIVERY_BASE_URL,
+            },
+            {
+              to: user.email,
+              subject: "Your Fyxvo weekly digest",
+              html,
+              text: `Fyxvo weekly digest for ${user.displayName}. Total requests: ${totalRequests}. Success rate: ${successRate}%.`,
+            }
+          );
+          sent = true;
+        } catch (error) {
+          logger.error(
+            { event: "worker.digest.email_failed", userId: user.id, error: error instanceof Error ? error.message : "Unknown error" },
+            "Failed to send weekly digest email"
+          );
+        }
       }
 
-      offset += pageSize;
-      if (users.length < pageSize) break;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any).digestRecord.create({
+        data: { userId: user.id, htmlContent: html, sent },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any).digestSchedule.update({
+        where: { id: schedule.id },
+        data: {
+          lastSentAt: new Date(),
+          nextSendAt: new Date(Date.now() + 7 * 24 * 3600 * 1000),
+        },
+      });
+      generated += 1;
     }
 
     logger.info({ event: "worker.digests.generated", count: generated }, "Weekly digests generated");

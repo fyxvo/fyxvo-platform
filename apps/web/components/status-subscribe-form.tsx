@@ -42,7 +42,7 @@ export function StatusSubscribeForm() {
             Stay informed
           </h2>
           <p className="mt-2 text-sm text-[var(--fyxvo-text-muted)]">
-            Join the status subscriber list for incident update emails. We save your address now so the operational list is ready as delivery expands.
+            Join the status subscriber list for incident update emails and live operational notices.
           </p>
           <div className="mt-4 flex gap-2">
             <input
@@ -68,7 +68,7 @@ export function StatusSubscribeForm() {
           </div>
           {subscribeState === "success" && (
             <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
-              ✓ Your email is now saved on the Fyxvo status subscriber list.
+              ✓ Your email is on the Fyxvo status subscriber list for incident updates.
             </p>
           )}
           {subscribeState === "error" && errorMessage ? (

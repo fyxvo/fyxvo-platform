@@ -65,6 +65,10 @@ export const apiEnvSchema = sharedEnvSchema.extend({
   API_JWT_SECRET: z.string().min(32).default("fyxvo-development-session-secret-change-me"),
   API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
   API_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  RESEND_API_KEY: z.string().trim().min(1).optional().catch(undefined),
+  EMAIL_FROM: z.string().trim().email().optional().catch(undefined),
+  EMAIL_REPLY_TO: z.string().trim().email().optional().catch(undefined),
+  EMAIL_DELIVERY_BASE_URL: z.url().default("https://api.resend.com"),
   USDC_MINT_ADDRESS: z
     .string()
     .trim()
@@ -99,6 +103,10 @@ export const gatewayEnvSchema = sharedEnvSchema.extend({
 export const workerEnvSchema = sharedEnvSchema.extend({
   API_ORIGIN: z.url().default(`http://localhost:${servicePorts.api}`),
   GATEWAY_ORIGIN: z.url().default(`http://localhost:${servicePorts.gateway}`),
+  RESEND_API_KEY: z.string().trim().min(1).optional().catch(undefined),
+  EMAIL_FROM: z.string().trim().email().optional().catch(undefined),
+  EMAIL_REPLY_TO: z.string().trim().email().optional().catch(undefined),
+  EMAIL_DELIVERY_BASE_URL: z.url().default("https://api.resend.com"),
   WORKER_NAME: z.string().trim().min(1).default("fyxvo-worker"),
   WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(5_000),
   WORKER_REDIS_PREFIX: z.string().trim().min(1).default("fyxvo:worker"),

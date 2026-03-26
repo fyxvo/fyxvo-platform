@@ -17,7 +17,7 @@ type UserStatus = User["status"];
 
 export type AuthenticatedUser = Pick<
   User,
-  "id" | "walletAddress" | "displayName" | "email" | "role" | "status" | "sessionVersion"
+  "id" | "walletAddress" | "displayName" | "email" | "role" | "status" | "sessionVersion" | "emailVerified"
 >;
 
 export type ProjectWithOwner = Project & {
@@ -641,6 +641,7 @@ export interface SystemAnnouncementItem {
 export interface AssistantConversationSummary {
   readonly id: string;
   readonly title: string;
+  readonly pinned: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastMessageAt: string;
@@ -945,9 +946,15 @@ export interface ApiRepository {
   listActivityLog(projectId: string, limit?: number): Promise<ActivityLogItem[]>;
   getActiveAnnouncement(): Promise<SystemAnnouncementItem | null>;
   upsertAnnouncement(input: { message: string; severity: string; startAt?: Date | null; endAt?: Date | null }): Promise<void>;
-  listAssistantConversations(userId: string, limit?: number): Promise<AssistantConversationSummary[]>;
+  listAssistantConversations(userId: string, limit?: number, query?: string): Promise<AssistantConversationSummary[]>;
+  getLatestAssistantConversation(userId: string): Promise<AssistantConversationDetail | null>;
   getAssistantConversation(userId: string, conversationId: string): Promise<AssistantConversationDetail | null>;
   createAssistantConversation(input: { userId: string; title: string }): Promise<AssistantConversationSummary>;
+  updateAssistantConversation(
+    userId: string,
+    conversationId: string,
+    input: { pinned?: boolean; title?: string }
+  ): Promise<AssistantConversationSummary | null>;
   saveAssistantConversationMessages(input: {
     userId: string;
     conversationId?: string;

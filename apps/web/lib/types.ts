@@ -748,6 +748,7 @@ export interface AssistantConversationMessage {
 export interface AssistantConversationSummary {
   readonly id: string;
   readonly title: string;
+  readonly pinned: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastMessageAt: string;

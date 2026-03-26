@@ -806,8 +806,15 @@ export async function getAssistantRateLimitStatus(token: string) {
   return requestApi<AssistantRateLimitStatus>("/v1/assistant/rate-limit-status", undefined, token);
 }
 
-export async function listAssistantConversations(token: string) {
-  return requestApi<{ items: AssistantConversationSummary[] }>("/v1/assistant/conversations", undefined, token);
+export async function listAssistantConversations(
+  token: string,
+  input?: { readonly limit?: number; readonly query?: string }
+) {
+  const params = new URLSearchParams();
+  if (input?.limit) params.set("limit", String(input.limit));
+  if (input?.query?.trim()) params.set("q", input.query.trim());
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  return requestApi<{ items: AssistantConversationSummary[] }>(`/v1/assistant/conversations${query}`, undefined, token);
 }
 
 export async function getLatestAssistantConversation(token: string) {
@@ -822,6 +829,18 @@ export async function createAssistantConversation(title: string | undefined, tok
   return requestApi<{ item: AssistantConversationSummary }>(
     "/v1/assistant/conversations",
     { method: "POST", body: JSON.stringify({ title }) },
+    token
+  );
+}
+
+export async function updateAssistantConversation(
+  conversationId: string,
+  input: { readonly pinned?: boolean; readonly title?: string },
+  token: string
+) {
+  return requestApi<{ item: AssistantConversationSummary }>(
+    `/v1/assistant/conversations/${conversationId}`,
+    { method: "PATCH", body: JSON.stringify(input) },
     token
   );
 }

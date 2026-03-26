@@ -736,6 +736,7 @@ model AssistantConversation {
   id            String             @id @default(uuid()) @db.Uuid
   userId        String             @db.Uuid
   title         String
+  pinned        Boolean            @default(false)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   lastMessageAt DateTime           @default(now())
@@ -744,6 +745,7 @@ model AssistantConversation {
   feedback      AssistantFeedback[]
 
   @@index([userId, lastMessageAt])
+  @@index([userId, pinned, lastMessageAt])
 }
 
 model AssistantMessage {

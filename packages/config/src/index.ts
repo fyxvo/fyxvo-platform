@@ -1,6 +1,7 @@
 export * from "./api-keys.js";
 export * from "./authority.js";
 export * from "./constants.js";
+export * from "./email.js";
 export * from "./env.js";
 export * from "./fyxvo-program.js";
 export * from "./pricing.js";

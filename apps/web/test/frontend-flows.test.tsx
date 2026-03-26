@@ -47,6 +47,7 @@ const apiMocks = vi.hoisted(() => ({
   submitInterest: vi.fn(),
   submitAssistantFeedback: vi.fn(),
   trackProductEvent: vi.fn(),
+  updateAssistantConversation: vi.fn(),
   verifyWalletSession: vi.fn()
 }));
 
@@ -115,6 +116,7 @@ vi.mock("../lib/api", () => ({
   submitInterest: apiMocks.submitInterest,
   submitAssistantFeedback: apiMocks.submitAssistantFeedback,
   trackProductEvent: apiMocks.trackProductEvent,
+  updateAssistantConversation: apiMocks.updateAssistantConversation,
   verifyWalletSession: apiMocks.verifyWalletSession
 }));
 
@@ -285,6 +287,7 @@ beforeEach(() => {
     item: {
       id: "conversation-1",
       title: "Explain the difference between standard RPC and priority relay on Fyxvo",
+      pinned: false,
       createdAt: "2026-03-26T00:00:00.000Z",
       updatedAt: "2026-03-26T00:00:00.000Z",
       lastMessageAt: "2026-03-26T00:00:00.000Z",
@@ -295,6 +298,7 @@ beforeEach(() => {
     item: {
       id: "conversation-1",
       title: "Explain the difference between standard RPC and priority relay on Fyxvo",
+      pinned: false,
       createdAt: "2026-03-26T00:00:00.000Z",
       updatedAt: "2026-03-26T00:00:01.000Z",
       lastMessageAt: "2026-03-26T00:00:01.000Z",
@@ -557,7 +561,7 @@ describe("frontend flows", () => {
       });
     });
     expect(
-      await screen.findByText("✓ Your email is now saved on the Fyxvo status subscriber list.")
+      await screen.findByText("✓ Your email is on the Fyxvo status subscriber list for incident updates.")
     ).toBeInTheDocument();
   });
 });

@@ -219,6 +219,8 @@ export default function SettingsPage() {
   const [emailValue, setEmailValue] = useState("");
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailSaved, setEmailSaved] = useState(false);
+  const [emailVerificationSending, setEmailVerificationSending] = useState(false);
+  const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null);
 
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState<{
@@ -431,10 +433,33 @@ export default function SettingsPage() {
     setEmailSaving(true);
     try {
       await updateNotificationPreferences({ email: emailValue || null }, portal.token);
+      await portal.refresh();
       setEmailSaved(true);
       setTimeout(() => setEmailSaved(false), 2500);
     } finally {
       setEmailSaving(false);
+    }
+  }
+
+  async function requestEmailVerification() {
+    if (!portal.token || !emailValue.trim()) return;
+    setEmailVerificationSending(true);
+    setEmailVerificationMessage(null);
+    try {
+      const response = await fetch(new URL("/v1/me/verify-email/request", webEnv.apiBaseUrl), {
+        method: "POST",
+        headers: { authorization: `Bearer ${portal.token}` },
+      });
+      const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+      setEmailVerificationMessage(
+        response.ok
+          ? payload.message ?? "Verification email sent."
+          : payload.message ?? payload.error ?? "Unable to send verification email right now."
+      );
+    } catch {
+      setEmailVerificationMessage("Unable to send verification email right now.");
+    } finally {
+      setEmailVerificationSending(false);
     }
   }
 
@@ -960,7 +985,7 @@ export default function SettingsPage() {
               <span className="text-sm text-[var(--fyxvo-text-muted)]">Not connected</span>
             )}
           </SettingRow>
-          <SettingRow label="Email address" description="Used for alerts and digest emails. Saved now and held for operational delivery.">
+          <SettingRow label="Email address" description="Used for alerts, status notices, and digest emails after verification.">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
                 <Input
@@ -973,6 +998,8 @@ export default function SettingsPage() {
                 />
                 {emailValue && !portal.user?.emailVerified ? (
                   <span className="ml-2 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-400">Unverified</span>
+                ) : emailValue ? (
+                  <span className="ml-2 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-400">Verified</span>
                 ) : null}
                 <Button
                   variant="secondary"
@@ -987,11 +1014,29 @@ export default function SettingsPage() {
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">Email saved.</p>
               ) : null}
               <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                Email delivery is not active yet. Fyxvo stores your address now so alert and digest delivery can be enabled without re-collecting account details.
+                Fyxvo uses this address for verification, weekly digests, and operational notices after you confirm it.
               </p>
               <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                Email verification will be required before operational email sending is enabled for your account.
+                Verification keeps delivery tied to the right wallet session and prevents notices from going to an unconfirmed address.
               </p>
+              {emailValue && !portal.user?.emailVerified ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void requestEmailVerification()}
+                    disabled={emailVerificationSending || !portal.token}
+                  >
+                    {emailVerificationSending ? "Sending…" : "Send verification email"}
+                  </Button>
+                  <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                    A secure confirmation link will be sent to this address.
+                  </span>
+                </div>
+              ) : null}
+              {emailVerificationMessage ? (
+                <p className="text-xs text-[var(--fyxvo-text-muted)]">{emailVerificationMessage}</p>
+              ) : null}
             </div>
           </SettingRow>
           <SettingRow label="Display name" description="Auto-generated from your wallet address.">

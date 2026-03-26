@@ -123,6 +123,7 @@ class MemoryApiRepository implements ApiRepository {
       id: string;
       userId: string;
       title: string;
+      pinned: boolean;
       createdAt: string;
       updatedAt: string;
       lastMessageAt: string;
@@ -198,6 +199,19 @@ class MemoryApiRepository implements ApiRepository {
       ...user,
       role,
       updatedAt: new Date()
+    });
+  }
+
+  setUserEmail(walletAddress: string, email: string) {
+    const user = [...this.users.values()].find((candidate) => candidate.walletAddress === walletAddress);
+    if (!user) {
+      throw new Error(`User for wallet ${walletAddress} was not found.`);
+    }
+
+    this.users.set(user.id, {
+      ...user,
+      email,
+      updatedAt: new Date(),
     });
   }
 
@@ -1004,6 +1018,7 @@ class MemoryApiRepository implements ApiRepository {
   private mapAssistantConversationSummary(conversation: {
     id: string;
     title: string;
+    pinned: boolean;
     createdAt: string;
     updatedAt: string;
     lastMessageAt: string;
@@ -1012,6 +1027,7 @@ class MemoryApiRepository implements ApiRepository {
     return {
       id: conversation.id,
       title: conversation.title,
+      pinned: conversation.pinned,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       lastMessageAt: conversation.lastMessageAt,
@@ -1058,12 +1074,35 @@ class MemoryApiRepository implements ApiRepository {
 
   async countAssistantMessagesThisHour(_userId: string, _since: Date): Promise<number> { return 0; }
 
-  async listAssistantConversations(userId: string, limit = 20) {
+  async listAssistantConversations(userId: string, limit = 20, query?: string) {
     return [...this.assistantConversations.values()]
       .filter((conversation) => conversation.userId === userId)
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .filter((conversation) =>
+        query?.trim()
+          ? conversation.title.toLowerCase().includes(query.trim().toLowerCase()) ||
+            conversation.messages.some((message) => message.content.toLowerCase().includes(query.trim().toLowerCase()))
+          : true
+      )
+      .sort((left, right) =>
+        left.pinned === right.pinned
+          ? right.updatedAt.localeCompare(left.updatedAt)
+          : left.pinned
+            ? -1
+            : 1
+      )
       .slice(0, limit)
       .map((conversation) => this.mapAssistantConversationSummary(conversation));
+  }
+
+  async getLatestAssistantConversation(userId: string) {
+    const conversation = [...this.assistantConversations.values()]
+      .filter((candidate) => candidate.userId === userId)
+      .sort((left, right) => right.lastMessageAt.localeCompare(left.lastMessageAt))[0];
+    if (!conversation) return null;
+    return {
+      ...this.mapAssistantConversationSummary(conversation),
+      messages: [...conversation.messages],
+    };
   }
 
   async getAssistantConversation(userId: string, conversationId: string) {
@@ -1084,6 +1123,7 @@ class MemoryApiRepository implements ApiRepository {
       id: randomUUID(),
       userId: input.userId,
       title: input.title,
+      pinned: false,
       createdAt: now,
       updatedAt: now,
       lastMessageAt: now,
@@ -1091,6 +1131,25 @@ class MemoryApiRepository implements ApiRepository {
     };
     this.assistantConversations.set(conversation.id, conversation);
     return this.mapAssistantConversationSummary(conversation);
+  }
+
+  async updateAssistantConversation(
+    userId: string,
+    conversationId: string,
+    input: { pinned?: boolean; title?: string }
+  ) {
+    const conversation = this.assistantConversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return null;
+    }
+    const nextConversation = {
+      ...conversation,
+      ...(typeof input.pinned === "boolean" ? { pinned: input.pinned } : {}),
+      ...(input.title ? { title: input.title } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    this.assistantConversations.set(conversationId, nextConversation);
+    return this.mapAssistantConversationSummary(nextConversation);
   }
 
   async saveAssistantConversationMessages(input: {
@@ -1326,8 +1385,31 @@ class MemoryApiRepository implements ApiRepository {
   async subscribeNewsletter(_input: NewsletterSubscribeInput): Promise<void> {}
   async getNewsletterCount(): Promise<number> { return 0; }
   async getLeaderboard(): Promise<LeaderboardEntry[]> { return []; }
-  async setEmailVerificationToken(_userId: string, _token: string, _expiry: Date): Promise<void> {}
-  async verifyEmail(_token: string): Promise<{ success: boolean }> { return { success: false }; }
+  async setEmailVerificationToken(userId: string, token: string, expiry: Date): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) return;
+    this.users.set(userId, {
+      ...user,
+      emailVerificationToken: token,
+      emailVerificationExpiry: expiry,
+    });
+  }
+  async verifyEmail(token: string): Promise<{ success: boolean }> {
+    const user = [...this.users.values()].find(
+      (candidate) =>
+        candidate.emailVerificationToken === token &&
+        candidate.emailVerificationExpiry &&
+        candidate.emailVerificationExpiry.getTime() >= Date.now()
+    );
+    if (!user) return { success: false };
+    this.users.set(user.id, {
+      ...user,
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpiry: null,
+    });
+    return { success: true };
+  }
   async acceptTos(_userId: string): Promise<void> {}
   async getTosStatus(_userId: string): Promise<{ accepted: boolean; acceptedAt: string | null }> { return { accepted: false, acceptedAt: null }; }
   async findUserByReferralCode(_referralCode: string): Promise<{ id: string } | null> { return null; }
@@ -1711,6 +1793,97 @@ describe("Fyxvo API service", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({ success: true });
+  });
+
+  it("supports assistant conversation pinning and search", async () => {
+    const context = await createTestApp();
+    appsToClose.add(context.app);
+    const auth = await authenticateWallet({ app: context.app, repository: context.repository });
+
+    const firstCreate = await context.app.inject({
+      method: "POST",
+      url: "/v1/assistant/conversations",
+      headers: { authorization: `Bearer ${auth.token}` },
+      payload: { title: "Latency debugging" },
+    });
+    const secondCreate = await context.app.inject({
+      method: "POST",
+      url: "/v1/assistant/conversations",
+      headers: { authorization: `Bearer ${auth.token}` },
+      payload: { title: "Funding checklist" },
+    });
+
+    expect(firstCreate.statusCode).toBe(201);
+    expect(secondCreate.statusCode).toBe(201);
+    const firstConversationId = firstCreate.json<{ item: { id: string } }>().item.id;
+
+    const pinResponse = await context.app.inject({
+      method: "PATCH",
+      url: `/v1/assistant/conversations/${firstConversationId}`,
+      headers: { authorization: `Bearer ${auth.token}` },
+      payload: { pinned: true },
+    });
+    expect(pinResponse.statusCode).toBe(200);
+    expect(pinResponse.json<{ item: { pinned: boolean } }>().item.pinned).toBe(true);
+
+    const listResponse = await context.app.inject({
+      method: "GET",
+      url: "/v1/assistant/conversations",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json<{ items: Array<{ id: string; pinned: boolean }> }>().items[0]).toMatchObject({
+      id: firstConversationId,
+      pinned: true,
+    });
+
+    const searchResponse = await context.app.inject({
+      method: "GET",
+      url: "/v1/assistant/conversations?q=funding",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+    expect(searchResponse.statusCode).toBe(200);
+    expect(searchResponse.json<{ items: Array<{ title: string }> }>().items).toEqual([
+      expect.objectContaining({ title: "Funding checklist" }),
+    ]);
+  });
+
+  it("sends verification email requests when delivery is configured", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "email-1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const context = await createTestApp({
+      envOverrides: {
+        RESEND_API_KEY: "resend-test-key",
+        EMAIL_FROM: "alerts@fyxvo.com",
+      },
+    });
+    appsToClose.add(context.app);
+    const auth = await authenticateWallet({ app: context.app, repository: context.repository });
+    context.repository.setUserEmail(auth.wallet.publicKey.toBase58(), "alerts@example.com");
+
+    const response = await context.app.inject({
+      method: "POST",
+      url: "/v1/me/verify-email/request",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toMatchObject({
+      requested: true,
+      message: "Verification email sent.",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.resend.com/emails",
+      expect.objectContaining({
+        method: "POST",
+      })
+    );
   });
 
   it("returns assistant availability, 503 when not configured, 500 on upstream failure, and streams SSE responses", async () => {

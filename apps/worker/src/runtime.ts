@@ -194,9 +194,9 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
       }, 300_000);
 
       // Weekly digest generation — run once on startup, then weekly
-      void generateWeeklyDigests(prismaClient, logger);
+      void generateWeeklyDigests(prismaClient, this.dependencies.env, logger);
       this.digestInterval = setInterval(() => {
-        void generateWeeklyDigests(prismaClient, logger);
+        void generateWeeklyDigests(prismaClient, this.dependencies.env, logger);
       }, 7 * 24 * 3_600_000);
     }
 

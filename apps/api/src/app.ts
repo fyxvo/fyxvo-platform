@@ -13,9 +13,11 @@ import {
   WRITE_METHODS,
   normalizeApiKeyScopes,
   resolveAuthorityPlan,
+  isEmailDeliveryEnabled,
   supportedApiKeyScopes,
   getSolanaNetworkConfig,
-  resolveAllowedCorsOrigins
+  resolveAllowedCorsOrigins,
+  sendTransactionalEmail
 } from "@fyxvo/config";
 import { databaseHealthcheck } from "@fyxvo/database";
 import bs58 from "bs58";
@@ -61,6 +63,56 @@ class HttpError extends Error {
 }
 
 const API_STATUS_VERSION = "v1";
+
+function buildEmailVerificationMessage(input: {
+  readonly origin: string;
+  readonly walletAddress: string;
+  readonly token: string;
+}) {
+  const verificationUrl = `${input.origin.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(input.token)}`;
+  return {
+    subject: "Verify your Fyxvo email",
+    text:
+      `Verify your email for Fyxvo.\n\n` +
+      `Wallet: ${input.walletAddress}\n` +
+      `Open this link to confirm: ${verificationUrl}\n\n` +
+      `This verification link expires in 24 hours.`,
+    html:
+      `<div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">` +
+      `<h1 style="font-size:24px;line-height:1.2;margin:0 0 16px;">Verify your Fyxvo email</h1>` +
+      `<p style="font-size:15px;line-height:1.7;margin:0 0 16px;">Confirm this address to receive weekly digests and account alerts for wallet <strong>${input.walletAddress}</strong>.</p>` +
+      `<p style="margin:24px 0;"><a href="${verificationUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600;">Verify email</a></p>` +
+      `<p style="font-size:13px;line-height:1.6;color:#475569;margin:0 0 12px;">If the button does not open, copy this link into your browser:</p>` +
+      `<p style="font-size:13px;line-height:1.6;word-break:break-word;color:#0f172a;margin:0 0 16px;">${verificationUrl}</p>` +
+      `<p style="font-size:12px;line-height:1.6;color:#64748b;margin:0;">This verification link expires in 24 hours.</p>` +
+      `</div>`,
+  };
+}
+
+function buildIncidentSubscriberMessage(input: {
+  readonly serviceName: string;
+  readonly severity: string;
+  readonly description: string;
+  readonly statusLabel: string;
+  readonly statusPageUrl: string;
+}) {
+  return {
+    subject: `[Fyxvo status] ${input.statusLabel}: ${input.serviceName}`,
+    text:
+      `${input.statusLabel} for ${input.serviceName}\n\n` +
+      `${input.description}\n\n` +
+      `Severity: ${input.severity}\n` +
+      `Status page: ${input.statusPageUrl}`,
+    html:
+      `<div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">` +
+      `<p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">Fyxvo status update</p>` +
+      `<h1 style="font-size:24px;line-height:1.2;margin:0 0 12px;">${input.statusLabel}: ${input.serviceName}</h1>` +
+      `<p style="font-size:15px;line-height:1.7;margin:0 0 16px;">${input.description}</p>` +
+      `<p style="font-size:13px;line-height:1.6;color:#475569;margin:0 0 18px;">Severity: ${input.severity}</p>` +
+      `<p style="margin:0;"><a href="${input.statusPageUrl}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:600;">Open status page</a></p>` +
+      `</div>`,
+  };
+}
 
 function getRuntimeCommitSha() {
   const commit =
@@ -781,6 +833,63 @@ export async function buildApiApp(input: {
     return input.prisma;
   }
 
+  async function deliverEmail(inputMessage: {
+    readonly to: string | readonly string[];
+    readonly subject: string;
+    readonly html: string;
+    readonly text: string;
+  }) {
+    await sendTransactionalEmail(
+      {
+        apiKey: input.env.RESEND_API_KEY,
+        from: input.env.EMAIL_FROM,
+        replyTo: input.env.EMAIL_REPLY_TO,
+        baseUrl: input.env.EMAIL_DELIVERY_BASE_URL,
+      },
+      inputMessage
+    );
+  }
+
+  async function notifyStatusSubscribers(inputMessage: {
+    readonly serviceName: string;
+    readonly severity: string;
+    readonly description: string;
+    readonly statusLabel: string;
+  }) {
+    if (!isEmailDeliveryEnabled({ apiKey: input.env.RESEND_API_KEY, from: input.env.EMAIL_FROM })) {
+      return;
+    }
+
+    try {
+      const subscribers = await requirePrisma().statusSubscriber.findMany({
+        where: { active: true },
+        select: { email: true },
+        take: 250,
+      });
+      const recipients = subscribers.map((subscriber) => subscriber.email).filter(Boolean);
+      if (recipients.length === 0) return;
+
+      const message = buildIncidentSubscriberMessage({
+        ...inputMessage,
+        statusPageUrl: input.env.WEB_ORIGIN.replace(/\/$/, "") + "/status",
+      });
+      await deliverEmail({
+        to: recipients,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      });
+    } catch (error) {
+      app.log.warn(
+        {
+          event: "status.email_delivery_failed",
+          message: error instanceof Error ? error.message : "Unknown status email delivery failure",
+        },
+        "Status subscriber email delivery failed"
+      );
+    }
+  }
+
   function startOfUtcDay(date = new Date()) {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   }
@@ -1166,6 +1275,12 @@ export async function buildApiApp(input: {
       description: z.string().min(5).max(500),
     }).parse(request.body);
     const incident = await input.repository.createIncident(body);
+    void notifyStatusSubscribers({
+      serviceName: incident.serviceName,
+      severity: incident.severity,
+      description: incident.description,
+      statusLabel: "Incident opened",
+    });
     return reply.status(201).send({ item: incident });
   });
 
@@ -1193,6 +1308,12 @@ export async function buildApiApp(input: {
           message: body.description ?? incident.description,
           affectedServices: [incident.serviceName],
         },
+      });
+      void notifyStatusSubscribers({
+        serviceName: incident.serviceName,
+        severity: incident.severity,
+        description: body.description ?? incident.description,
+        statusLabel: body.status === "resolved" ? "Incident resolved" : body.status === "open" ? "Incident reopened" : "Incident updated",
       });
     }
     return { item: incident };
@@ -1239,6 +1360,17 @@ export async function buildApiApp(input: {
     if (!incident) {
       throw new HttpError(404, "incident_not_found", "The requested incident could not be found.");
     }
+    void notifyStatusSubscribers({
+      serviceName: incident.serviceName,
+      severity: body.severity ?? incident.severity,
+      description: body.message,
+      statusLabel:
+        body.status === "resolved"
+          ? "Incident resolved"
+          : body.status === "escalated"
+            ? "Incident escalated"
+            : "Incident update",
+    });
     return reply.status(201).send({
       item: serializeForJson(incident),
     });
@@ -3643,18 +3775,21 @@ export async function buildApiApp(input: {
 
   app.get("/v1/assistant/conversations", async (request) => {
     const user = requireUser(request);
+    const query = z.object({
+      limit: z.coerce.number().int().min(1).max(50).default(20),
+      q: z.string().trim().max(120).optional(),
+    }).parse(request.query);
     return {
-      items: await input.repository.listAssistantConversations(user.id, 20)
+      items: await input.repository.listAssistantConversations(user.id, query.limit, query.q)
     };
   });
 
   app.get("/v1/assistant/conversations/latest", async (request) => {
     const user = requireUser(request);
-    const items = await input.repository.listAssistantConversations(user.id, 1);
-    if (items.length === 0) {
+    const item = await input.repository.getLatestAssistantConversation(user.id);
+    if (!item) {
       return { item: null };
     }
-    const item = await input.repository.getAssistantConversation(user.id, items[0]!.id);
     return { item };
   });
 
@@ -3672,6 +3807,27 @@ export async function buildApiApp(input: {
     const user = requireUser(request);
     const params = z.object({ conversationId: z.string().uuid() }).parse(request.params);
     const item = await input.repository.getAssistantConversation(user.id, params.conversationId);
+    if (!item) throw new HttpError(404, "not_found", "Conversation not found.");
+    return { item };
+  });
+
+  app.patch("/v1/assistant/conversations/:conversationId", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ conversationId: z.string().uuid() }).parse(request.params);
+    const body = z
+      .object({
+        pinned: z.boolean().optional(),
+        title: z.string().trim().min(1).max(80).optional(),
+      })
+      .refine((value) => typeof value.pinned === "boolean" || typeof value.title === "string", {
+        message: "At least one conversation field must be updated.",
+      })
+      .parse(request.body ?? {});
+
+    const item = await input.repository.updateAssistantConversation(user.id, params.conversationId, {
+      ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
+      ...(typeof body.title === "string" ? { title: body.title } : {}),
+    });
     if (!item) throw new HttpError(404, "not_found", "Conversation not found.");
     return { item };
   });
@@ -5265,10 +5421,47 @@ ${liveContextLines.join("\n")}
 
   // ── Email verification prep ───────────────────────────────────────────────
   app.post("/v1/me/verify-email/request", async (request, reply) => {
-    requireUser(request);
-    return reply.status(503).send({
-      error: "email_delivery_not_enabled",
-      message: "Email delivery is not yet enabled. Verification will be available in a future release."
+    const user = requireUser(request);
+    if (!user.email) {
+      return reply.status(400).send({
+        error: "email_missing",
+        message: "Add an email address in settings before requesting verification.",
+      });
+    }
+    if (user.emailVerified) {
+      return reply.status(200).send({
+        requested: false,
+        alreadyVerified: true,
+        message: "This email address is already verified.",
+      });
+    }
+    if (!isEmailDeliveryEnabled({ apiKey: input.env.RESEND_API_KEY, from: input.env.EMAIL_FROM })) {
+      return reply.status(503).send({
+        error: "email_delivery_not_enabled",
+        message: "Email delivery is not configured in this environment.",
+      });
+    }
+
+    const token = randomBytes(24).toString("hex");
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await input.repository.setEmailVerificationToken(user.id, token, expiry);
+
+    const message = buildEmailVerificationMessage({
+      origin: input.env.WEB_ORIGIN,
+      walletAddress: user.walletAddress,
+      token,
+    });
+    await deliverEmail({
+      to: user.email,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    });
+
+    return reply.status(202).send({
+      requested: true,
+      expiresAt: expiry.toISOString(),
+      message: "Verification email sent.",
     });
   });
 

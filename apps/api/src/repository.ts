@@ -165,6 +165,7 @@ function toJsonValue(value: Record<string, unknown>): PrismaNamespace.InputJsonV
 function mapAssistantConversationSummary(row: {
   id: string;
   title: string;
+  pinned?: boolean;
   createdAt: Date;
   updatedAt: Date;
   lastMessageAt: Date;
@@ -173,6 +174,7 @@ function mapAssistantConversationSummary(row: {
   return {
     id: row.id,
     title: row.title,
+    pinned: row.pinned ?? false,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastMessageAt: row.lastMessageAt.toISOString(),
@@ -2206,21 +2208,48 @@ export class PrismaApiRepository implements ApiRepository {
     });
   }
 
-  async listAssistantConversations(userId: string, limit = 20): Promise<AssistantConversationSummary[]> {
+  async listAssistantConversations(userId: string, limit = 20, query?: string): Promise<AssistantConversationSummary[]> {
     const rows = await this.prisma.assistantConversation.findMany({
-      where: { userId },
-      orderBy: { lastMessageAt: "desc" },
+      where: {
+        userId,
+        ...(query?.trim()
+          ? {
+              OR: [
+                { title: { contains: query.trim(), mode: "insensitive" } },
+                {
+                  messages: {
+                    some: {
+                      content: { contains: query.trim(), mode: "insensitive" },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ pinned: "desc" }, { lastMessageAt: "desc" }],
       take: limit,
       include: { _count: { select: { messages: true } } },
     });
     return rows.map((row: {
       id: string;
       title: string;
+      pinned: boolean;
       createdAt: Date;
       updatedAt: Date;
       lastMessageAt: Date;
       _count: { messages: number };
     }) => mapAssistantConversationSummary(row));
+  }
+
+  async getLatestAssistantConversation(userId: string): Promise<AssistantConversationDetail | null> {
+    const row = await this.prisma.assistantConversation.findFirst({
+      where: { userId },
+      orderBy: { lastMessageAt: "desc" },
+      select: { id: true },
+    });
+    if (!row) return null;
+    return this.getAssistantConversation(userId, row.id);
   }
 
   async getAssistantConversation(userId: string, conversationId: string): Promise<AssistantConversationDetail | null> {
@@ -2249,6 +2278,30 @@ export class PrismaApiRepository implements ApiRepository {
       data: {
         userId: input.userId,
         title: input.title.slice(0, 80),
+      },
+      include: { _count: { select: { messages: true } } },
+    });
+    return mapAssistantConversationSummary(row);
+  }
+
+  async updateAssistantConversation(
+    userId: string,
+    conversationId: string,
+    input: { pinned?: boolean; title?: string }
+  ): Promise<AssistantConversationSummary | null> {
+    const existing = await this.prisma.assistantConversation.findFirst({
+      where: { id: conversationId, userId },
+      select: { id: true },
+    });
+    if (!existing) return null;
+
+    const row = await this.prisma.assistantConversation.update({
+      where: { id: conversationId },
+      data: {
+        ...(typeof input.pinned === "boolean" ? { pinned: input.pinned } : {}),
+        ...(typeof input.title === "string" && input.title.trim()
+          ? { title: input.title.trim().slice(0, 80) }
+          : {}),
       },
       include: { _count: { select: { messages: true } } },
     });
