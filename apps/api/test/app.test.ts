@@ -1697,6 +1697,22 @@ describe("Fyxvo API service", () => {
     });
   });
 
+  it("accepts public status subscriptions", async () => {
+    const { app } = await createTestApp();
+    appsToClose.add(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/status/subscribe",
+      payload: {
+        email: "alerts@example.com"
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ success: true });
+  });
+
   it("returns assistant availability, 503 when not configured, 500 on upstream failure, and streams SSE responses", async () => {
     const unavailableContext = await createTestApp();
     appsToClose.add(unavailableContext.app);

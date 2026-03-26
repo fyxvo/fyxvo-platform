@@ -1,11 +1,12 @@
 import React, { type ReactNode } from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AssistantPage from "../app/assistant/page";
 import ApiKeysPage from "../app/api-keys/page";
 import FundingPage from "../app/funding/page";
 import { PortalProvider } from "../components/portal-provider";
+import { StatusSubscribeForm } from "../components/status-subscribe-form";
 import { WalletPanel } from "../components/wallet-panel";
 import {
   previewAdminOverview,
@@ -526,6 +527,37 @@ describe("frontend flows", () => {
     });
     expect(
       await screen.findByText("Ask about onboarding, debugging, relay behavior, or live project state")
+    ).toBeInTheDocument();
+  }, 10000);
+
+  it("submits a status subscription and shows a saved confirmation", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 201,
+        headers: {
+          "content-type": "application/json"
+        }
+      })
+    );
+
+    renderPortal(<StatusSubscribeForm />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Status subscription email" }), {
+      target: {
+        value: " alerts@example.com "
+      }
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Join list" }));
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith("/api/status-subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "alerts@example.com" }),
+      });
+    });
+    expect(
+      await screen.findByText("✓ Your email is now saved on the Fyxvo status subscriber list.")
     ).toBeInTheDocument();
   });
 });

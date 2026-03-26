@@ -7,22 +7,29 @@ type SubscribeState = "idle" | "loading" | "success" | "error";
 export function StatusSubscribeForm() {
   const [subscribeEmail, setSubscribeEmail] = useState("");
   const [subscribeState, setSubscribeState] = useState<SubscribeState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSubscribe() {
-    if (!subscribeEmail.includes("@")) return;
+    const normalizedEmail = subscribeEmail.trim();
+    if (!normalizedEmail.includes("@")) return;
     setSubscribeState("loading");
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/status-subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: subscribeEmail }),
+        body: JSON.stringify({ email: normalizedEmail }),
       });
       if (res.ok) {
         setSubscribeState("success");
+        setSubscribeEmail("");
       } else {
+        const body = (await res.json().catch(() => ({ error: null }))) as { error?: string | null };
+        setErrorMessage(body.error ?? "Unable to save your status subscription right now.");
         setSubscribeState("error");
       }
     } catch {
+      setErrorMessage("Unable to save your status subscription right now.");
       setSubscribeState("error");
     }
   }
@@ -35,11 +42,12 @@ export function StatusSubscribeForm() {
             Stay informed
           </h2>
           <p className="mt-2 text-sm text-[var(--fyxvo-text-muted)]">
-            Get notified when incidents are opened or resolved.
+            Join the status subscriber list for incident update emails. We save your address now so the operational list is ready as delivery expands.
           </p>
           <div className="mt-4 flex gap-2">
             <input
               type="email"
+              aria-label="Status subscription email"
               placeholder="your@email.com"
               className="flex-1 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] px-3 py-2 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] outline-none focus:border-[var(--fyxvo-brand,#7c3aed)]"
               value={subscribeEmail}
@@ -54,17 +62,20 @@ export function StatusSubscribeForm() {
               {subscribeState === "loading"
                 ? "Subscribing…"
                 : subscribeState === "success"
-                  ? "Subscribed!"
-                  : "Notify me"}
+                  ? "Saved"
+                  : "Join list"}
             </button>
           </div>
           {subscribeState === "success" && (
             <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
-              ✓ You&apos;ll be notified when status changes. (Email alerts launch soon.)
+              ✓ Your email is now saved on the Fyxvo status subscriber list.
             </p>
           )}
+          {subscribeState === "error" && errorMessage ? (
+            <p className="mt-2 text-xs text-rose-400">{errorMessage}</p>
+          ) : null}
           <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)] opacity-60">
-            Email alerts are coming soon.
+            Stored for status communications only. No marketing list crossover.
           </p>
         </div>
       </div>

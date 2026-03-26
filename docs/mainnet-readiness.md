@@ -44,7 +44,7 @@ Fyxvo is credible on devnet. It is not ready for paid mainnet traffic without de
 ### 2.5 Product and Commercial
 
 1. Pricing is credible for devnet launch, but not mature enough yet for irreversible paid commitments.
-2. The current project model is owner-admin only. Team collaboration, member roles, and support workflows still need to be productized before broader paid adoption.
+2. Team collaboration, member roles, and support workflows now exist for the devnet product, but the governance, audit, and operational model for broader paid adoption still needs to mature.
 3. SLA language is intentionally absent today. That is correct, but it also means paid launch should wait until support and incident expectations are defined.
 
 ## 3. Honest Launch Sequencing
@@ -82,5 +82,5 @@ These limits are deliberate and should stay explicit in product and docs.
 1. SOL is the live public funding path on devnet.
 2. USDC remains configuration-gated until it is deliberately enabled and fully validated.
 3. The operator path is managed infrastructure first, not open decentralized supply.
-4. Project collaboration is not yet multi-user. Projects are still effectively owner-admin managed.
+4. Project collaboration is now multi-user, but it is still intentionally lightweight compared with the governed permission and approval model that paid mainnet operations will require.
 5. The current launch is devnet-first and should be positioned that way until the mainnet gates above are closed.
