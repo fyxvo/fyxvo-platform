@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "fyxvo-cookies-accepted";
 
@@ -13,8 +13,27 @@ function hasAccepted() {
   }
 }
 
+function subscribe(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (!event.key || event.key === STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+  return () => window.removeEventListener("storage", handleStorage);
+}
+
+function getSnapshot() {
+  return !hasAccepted();
+}
+
 export function CookieNotice() {
-  const [visible, setVisible] = useState(() => !hasAccepted());
+  const visible = useSyncExternalStore(subscribe, getSnapshot, () => false);
 
   function dismiss() {
     try {
@@ -22,7 +41,7 @@ export function CookieNotice() {
     } catch {
       // ignore
     }
-    setVisible(false);
+    window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY, newValue: "1" }));
   }
 
   if (!visible) {
