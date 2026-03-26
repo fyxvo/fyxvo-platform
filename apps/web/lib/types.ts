@@ -812,3 +812,130 @@ export interface AdminDeploymentReadiness {
     readonly error: string | null;
   };
 }
+
+export interface ReleaseReadinessSummary {
+  readonly timestamp: string;
+  readonly environment: string;
+  readonly infrastructure: {
+    readonly status: "healthy" | "needs_attention" | "blocked";
+    readonly apiCommit: string | null;
+    readonly gatewayHealth: string;
+    readonly assistantAvailable: boolean;
+    readonly currentIncidentCount: number;
+    readonly cspViolationsLast24h: number;
+    readonly webhookFailureRate: number;
+    readonly supportBacklogCount: number;
+  };
+  readonly product: {
+    readonly status: "healthy" | "needs_attention" | "blocked";
+    readonly totalUsers: number;
+    readonly totalActiveProjects: number;
+    readonly projectsWithRecentTraffic: number;
+    readonly projectsWithLowBalanceAlerts: number;
+    readonly projectsWithHighErrorRates: number;
+    readonly assistantUsageToday: number;
+    readonly newsletterSubscribers: number;
+    readonly leaderboardOptIns: number;
+    readonly publicProjectPagesCount: number;
+  };
+  readonly operations: {
+    readonly status: "healthy" | "needs_attention" | "blocked";
+    readonly pendingMigrations: {
+      readonly checkedAt: string;
+      readonly detected: boolean;
+      readonly count: number;
+      readonly names: readonly string[];
+      readonly error: string | null;
+    };
+    readonly latestAnnouncement: {
+      readonly message: string;
+      readonly severity: string;
+      readonly createdAt: string;
+    } | null;
+    readonly latestBlogPost: {
+      readonly title: string;
+      readonly slug: string;
+      readonly publishedAt: string | null;
+    } | null;
+    readonly latestChangelogVersion: {
+      readonly version: string;
+      readonly title: string;
+      readonly publishedAt: string;
+    } | null;
+    readonly openSupportTickets: number;
+    readonly activeIncidents: ReadonlyArray<{
+      readonly id: string;
+      readonly serviceName: string;
+      readonly severity: string;
+      readonly description: string;
+      readonly startedAt: string;
+    }>;
+    readonly digestGenerationStatus: {
+      readonly latestGeneratedAt: string | null;
+      readonly latestSent: boolean | null;
+      readonly dueSchedules: number;
+    };
+    readonly statusSubscriberCount: number;
+  };
+}
+
+export interface OnboardingFunnelSummary {
+  readonly windowDays: number;
+  readonly generatedAt: string;
+  readonly steps: ReadonlyArray<{
+    readonly key: string;
+    readonly label: string;
+    readonly count: number;
+    readonly previousCount: number;
+    readonly conversionPercentage: number;
+    readonly trend: "up" | "flat" | "down";
+  }>;
+}
+
+export interface FeedbackInboxItem {
+  readonly id: string;
+  readonly type:
+    | "feedback_submission"
+    | "assistant_feedback"
+    | "support_ticket"
+    | "newsletter_signup"
+    | "referral_conversion";
+  readonly title: string;
+  readonly summary: string;
+  readonly source: string;
+  readonly createdAt: string;
+  readonly actor: string;
+  readonly project: {
+    readonly id: string;
+    readonly name: string;
+    readonly slug: string;
+  } | null;
+  readonly status: "new" | "reviewed" | "planned" | "resolved";
+  readonly tags: readonly string[];
+}
+
+export interface DashboardPreferences {
+  readonly widgetOrder: readonly string[];
+  readonly hiddenWidgets: readonly string[];
+  readonly updatedAt: string | null;
+}
+
+export interface SavedViewRecord {
+  readonly id: string;
+  readonly kind: "alerts" | "request_logs";
+  readonly name: string;
+  readonly projectId: string | null;
+  readonly filters: Record<string, unknown>;
+  readonly isDefault: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface BookmarkRecord {
+  readonly id: string;
+  readonly projectId: string | null;
+  readonly label: string;
+  readonly href: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}

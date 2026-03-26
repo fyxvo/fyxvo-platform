@@ -764,6 +764,21 @@ export async function buildApiApp(input: {
   });
   const allowedOrigins = new Set(resolveAllowedCorsOrigins(input.env));
 
+  function requirePrisma() {
+    if (!input.prisma) {
+      throw new HttpError(
+        503,
+        "database_unavailable",
+        "This route requires a database-backed runtime."
+      );
+    }
+    return input.prisma;
+  }
+
+  function startOfUtcDay(date = new Date()) {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  }
+
   await app.register(cors, {
     origin(origin, callback) {
       if (!origin || allowedOrigins.has(origin)) {
@@ -1204,6 +1219,263 @@ export async function buildApiApp(input: {
     });
 
     return reply.send({ success: true });
+  });
+
+  app.get("/v1/me/dashboard-preferences", async (request) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const item = await db.dashboardPreference.findUnique({
+      where: { userId: user.id },
+      select: {
+        widgetOrder: true,
+        hiddenWidgets: true,
+        updatedAt: true,
+      },
+    });
+    return {
+      item: {
+        widgetOrder: item?.widgetOrder ?? [],
+        hiddenWidgets: item?.hiddenWidgets ?? [],
+        updatedAt: item?.updatedAt?.toISOString() ?? null,
+      },
+    };
+  });
+
+  app.patch("/v1/me/dashboard-preferences", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const body = z.object({
+      widgetOrder: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+      hiddenWidgets: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+    }).parse(request.body);
+
+    const item = await db.dashboardPreference.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        widgetOrder: body.widgetOrder ?? [],
+        hiddenWidgets: body.hiddenWidgets ?? [],
+      },
+      update: {
+        ...(body.widgetOrder !== undefined ? { widgetOrder: body.widgetOrder } : {}),
+        ...(body.hiddenWidgets !== undefined ? { hiddenWidgets: body.hiddenWidgets } : {}),
+      },
+      select: {
+        widgetOrder: true,
+        hiddenWidgets: true,
+        updatedAt: true,
+      },
+    });
+
+    return reply.send({
+      item: {
+        widgetOrder: item.widgetOrder,
+        hiddenWidgets: item.hiddenWidgets,
+        updatedAt: item.updatedAt.toISOString(),
+      },
+    });
+  });
+
+  app.get("/v1/bookmarks", async (request) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const items = await db.userBookmark.findMany({
+      where: { userId: user.id },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    });
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        projectId: item.projectId ?? null,
+        label: item.label,
+        href: item.href,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      })),
+    };
+  });
+
+  app.post("/v1/bookmarks", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const body = z.object({
+      label: z.string().trim().min(1).max(80),
+      href: z.string().trim().min(1).max(300),
+      projectId: z.string().uuid().optional().nullable(),
+    }).parse(request.body);
+
+    const item = await db.userBookmark.upsert({
+      where: {
+        userId_href: {
+          userId: user.id,
+          href: body.href,
+        },
+      },
+      create: {
+        userId: user.id,
+        label: body.label,
+        href: body.href,
+        ...(body.projectId ? { projectId: body.projectId } : {}),
+      },
+      update: {
+        label: body.label,
+        ...(body.projectId !== undefined ? { projectId: body.projectId } : {}),
+      },
+    });
+
+    return reply.status(201).send({
+      item: {
+        id: item.id,
+        projectId: item.projectId ?? null,
+        label: item.label,
+        href: item.href,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      },
+    });
+  });
+
+  app.delete("/v1/bookmarks/:bookmarkId", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const { bookmarkId } = z.object({ bookmarkId: z.string().uuid() }).parse(request.params);
+    await db.userBookmark.deleteMany({
+      where: { id: bookmarkId, userId: user.id },
+    });
+    return reply.status(204).send();
+  });
+
+  app.get("/v1/saved-views", async (request) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const query = z.object({
+      kind: z.enum(["alerts", "request_logs"]),
+      projectId: z.string().uuid().optional(),
+    }).parse(request.query);
+
+    const items = await db.savedView.findMany({
+      where: {
+        userId: user.id,
+        kind: query.kind,
+        ...(query.projectId ? { OR: [{ projectId: query.projectId }, { projectId: null }] } : {}),
+      },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+    });
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        name: item.name,
+        projectId: item.projectId ?? null,
+        filters: item.filters,
+        isDefault: item.isDefault,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      })),
+    };
+  });
+
+  app.post("/v1/saved-views", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const body = z.object({
+      kind: z.enum(["alerts", "request_logs"]),
+      name: z.string().trim().min(1).max(80),
+      projectId: z.string().uuid().optional().nullable(),
+      filters: z.record(z.string(), z.unknown()),
+      isDefault: z.boolean().optional(),
+    }).parse(request.body);
+
+    if (body.isDefault) {
+      await db.savedView.updateMany({
+        where: { userId: user.id, kind: body.kind },
+        data: { isDefault: false },
+      });
+    }
+
+    const item = await db.savedView.create({
+      data: {
+        userId: user.id,
+        kind: body.kind,
+        name: body.name,
+        filters: JSON.parse(JSON.stringify(body.filters)) as never,
+        isDefault: body.isDefault ?? false,
+        ...(body.projectId ? { projectId: body.projectId } : {}),
+      },
+    });
+
+    return reply.status(201).send({
+      item: {
+        id: item.id,
+        kind: item.kind,
+        name: item.name,
+        projectId: item.projectId ?? null,
+        filters: item.filters,
+        isDefault: item.isDefault,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      },
+    });
+  });
+
+  app.patch("/v1/saved-views/:viewId", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const { viewId } = z.object({ viewId: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      name: z.string().trim().min(1).max(80).optional(),
+      filters: z.record(z.string(), z.unknown()).optional(),
+      isDefault: z.boolean().optional(),
+    }).parse(request.body);
+
+    const existing = await db.savedView.findFirst({
+      where: { id: viewId, userId: user.id },
+    });
+    if (!existing) {
+      throw new HttpError(404, "not_found", "Saved view not found.");
+    }
+
+    if (body.isDefault) {
+      await db.savedView.updateMany({
+        where: { userId: user.id, kind: existing.kind },
+        data: { isDefault: false },
+      });
+    }
+
+    const item = await db.savedView.update({
+      where: { id: viewId },
+      data: {
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.filters !== undefined
+          ? { filters: JSON.parse(JSON.stringify(body.filters)) as never }
+          : {}),
+        ...(body.isDefault !== undefined ? { isDefault: body.isDefault } : {}),
+      },
+    });
+
+    return reply.send({
+      item: {
+        id: item.id,
+        kind: item.kind,
+        name: item.name,
+        projectId: item.projectId ?? null,
+        filters: item.filters,
+        isDefault: item.isDefault,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      },
+    });
+  });
+
+  app.delete("/v1/saved-views/:viewId", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const { viewId } = z.object({ viewId: z.string().uuid() }).parse(request.params);
+    await db.savedView.deleteMany({
+      where: { id: viewId, userId: user.id },
+    });
+    return reply.status(204).send();
   });
 
   app.post("/v1/me/accept-tos", async (request, reply) => {
@@ -2303,6 +2575,511 @@ export async function buildApiApp(input: {
     return { item: await input.repository.getAdminObservability() };
   });
 
+  app.get("/v1/admin/release-readiness", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const now = new Date();
+    const start24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const start7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const startOfToday = startOfUtcDay(now);
+
+    const [
+      latestGatewayHealth,
+      activeIncidentCount,
+      webhookDeliveries24h,
+      supportBacklogCount,
+      totalUsers,
+      totalActiveProjects,
+      recentTrafficProjects,
+      lowBalanceAlertProjects,
+      recentProjectLogs,
+      assistantUsageToday,
+      newsletterSubscribers,
+      leaderboardOptIns,
+      publicProjectPagesCount,
+      pendingMigrations,
+      latestAnnouncement,
+      latestBlogPost,
+      latestWhatsNew,
+      openSupportTickets,
+      activeIncidents,
+      latestDigestRecord,
+      dueDigestCount,
+      statusSubscriberCount,
+    ] = await Promise.all([
+      db.serviceHealthSnapshot.findFirst({
+        where: { serviceName: "gateway" },
+        orderBy: { checkedAt: "desc" },
+        select: { status: true, checkedAt: true },
+      }),
+      db.incident.count({ where: { resolvedAt: null } }),
+      db.webhookDelivery.findMany({
+        where: { createdAt: { gte: start24h } },
+        select: { status: true },
+      }),
+      db.supportTicket.count({
+        where: { status: { in: ["open", "in_progress"] } },
+      }),
+      db.user.count(),
+      db.project.count({ where: { archivedAt: null } }),
+      db.requestLog.findMany({
+        where: {
+          projectId: { not: null },
+          createdAt: { gte: start7d },
+        },
+        select: { projectId: true },
+        distinct: ["projectId"],
+      }),
+      db.notification.findMany({
+        where: {
+          projectId: { not: null },
+          createdAt: { gte: start7d },
+          OR: [
+            { title: { contains: "low balance", mode: "insensitive" } },
+            { message: { contains: "low balance", mode: "insensitive" } },
+          ],
+        },
+        select: { projectId: true },
+        distinct: ["projectId"],
+      }),
+      db.requestLog.findMany({
+        where: {
+          projectId: { not: null },
+          createdAt: { gte: start24h },
+        },
+        select: { projectId: true, statusCode: true },
+      }),
+      db.assistantMessage.count({
+        where: { role: "user", createdAt: { gte: startOfToday } },
+      }),
+      db.newsletterSubscriber.count(),
+      db.project.count({ where: { leaderboardVisible: true, archivedAt: null } }),
+      db.project.count({ where: { isPublic: true, publicSlug: { not: null } } }),
+      detectPendingPrismaMigrations(db),
+      db.systemAnnouncement.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { message: true, severity: true, createdAt: true },
+      }),
+      db.blogPost.findFirst({
+        where: { visible: true, publishedAt: { not: null } },
+        orderBy: { publishedAt: "desc" },
+        select: { title: true, slug: true, publishedAt: true },
+      }),
+      db.whatsNew.findFirst({
+        where: { active: true },
+        orderBy: { publishedAt: "desc" },
+        select: { version: true, title: true, publishedAt: true },
+      }),
+      db.supportTicket.count({ where: { status: { in: ["open", "in_progress"] } } }),
+      db.incident.findMany({
+        where: { resolvedAt: null },
+        orderBy: { startedAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          serviceName: true,
+          severity: true,
+          description: true,
+          startedAt: true,
+        },
+      }),
+      db.digestRecord.findFirst({
+        orderBy: { generatedAt: "desc" },
+        select: { generatedAt: true, sent: true },
+      }),
+      db.digestSchedule.count({ where: { nextSendAt: { lte: now } } }),
+      db.statusSubscriber.count({ where: { active: true } }),
+    ]);
+
+    const highErrorRateProjects = new Set<string>();
+    const statsByProject = new Map<string, { total: number; errors: number }>();
+    for (const log of recentProjectLogs) {
+      if (!log.projectId) continue;
+      const stats = statsByProject.get(log.projectId) ?? { total: 0, errors: 0 };
+      stats.total += 1;
+      if (log.statusCode >= 400) stats.errors += 1;
+      statsByProject.set(log.projectId, stats);
+    }
+    for (const [projectId, stats] of statsByProject.entries()) {
+      if (stats.total >= 20 && stats.errors / stats.total >= 0.1) {
+        highErrorRateProjects.add(projectId);
+      }
+    }
+
+    const failedWebhookCount = webhookDeliveries24h.filter((delivery) =>
+      delivery.status === "failed" || delivery.status === "permanent_failure"
+    ).length;
+    const webhookFailureRate =
+      webhookDeliveries24h.length > 0
+        ? Number(((failedWebhookCount / webhookDeliveries24h.length) * 100).toFixed(1))
+        : 0;
+
+    const infrastructureStatus =
+      !isAssistantConfigured(input.env) || latestGatewayHealth?.status === "offline" || activeIncidentCount > 0
+        ? "blocked"
+        : webhookFailureRate > 10 || supportBacklogCount > 10 || cspViolations.filter((entry) => new Date(entry.receivedAt).getTime() >= start24h.getTime()).length > 0
+          ? "needs_attention"
+          : "healthy";
+    const productStatus =
+      totalActiveProjects === 0 || recentTrafficProjects.length === 0
+        ? "needs_attention"
+        : highErrorRateProjects.size > 0 || lowBalanceAlertProjects.length > 0
+          ? "needs_attention"
+          : "healthy";
+    const operationsStatus =
+      pendingMigrations.detected || activeIncidentCount > 0
+        ? "blocked"
+        : dueDigestCount > 0 || openSupportTickets > 0
+          ? "needs_attention"
+          : "healthy";
+
+    return {
+      item: {
+        timestamp: now.toISOString(),
+        environment: input.env.FYXVO_ENV,
+        infrastructure: {
+          status: infrastructureStatus,
+          apiCommit: getRuntimeCommitSha(),
+          gatewayHealth: latestGatewayHealth?.status ?? "unknown",
+          assistantAvailable: isAssistantConfigured(input.env),
+          currentIncidentCount: activeIncidentCount,
+          cspViolationsLast24h: cspViolations.filter((entry) => new Date(entry.receivedAt).getTime() >= start24h.getTime()).length,
+          webhookFailureRate,
+          supportBacklogCount,
+        },
+        product: {
+          status: productStatus,
+          totalUsers,
+          totalActiveProjects,
+          projectsWithRecentTraffic: recentTrafficProjects.length,
+          projectsWithLowBalanceAlerts: lowBalanceAlertProjects.length,
+          projectsWithHighErrorRates: highErrorRateProjects.size,
+          assistantUsageToday,
+          newsletterSubscribers,
+          leaderboardOptIns,
+          publicProjectPagesCount,
+        },
+        operations: {
+          status: operationsStatus,
+          pendingMigrations,
+          latestAnnouncement: latestAnnouncement
+            ? {
+                message: latestAnnouncement.message,
+                severity: latestAnnouncement.severity,
+                createdAt: latestAnnouncement.createdAt.toISOString(),
+              }
+            : null,
+          latestBlogPost: latestBlogPost
+            ? {
+                title: latestBlogPost.title,
+                slug: latestBlogPost.slug,
+                publishedAt: latestBlogPost.publishedAt?.toISOString() ?? null,
+              }
+            : null,
+          latestChangelogVersion: latestWhatsNew
+            ? {
+                version: latestWhatsNew.version,
+                title: latestWhatsNew.title,
+                publishedAt: latestWhatsNew.publishedAt.toISOString(),
+              }
+            : null,
+          openSupportTickets,
+          activeIncidents: activeIncidents.map((incident) => ({
+            id: incident.id,
+            serviceName: incident.serviceName,
+            severity: incident.severity,
+            description: incident.description,
+            startedAt: incident.startedAt.toISOString(),
+          })),
+          digestGenerationStatus: {
+            latestGeneratedAt: latestDigestRecord?.generatedAt.toISOString() ?? null,
+            latestSent: latestDigestRecord?.sent ?? null,
+            dueSchedules: dueDigestCount,
+          },
+          statusSubscriberCount,
+        },
+      },
+    };
+  });
+
+  app.get("/v1/admin/onboarding-funnel", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const query = z.object({ windowDays: z.coerce.number().int().min(7).max(30).default(7) }).parse(request.query);
+    const now = new Date();
+
+    async function buildWindowSummary(start: Date, end: Date) {
+      const [walletConnected, projectCreated, projectActivatedRows, fundedRows, apiKeysCreated, firstRequestRows] =
+        await Promise.all([
+          db.requestLog.count({
+            where: {
+              service: "web",
+              route: "/events/wallet_connect_intent",
+              createdAt: { gte: start, lt: end },
+            },
+          }),
+          db.project.count({ where: { createdAt: { gte: start, lt: end } } }),
+          db.notification.findMany({
+            where: {
+              type: "project_activated",
+              projectId: { not: null },
+              createdAt: { gte: start, lt: end },
+            },
+            select: { projectId: true },
+            distinct: ["projectId"],
+          }),
+          db.fundingCoordinate.findMany({
+            where: { createdAt: { gte: start, lt: end } },
+            select: { projectId: true },
+            distinct: ["projectId"],
+          }),
+          db.apiKey.count({ where: { createdAt: { gte: start, lt: end } } }),
+          db.requestLog.findMany({
+            where: {
+              projectId: { not: null },
+              createdAt: { gte: start, lt: end },
+            },
+            select: { projectId: true },
+            distinct: ["projectId"],
+          }),
+        ]);
+
+      return {
+        walletConnected,
+        projectCreated,
+        projectActivated: projectActivatedRows.length,
+        funded: fundedRows.length,
+        apiKeyCreated: apiKeysCreated,
+        firstRequestMade: firstRequestRows.length,
+      };
+    }
+
+    const currentStart = new Date(now.getTime() - query.windowDays * 24 * 60 * 60 * 1000);
+    const previousStart = new Date(now.getTime() - query.windowDays * 2 * 24 * 60 * 60 * 1000);
+    const [current, previous] = await Promise.all([
+      buildWindowSummary(currentStart, now),
+      buildWindowSummary(previousStart, currentStart),
+    ]);
+
+    const steps = [
+      { key: "wallet_connected", label: "Wallet connected", count: current.walletConnected, previousCount: previous.walletConnected },
+      { key: "project_created", label: "Project created", count: current.projectCreated, previousCount: previous.projectCreated },
+      { key: "project_activated", label: "Project activated", count: current.projectActivated, previousCount: previous.projectActivated },
+      { key: "funded", label: "Funded", count: current.funded, previousCount: previous.funded },
+      { key: "api_key_created", label: "API key created", count: current.apiKeyCreated, previousCount: previous.apiKeyCreated },
+      { key: "first_request_made", label: "First request made", count: current.firstRequestMade, previousCount: previous.firstRequestMade },
+    ].map((step, index, allSteps) => {
+      const previousStepCount = index === 0 ? step.count : allSteps[index - 1]!.count;
+      const conversionPercentage =
+        index === 0
+          ? 100
+          : previousStepCount > 0
+            ? Number(((step.count / previousStepCount) * 100).toFixed(1))
+            : 0;
+      const trend =
+        step.count > step.previousCount ? "up"
+          : step.count < step.previousCount ? "down"
+            : "flat";
+      return {
+        key: step.key,
+        label: step.label,
+        count: step.count,
+        previousCount: step.previousCount,
+        conversionPercentage,
+        trend,
+      };
+    });
+
+    return {
+      item: {
+        windowDays: query.windowDays,
+        generatedAt: now.toISOString(),
+        steps,
+      },
+    };
+  });
+
+  app.get("/v1/admin/feedback-inbox", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const query = z.object({
+      type: z.enum(["all", "feedback_submission", "assistant_feedback", "support_ticket", "newsletter_signup", "referral_conversion"]).default("all"),
+      status: z.enum(["all", "new", "reviewed", "planned", "resolved"]).default("all"),
+    }).parse(request.query);
+
+    const [feedbackRows, assistantFeedbackRows, supportRows, newsletterRows, referralRows, triageRows] = await Promise.all([
+      db.feedbackSubmission.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: { project: { select: { id: true, name: true, slug: true } } },
+      }),
+      db.assistantFeedback.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          conversation: { select: { id: true, title: true } },
+          user: { select: { walletAddress: true, displayName: true } },
+          message: { select: { content: true } },
+        },
+      }),
+      db.supportTicket.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          user: { select: { walletAddress: true, displayName: true } },
+          project: { select: { id: true, name: true, slug: true } },
+        },
+      }),
+      db.newsletterSubscriber.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 40,
+      }),
+      db.referralClick.findMany({
+        where: { convertedToSignup: true },
+        orderBy: { clickedAt: "desc" },
+        take: 40,
+        include: { referrer: { select: { walletAddress: true, displayName: true } } },
+      }),
+      db.feedbackInboxTriage.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 200,
+      }),
+    ]);
+
+    const triageByKey = new Map(triageRows.map((row) => [`${row.itemType}:${row.itemId}`, row]));
+    const items = [
+      ...feedbackRows.map((row) => {
+        const triage = triageByKey.get(`feedback_submission:${row.id}`);
+        return {
+          id: row.id,
+          type: "feedback_submission",
+          title: row.category.replace(/_/g, " ").toLowerCase(),
+          summary: row.message,
+          source: row.source,
+          createdAt: row.createdAt.toISOString(),
+          actor: row.walletAddress ?? row.email,
+          project: row.project ? { id: row.project.id, name: row.project.name, slug: row.project.slug } : null,
+          status: triage?.status ?? "new",
+          tags: triage?.tags ?? [],
+        };
+      }),
+      ...assistantFeedbackRows.map((row) => {
+        const triage = triageByKey.get(`assistant_feedback:${row.id}`);
+        return {
+          id: row.id,
+          type: "assistant_feedback",
+          title: row.rating === "up" ? "Assistant thumbs up" : "Assistant thumbs down",
+          summary: row.note ?? row.message.content.slice(0, 180),
+          source: row.conversation.title,
+          createdAt: row.createdAt.toISOString(),
+          actor: row.user.walletAddress,
+          project: null,
+          status: triage?.status ?? "new",
+          tags: triage?.tags ?? [],
+        };
+      }),
+      ...supportRows.map((row) => {
+        const triage = triageByKey.get(`support_ticket:${row.id}`);
+        return {
+          id: row.id,
+          type: "support_ticket",
+          title: row.subject,
+          summary: row.description,
+          source: row.category,
+          createdAt: row.createdAt.toISOString(),
+          actor: row.user.walletAddress,
+          project: row.project ? { id: row.project.id, name: row.project.name, slug: row.project.slug } : null,
+          status: triage?.status ?? "new",
+          tags: triage?.tags ?? [],
+        };
+      }),
+      ...newsletterRows.map((row) => {
+        const triage = triageByKey.get(`newsletter_signup:${row.id}`);
+        return {
+          id: row.id,
+          type: "newsletter_signup",
+          title: "Newsletter signup",
+          summary: row.email,
+          source: row.source,
+          createdAt: row.createdAt.toISOString(),
+          actor: row.email,
+          project: null,
+          status: triage?.status ?? "new",
+          tags: triage?.tags ?? [],
+        };
+      }),
+      ...referralRows.map((row) => {
+        const triage = triageByKey.get(`referral_conversion:${row.id}`);
+        return {
+          id: row.id,
+          type: "referral_conversion",
+          title: "Referral conversion",
+          summary: `${row.referrer.displayName} generated a converted signup.`,
+          source: "referral",
+          createdAt: row.clickedAt.toISOString(),
+          actor: row.referrer.walletAddress,
+          project: null,
+          status: triage?.status ?? "new",
+          tags: triage?.tags ?? [],
+        };
+      }),
+    ]
+      .filter((item) => query.type === "all" || item.type === query.type)
+      .filter((item) => query.status === "all" || item.status === query.status)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+
+    return { items };
+  });
+
+  app.patch("/v1/admin/feedback-inbox/:itemType/:itemId", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const params = z.object({
+      itemType: z.enum(["feedback_submission", "assistant_feedback", "support_ticket", "newsletter_signup", "referral_conversion"]),
+      itemId: z.string().min(1).max(64),
+    }).parse(request.params);
+    const body = z.object({
+      status: z.enum(["new", "reviewed", "planned", "resolved"]).optional(),
+      tags: z.array(z.string().trim().min(1).max(32)).max(8).optional(),
+    }).parse(request.body);
+
+    const item = await db.feedbackInboxTriage.upsert({
+      where: {
+        itemType_itemId: {
+          itemType: params.itemType,
+          itemId: params.itemId,
+        },
+      },
+      create: {
+        itemType: params.itemType,
+        itemId: params.itemId,
+        status: body.status ?? "new",
+        tags: body.tags ?? [],
+        updatedByUserId: user.id,
+      },
+      update: {
+        ...(body.status !== undefined ? { status: body.status } : {}),
+        ...(body.tags !== undefined ? { tags: body.tags } : {}),
+        updatedByUserId: user.id,
+      },
+    });
+
+    return {
+      item: {
+        id: item.id,
+        itemType: item.itemType,
+        itemId: item.itemId,
+        status: item.status,
+        tags: item.tags,
+        updatedAt: item.updatedAt.toISOString(),
+      },
+    };
+  });
+
   app.get("/v1/admin/deployment-readiness", async (request) => {
     const user = requireUser(request);
     requireAdmin(user);
@@ -3348,6 +4125,113 @@ ${liveContextLines.join("\n")}
       throw new HttpError(403, "forbidden", "Access denied.");
     }
     return { history: await input.repository.getHealthHistory(projectId, query.range === "30d" ? 30 : 7) };
+  });
+
+  app.get("/v1/projects/:projectId/export-summary", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const { projectId } = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const { format = "json" } = z.object({ format: z.enum(["json", "markdown"]).default("json") }).parse(request.query);
+    const project = await input.repository.findProjectById(projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "Project not found.");
+    }
+
+    const [health, apiKeys, members, requests7d, webhooks, notifications, fundingRows] = await Promise.all([
+      input.repository.getProjectHealthScore(projectId),
+      input.repository.listApiKeys(projectId),
+      input.repository.listProjectMembers(projectId),
+      db.requestLog.findMany({
+        where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        select: { statusCode: true, durationMs: true },
+      }),
+      db.webhook.findMany({
+        where: { projectId },
+        include: {
+          deliveries: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            select: { status: true, createdAt: true },
+          },
+        },
+      }),
+      db.notification.findMany({
+        where: { projectId, createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { title: true, message: true, createdAt: true },
+      }),
+      db.fundingCoordinate.findMany({
+        where: { projectId, asset: "SOL" },
+        select: { amount: true },
+      }),
+    ]);
+
+    const successCount = requests7d.filter((log) => log.statusCode < 400).length;
+    const avgLatencyMs =
+      requests7d.length > 0
+        ? Math.round(requests7d.reduce((sum, log) => sum + log.durationMs, 0) / requests7d.length)
+        : 0;
+    const webhookDeliveries = webhooks.flatMap((webhook) => webhook.deliveries);
+    const successfulWebhookDeliveries = webhookDeliveries.filter((delivery) => delivery.status === "delivered").length;
+    const webhookHealth =
+      webhookDeliveries.length > 0
+        ? Number(((successfulWebhookDeliveries / webhookDeliveries.length) * 100).toFixed(1))
+        : null;
+
+    const totalFundedLamports = fundingRows.reduce((sum, row) => sum + row.amount, 0n);
+    const summary = {
+      project: {
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        status: project.archivedAt ? "archived" : "active",
+        healthScore: health.score,
+        fundingSol: `${Number(totalFundedLamports) / 1_000_000_000} SOL`,
+        apiKeyCount: apiKeys.length,
+        successRate7d: requests7d.length > 0 ? Number(((successCount / requests7d.length) * 100).toFixed(1)) : null,
+        averageLatencyMs7d: avgLatencyMs,
+        webhookHealth7d: webhookHealth,
+        teamMembers: members.map((member) => ({
+          walletAddress: member.user.walletAddress,
+          displayName: member.user.displayName,
+          role: member.role,
+        })),
+        recentAlerts: notifications.map((notification) => ({
+          title: notification.title,
+          message: notification.message,
+          createdAt: notification.createdAt.toISOString(),
+        })),
+      },
+    };
+
+    if (format === "markdown") {
+      const markdown = [
+        `# ${summary.project.name}`,
+        "",
+        `- Status: ${summary.project.status}`,
+        `- Health score: ${summary.project.healthScore}`,
+        `- Funding: ${summary.project.fundingSol}`,
+        `- API keys: ${summary.project.apiKeyCount}`,
+        `- Success rate (7d): ${summary.project.successRate7d ?? "Unavailable"}${summary.project.successRate7d !== null ? "%" : ""}`,
+        `- Average latency (7d): ${summary.project.averageLatencyMs7d || "Unavailable"}${summary.project.averageLatencyMs7d ? "ms" : ""}`,
+        `- Webhook health (7d): ${summary.project.webhookHealth7d ?? "Unavailable"}${summary.project.webhookHealth7d !== null ? "%" : ""}`,
+        "",
+        "## Team members",
+        ...(summary.project.teamMembers.length > 0
+          ? summary.project.teamMembers.map((member) => `- ${member.displayName} (${member.role}) · ${member.walletAddress}`)
+          : ["- No team members yet."]),
+        "",
+        "## Recent alerts",
+        ...(summary.project.recentAlerts.length > 0
+          ? summary.project.recentAlerts.map((alert) => `- ${alert.title}: ${alert.message}`)
+          : ["- No recent alerts."]),
+      ].join("\n");
+      reply.header("content-type", "text/markdown; charset=utf-8");
+      return reply.send(markdown);
+    }
+
+    return reply.send(summary);
   });
 
   app.get("/v1/projects/:projectId/playground/recipes", async (request) => {

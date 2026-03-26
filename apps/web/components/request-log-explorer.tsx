@@ -8,6 +8,7 @@ import { CopyButton } from "./copy-button";
 import { downloadProjectRequestLogs, getProjectRequestLogs } from "../lib/api";
 import { formatDuration, formatInteger, formatRelativeDate } from "../lib/format";
 import type { ProjectRequestLogItem, RequestLogRange } from "../lib/types";
+import { SavedViewBar } from "./saved-view-bar";
 
 const RANGE_OPTIONS: readonly RequestLogRange[] = ["1h", "6h", "24h", "7d", "30d"];
 
@@ -114,6 +115,32 @@ function renderHint(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+function normalizeFilters(candidate: Record<string, unknown>): ExplorerFilters {
+  const range = typeof candidate.range === "string" && RANGE_OPTIONS.includes(candidate.range as RequestLogRange)
+    ? (candidate.range as RequestLogRange)
+    : DEFAULT_FILTERS.range;
+  const status = candidate.status === "success" || candidate.status === "error"
+    ? candidate.status
+    : DEFAULT_FILTERS.status;
+  const mode = candidate.mode === "standard" || candidate.mode === "priority"
+    ? candidate.mode
+    : DEFAULT_FILTERS.mode;
+  const page = typeof candidate.page === "number" ? candidate.page : Number(candidate.page ?? DEFAULT_FILTERS.page);
+  const pageSize = typeof candidate.pageSize === "number" ? candidate.pageSize : Number(candidate.pageSize ?? DEFAULT_FILTERS.pageSize);
+  return {
+    range,
+    method: typeof candidate.method === "string" ? candidate.method : DEFAULT_FILTERS.method,
+    status,
+    apiKey: typeof candidate.apiKey === "string" ? candidate.apiKey : DEFAULT_FILTERS.apiKey,
+    mode,
+    simulatedOnly: candidate.simulatedOnly === true,
+    errorsOnly: candidate.errorsOnly === true,
+    search: typeof candidate.search === "string" ? candidate.search : DEFAULT_FILTERS.search,
+    page: Number.isFinite(page) && page > 0 ? page : DEFAULT_FILTERS.page,
+    pageSize: Number.isFinite(pageSize) && [20, 50, 100].includes(pageSize) ? pageSize : DEFAULT_FILTERS.pageSize,
+  };
+}
+
 export function RequestLogExplorer({
   projectId,
   token,
@@ -195,6 +222,11 @@ export function RequestLogExplorer({
     const end = Math.min(data.totalCount, start + data.items.length - 1);
     return `Showing ${formatInteger(start)}-${formatInteger(end)} of ${formatInteger(data.totalCount)} requests.`;
   }, [data, filters.page, filters.pageSize]);
+  const hasActiveQuery = useMemo(
+    () =>
+      JSON.stringify({ ...filters, page: 1 }) !== JSON.stringify({ ...DEFAULT_FILTERS, page: 1 }),
+    [filters]
+  );
 
   async function exportLogs(format: "csv" | "json") {
     const blob = await downloadProjectRequestLogs(projectId, token, format, {
@@ -244,6 +276,14 @@ export function RequestLogExplorer({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <SavedViewBar
+            kind="request_logs"
+            token={token}
+            projectId={projectId}
+            filters={filters}
+            hasActiveQuery={hasActiveQuery}
+            onApply={(nextFilters) => updateFilters(normalizeFilters(nextFilters))}
+          />
           <div className="sticky top-0 z-10 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 p-4 backdrop-blur">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <label className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">

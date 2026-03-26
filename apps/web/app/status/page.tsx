@@ -20,6 +20,7 @@ import { ResponseTimeTicker } from "../../components/response-time-ticker";
 import { StatusSubscribeForm } from "../../components/status-subscribe-form";
 import { StatusRegions, StatusHealthCalendar } from "../../components/status-regions";
 import { StatusAdminIncidents } from "../../components/status-admin-incidents";
+import { CopyButton } from "../../components/copy-button";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,14 @@ export default async function StatusPage() {
           : ("neutral" as const),
     },
   ];
+  const snapshotSummary = [
+    `Fyxvo status snapshot`,
+    `Timestamp: ${status.apiHealth.timestamp}`,
+    `API: ${status.apiHealth.status}`,
+    `Gateway: ${status.gatewayHealth.status}`,
+    `Protocol ready: ${readiness?.ready ? "yes" : "no"}`,
+    `Active incidents: ${incidents.filter((incident) => incident.resolvedAt == null).length}`,
+  ].join("\n");
 
   return (
     <div className="space-y-10 lg:space-y-12">
@@ -159,9 +168,19 @@ export default async function StatusPage() {
         <p className="text-sm text-[var(--fyxvo-text-muted)] max-w-lg">
           Live condition across the Fyxvo control plane, relay gateway, and Solana devnet program.
         </p>
+        <CopyButton value={snapshotSummary} label="Copy snapshot" />
         <StatusRefreshIndicator />
         <ResponseTimeTicker apiBase={webEnv.apiBaseUrl} />
       </div>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Notice tone={healthy ? "success" : "warning"} title="How to read this page">
+          Healthy means the API, gateway, and protocol checks are all responding normally. Degraded means at least one core surface is still serving but needs attention. Service disruption means a core surface is unavailable or an incident is actively open.
+        </Notice>
+        <Notice tone="neutral" title="Managed infrastructure in the current devnet phase">
+          Fyxvo currently operates managed infrastructure for the devnet private alpha. That means status reflects the live managed stack today, not a public mainnet SLA or an open operator marketplace claim.
+        </Notice>
+      </section>
 
       {/* Three service cards */}
       <section className="grid gap-4 md:grid-cols-3">

@@ -30,6 +30,8 @@ import { CommandPalette } from "./command-palette";
 import { ConnectionQualityIndicator } from "./connection-quality";
 import { KeyboardShortcuts } from "./keyboard-shortcuts";
 import { shortenAddress } from "../lib/format";
+import { listBookmarks } from "../lib/api";
+import type { BookmarkRecord } from "../lib/types";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: GaugeIcon },
@@ -99,8 +101,25 @@ function SidebarContent({
   onOpenShortcuts?: () => void;
 }) {
   const portal = usePortal();
+  const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   const projectHref =
     portal.selectedProject ? `/projects/${portal.selectedProject.slug}` : "/projects/solstice-labs";
+
+  useEffect(() => {
+    if (portal.walletPhase !== "authenticated" || !portal.token) return;
+    let cancelled = false;
+    listBookmarks(portal.token)
+      .then((items) => {
+        if (!cancelled) setBookmarks(items.slice(0, 6));
+      })
+      .catch(() => {
+        if (!cancelled) setBookmarks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [portal.token, portal.walletPhase]);
+  const visibleBookmarks = portal.walletPhase === "authenticated" ? bookmarks : [];
 
   return (
     <div className="flex h-full flex-col">
@@ -136,6 +155,26 @@ function SidebarContent({
           <p className="mt-1 truncate text-sm font-medium text-[var(--fyxvo-text)]">
             {portal.selectedProject.name}
           </p>
+        </div>
+      ) : null}
+
+      {visibleBookmarks.length > 0 ? (
+        <div className="border-b border-[var(--fyxvo-border)] px-4 py-3">
+          <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
+            Quick access
+          </p>
+          <div className="mt-2 space-y-1.5">
+            {visibleBookmarks.map((bookmark) => (
+              <Link
+                key={bookmark.id}
+                href={bookmark.href}
+                {...(onNavigate ? { onClick: onNavigate } : {})}
+                className="block rounded-md px-2 py-1.5 text-sm text-[var(--fyxvo-text-muted)] transition hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+              >
+                {bookmark.label}
+              </Link>
+            ))}
+          </div>
         </div>
       ) : null}
 

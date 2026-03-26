@@ -9,6 +9,8 @@ const productLinks = [
   { href: "/pricing", label: "Pricing" },
   { href: "/docs", label: "Docs" },
   { href: "/status", label: "Status" },
+  { href: "/security", label: "Security" },
+  { href: "/reliability", label: "Reliability" },
   { href: "/changelog", label: "Changelog" },
   { href: "/enterprise", label: "Enterprise" },
   { href: "/updates", label: "Updates" },
@@ -30,6 +32,7 @@ const legalLinks = [
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/cookies", label: "Cookies" },
+  { href: "/security", label: "Security" },
 ];
 
 export function SiteFooter() {

@@ -25,6 +25,7 @@ const NAV_SECTIONS = [
   { id: "team-collaboration", label: "Team Workflows", keywords: "team member invite wallet collaboration owner role notes runbook recipes alerts health archive restore" },
   { id: "playground", label: "Playground", keywords: "playground rpc methods test compare mode schema panel share url examples" },
   { id: "operations-guide", label: "Operations Guide", keywords: "operations monitoring alerts traces webhooks latency success rate cache hit request logs" },
+  { id: "release-guide", label: "Release Guide", keywords: "release readiness zero to first request devnet simulation alerts logs health score mainnet preparation" },
   { id: "public-profiles", label: "Public Project Pages", keywords: "public profile page slug badge readme status latency" },
   { id: "sdk-reference", label: "SDK Reference", keywords: "sdk library reference types api endpoint paths" },
   { id: "rate-limits", label: "Rate Limits", keywords: "rate limit 429 throttle bandwidth quota scope" },
@@ -1307,6 +1308,54 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
                 Start with status, confirm the project and time range, inspect request logs, follow a trace when needed, verify funding posture, then replay or simulate the request in the playground before making code changes.
               </Notice>
             </div>
+          </section>
+
+          <section id="release-guide">
+            <SectionHeading
+              id="release-guide"
+              eyebrow="Release"
+              title="Release Guide"
+              description="A practical path from first wallet connection to a stable devnet integration that the team can actually operate."
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              {[
+                {
+                  title: "Go from zero to first request",
+                  body: "Connect a wallet, create a project, activate it, fund it with a small devnet SOL amount, create one API key, and send one standard RPC request through the hosted gateway.",
+                },
+                {
+                  title: "Fund and test safely on devnet",
+                  body: "Use small amounts, treat devnet funding as workflow validation, and confirm that analytics, request logs, and alerts respond before trying larger evaluation traffic.",
+                },
+                {
+                  title: "Use simulation before real request flow",
+                  body: "Run the request shape through simulation mode first when onboarding a teammate or verifying payload structure, then switch to live funded flow when you need real routing and accounting.",
+                },
+                {
+                  title: "Monitor once traffic starts",
+                  body: "Keep the status page, alert center, request logs, and project health score open together so you can separate platform incidents from integration-specific issues quickly.",
+                },
+                {
+                  title: "Use alerts, request logs, and health score together",
+                  body: "Alerts tell you what changed, request logs show which traffic caused it, and the health score summarizes whether the project is still operationally ready for the team.",
+                },
+                {
+                  title: "Prepare for mainnet honestly",
+                  body: "Treat the current devnet phase as operational rehearsal: tighten runbooks, scopes, alerts, and collaboration habits now so the product and your integration are better prepared for future mainnet work.",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
+                >
+                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
+                  <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+                </div>
+              ))}
+            </div>
+            <Notice tone="neutral" title="Release habit">
+              Before any larger rollout, confirm live status, funded balance, request logs, alert thresholds, webhook handling, and one real request in the authenticated product — not just local code or mock traffic.
+            </Notice>
           </section>
 
           {/* ── SDK Reference ────────────────────────────────────── */}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { FeedbackCaptureForm } from "../../components/feedback-capture-form";
@@ -52,11 +53,13 @@ export default function ContactPage() {
       />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <InterestCaptureForm
-          source="contact-page"
-          title="Request alpha access or rollout follow-up"
-          description="Capture your team, use case, expected volume, and what you care about most so follow-up can stay relevant for the current devnet alpha."
-        />
+        <div id="contact-interest">
+          <InterestCaptureForm
+            source="contact-page"
+            title="Request alpha access or rollout follow-up"
+            description="Capture your team, use case, expected volume, and what you care about most so follow-up can stay relevant for the current devnet alpha."
+          />
+        </div>
 
         <div className="space-y-6">
           <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
@@ -91,6 +94,52 @@ export default function ContactPage() {
             </CardContent>
           </Card>
 
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Choose the right path</CardTitle>
+              <CardDescription>Each route lands in a different review flow so follow-up stays relevant.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  title: "General interest",
+                  body: "Use the alpha access form for fit, rollout planning, and launch conversations.",
+                  href: "#contact-interest",
+                  label: "Open interest form",
+                },
+                {
+                  title: "Technical support",
+                  body: "Use the feedback path below for bugs, onboarding friction, or product questions tied to a real workflow.",
+                  href: "#contact-support",
+                  label: "Open support form",
+                },
+                {
+                  title: "Enterprise interest",
+                  body: "Use the enterprise page when the conversation is about workload size, rollout support, or commercial fit.",
+                  href: "/enterprise",
+                  label: "Open enterprise path",
+                },
+                {
+                  title: "Security disclosure",
+                  body: "Use the security page and private disclosure path for vulnerabilities or sensitive reports.",
+                  href: "/security",
+                  label: "Open security page",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
+                >
+                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+                  <Link href={item.href} className="mt-3 inline-flex text-sm font-medium text-[var(--fyxvo-brand)]">
+                    {item.label}
+                  </Link>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           <Notice tone="neutral" title="Two distinct queues">
             Interest submissions are for fit, rollout, and founder follow-up. Feedback submissions
             are for bugs, support, and onboarding friction. Both persist directly into the Fyxvo
@@ -100,13 +149,15 @@ export default function ContactPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <FeedbackCaptureForm
-          source="contact-page"
-          page="/contact"
-          title="Report an issue or onboarding friction"
-          description="Use this when you hit something confusing during wallet auth, project activation, funding, key creation, or your first relay request."
-          includeProjectContext={false}
-        />
+        <div id="contact-support">
+          <FeedbackCaptureForm
+            source="contact-page"
+            page="/contact"
+            title="Report an issue or onboarding friction"
+            description="Use this when you hit something confusing during wallet auth, project activation, funding, key creation, or your first relay request."
+            includeProjectContext={false}
+          />
+        </div>
 
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
@@ -129,6 +180,10 @@ export default function ContactPage() {
             <p>
               Use the interest form above instead when the main question is fit, rollout planning,
               pricing context, or a founder review of the workload.
+            </p>
+            <p>
+              Use the enterprise path for larger commercial planning and use the security page for
+              vulnerability disclosure instead of public support channels.
             </p>
             <Notice tone="neutral" title="Private alpha support posture">
               Fyxvo is open to a small number of external teams on devnet. Access is not

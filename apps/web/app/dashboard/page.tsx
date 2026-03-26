@@ -43,14 +43,20 @@ import type {
   AdminDeploymentReadiness,
   AdminObservability,
   AdminOverview,
+  AlertCenterItem,
+  DashboardPreferences,
+  FeedbackInboxItem,
   NetworkStats,
+  OnboardingFunnelSummary,
   PortalProject,
   PortalServiceStatus,
+  ReleaseReadinessSummary,
   WebDeploymentStatus
 } from "../../lib/types";
 import { webEnv } from "../../lib/env";
 import { liveDevnetState } from "../../lib/live-state";
 import {
+  getAlertCenter,
   dismissWhatsNew,
   fetchApiStatus,
   fetchGatewayStatus,
@@ -58,9 +64,15 @@ import {
   getActiveAnnouncement,
   getAdminObservability,
   getAdminDeploymentReadiness,
+  getDashboardPreferences,
+  getFeedbackInbox,
   getNetworkStats,
+  getOnboardingFunnel,
+  getReleaseReadiness,
   getWhatsNew,
-  listProjectMembers
+  listProjectMembers,
+  updateFeedbackInboxItem,
+  updateDashboardPreferences
 } from "../../lib/api";
 
 interface ProjectHealthInput {
@@ -390,6 +402,23 @@ function buildOpsItems(overview: AdminOverview | null) {
   };
 }
 
+const DASHBOARD_WIDGETS = [
+  "quick_stats",
+  "next_step",
+  "recent_wins",
+  "alerts_preview",
+  "project_list",
+  "gateway_health",
+] as const;
+
+type DashboardWidgetId = (typeof DASHBOARD_WIDGETS)[number];
+
+const DEFAULT_DASHBOARD_PREFERENCES: DashboardPreferences = {
+  widgetOrder: [...DASHBOARD_WIDGETS],
+  hiddenWidgets: [],
+  updatedAt: null,
+};
+
 export default function DashboardPage() {
   const portal = usePortal();
   const router = useRouter();
@@ -430,6 +459,12 @@ export default function DashboardPage() {
   const [gatewayDeploymentStatus, setGatewayDeploymentStatus] = useState<PortalServiceStatus | null>(null);
   const [deploymentReadiness, setDeploymentReadiness] = useState<AdminDeploymentReadiness | null>(null);
   const [adminObservability, setAdminObservability] = useState<AdminObservability | null>(null);
+  const [releaseReadiness, setReleaseReadiness] = useState<ReleaseReadinessSummary | null>(null);
+  const [onboardingFunnel7d, setOnboardingFunnel7d] = useState<OnboardingFunnelSummary | null>(null);
+  const [onboardingFunnel30d, setOnboardingFunnel30d] = useState<OnboardingFunnelSummary | null>(null);
+  const [feedbackInbox, setFeedbackInbox] = useState<FeedbackInboxItem[]>([]);
+  const [dashboardPreferences, setDashboardPreferences] = useState<DashboardPreferences>(DEFAULT_DASHBOARD_PREFERENCES);
+  const [alertsPreview, setAlertsPreview] = useState<AlertCenterItem[]>([]);
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const celebrationProjectId = celebrationProject?.id ?? null;
   const isAdminAuthorityWallet =
@@ -641,6 +676,54 @@ export default function DashboardPage() {
   }, [isAdminAuthorityWallet, portal.token]);
 
   useEffect(() => {
+    if (portal.walletPhase !== "authenticated" || !portal.token) {
+      setDashboardPreferences(DEFAULT_DASHBOARD_PREFERENCES);
+      setAlertsPreview([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.allSettled([
+      getDashboardPreferences(portal.token),
+      getAlertCenter(portal.token),
+    ]).then(([preferencesResult, alertsResult]) => {
+      if (cancelled) return;
+      setDashboardPreferences(
+        preferencesResult.status === "fulfilled" ? preferencesResult.value : DEFAULT_DASHBOARD_PREFERENCES
+      );
+      setAlertsPreview(alertsResult.status === "fulfilled" ? alertsResult.value.slice(0, 4) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [portal.token, portal.walletPhase]);
+
+  useEffect(() => {
+    if (!isAdminAuthorityWallet || !portal.token) {
+      setReleaseReadiness(null);
+      setOnboardingFunnel7d(null);
+      setOnboardingFunnel30d(null);
+      setFeedbackInbox([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.allSettled([
+      getReleaseReadiness(portal.token),
+      getOnboardingFunnel(7, portal.token),
+      getOnboardingFunnel(30, portal.token),
+      getFeedbackInbox(portal.token),
+    ]).then(([readinessResult, funnel7Result, funnel30Result, feedbackResult]) => {
+      if (cancelled) return;
+      setReleaseReadiness(readinessResult.status === "fulfilled" ? readinessResult.value : null);
+      setOnboardingFunnel7d(funnel7Result.status === "fulfilled" ? funnel7Result.value : null);
+      setOnboardingFunnel30d(funnel30Result.status === "fulfilled" ? funnel30Result.value : null);
+      setFeedbackInbox(feedbackResult.status === "fulfilled" ? feedbackResult.value.items.slice(0, 8) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminAuthorityWallet, portal.token]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
       if (e.key === "n" || e.key === "N") {
@@ -751,6 +834,198 @@ export default function DashboardPage() {
     hasRelayTraffic ? "First request made" : null,
     portal.selectedProject?.isPublic && portal.selectedProject?.publicSlug ? "Public project shared" : null,
   ].filter(Boolean) as string[];
+  const orderedHomeWidgets = useMemo(() => {
+    const preferred = dashboardPreferences.widgetOrder.filter((widget): widget is DashboardWidgetId =>
+      DASHBOARD_WIDGETS.includes(widget as DashboardWidgetId)
+    );
+    const remaining = DASHBOARD_WIDGETS.filter((widget) => !preferred.includes(widget));
+    return [...preferred, ...remaining].filter(
+      (widget) => !dashboardPreferences.hiddenWidgets.includes(widget)
+    );
+  }, [dashboardPreferences]);
+
+  async function persistDashboardWidgetPreferences(next: DashboardPreferences) {
+    setDashboardPreferences(next);
+    if (!portal.token) return;
+    try {
+      const saved = await updateDashboardPreferences(
+        {
+          widgetOrder: next.widgetOrder,
+          hiddenWidgets: next.hiddenWidgets,
+        },
+        portal.token
+      );
+      setDashboardPreferences(saved);
+    } catch {
+      // keep optimistic UI; the next refresh will reconcile if needed
+    }
+  }
+
+  function moveDashboardWidget(widget: DashboardWidgetId, direction: -1 | 1) {
+    const current = [...orderedHomeWidgets];
+    const index = current.indexOf(widget);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return;
+    [current[index], current[nextIndex]] = [current[nextIndex]!, current[index]!];
+    void persistDashboardWidgetPreferences({
+      ...dashboardPreferences,
+      widgetOrder: current,
+    });
+  }
+
+  function toggleDashboardWidget(widget: DashboardWidgetId) {
+    const hidden = dashboardPreferences.hiddenWidgets.includes(widget)
+      ? dashboardPreferences.hiddenWidgets.filter((item) => item !== widget)
+      : [...dashboardPreferences.hiddenWidgets, widget];
+    void persistDashboardWidgetPreferences({
+      ...dashboardPreferences,
+      hiddenWidgets: hidden,
+    });
+  }
+
+  function renderHomeWidget(widget: DashboardWidgetId) {
+    switch (widget) {
+      case "quick_stats":
+        return (
+          <Card key={widget} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Quick stats</CardTitle>
+              <CardDescription>Today&apos;s calm summary across the current workspace.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Projects</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">{portal.projects.length}</div>
+              </div>
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">API keys</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">{portal.apiKeys.length}</div>
+              </div>
+              <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Requests</div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">{formatInteger(portal.projectAnalytics.totals.requestLogs)}</div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      case "next_step":
+        return (
+          <Card key={widget} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>What should I do next?</CardTitle>
+              <CardDescription>One concrete next step based on the current project state.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-lg font-semibold text-[var(--fyxvo-text)]">{nextBestAction.label}</div>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--fyxvo-text-soft)]">{nextBestAction.reason}</p>
+              </div>
+              <Button asChild>
+                <Link href={nextBestAction.href}>Do this next</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      case "recent_wins":
+        return (
+          <Card key={widget} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Recent wins</CardTitle>
+              <CardDescription>Subtle momentum markers from the live workspace.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {recentWins.length > 0 ? recentWins.map((item) => (
+                <div key={item} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)]">
+                  {item}
+                </div>
+              )) : (
+                <Notice tone="neutral" title="Wins will appear as you progress">
+                  Activate a project, fund it, create a key, or send traffic to start building a visible operating history.
+                </Notice>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case "alerts_preview":
+        return (
+          <Card key={widget} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Alerts preview</CardTitle>
+              <CardDescription>The latest operational signals without leaving the dashboard.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {alertsPreview.length > 0 ? alertsPreview.map((item) => (
+                <div key={item.id} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-[var(--fyxvo-text)]">{item.title}</div>
+                    <Badge tone={item.severity === "critical" ? "danger" : item.severity === "warning" ? "warning" : "neutral"}>
+                      {item.state}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.description}</p>
+                </div>
+              )) : (
+                <Notice tone="success" title="No active alerts right now">
+                  The current workspace is clear on recent low balance, webhook, assistant, and incident-linked alerts.
+                </Notice>
+              )}
+              <Button asChild size="sm" variant="secondary">
+                <Link href="/alerts">Open alert center</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      case "project_list":
+        return (
+          <Card key={widget} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Project list</CardTitle>
+              <CardDescription>Keep the active workspace close when switching between operating surfaces.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {portal.projects.slice(0, 4).map((project) => (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.slug}`}
+                  className="block rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                >
+                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{project.name}</div>
+                  <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{project.slug}</div>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        );
+      case "gateway_health":
+        return <GatewayHealthCard key={widget} />;
+      default:
+        return null;
+    }
+  }
+
+  async function updateFeedbackItemStatus(
+    item: FeedbackInboxItem,
+    status: FeedbackInboxItem["status"],
+    tags?: readonly string[]
+  ) {
+    if (!portal.token) return;
+    await updateFeedbackInboxItem(
+      {
+        type: item.type,
+        id: item.id,
+        status,
+        ...(tags ? { tags } : {}),
+      },
+      portal.token
+    );
+    setFeedbackInbox((current) =>
+      current.map((entry) =>
+        entry.id === item.id && entry.type === item.type
+          ? { ...entry, status, ...(tags ? { tags } : {}) }
+          : entry
+      )
+    );
+  }
   async function saveAnnouncementSchedule() {
     if (!portal.token || !announcementDraft.trim()) return;
     setAnnouncementSaving(true);
@@ -1027,6 +1302,53 @@ export default function DashboardPage() {
         }
       />
 
+      {portal.walletPhase === "authenticated" ? (
+        <section className="space-y-4">
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Dashboard home</CardTitle>
+              <CardDescription>Reorder or hide the widgets you want closest during day-to-day operation.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 lg:grid-cols-2">
+              {DASHBOARD_WIDGETS.map((widget) => {
+                const hidden = dashboardPreferences.hiddenWidgets.includes(widget);
+                const currentIndex = orderedHomeWidgets.indexOf(widget);
+                return (
+                  <div
+                    key={widget}
+                    className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-[var(--fyxvo-text)]">
+                        {widget.replace(/_/g, " ")}
+                      </div>
+                      <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                        {hidden ? "Hidden from home" : "Visible on home"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => moveDashboardWidget(widget, -1)} disabled={currentIndex <= 0 || hidden}>
+                        Up
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => moveDashboardWidget(widget, 1)} disabled={currentIndex < 0 || currentIndex === orderedHomeWidgets.length - 1 || hidden}>
+                        Down
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => toggleDashboardWidget(widget)}>
+                        {hidden ? "Show" : "Hide"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <section className="grid gap-4 xl:grid-cols-2">
+            {orderedHomeWidgets.map((widget) => renderHomeWidget(widget))}
+          </section>
+        </section>
+      ) : null}
+
       <QuickstartLauncher project={portal.selectedProject} />
 
       {portal.walletPhase === "authenticated" ? (
@@ -1292,6 +1614,11 @@ export default function DashboardPage() {
                 </div>
               ))}
             </CardContent>
+            <div className="px-6 pb-6">
+              <Button onClick={() => setCreateOpen(true)}>
+                Create your first project
+              </Button>
+            </div>
           </Card>
         </div>
       ) : null}
@@ -2032,6 +2359,191 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isAdminAuthorityWallet && releaseReadiness ? (
+            <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Release readiness</CardTitle>
+                <CardDescription>
+                  Founder cockpit for infrastructure, product traction, and operational posture using live platform data.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(releaseReadiness, null, 2)], { type: "application/json" });
+                      const href = URL.createObjectURL(blob);
+                      const anchor = document.createElement("a");
+                      anchor.href = href;
+                      anchor.download = "fyxvo-release-readiness.json";
+                      anchor.click();
+                      URL.revokeObjectURL(href);
+                    }}
+                  >
+                    Export JSON
+                  </Button>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-3">
+                  {[
+                    {
+                      title: "Infrastructure",
+                      status: releaseReadiness.infrastructure.status,
+                      lines: [
+                        `Frontend ${formatCommitSha(webDeploymentStatus?.commit)}`,
+                        `API ${formatCommitSha(releaseReadiness.infrastructure.apiCommit)}`,
+                        `Gateway ${gatewayDeploymentStatus?.status ?? releaseReadiness.infrastructure.gatewayHealth}`,
+                        `${releaseReadiness.infrastructure.currentIncidentCount} active incidents`,
+                        `${releaseReadiness.infrastructure.cspViolationsLast24h} CSP violations / 24h`,
+                        `${releaseReadiness.infrastructure.webhookFailureRate}% webhook failures / 24h`,
+                      ],
+                    },
+                    {
+                      title: "Product",
+                      status: releaseReadiness.product.status,
+                      lines: [
+                        `${formatInteger(releaseReadiness.product.totalUsers)} users`,
+                        `${formatInteger(releaseReadiness.product.totalActiveProjects)} active projects`,
+                        `${formatInteger(releaseReadiness.product.projectsWithRecentTraffic)} projects with recent traffic`,
+                        `${releaseReadiness.product.projectsWithLowBalanceAlerts} low-balance projects`,
+                        `${releaseReadiness.product.projectsWithHighErrorRates} high-error projects`,
+                        `${formatInteger(releaseReadiness.product.assistantUsageToday)} assistant prompts today`,
+                      ],
+                    },
+                    {
+                      title: "Operations",
+                      status: releaseReadiness.operations.status,
+                      lines: [
+                        releaseReadiness.operations.pendingMigrations.detected
+                          ? `${releaseReadiness.operations.pendingMigrations.count} pending migrations`
+                          : "No pending migrations",
+                        `${releaseReadiness.operations.openSupportTickets} open support tickets`,
+                        `${releaseReadiness.operations.activeIncidents.length} active incidents`,
+                        `${releaseReadiness.operations.statusSubscriberCount} status subscribers`,
+                        releaseReadiness.operations.latestAnnouncement
+                          ? `Announcement: ${releaseReadiness.operations.latestAnnouncement.severity}`
+                          : "No announcement",
+                        releaseReadiness.operations.latestChangelogVersion
+                          ? `Changelog ${releaseReadiness.operations.latestChangelogVersion.version}`
+                          : "No changelog version",
+                      ],
+                    },
+                  ].map((section) => (
+                    <div
+                      key={section.title}
+                      className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{section.title}</div>
+                        <Badge tone={section.status === "healthy" ? "success" : section.status === "blocked" ? "danger" : "warning"}>
+                          {section.status.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                        {section.lines.map((line) => (
+                          <div key={line}>{line}</div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+              </Card>
+
+              <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+                <CardHeader>
+                  <CardTitle>Onboarding funnel</CardTitle>
+                  <CardDescription>Counts and conversion posture across the last 7 and 30 days.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(onboardingFunnel7d?.steps ?? []).map((step, index) => (
+                    <div
+                      key={step.key}
+                      className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{step.label}</div>
+                          <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                            {index === 0 ? "Top of funnel" : `${step.conversionPercentage}% conversion from previous step`}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-[var(--fyxvo-text)]">{formatInteger(step.count)}</div>
+                          <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                            30d: {formatInteger(onboardingFunnel30d?.steps[index]?.count ?? 0)} · {step.trend}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </section>
+          ) : null}
+
+          {isAdminAuthorityWallet && feedbackInbox.length > 0 ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Feedback inbox</CardTitle>
+                <CardDescription>
+                  Triage incoming feedback, assistant sentiment, support work, newsletter sources, and referral conversions in one queue.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 lg:grid-cols-2">
+                {feedbackInbox.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="neutral">{item.type.replace(/_/g, " ")}</Badge>
+                      <Badge tone={item.status === "resolved" ? "success" : item.status === "planned" ? "warning" : "neutral"}>
+                        {item.status}
+                      </Badge>
+                      {item.tags.map((tag) => (
+                        <Badge key={tag} tone="brand">{tag}</Badge>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
+                    <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.summary}</p>
+                    <div className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
+                      {item.actor} · {item.source} · {formatRelativeDate(item.createdAt)}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => void updateFeedbackItemStatus(item, "reviewed")}>
+                        Reviewed
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => void updateFeedbackItemStatus(item, "planned")}>
+                        Planned
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => void updateFeedbackItemStatus(item, "resolved")}>
+                        Resolved
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          const next = window.prompt("Comma-separated tags", item.tags.join(", "));
+                          if (next === null) return;
+                          const tags = next
+                            .split(",")
+                            .map((tag) => tag.trim())
+                            .filter(Boolean);
+                          void updateFeedbackItemStatus(item, item.status, tags);
+                        }}
+                      >
+                        Edit tags
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ) : null}

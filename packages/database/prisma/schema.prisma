@@ -490,6 +490,62 @@ model AlertState {
   @@index([projectId, updatedAt])
 }
 
+model DashboardPreference {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @unique @db.Uuid
+  widgetOrder  String[] @default([])
+  hiddenWidgets String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SavedView {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  kind      String
+  name      String
+  projectId String?  @db.Uuid
+  filters   Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, kind, name])
+  @@index([userId, kind, updatedAt])
+  @@index([userId, kind, isDefault])
+  @@index([projectId, updatedAt])
+}
+
+model UserBookmark {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  projectId String?  @db.Uuid
+  label     String
+  href      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, href])
+  @@index([userId, updatedAt])
+  @@index([projectId, updatedAt])
+}
+
+model FeedbackInboxTriage {
+  id              String   @id @default(uuid()) @db.Uuid
+  itemType        String
+  itemId          String
+  status          String   @default("new")
+  tags            String[] @default([])
+  updatedByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([itemType, itemId])
+  @@index([status, updatedAt])
+}
+
 model OperatorRewardSnapshot {
   id               String       @id @default(uuid()) @db.Uuid
   operatorId       String       @db.Uuid

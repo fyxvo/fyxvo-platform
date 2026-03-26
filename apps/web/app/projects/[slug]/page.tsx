@@ -31,7 +31,13 @@ import { usePortal } from "../../../components/portal-provider";
 import { fundingTrend } from "../../../lib/sample-data";
 import { formatDuration, formatInteger, shortenAddress } from "../../../lib/format";
 import { webEnv } from "../../../lib/env";
-import { createPlaygroundRecipe, getProjectActivity, updateProject } from "../../../lib/api";
+import {
+  createBookmark,
+  createPlaygroundRecipe,
+  downloadProjectSummary,
+  getProjectActivity,
+  updateProject,
+} from "../../../lib/api";
 import { RealtimeFeed } from "./realtime-feed";
 import type { ProjectAnalytics } from "../../../lib/types";
 
@@ -215,6 +221,8 @@ export default function ProjectPage({
   const [embedSize, setEmbedSize] = useState<"small" | "medium" | "large">("medium");
   const [embedCompact, setEmbedCompact] = useState(false);
   const [applyingStarterKit, setApplyingStarterKit] = useState(false);
+  const [bookmarking, setBookmarking] = useState(false);
+  const [exporting, setExporting] = useState<"json" | "markdown" | null>(null);
 
   const project =
     portal.projects.find((item) => item.slug === params.slug) ??
@@ -352,6 +360,32 @@ export default function ProjectPage({
     }
   }
 
+  async function saveBookmark(label: string, href: string) {
+    if (!portal.token || !project) return;
+    setBookmarking(true);
+    try {
+      await createBookmark({ label, href, projectId: project.id }, portal.token);
+    } finally {
+      setBookmarking(false);
+    }
+  }
+
+  async function exportSummary(format: "json" | "markdown") {
+    if (!portal.token || !project) return;
+    setExporting(format);
+    try {
+      const blob = await downloadProjectSummary(project.id, format, portal.token);
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `${project.slug}-summary.${format === "json" ? "json" : "md"}`;
+      anchor.click();
+      URL.revokeObjectURL(href);
+    } finally {
+      setExporting(null);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -398,6 +432,26 @@ export default function ProjectPage({
                 GitHub
               </a>
             ) : null}
+            {portal.token ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void saveBookmark(`${project.name} · ${activeTab}`, `/projects/${project.slug}${activeTab === "overview" ? "" : `?tab=${activeTab}`}`)}
+                disabled={bookmarking}
+              >
+                {bookmarking ? "Saving bookmark…" : "Bookmark tab"}
+              </Button>
+            ) : null}
+            {portal.token ? (
+              <Button size="sm" variant="secondary" onClick={() => void exportSummary("markdown")} disabled={exporting !== null}>
+                {exporting === "markdown" ? "Exporting…" : "Export summary"}
+              </Button>
+            ) : null}
+            {portal.token ? (
+              <Button size="sm" variant="ghost" onClick={() => void exportSummary("json")} disabled={exporting !== null}>
+                {exporting === "json" ? "Exporting…" : "Export JSON"}
+              </Button>
+            ) : null}
             <Badge tone={project.ownerId === portal.user?.id ? "success" : "neutral"}>
               {project.ownerId === portal.user?.id ? "owner session" : "workspace view"}
             </Badge>
@@ -435,6 +489,35 @@ export default function ProjectPage({
       ) : null}
 
       {portal.walletPhase === "authenticated" ? <QuickstartLauncher project={project} /> : null}
+
+      {portal.walletPhase === "authenticated" ? (
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Project bookmarks</CardTitle>
+            <CardDescription>Save the surfaces your team opens repeatedly and keep them in sidebar quick access.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {[
+              { label: "Analytics", href: "/analytics" },
+              { label: "Request logs", href: `/projects/${project.slug}?tab=logs` },
+              { label: "Alerts", href: "/alerts" },
+              { label: "Funding", href: "/funding" },
+              { label: "Team", href: `/projects/${project.slug}?tab=activity` },
+              { label: "Webhooks", href: `/settings?project=${project.id}#webhooks` },
+            ].map((item) => (
+              <Button
+                key={item.label}
+                size="sm"
+                variant="secondary"
+                onClick={() => void saveBookmark(`${project.name} · ${item.label}`, item.href)}
+                disabled={bookmarking}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="flex gap-1 border-b border-[var(--fyxvo-border)]">
         {(["overview", "activity", "realtime", "logs"] as const).map((tab) => (

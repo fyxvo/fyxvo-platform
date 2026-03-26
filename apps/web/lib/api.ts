@@ -12,7 +12,10 @@ import type {
   AnalyticsOverview,
   AnalyticsRange,
   ApiKeyAnalytics,
+  BookmarkRecord,
+  DashboardPreferences,
   ErrorLogEntry,
+  FeedbackInboxItem,
   FeedbackSubmissionInput,
   FeedbackSubmissionReceipt,
   FundingHistoryItem,
@@ -37,7 +40,10 @@ import type {
   ProjectChecklist,
   PlaygroundRecipe,
   ProjectRequestLogList,
+  ReleaseReadinessSummary,
   RequestLogRange,
+  SavedViewRecord,
+  OnboardingFunnelSummary,
   WebDeploymentStatus
 } from "./types";
 import { webEnv } from "./env";
@@ -522,6 +528,46 @@ export async function getAdminObservability(token: string) {
   return response.item;
 }
 
+export async function getReleaseReadiness(token: string) {
+  const response = await requestApi<{ item: ReleaseReadinessSummary }>("/v1/admin/release-readiness", undefined, token);
+  return response.item;
+}
+
+export async function getOnboardingFunnel(windowDays: 7 | 30, token: string) {
+  const response = await requestApi<{ item: OnboardingFunnelSummary }>(`/v1/admin/onboarding-funnel?windowDays=${windowDays}`, undefined, token);
+  return response.item;
+}
+
+export async function getFeedbackInbox(
+  token: string,
+  query: Partial<{ type: FeedbackInboxItem["type"] | "all"; status: FeedbackInboxItem["status"] | "all" }> = {}
+) {
+  const url = new URL("/v1/admin/feedback-inbox", webEnv.apiBaseUrl);
+  if (query.type) url.searchParams.set("type", query.type);
+  if (query.status) url.searchParams.set("status", query.status);
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  return parseResponse<{ items: FeedbackInboxItem[] }>(response);
+}
+
+export async function updateFeedbackInboxItem(
+  input: {
+    readonly type: FeedbackInboxItem["type"];
+    readonly id: string;
+    readonly status?: FeedbackInboxItem["status"];
+    readonly tags?: readonly string[];
+  },
+  token: string
+) {
+  return requestApi<{ item: { id: string; itemType: string; itemId: string; status: string; tags: string[]; updatedAt: string } }>(
+    `/v1/admin/feedback-inbox/${input.type}/${input.id}`,
+    { method: "PATCH", body: JSON.stringify({ status: input.status, tags: input.tags }) },
+    token
+  );
+}
+
 export async function getOperators(token: string) {
   const response = await requestApi<{ items: OperatorSummary[] }>("/v1/admin/operators", undefined, token);
   return response.items;
@@ -529,6 +575,23 @@ export async function getOperators(token: string) {
 
 export async function getMe(token: string) {
   return requestApi<{ user: PortalUser; projectCount: number }>("/v1/me", undefined, token);
+}
+
+export async function getDashboardPreferences(token: string) {
+  const response = await requestApi<{ item: DashboardPreferences }>("/v1/me/dashboard-preferences", undefined, token);
+  return response.item;
+}
+
+export async function updateDashboardPreferences(
+  input: Partial<Pick<DashboardPreferences, "widgetOrder" | "hiddenWidgets">>,
+  token: string
+) {
+  const response = await requestApi<{ item: DashboardPreferences }>(
+    "/v1/me/dashboard-preferences",
+    { method: "PATCH", body: JSON.stringify(input) },
+    token
+  );
+  return response.item;
 }
 
 export async function getFundingHistory(token: string) {
@@ -594,6 +657,73 @@ export async function getNotificationPreferences(token: string) {
 export async function getAlertCenter(token: string) {
   const response = await requestApi<{ items: AlertCenterItem[] }>("/v1/alerts", undefined, token);
   return response.items;
+}
+
+export async function listSavedViews(
+  token: string,
+  query: { readonly kind: SavedViewRecord["kind"]; readonly projectId?: string }
+) {
+  const url = new URL("/v1/saved-views", webEnv.apiBaseUrl);
+  url.searchParams.set("kind", query.kind);
+  if (query.projectId) url.searchParams.set("projectId", query.projectId);
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  return parseResponse<{ items: SavedViewRecord[] }>(response);
+}
+
+export async function createSavedView(
+  input: {
+    readonly kind: SavedViewRecord["kind"];
+    readonly name: string;
+    readonly filters: Record<string, unknown>;
+    readonly projectId?: string | null;
+    readonly isDefault?: boolean;
+  },
+  token: string
+) {
+  return requestApi<{ item: SavedViewRecord }>(
+    "/v1/saved-views",
+    { method: "POST", body: JSON.stringify(input) },
+    token
+  );
+}
+
+export async function updateSavedView(
+  viewId: string,
+  input: Partial<Pick<SavedViewRecord, "name" | "isDefault">> & { readonly filters?: Record<string, unknown> },
+  token: string
+) {
+  return requestApi<{ item: SavedViewRecord }>(
+    `/v1/saved-views/${viewId}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+    token
+  );
+}
+
+export async function deleteSavedView(viewId: string, token: string) {
+  return requestApi<void>(`/v1/saved-views/${viewId}`, { method: "DELETE" }, token);
+}
+
+export async function listBookmarks(token: string) {
+  const response = await requestApi<{ items: BookmarkRecord[] }>("/v1/bookmarks", undefined, token);
+  return response.items;
+}
+
+export async function createBookmark(
+  input: { readonly label: string; readonly href: string; readonly projectId?: string | null },
+  token: string
+) {
+  return requestApi<{ item: BookmarkRecord }>(
+    "/v1/bookmarks",
+    { method: "POST", body: JSON.stringify(input) },
+    token
+  );
+}
+
+export async function deleteBookmark(bookmarkId: string, token: string) {
+  return requestApi<void>(`/v1/bookmarks/${bookmarkId}`, { method: "DELETE" }, token);
 }
 
 export async function updateAlertState(
@@ -764,6 +894,19 @@ export async function getProjectHealthHistory(projectId: string, token: string, 
     undefined,
     token
   );
+}
+
+export async function downloadProjectSummary(projectId: string, format: "json" | "markdown", token: string) {
+  const url = new URL(`/v1/projects/${projectId}/export-summary`, webEnv.apiBaseUrl);
+  url.searchParams.set("format", format);
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Project summary export failed: ${response.status}`);
+  }
+  return response.blob();
 }
 
 export async function createWebhook(projectId: string, input: { url: string; events: string[] }, token: string) {

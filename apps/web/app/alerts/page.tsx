@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { PageHeader } from "../../components/page-header";
 import { usePortal } from "../../components/portal-provider";
+import { SavedViewBar } from "../../components/saved-view-bar";
 import { AuthGate } from "../../components/state-panels";
 import { getAlertCenter, updateAlertState } from "../../lib/api";
 import { formatRelativeDate } from "../../lib/format";
@@ -68,6 +69,18 @@ function quickActions(item: AlertCenterItem) {
 
 function stateTone(state: AlertCenterItem["state"]) {
   return state === "resolved" ? "success" : state === "acknowledged" ? "warning" : "neutral";
+}
+
+function normalizeAlertFilters(candidate: Record<string, unknown>): {
+  type: AlertTypeFilter;
+  project: string;
+} {
+  const type =
+    typeof candidate.type === "string" && ALERT_TYPES.includes(candidate.type as AlertTypeFilter)
+      ? (candidate.type as AlertTypeFilter)
+      : "all";
+  const project = typeof candidate.project === "string" ? candidate.project : "all";
+  return { type, project };
 }
 
 export default function AlertsPage() {
@@ -184,6 +197,18 @@ export default function AlertsPage() {
           <CardDescription>Filter by alert type or project to focus on the signals that matter right now.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {portal.token ? (
+            <SavedViewBar
+              kind="alerts"
+              token={portal.token}
+              filters={{ type: typeFilter, project: projectFilter }}
+              hasActiveQuery={typeFilter !== "all" || projectFilter !== "all"}
+              onApply={(nextFilters) => {
+                const normalized = normalizeAlertFilters(nextFilters);
+                updateUrl(normalized.type, normalized.project);
+              }}
+            />
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {ALERT_TYPES.map((type) => (
               <button
