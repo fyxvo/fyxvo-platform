@@ -957,15 +957,9 @@ export function AssistantWorkspace() {
   }
 
   async function sendMessage(content: string) {
-    if (!content.trim() || composer.isStreaming || isAssistantUnavailable || !portal.token) return;
+    if (!content.trim() || composer.isStreaming || !portal.token) return;
 
     let conversationId = activeConversationId;
-    if (!conversationId) {
-      const created = await createAssistantConversation(content.trim().slice(0, 60), portal.token);
-      conversationId = created.item.id;
-      setActiveConversationId(conversationId);
-      setConversations((current) => [created.item, ...current.filter((item) => item.id !== created.item.id)]);
-    }
 
     const userMessage: AssistantConversationMessage = {
       id: `local-user-${Date.now()}`,
@@ -987,6 +981,13 @@ export function AssistantWorkspace() {
     setFeedbackDraft(null);
 
     try {
+      if (!conversationId) {
+        const created = await createAssistantConversation(content.trim().slice(0, 60), portal.token);
+        conversationId = created.item.id;
+        setActiveConversationId(conversationId);
+        setConversations((current) => [created.item, ...current.filter((item) => item.id !== created.item.id)]);
+      }
+
       const projectContext = selectedProject
         ? {
             projectId: selectedProject.id,
@@ -1859,7 +1860,7 @@ export function AssistantWorkspace() {
                             ? "Ask about Fyxvo, Solana RPC, debugging, funding, or analytics…"
                             : "Connect wallet to chat"
                       }
-                      disabled={!isAuthenticated || composer.isStreaming || isAssistantUnavailable}
+                      disabled={!isAuthenticated || composer.isStreaming}
                       rows={2}
                       className={cn(
                         "max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-1 py-2 text-sm leading-6 text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] disabled:opacity-60",
@@ -1874,7 +1875,7 @@ export function AssistantWorkspace() {
                   <Button
                     size="sm"
                     onClick={() => void sendMessage(composer.input)}
-                    disabled={!composer.input.trim() || !isAuthenticated || composer.isStreaming || isAssistantUnavailable}
+                    disabled={!composer.input.trim() || !isAuthenticated || composer.isStreaming}
                     className={cn("h-11 w-11 shrink-0 rounded-2xl px-0 sm:w-auto sm:px-5", FOCUS_RING_CLASS)}
                     aria-label="Send"
                   >
