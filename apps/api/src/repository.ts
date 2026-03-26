@@ -29,6 +29,7 @@ import type {
   CreateApiKeyInput,
   CreateNotificationInput,
   CreateProjectInput,
+  EmailDeliveryStatus,
   ErrorLogItem,
   FundingHistoryItem,
   FundingRecordInput,
@@ -166,6 +167,7 @@ function mapAssistantConversationSummary(row: {
   id: string;
   title: string;
   pinned?: boolean;
+  archivedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   lastMessageAt: Date;
@@ -175,6 +177,7 @@ function mapAssistantConversationSummary(row: {
     id: row.id,
     title: row.title,
     pinned: row.pinned ?? false,
+    archivedAt: row.archivedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastMessageAt: row.lastMessageAt.toISOString(),
@@ -1526,7 +1529,19 @@ export class PrismaApiRepository implements ApiRepository {
     const startOfWeek = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
     const assistantRoute = "/v1/assistant/chat";
 
-    const [requestsToday, requestsThisWeek, responseTimeAggregate, rateLimitHitsToday, recentLogs, assistantMessages, feedbackRows] =
+    const [
+      requestsToday,
+      requestsThisWeek,
+      failedRequestsToday,
+      failedRequestsThisWeek,
+      internalFailuresToday,
+      responseTimeAggregate,
+      rateLimitHitsToday,
+      recentLogs,
+      assistantMessages,
+      feedbackRows,
+      recentFailureRows,
+    ] =
       await Promise.all([
         this.prisma.requestLog.count({
           where: {
@@ -1540,6 +1555,27 @@ export class PrismaApiRepository implements ApiRepository {
             route: assistantRoute,
             statusCode: { lt: 400 },
             createdAt: { gte: startOfWeek },
+          },
+        }),
+        this.prisma.requestLog.count({
+          where: {
+            route: assistantRoute,
+            statusCode: { gte: 400 },
+            createdAt: { gte: startOfToday },
+          },
+        }),
+        this.prisma.requestLog.count({
+          where: {
+            route: assistantRoute,
+            statusCode: { gte: 400 },
+            createdAt: { gte: startOfWeek },
+          },
+        }),
+        this.prisma.requestLog.count({
+          where: {
+            route: assistantRoute,
+            statusCode: { gte: 500 },
+            createdAt: { gte: startOfToday },
           },
         }),
         this.prisma.requestLog.aggregate({
@@ -1588,6 +1624,20 @@ export class PrismaApiRepository implements ApiRepository {
             messageId: true,
           },
         }),
+        this.prisma.requestLog.findMany({
+          where: {
+            route: assistantRoute,
+            statusCode: { gte: 400 },
+            createdAt: { gte: startOfWeek },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            statusCode: true,
+            createdAt: true,
+            durationMs: true,
+          },
+        }),
       ]);
 
     const countsByDay = new Map<string, number>();
@@ -1626,6 +1676,9 @@ export class PrismaApiRepository implements ApiRepository {
     return {
       requestsToday,
       requestsThisWeek,
+      failedRequestsToday,
+      failedRequestsThisWeek,
+      internalFailuresToday,
       averageResponseTimeMs: Math.round(responseTimeAggregate._avg.durationMs ?? 0),
       averageTokensPerResponse: outputTokenCount > 0 ? Math.round(outputTokenTotal / outputTokenCount) : 0,
       rateLimitHitsToday,
@@ -1651,6 +1704,11 @@ export class PrismaApiRepository implements ApiRepository {
           messageId: row.messageId,
         })),
       },
+      recentFailures: recentFailureRows.map((row) => ({
+        statusCode: row.statusCode,
+        createdAt: row.createdAt.toISOString(),
+        durationMs: row.durationMs,
+      })),
     };
   }
 
@@ -2208,10 +2266,16 @@ export class PrismaApiRepository implements ApiRepository {
     });
   }
 
-  async listAssistantConversations(userId: string, limit = 20, query?: string): Promise<AssistantConversationSummary[]> {
+  async listAssistantConversations(
+    userId: string,
+    limit = 20,
+    query?: string,
+    includeArchived = true
+  ): Promise<AssistantConversationSummary[]> {
     const rows = await this.prisma.assistantConversation.findMany({
       where: {
         userId,
+        ...(includeArchived ? {} : { archivedAt: null }),
         ...(query?.trim()
           ? {
               OR: [
@@ -2235,6 +2299,7 @@ export class PrismaApiRepository implements ApiRepository {
       id: string;
       title: string;
       pinned: boolean;
+      archivedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
       lastMessageAt: Date;
@@ -2244,7 +2309,7 @@ export class PrismaApiRepository implements ApiRepository {
 
   async getLatestAssistantConversation(userId: string): Promise<AssistantConversationDetail | null> {
     const row = await this.prisma.assistantConversation.findFirst({
-      where: { userId },
+      where: { userId, archivedAt: null },
       orderBy: { lastMessageAt: "desc" },
       select: { id: true },
     });
@@ -2278,6 +2343,7 @@ export class PrismaApiRepository implements ApiRepository {
       data: {
         userId: input.userId,
         title: input.title.slice(0, 80),
+        archivedAt: null,
       },
       include: { _count: { select: { messages: true } } },
     });
@@ -2287,7 +2353,7 @@ export class PrismaApiRepository implements ApiRepository {
   async updateAssistantConversation(
     userId: string,
     conversationId: string,
-    input: { pinned?: boolean; title?: string }
+    input: { pinned?: boolean; title?: string; archived?: boolean }
   ): Promise<AssistantConversationSummary | null> {
     const existing = await this.prisma.assistantConversation.findFirst({
       where: { id: conversationId, userId },
@@ -2301,6 +2367,12 @@ export class PrismaApiRepository implements ApiRepository {
         ...(typeof input.pinned === "boolean" ? { pinned: input.pinned } : {}),
         ...(typeof input.title === "string" && input.title.trim()
           ? { title: input.title.trim().slice(0, 80) }
+          : {}),
+        ...(typeof input.archived === "boolean"
+          ? {
+              archivedAt: input.archived ? new Date() : null,
+              ...(input.archived ? { pinned: false } : {}),
+            }
           : {}),
       },
       include: { _count: { select: { messages: true } } },
@@ -2341,6 +2413,7 @@ export class PrismaApiRepository implements ApiRepository {
       data: {
         userId: input.userId,
         title,
+        archivedAt: null,
       },
       select: { id: true },
     })).id;
@@ -2396,6 +2469,7 @@ export class PrismaApiRepository implements ApiRepository {
         where: { id: conversationId },
         data: {
           title,
+          archivedAt: null,
           ...(lastMessage ? { lastMessageAt: new Date() } : {}),
         },
       });
@@ -3975,6 +4049,59 @@ export class PrismaApiRepository implements ApiRepository {
     await (this.prisma as any).digestRecord.create({
       data: { userId: input.userId, htmlContent: input.htmlContent },
     });
+  }
+
+  async getEmailDeliveryStatus(userId: string, configured: boolean): Promise<EmailDeliveryStatus> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        emailVerified: true,
+        notifyWeeklySummary: true,
+      },
+    });
+    const [schedule, latestRecord, statusSubscriber] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.prisma as any).digestSchedule.findUnique({
+        where: { userId },
+        select: {
+          nextSendAt: true,
+          lastSentAt: true,
+        },
+      }) as Promise<{ nextSendAt: Date | null; lastSentAt: Date | null } | null>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.prisma as any).digestRecord.findFirst({
+        where: { userId },
+        orderBy: { generatedAt: "desc" },
+        select: {
+          generatedAt: true,
+          sent: true,
+        },
+      }) as Promise<{ generatedAt: Date; sent: boolean } | null>,
+      user?.email
+        ? this.prisma.statusSubscriber.findFirst({
+            where: {
+              email: user.email,
+              active: true,
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      configured,
+      provider: configured ? "resend" : "unconfigured",
+      email: user?.email ?? null,
+      emailVerified: Boolean(user?.emailVerified),
+      verificationRequired: Boolean(user?.email && !user?.emailVerified),
+      digestEnabled: Boolean(user?.notifyWeeklySummary && schedule),
+      digestNextSendAt: schedule?.nextSendAt?.toISOString() ?? null,
+      digestLastSentAt: schedule?.lastSentAt?.toISOString() ?? null,
+      latestDigestGeneratedAt: latestRecord?.generatedAt?.toISOString() ?? null,
+      latestDigestSent: latestRecord?.sent ?? null,
+      statusSubscriberActive: Boolean(statusSubscriber),
+    };
   }
 
   async findAdminUsers(): Promise<Array<{ id: string }>> {

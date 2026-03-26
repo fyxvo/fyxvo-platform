@@ -124,6 +124,7 @@ class MemoryApiRepository implements ApiRepository {
       userId: string;
       title: string;
       pinned: boolean;
+      archivedAt: string | null;
       createdAt: string;
       updatedAt: string;
       lastMessageAt: string;
@@ -1019,6 +1020,7 @@ class MemoryApiRepository implements ApiRepository {
     id: string;
     title: string;
     pinned: boolean;
+    archivedAt: string | null;
     createdAt: string;
     updatedAt: string;
     lastMessageAt: string;
@@ -1028,6 +1030,7 @@ class MemoryApiRepository implements ApiRepository {
       id: conversation.id,
       title: conversation.title,
       pinned: conversation.pinned,
+      archivedAt: conversation.archivedAt,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       lastMessageAt: conversation.lastMessageAt,
@@ -1074,9 +1077,10 @@ class MemoryApiRepository implements ApiRepository {
 
   async countAssistantMessagesThisHour(_userId: string, _since: Date): Promise<number> { return 0; }
 
-  async listAssistantConversations(userId: string, limit = 20, query?: string) {
+  async listAssistantConversations(userId: string, limit = 20, query?: string, includeArchived = true) {
     return [...this.assistantConversations.values()]
       .filter((conversation) => conversation.userId === userId)
+      .filter((conversation) => includeArchived || conversation.archivedAt === null)
       .filter((conversation) =>
         query?.trim()
           ? conversation.title.toLowerCase().includes(query.trim().toLowerCase()) ||
@@ -1096,7 +1100,7 @@ class MemoryApiRepository implements ApiRepository {
 
   async getLatestAssistantConversation(userId: string) {
     const conversation = [...this.assistantConversations.values()]
-      .filter((candidate) => candidate.userId === userId)
+      .filter((candidate) => candidate.userId === userId && candidate.archivedAt === null)
       .sort((left, right) => right.lastMessageAt.localeCompare(left.lastMessageAt))[0];
     if (!conversation) return null;
     return {
@@ -1124,6 +1128,7 @@ class MemoryApiRepository implements ApiRepository {
       userId: input.userId,
       title: input.title,
       pinned: false,
+      archivedAt: null,
       createdAt: now,
       updatedAt: now,
       lastMessageAt: now,
@@ -1136,7 +1141,7 @@ class MemoryApiRepository implements ApiRepository {
   async updateAssistantConversation(
     userId: string,
     conversationId: string,
-    input: { pinned?: boolean; title?: string }
+    input: { pinned?: boolean; title?: string; archived?: boolean }
   ) {
     const conversation = this.assistantConversations.get(conversationId);
     if (!conversation || conversation.userId !== userId) {
@@ -1146,6 +1151,12 @@ class MemoryApiRepository implements ApiRepository {
       ...conversation,
       ...(typeof input.pinned === "boolean" ? { pinned: input.pinned } : {}),
       ...(input.title ? { title: input.title } : {}),
+      ...(typeof input.archived === "boolean"
+        ? {
+            archivedAt: input.archived ? new Date().toISOString() : null,
+            ...(input.archived ? { pinned: false } : {}),
+          }
+        : {}),
       updatedAt: new Date().toISOString(),
     };
     this.assistantConversations.set(conversationId, nextConversation);
@@ -1176,6 +1187,7 @@ class MemoryApiRepository implements ApiRepository {
       title: conversation.messages.length === 0 && input.titleFromFirstUserMessage
         ? input.titleFromFirstUserMessage
         : conversation.title,
+      archivedAt: null,
       updatedAt: lastMessageAt,
       lastMessageAt,
       messages
@@ -1427,6 +1439,44 @@ class MemoryApiRepository implements ApiRepository {
   }
   async getNewsletterSubscribers(_limit?: number): Promise<NewsletterSubscriberList> {
     return { count: 0, recent: [] };
+  }
+  async getAssistantStats() {
+    return {
+      requestsToday: 0,
+      requestsThisWeek: 0,
+      failedRequestsToday: 0,
+      failedRequestsThisWeek: 0,
+      internalFailuresToday: 0,
+      averageResponseTimeMs: 0,
+      averageTokensPerResponse: 0,
+      rateLimitHitsToday: 0,
+      messagesPerDay: [],
+      topPromptCategories: [],
+      topLinkedDocsSections: [],
+      feedback: {
+        positive: 0,
+        negative: 0,
+        withNotes: 0,
+        recent: [],
+      },
+      recentFailures: [],
+    };
+  }
+  async getEmailDeliveryStatus(userId: string, configured: boolean) {
+    const user = this.users.get(userId);
+    return {
+      configured,
+      provider: configured ? "resend" : "unconfigured",
+      email: user?.email ?? null,
+      emailVerified: user?.emailVerified ?? false,
+      verificationRequired: Boolean(user?.email && !user?.emailVerified),
+      digestEnabled: false,
+      digestNextSendAt: null,
+      digestLastSentAt: null,
+      latestDigestGeneratedAt: null,
+      latestDigestSent: null,
+      statusSubscriberActive: false,
+    };
   }
   async getLatencyHeatmap(_projectId: string, _range: "24h" | "7d" | "30d"): Promise<number[][]> {
     return Array.from({ length: 24 }, () => Array(7).fill(0));
@@ -1795,7 +1845,7 @@ describe("Fyxvo API service", () => {
     expect(response.json()).toEqual({ success: true });
   });
 
-  it("supports assistant conversation pinning and search", async () => {
+  it("supports assistant conversation pinning, renaming, archival, and search", async () => {
     const context = await createTestApp();
     appsToClose.add(context.app);
     const auth = await authenticateWallet({ app: context.app, repository: context.repository });
@@ -1826,6 +1876,15 @@ describe("Fyxvo API service", () => {
     expect(pinResponse.statusCode).toBe(200);
     expect(pinResponse.json<{ item: { pinned: boolean } }>().item.pinned).toBe(true);
 
+    const renameResponse = await context.app.inject({
+      method: "PATCH",
+      url: `/v1/assistant/conversations/${firstConversationId}`,
+      headers: { authorization: `Bearer ${auth.token}` },
+      payload: { title: "Latency triage" },
+    });
+    expect(renameResponse.statusCode).toBe(200);
+    expect(renameResponse.json<{ item: { title: string } }>().item.title).toBe("Latency triage");
+
     const listResponse = await context.app.inject({
       method: "GET",
       url: "/v1/assistant/conversations",
@@ -1839,13 +1898,75 @@ describe("Fyxvo API service", () => {
 
     const searchResponse = await context.app.inject({
       method: "GET",
-      url: "/v1/assistant/conversations?q=funding",
+      url: "/v1/assistant/conversations?q=triage",
       headers: { authorization: `Bearer ${auth.token}` },
     });
     expect(searchResponse.statusCode).toBe(200);
     expect(searchResponse.json<{ items: Array<{ title: string }> }>().items).toEqual([
-      expect.objectContaining({ title: "Funding checklist" }),
+      expect.objectContaining({ title: "Latency triage" }),
     ]);
+
+    const archiveResponse = await context.app.inject({
+      method: "PATCH",
+      url: `/v1/assistant/conversations/${firstConversationId}`,
+      headers: { authorization: `Bearer ${auth.token}` },
+      payload: { archived: true },
+    });
+    expect(archiveResponse.statusCode).toBe(200);
+    expect(archiveResponse.json<{ item: { archivedAt: string | null; pinned: boolean } }>().item).toMatchObject({
+      pinned: false,
+    });
+    expect(archiveResponse.json<{ item: { archivedAt: string | null } }>().item.archivedAt).toEqual(expect.any(String));
+
+    const latestResponse = await context.app.inject({
+      method: "GET",
+      url: "/v1/assistant/conversations/latest",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+    expect(latestResponse.statusCode).toBe(200);
+    expect(latestResponse.json<{ item: { title: string } | null }>().item?.title).toBe("Funding checklist");
+
+    const restoreResponse = await context.app.inject({
+      method: "PATCH",
+      url: `/v1/assistant/conversations/${firstConversationId}`,
+      headers: { authorization: `Bearer ${auth.token}` },
+      payload: { archived: false },
+    });
+    expect(restoreResponse.statusCode).toBe(200);
+    expect(restoreResponse.json<{ item: { archivedAt: string | null; title: string } }>().item).toMatchObject({
+      archivedAt: null,
+      title: "Latency triage",
+    });
+  });
+
+  it("reports per-user email delivery readiness", async () => {
+    const context = await createTestApp({
+      envOverrides: {
+        RESEND_API_KEY: "resend-test-key",
+        EMAIL_FROM: "alerts@fyxvo.com",
+      },
+    });
+    appsToClose.add(context.app);
+    const auth = await authenticateWallet({ app: context.app, repository: context.repository });
+    context.repository.setUserEmail(auth.wallet.publicKey.toBase58(), "alerts@example.com");
+
+    const response = await context.app.inject({
+      method: "GET",
+      url: "/v1/me/email-delivery-status",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      item: {
+        configured: true,
+        provider: "resend",
+        email: "alerts@example.com",
+        emailVerified: false,
+        verificationRequired: true,
+        digestEnabled: false,
+      },
+    });
   });
 
   it("sends verification email requests when delivery is configured", async () => {

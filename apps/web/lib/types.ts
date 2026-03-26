@@ -749,6 +749,7 @@ export interface AssistantConversationSummary {
   readonly id: string;
   readonly title: string;
   readonly pinned: boolean;
+  readonly archivedAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastMessageAt: string;
@@ -772,6 +773,9 @@ export interface AssistantRateLimitStatus {
 export interface AssistantAdminStats {
   readonly requestsToday: number;
   readonly requestsThisWeek: number;
+  readonly failedRequestsToday: number;
+  readonly failedRequestsThisWeek: number;
+  readonly internalFailuresToday: number;
   readonly averageResponseTimeMs: number;
   readonly averageTokensPerResponse: number;
   readonly rateLimitHitsToday: number;
@@ -791,6 +795,11 @@ export interface AssistantAdminStats {
       readonly messageId: string;
     }>;
   };
+  readonly recentFailures: ReadonlyArray<{
+    readonly statusCode: number;
+    readonly createdAt: string;
+    readonly durationMs: number;
+  }>;
 }
 
 export interface WebDeploymentStatus {
@@ -951,6 +960,20 @@ export interface SessionDiagnostics {
   readonly assistantAvailable: boolean;
   readonly environment: string;
   readonly suggestions: readonly string[];
+}
+
+export interface EmailDeliveryStatus {
+  readonly configured: boolean;
+  readonly provider: "resend" | "unconfigured";
+  readonly email: string | null;
+  readonly emailVerified: boolean;
+  readonly verificationRequired: boolean;
+  readonly digestEnabled: boolean;
+  readonly digestNextSendAt: string | null;
+  readonly digestLastSentAt: string | null;
+  readonly latestDigestGeneratedAt: string | null;
+  readonly latestDigestSent: boolean | null;
+  readonly statusSubscriberActive: boolean;
 }
 
 export interface StatusIncidentUpdate {

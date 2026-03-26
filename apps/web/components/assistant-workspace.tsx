@@ -730,6 +730,8 @@ export function AssistantWorkspace() {
   const [conversationQuery, setConversationQuery] = useState("");
   const [conversationSearchLoading, setConversationSearchLoading] = useState(false);
   const [conversationUpdatingId, setConversationUpdatingId] = useState<string | null>(null);
+  const [conversationRenamingId, setConversationRenamingId] = useState<string | null>(null);
+  const [conversationRenameValue, setConversationRenameValue] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
@@ -760,6 +762,18 @@ export function AssistantWorkspace() {
   const usageRemaining = rateLimitStatus?.messagesRemainingThisHour ?? null;
   const rateLimitReset = rateLimitStatus?.resetAt ?? rateLimitStatus?.windowResetAt ?? null;
   const activeConversationSummary = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
+  const pinnedConversations = useMemo(
+    () => conversations.filter((conversation) => conversation.pinned && !conversation.archivedAt),
+    [conversations]
+  );
+  const recentConversations = useMemo(
+    () => conversations.filter((conversation) => !conversation.pinned && !conversation.archivedAt),
+    [conversations]
+  );
+  const archivedConversations = useMemo(
+    () => conversations.filter((conversation) => Boolean(conversation.archivedAt)),
+    [conversations]
+  );
 
   useEffect(() => {
     threadBottomRef.current?.scrollIntoView({ behavior: messages.length > 0 ? "smooth" : "auto" });
@@ -853,7 +867,7 @@ export function AssistantWorkspace() {
     let cancelled = false;
 
     Promise.all([
-      listAssistantConversations(portal.token, { limit: 20 }),
+      listAssistantConversations(portal.token, { limit: 20, includeArchived: true }),
       getLatestAssistantConversation(portal.token),
       getAssistantRateLimitStatus(portal.token),
       portal.user?.role === "OWNER" || portal.user?.role === "ADMIN" ? getAdminAssistantStats(portal.token) : Promise.resolve(null),
@@ -884,7 +898,7 @@ export function AssistantWorkspace() {
     let cancelled = false;
     const timeoutId = window.setTimeout(() => {
       setConversationSearchLoading(true);
-      void listAssistantConversations(portal.token!, { limit: 20, query: conversationQuery })
+      void listAssistantConversations(portal.token!, { limit: 20, query: conversationQuery, includeArchived: true })
         .then((data) => {
           if (cancelled) return;
           setConversations(data.items);
@@ -919,7 +933,7 @@ export function AssistantWorkspace() {
   async function refreshConversationState() {
     if (!portal.token) return;
     const [conversationData, rateData] = await Promise.all([
-      listAssistantConversations(portal.token, { limit: 20, query: conversationQuery }),
+      listAssistantConversations(portal.token, { limit: 20, query: conversationQuery, includeArchived: true }),
       getAssistantRateLimitStatus(portal.token).catch(() => null),
     ]);
     setConversations(conversationData.items);
@@ -955,6 +969,8 @@ export function AssistantWorkspace() {
     setSidebarOpen(false);
     setReturnBanner(null);
     setFeedbackDraft(null);
+    setConversationRenamingId(null);
+    setConversationRenameValue("");
   }
 
   async function handleToggleConversationPinned(conversation: AssistantConversationSummary) {
@@ -972,6 +988,62 @@ export function AssistantWorkspace() {
           return new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime();
         })
       );
+    } finally {
+      setConversationUpdatingId(null);
+    }
+  }
+
+  async function handleRenameConversation(conversation: AssistantConversationSummary) {
+    if (!portal.token || !conversationRenameValue.trim()) return;
+    setConversationUpdatingId(conversation.id);
+    try {
+      const data = await updateAssistantConversation(
+        conversation.id,
+        { title: conversationRenameValue.trim() },
+        portal.token
+      );
+      setConversations((current) =>
+        current.map((item) => (item.id === conversation.id ? data.item : item))
+      );
+      setConversationRenamingId(null);
+      setConversationRenameValue("");
+    } finally {
+      setConversationUpdatingId(null);
+    }
+  }
+
+  async function handleToggleConversationArchived(conversation: AssistantConversationSummary) {
+    if (!portal.token) return;
+    setConversationUpdatingId(conversation.id);
+    try {
+      await updateAssistantConversation(
+        conversation.id,
+        { archived: !conversation.archivedAt },
+        portal.token
+      );
+      const refreshed = await listAssistantConversations(portal.token, {
+        limit: 20,
+        query: conversationQuery,
+        includeArchived: true,
+      });
+      setConversations(refreshed.items);
+
+      if (!conversation.archivedAt) {
+        if (activeConversationId === conversation.id) {
+          const nextConversation = refreshed.items.find((item) => !item.archivedAt && item.id !== conversation.id) ?? null;
+          if (nextConversation) {
+            await loadConversation(nextConversation.id);
+          } else {
+            setActiveConversationId(null);
+            setMessages([]);
+          }
+        }
+      } else {
+        const restored = refreshed.items.find((item) => item.id === conversation.id);
+        if (restored) {
+          setActiveConversationId(restored.id);
+        }
+      }
     } finally {
       setConversationUpdatingId(null);
     }
@@ -1539,6 +1611,142 @@ export function AssistantWorkspace() {
     </div>
   );
 
+  function renderConversationRow(conversation: AssistantConversationSummary, compact = false) {
+    const isActive = activeConversationId === conversation.id;
+    const isRenaming = conversationRenamingId === conversation.id;
+    const archived = Boolean(conversation.archivedAt);
+
+    return (
+      <div
+        key={conversation.id}
+        className={cn(
+          "rounded-xl border px-3.5 py-3 transition-colors duration-150",
+          isActive
+            ? "border-brand-500/25 bg-brand-500/8"
+            : compact
+              ? "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
+              : "border-transparent hover:border-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel-soft)]"
+        )}
+      >
+        {isRenaming ? (
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={conversationRenameValue}
+              onChange={(event) => setConversationRenameValue(event.target.value)}
+              aria-label="Rename conversation"
+              className={cn(
+                "h-10 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 text-sm text-[var(--fyxvo-text)] outline-none transition-colors placeholder:text-[var(--fyxvo-text-muted)]",
+                "focus:border-brand-500/40",
+                FOCUS_RING_CLASS
+              )}
+            />
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setConversationRenamingId(null);
+                  setConversationRenameValue("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void handleRenameConversation(conversation)}
+                disabled={!conversationRenameValue.trim() || conversationUpdatingId === conversation.id}
+              >
+                {conversationUpdatingId === conversation.id ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => void loadConversation(conversation.id)}
+              aria-current={isActive ? "page" : undefined}
+              className={cn("min-h-[44px] w-full text-left", FOCUS_RING_CLASS)}
+            >
+              <div className="flex items-center gap-2">
+                <div className="line-clamp-2 text-sm font-medium text-[var(--fyxvo-text)]">{conversation.title}</div>
+                {conversation.pinned ? <Badge tone="neutral">Pinned</Badge> : null}
+                {archived ? <Badge tone="warning">Archived</Badge> : null}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--fyxvo-text-muted)]">
+                <span>{conversation.messageCount} msg</span>
+                <span>{shortRelative(conversation.lastMessageAt, isHydrated)}</span>
+              </div>
+            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"}
+                disabled={conversationUpdatingId === conversation.id || archived}
+                onClick={() => void handleToggleConversationPinned(conversation)}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                  FOCUS_RING_CLASS,
+                  conversation.pinned
+                    ? "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-brand)]"
+                    : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] disabled:opacity-50"
+                )}
+              >
+                {conversationUpdatingId === conversation.id ? "…" : conversation.pinned ? "Pinned" : "Pin"}
+              </button>
+              <button
+                type="button"
+                aria-label="Rename conversation"
+                disabled={conversationUpdatingId === conversation.id}
+                onClick={() => {
+                  setConversationRenamingId(conversation.id);
+                  setConversationRenameValue(conversation.title);
+                }}
+                className={cn(
+                  "rounded-lg border border-[var(--fyxvo-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]",
+                  FOCUS_RING_CLASS
+                )}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                aria-label={archived ? "Restore conversation" : "Archive conversation"}
+                disabled={conversationUpdatingId === conversation.id}
+                onClick={() => void handleToggleConversationArchived(conversation)}
+                className={cn(
+                  "rounded-lg border border-[var(--fyxvo-border)] px-2.5 py-1 text-[11px] font-medium text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]",
+                  FOCUS_RING_CLASS
+                )}
+              >
+                {conversationUpdatingId === conversation.id ? "…" : archived ? "Restore" : "Archive"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderConversationSection(
+    title: string,
+    items: readonly AssistantConversationSummary[],
+    compact = false
+  ) {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <div className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+          {title}
+        </div>
+        <div className="space-y-2">
+          {items.map((conversation) => renderConversationRow(conversation, compact))}
+        </div>
+      </div>
+    );
+  }
+
   const adminAssistantInsightSection = adminAssistantStats ? (
     <SectionCard title="Admin assistant insight" description="Assistant usage and feedback summary for admin sessions.">
       <div className="space-y-3 text-sm">
@@ -1550,6 +1758,20 @@ export function AssistantWorkspace() {
           <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
             <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Avg response</div>
             <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.averageResponseTimeMs}ms</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Failures today</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.failedRequestsToday}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">500s today</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.internalFailuresToday}</div>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">429s today</div>
+            <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{adminAssistantStats.rateLimitHitsToday}</div>
           </div>
         </div>
         <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
@@ -1573,6 +1795,20 @@ export function AssistantWorkspace() {
             </div>
           ) : null}
         </div>
+        {adminAssistantStats.recentFailures.length > 0 ? (
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Recent failures</div>
+            <div className="mt-3 space-y-2">
+              {adminAssistantStats.recentFailures.map((entry) => (
+                <div key={`${entry.statusCode}-${entry.createdAt}`} className="flex items-center justify-between gap-3 text-xs text-[var(--fyxvo-text-muted)]">
+                  <span className="font-medium text-[var(--fyxvo-text)]">{entry.statusCode}</span>
+                  <span>{entry.durationMs}ms</span>
+                  <span>{shortRelative(entry.createdAt, isHydrated)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </SectionCard>
   ) : null;
@@ -1697,51 +1933,10 @@ export function AssistantWorkspace() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {conversations.map((conversation) => (
-                  <div
-                    key={conversation.id}
-                    className={cn(
-                      "rounded-xl border px-3.5 py-3 transition-colors duration-150",
-                      activeConversationId === conversation.id
-                        ? "border-brand-500/25 bg-brand-500/8"
-                        : "border-transparent hover:border-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel-soft)]"
-                    )}
-                  >
-                    <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void loadConversation(conversation.id)}
-                        aria-current={activeConversationId === conversation.id ? "page" : undefined}
-                        className={cn("min-w-0 flex-1 text-left", FOCUS_RING_CLASS)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="line-clamp-2 text-sm font-medium text-[var(--fyxvo-text)]">{conversation.title}</div>
-                          {conversation.pinned ? <Badge tone="neutral">Pinned</Badge> : null}
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--fyxvo-text-muted)]">
-                          <span>{conversation.messageCount} msg</span>
-                          <span>{shortRelative(conversation.lastMessageAt, isHydrated)}</span>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"}
-                        disabled={conversationUpdatingId === conversation.id}
-                        onClick={() => void handleToggleConversationPinned(conversation)}
-                        className={cn(
-                          "shrink-0 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors",
-                          FOCUS_RING_CLASS,
-                          conversation.pinned
-                            ? "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-brand)]"
-                            : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-                        )}
-                      >
-                        {conversationUpdatingId === conversation.id ? "..." : conversation.pinned ? "Pinned" : "Pin"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                {renderConversationSection("Pinned", pinnedConversations)}
+                {renderConversationSection(conversationQuery.trim() ? "Matching conversations" : "Recent", recentConversations)}
+                {renderConversationSection("Archived", archivedConversations)}
               </div>
             )}
           </div>
@@ -2116,48 +2311,10 @@ export function AssistantWorkspace() {
                     : "Start a new conversation and it will appear here."}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {conversations.map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      className={cn(
-                        "rounded-2xl border px-4 py-3",
-                        activeConversationId === conversation.id
-                          ? "border-brand-500/30 bg-brand-500/10"
-                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void loadConversation(conversation.id)}
-                          aria-current={activeConversationId === conversation.id ? "page" : undefined}
-                          className={cn("min-h-[44px] min-w-0 flex-1 text-left", FOCUS_RING_CLASS)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="line-clamp-2 text-sm font-semibold text-[var(--fyxvo-text)]">{conversation.title}</div>
-                            {conversation.pinned ? <Badge tone="neutral">Pinned</Badge> : null}
-                          </div>
-                          <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{shortRelative(conversation.lastMessageAt, isHydrated)}</div>
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={conversation.pinned ? "Unpin conversation" : "Pin conversation"}
-                          disabled={conversationUpdatingId === conversation.id}
-                          onClick={() => void handleToggleConversationPinned(conversation)}
-                          className={cn(
-                            "rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors",
-                            FOCUS_RING_CLASS,
-                            conversation.pinned
-                              ? "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-brand)]"
-                              : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-                          )}
-                        >
-                          {conversationUpdatingId === conversation.id ? "..." : conversation.pinned ? "Pinned" : "Pin"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  {renderConversationSection("Pinned", pinnedConversations, true)}
+                  {renderConversationSection(conversationQuery.trim() ? "Matching conversations" : "Recent", recentConversations, true)}
+                  {renderConversationSection("Archived", archivedConversations, true)}
                 </div>
               )}
             </div>

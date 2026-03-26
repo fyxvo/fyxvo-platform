@@ -3778,9 +3778,15 @@ export async function buildApiApp(input: {
     const query = z.object({
       limit: z.coerce.number().int().min(1).max(50).default(20),
       q: z.string().trim().max(120).optional(),
+      includeArchived: z.coerce.boolean().optional(),
     }).parse(request.query);
     return {
-      items: await input.repository.listAssistantConversations(user.id, query.limit, query.q)
+      items: await input.repository.listAssistantConversations(
+        user.id,
+        query.limit,
+        query.q,
+        query.includeArchived ?? true
+      )
     };
   });
 
@@ -3817,15 +3823,17 @@ export async function buildApiApp(input: {
     const body = z
       .object({
         pinned: z.boolean().optional(),
+        archived: z.boolean().optional(),
         title: z.string().trim().min(1).max(80).optional(),
       })
-      .refine((value) => typeof value.pinned === "boolean" || typeof value.title === "string", {
+      .refine((value) => typeof value.pinned === "boolean" || typeof value.archived === "boolean" || typeof value.title === "string", {
         message: "At least one conversation field must be updated.",
       })
       .parse(request.body ?? {});
 
     const item = await input.repository.updateAssistantConversation(user.id, params.conversationId, {
       ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
+      ...(typeof body.archived === "boolean" ? { archived: body.archived } : {}),
       ...(typeof body.title === "string" ? { title: body.title } : {}),
     });
     if (!item) throw new HttpError(404, "not_found", "Conversation not found.");
@@ -5485,6 +5493,14 @@ ${liveContextLines.join("\n")}
       return reply.status(400).send({ error: "invalid_token", message: "Token is invalid or expired." });
     }
     return { success: true };
+  });
+
+  app.get("/v1/me/email-delivery-status", async (request) => {
+    const user = requireUser(request);
+    const configured = isEmailDeliveryEnabled({ apiKey: input.env.RESEND_API_KEY, from: input.env.EMAIL_FROM });
+    return {
+      item: await input.repository.getEmailDeliveryStatus(user.id, configured),
+    };
   });
 
   app.get("/v1/me/tos-status", async (request) => {

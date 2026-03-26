@@ -27,6 +27,7 @@ const apiMocks = vi.hoisted(() => ({
   createAuthChallenge: vi.fn(),
   fetchApiHealth: vi.fn(),
   fetchApiStatus: vi.fn(),
+  getEmailDeliveryStatus: vi.fn(),
   getAdminOverview: vi.fn(),
   getAdminAssistantStats: vi.fn(),
   getAdminStats: vi.fn(),
@@ -96,6 +97,7 @@ vi.mock("../lib/api", () => ({
   createAuthChallenge: apiMocks.createAuthChallenge,
   fetchApiHealth: apiMocks.fetchApiHealth,
   fetchApiStatus: apiMocks.fetchApiStatus,
+  getEmailDeliveryStatus: apiMocks.getEmailDeliveryStatus,
   getAdminOverview: apiMocks.getAdminOverview,
   getAdminAssistantStats: apiMocks.getAdminAssistantStats,
   getAdminStats: apiMocks.getAdminStats,
@@ -288,6 +290,7 @@ beforeEach(() => {
       id: "conversation-1",
       title: "Explain the difference between standard RPC and priority relay on Fyxvo",
       pinned: false,
+      archivedAt: null,
       createdAt: "2026-03-26T00:00:00.000Z",
       updatedAt: "2026-03-26T00:00:00.000Z",
       lastMessageAt: "2026-03-26T00:00:00.000Z",
@@ -299,6 +302,7 @@ beforeEach(() => {
       id: "conversation-1",
       title: "Explain the difference between standard RPC and priority relay on Fyxvo",
       pinned: false,
+      archivedAt: null,
       createdAt: "2026-03-26T00:00:00.000Z",
       updatedAt: "2026-03-26T00:00:01.000Z",
       lastMessageAt: "2026-03-26T00:00:01.000Z",
@@ -333,6 +337,9 @@ beforeEach(() => {
     item: {
       requestsToday: 4,
       requestsThisWeek: 12,
+      failedRequestsToday: 1,
+      failedRequestsThisWeek: 2,
+      internalFailuresToday: 0,
       averageResponseTimeMs: 480,
       averageTokensPerResponse: 210,
       rateLimitHitsToday: 0,
@@ -344,8 +351,22 @@ beforeEach(() => {
         negative: 0,
         withNotes: 0,
         recent: []
-      }
+      },
+      recentFailures: []
     }
+  });
+  apiMocks.getEmailDeliveryStatus.mockResolvedValue({
+    configured: true,
+    provider: "resend",
+    email: "owner@fyxvo.dev",
+    emailVerified: false,
+    verificationRequired: true,
+    digestEnabled: false,
+    digestNextSendAt: null,
+    digestLastSentAt: null,
+    latestDigestGeneratedAt: null,
+    latestDigestSent: null,
+    statusSubscriberActive: false,
   });
   apiMocks.getAdminStats.mockResolvedValue(previewAdminStats);
   apiMocks.getOperators.mockResolvedValue(previewOperators);

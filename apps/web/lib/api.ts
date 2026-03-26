@@ -16,6 +16,7 @@ import type {
   ApiKeyAnalytics,
   BookmarkRecord,
   DashboardPreferences,
+  EmailDeliveryStatus,
   ErrorLogEntry,
   FeedbackInboxItem,
   FeedbackSubmissionInput,
@@ -808,11 +809,12 @@ export async function getAssistantRateLimitStatus(token: string) {
 
 export async function listAssistantConversations(
   token: string,
-  input?: { readonly limit?: number; readonly query?: string }
+  input?: { readonly limit?: number; readonly query?: string; readonly includeArchived?: boolean }
 ) {
   const params = new URLSearchParams();
   if (input?.limit) params.set("limit", String(input.limit));
   if (input?.query?.trim()) params.set("q", input.query.trim());
+  if (typeof input?.includeArchived === "boolean") params.set("includeArchived", String(input.includeArchived));
   const query = params.size > 0 ? `?${params.toString()}` : "";
   return requestApi<{ items: AssistantConversationSummary[] }>(`/v1/assistant/conversations${query}`, undefined, token);
 }
@@ -835,7 +837,7 @@ export async function createAssistantConversation(title: string | undefined, tok
 
 export async function updateAssistantConversation(
   conversationId: string,
-  input: { readonly pinned?: boolean; readonly title?: string },
+  input: { readonly pinned?: boolean; readonly title?: string; readonly archived?: boolean },
   token: string
 ) {
   return requestApi<{ item: AssistantConversationSummary }>(
@@ -874,6 +876,11 @@ export async function submitAssistantFeedback(
 
 export async function getAdminAssistantStats(token: string) {
   return requestApi<{ item: AssistantAdminStats }>("/v1/admin/assistant/stats", undefined, token);
+}
+
+export async function getEmailDeliveryStatus(token: string) {
+  const response = await requestApi<{ item: EmailDeliveryStatus }>("/v1/me/email-delivery-status", undefined, token);
+  return response.item;
 }
 
 export async function getAdminDeploymentReadiness(token: string) {

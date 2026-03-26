@@ -642,6 +642,7 @@ export interface AssistantConversationSummary {
   readonly id: string;
   readonly title: string;
   readonly pinned: boolean;
+  readonly archivedAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastMessageAt: string;
@@ -946,14 +947,14 @@ export interface ApiRepository {
   listActivityLog(projectId: string, limit?: number): Promise<ActivityLogItem[]>;
   getActiveAnnouncement(): Promise<SystemAnnouncementItem | null>;
   upsertAnnouncement(input: { message: string; severity: string; startAt?: Date | null; endAt?: Date | null }): Promise<void>;
-  listAssistantConversations(userId: string, limit?: number, query?: string): Promise<AssistantConversationSummary[]>;
+  listAssistantConversations(userId: string, limit?: number, query?: string, includeArchived?: boolean): Promise<AssistantConversationSummary[]>;
   getLatestAssistantConversation(userId: string): Promise<AssistantConversationDetail | null>;
   getAssistantConversation(userId: string, conversationId: string): Promise<AssistantConversationDetail | null>;
   createAssistantConversation(input: { userId: string; title: string }): Promise<AssistantConversationSummary>;
   updateAssistantConversation(
     userId: string,
     conversationId: string,
-    input: { pinned?: boolean; title?: string }
+    input: { pinned?: boolean; title?: string; archived?: boolean }
   ): Promise<AssistantConversationSummary | null>;
   saveAssistantConversationMessages(input: {
     userId: string;
@@ -1089,6 +1090,7 @@ export interface ApiRepository {
   findApiKeyByHash(keyHash: string): Promise<{ id: string; projectId: string; scopes: unknown; status: string; expiresAt: Date | null } | null>;
   getLatestDigestRecord(userId: string): Promise<{ htmlContent: string; generatedAt: Date } | null>;
   createDigestRecord(input: { userId: string; htmlContent: string }): Promise<void>;
+  getEmailDeliveryStatus(userId: string, configured: boolean): Promise<EmailDeliveryStatus>;
   findAdminUsers(): Promise<Array<{ id: string }>>;
 }
 
@@ -1159,6 +1161,9 @@ export interface OnChainProjectSnapshot {
 export interface AssistantStats {
   readonly requestsToday: number;
   readonly requestsThisWeek: number;
+  readonly failedRequestsToday: number;
+  readonly failedRequestsThisWeek: number;
+  readonly internalFailuresToday: number;
   readonly averageResponseTimeMs: number;
   readonly averageTokensPerResponse: number;
   readonly rateLimitHitsToday: number;
@@ -1187,6 +1192,25 @@ export interface AssistantStats {
       readonly messageId: string;
     }>;
   };
+  readonly recentFailures: ReadonlyArray<{
+    readonly statusCode: number;
+    readonly createdAt: string;
+    readonly durationMs: number;
+  }>;
+}
+
+export interface EmailDeliveryStatus {
+  readonly configured: boolean;
+  readonly provider: "resend" | "unconfigured";
+  readonly email: string | null;
+  readonly emailVerified: boolean;
+  readonly verificationRequired: boolean;
+  readonly digestEnabled: boolean;
+  readonly digestNextSendAt: string | null;
+  readonly digestLastSentAt: string | null;
+  readonly latestDigestGeneratedAt: string | null;
+  readonly latestDigestSent: boolean | null;
+  readonly statusSubscriberActive: boolean;
 }
 
 export interface BlockchainClient {

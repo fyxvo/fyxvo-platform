@@ -18,7 +18,8 @@ import { usePortal } from "../../components/portal-provider";
 import { ThemeToggle } from "../../components/theme-toggle";
 import { formatRelativeDate, shortenAddress } from "../../lib/format";
 import { webEnv } from "../../lib/env";
-import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember, getSessionDiagnostics, recordProjectAccessView } from "../../lib/api";
+import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember, getEmailDeliveryStatus, getSessionDiagnostics, recordProjectAccessView } from "../../lib/api";
+import type { EmailDeliveryStatus } from "../../lib/types";
 
 function buildProjectNotesTemplate(projectName: string) {
   return `# Overview
@@ -196,6 +197,7 @@ export default function SettingsPage() {
     environment: string;
     suggestions: readonly string[];
   } | null>(null);
+  const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<EmailDeliveryStatus | null>(null);
   const [signaturePayload, setSignaturePayload] = useState("{\n  \"event\": \"request.completed\",\n  \"project\": \"demo\"\n}");
   const [signatureHeader, setSignatureHeader] = useState("");
   const [signatureSecret, setSignatureSecret] = useState("");
@@ -357,15 +359,21 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!portal.token) {
       setSessionDiagnostics(null);
+      setEmailDeliveryStatus(null);
       return;
     }
     let cancelled = false;
-    getSessionDiagnostics(portal.token)
-      .then((item) => {
-        if (!cancelled) setSessionDiagnostics(item);
+    Promise.all([getSessionDiagnostics(portal.token), getEmailDeliveryStatus(portal.token)])
+      .then(([diagnostics, delivery]) => {
+        if (cancelled) return;
+        setSessionDiagnostics(diagnostics);
+        setEmailDeliveryStatus(delivery);
       })
       .catch(() => {
-        if (!cancelled) setSessionDiagnostics(null);
+        if (!cancelled) {
+          setSessionDiagnostics(null);
+          setEmailDeliveryStatus(null);
+        }
       });
     return () => {
       cancelled = true;
@@ -433,7 +441,11 @@ export default function SettingsPage() {
     setEmailSaving(true);
     try {
       await updateNotificationPreferences({ email: emailValue || null }, portal.token);
-      await portal.refresh();
+      const [_, delivery] = await Promise.all([
+        portal.refresh(),
+        getEmailDeliveryStatus(portal.token).catch(() => null),
+      ]);
+      if (delivery) setEmailDeliveryStatus(delivery);
       setEmailSaved(true);
       setTimeout(() => setEmailSaved(false), 2500);
     } finally {
@@ -456,6 +468,10 @@ export default function SettingsPage() {
           ? payload.message ?? "Verification email sent."
           : payload.message ?? payload.error ?? "Unable to send verification email right now."
       );
+      if (response.ok) {
+        const delivery = await getEmailDeliveryStatus(portal.token).catch(() => null);
+        if (delivery) setEmailDeliveryStatus(delivery);
+      }
     } catch {
       setEmailVerificationMessage("Unable to send verification email right now.");
     } finally {
@@ -727,6 +743,8 @@ export default function SettingsPage() {
         method: next ? "POST" : "DELETE",
         headers: { authorization: `Bearer ${portal.token}` },
       });
+      const delivery = await getEmailDeliveryStatus(portal.token).catch(() => null);
+      if (delivery) setEmailDeliveryStatus(delivery);
     } catch {
       // revert on error
       setDigestEnabled(!next);
@@ -1036,6 +1054,50 @@ export default function SettingsPage() {
               ) : null}
               {emailVerificationMessage ? (
                 <p className="text-xs text-[var(--fyxvo-text-muted)]">{emailVerificationMessage}</p>
+              ) : null}
+              {emailDeliveryStatus ? (
+                <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-3 text-xs text-[var(--fyxvo-text-muted)]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={emailDeliveryStatus.configured ? "success" : "warning"}>
+                      {emailDeliveryStatus.configured ? "Email delivery configured" : "Email delivery unavailable"}
+                    </Badge>
+                    <Badge tone={emailDeliveryStatus.statusSubscriberActive ? "success" : "neutral"}>
+                      {emailDeliveryStatus.statusSubscriberActive ? "Status subscriber active" : "Status subscriber inactive"}
+                    </Badge>
+                    <Badge tone={emailDeliveryStatus.digestEnabled ? "success" : "neutral"}>
+                      {emailDeliveryStatus.digestEnabled ? "Weekly digest enabled" : "Weekly digest disabled"}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 grid gap-1">
+                    <div>
+                      Provider: <span className="text-[var(--fyxvo-text)]">{emailDeliveryStatus.provider}</span>
+                    </div>
+                    <div>
+                      Verification:{" "}
+                      <span className="text-[var(--fyxvo-text)]">
+                        {emailDeliveryStatus.emailVerified
+                          ? "Verified"
+                          : emailDeliveryStatus.verificationRequired
+                            ? "Pending confirmation"
+                            : "No email saved"}
+                      </span>
+                    </div>
+                    <div>
+                      Next digest:{" "}
+                      <span className="text-[var(--fyxvo-text)]">
+                        {emailDeliveryStatus.digestNextSendAt ? formatRelativeDate(emailDeliveryStatus.digestNextSendAt) : "Not scheduled"}
+                      </span>
+                    </div>
+                    <div>
+                      Latest digest:{" "}
+                      <span className="text-[var(--fyxvo-text)]">
+                        {emailDeliveryStatus.latestDigestGeneratedAt
+                          ? `${formatRelativeDate(emailDeliveryStatus.latestDigestGeneratedAt)}${emailDeliveryStatus.latestDigestSent === false ? " (not sent)" : ""}`
+                          : "None generated yet"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               ) : null}
             </div>
           </SettingRow>
