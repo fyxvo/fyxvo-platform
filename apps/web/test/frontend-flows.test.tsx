@@ -37,6 +37,7 @@ const apiMocks = vi.hoisted(() => ({
   getOnchainSnapshot: vi.fn(),
   getOperators: vi.fn(),
   getProjectAnalytics: vi.fn(),
+  getProjectBudgetStatus: vi.fn(),
   listAssistantConversations: vi.fn(),
   listApiKeys: vi.fn(),
   listProjects: vi.fn(),
@@ -104,6 +105,7 @@ vi.mock("../lib/api", () => ({
   getOnchainSnapshot: apiMocks.getOnchainSnapshot,
   getOperators: apiMocks.getOperators,
   getProjectAnalytics: apiMocks.getProjectAnalytics,
+  getProjectBudgetStatus: apiMocks.getProjectBudgetStatus,
   listAssistantConversations: apiMocks.listAssistantConversations,
   listApiKeys: apiMocks.listApiKeys,
   listProjects: apiMocks.listProjects,
@@ -344,6 +346,18 @@ beforeEach(() => {
   apiMocks.getOperators.mockResolvedValue(previewOperators);
   apiMocks.prepareFunding.mockResolvedValue(createFundingPreparation());
   apiMocks.getFundingHistory.mockResolvedValue([]);
+  apiMocks.getProjectBudgetStatus.mockResolvedValue({
+    dailyBudgetLamports: null,
+    monthlyBudgetLamports: null,
+    warningThresholdPct: 80,
+    hardStop: false,
+    dailySpendLamports: 0,
+    monthlySpendLamports: 0,
+    dailyUsagePct: null,
+    monthlyUsagePct: null,
+    dailyWarningTriggered: false,
+    monthlyWarningTriggered: false,
+  });
   apiMocks.createApiKey.mockResolvedValue(createApiKeyResult());
   apiMocks.revokeApiKey.mockResolvedValue(undefined);
   apiMocks.submitInterest.mockResolvedValue({

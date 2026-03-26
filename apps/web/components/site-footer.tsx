@@ -15,6 +15,7 @@ const productLinks = [
   { href: "/enterprise", label: "Enterprise" },
   { href: "/updates", label: "Updates" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/explore", label: "Explore" },
   { href: "/assistant", label: "Assistant" },
   { href: "/playground", label: "Playground" },
   { href: "/contact", label: "Contact" },

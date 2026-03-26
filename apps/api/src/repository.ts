@@ -414,6 +414,10 @@ export class PrismaApiRepository implements ApiRepository {
         ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
         ...(input.lowBalanceThresholdSol !== undefined ? { lowBalanceThresholdSol: input.lowBalanceThresholdSol } : {}),
         ...(input.dailyRequestAlertThreshold !== undefined ? { dailyRequestAlertThreshold: input.dailyRequestAlertThreshold } : {}),
+        ...(input.dailyBudgetLamports !== undefined ? { dailyBudgetLamports: input.dailyBudgetLamports } : {}),
+        ...(input.monthlyBudgetLamports !== undefined ? { monthlyBudgetLamports: input.monthlyBudgetLamports } : {}),
+        ...(input.budgetWarningThresholdPct !== undefined ? { budgetWarningThresholdPct: input.budgetWarningThresholdPct } : {}),
+        ...(input.budgetHardStop !== undefined ? { budgetHardStop: input.budgetHardStop } : {}),
         ...(input.archivedAt !== undefined ? { archivedAt: input.archivedAt } : {}),
         ...(input.environment !== undefined ? { environment: input.environment } : {}),
         ...(input.starred !== undefined ? { starred: input.starred } : {}),
@@ -1797,6 +1801,11 @@ export class PrismaApiRepository implements ApiRepository {
 
   async listIncidents(limit: number): Promise<IncidentItem[]> {
     const rows = await this.prisma.incident.findMany({
+      include: {
+        updates: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
       orderBy: { startedAt: "desc" },
       take: limit
     });
@@ -1806,7 +1815,15 @@ export class PrismaApiRepository implements ApiRepository {
       severity: row.severity,
       description: row.description,
       startedAt: row.startedAt.toISOString(),
-      resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null
+      resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+      updates: row.updates.map((update) => ({
+        id: update.id,
+        status: update.status,
+        severity: update.severity ?? null,
+        message: update.message,
+        affectedServices: update.affectedServices,
+        createdAt: update.createdAt.toISOString(),
+      })),
     }));
   }
 
@@ -1816,6 +1833,19 @@ export class PrismaApiRepository implements ApiRepository {
         serviceName: input.serviceName,
         severity: input.severity,
         description: input.description,
+        updates: {
+          create: {
+            status: "opened",
+            severity: input.severity,
+            message: input.description,
+            affectedServices: [input.serviceName],
+          },
+        },
+      },
+      include: {
+        updates: {
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
     return {
@@ -1825,6 +1855,14 @@ export class PrismaApiRepository implements ApiRepository {
       description: row.description,
       startedAt: row.startedAt.toISOString(),
       resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+      updates: row.updates.map((update) => ({
+        id: update.id,
+        status: update.status,
+        severity: update.severity ?? null,
+        message: update.message,
+        affectedServices: update.affectedServices,
+        createdAt: update.createdAt.toISOString(),
+      })),
     };
   }
 
@@ -1839,6 +1877,11 @@ export class PrismaApiRepository implements ApiRepository {
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.resolvedAt !== undefined ? { resolvedAt: input.resolvedAt } : {}),
       },
+      include: {
+        updates: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
     });
     return {
       id: row.id,
@@ -1847,6 +1890,14 @@ export class PrismaApiRepository implements ApiRepository {
       description: row.description,
       startedAt: row.startedAt.toISOString(),
       resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+      updates: row.updates.map((update) => ({
+        id: update.id,
+        status: update.status,
+        severity: update.severity ?? null,
+        message: update.message,
+        affectedServices: update.affectedServices,
+        createdAt: update.createdAt.toISOString(),
+      })),
     };
   }
 
@@ -3270,7 +3321,7 @@ export class PrismaApiRepository implements ApiRepository {
       const body = `${notification.title} ${notification.message}`.toLowerCase();
       const inferredType: AlertCenterItem["type"] =
         body.includes("low balance") ? "low_balance"
-          : body.includes("cost") ? "daily_cost"
+          : body.includes("cost") || body.includes("budget") ? "daily_cost"
             : "notification";
       const severity =
         /low balance|high error|failed|warning/i.test(`${notification.title} ${notification.message}`)

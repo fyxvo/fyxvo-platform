@@ -16,9 +16,9 @@ import {
 import { PageHeader } from "../../components/page-header";
 import { usePortal } from "../../components/portal-provider";
 import { ThemeToggle } from "../../components/theme-toggle";
-import { shortenAddress } from "../../lib/format";
+import { formatRelativeDate, shortenAddress } from "../../lib/format";
 import { webEnv } from "../../lib/env";
-import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember } from "../../lib/api";
+import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember, getSessionDiagnostics, recordProjectAccessView } from "../../lib/api";
 
 function buildProjectNotesTemplate(projectName: string) {
   return `# Overview
@@ -175,9 +175,34 @@ export default function SettingsPage() {
   const [projectIsPublic, setProjectIsPublic] = useState(portal.selectedProject?.isPublic ?? false);
   const [projectPublicSlug, setProjectPublicSlug] = useState(portal.selectedProject?.publicSlug ?? "");
   const [projectLeaderboardVisible, setProjectLeaderboardVisible] = useState(portal.selectedProject?.leaderboardVisible ?? false);
+  const [dailyBudgetLamports, setDailyBudgetLamports] = useState(portal.selectedProject?.dailyBudgetLamports ?? "");
+  const [monthlyBudgetLamports, setMonthlyBudgetLamports] = useState(portal.selectedProject?.monthlyBudgetLamports ?? "");
+  const [budgetWarningThresholdPct, setBudgetWarningThresholdPct] = useState(
+    portal.selectedProject?.budgetWarningThresholdPct?.toString() ?? "80"
+  );
+  const [budgetHardStop, setBudgetHardStop] = useState(portal.selectedProject?.budgetHardStop ?? false);
   const [projectFieldsSaving, setProjectFieldsSaving] = useState(false);
   const [notesPreview, setNotesPreview] = useState(false);
   const [notesSaveState, setNotesSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [sessionDiagnostics, setSessionDiagnostics] = useState<{
+    sessionActive: boolean;
+    walletAddress: string;
+    authMode: string;
+    issuedAt: string | null;
+    expiresAt: string | null;
+    termsAccepted: boolean;
+    onboardingDismissed: boolean;
+    assistantAvailable: boolean;
+    environment: string;
+    suggestions: readonly string[];
+  } | null>(null);
+  const [signaturePayload, setSignaturePayload] = useState("{\n  \"event\": \"request.completed\",\n  \"project\": \"demo\"\n}");
+  const [signatureHeader, setSignatureHeader] = useState("");
+  const [signatureSecret, setSignatureSecret] = useState("");
+  const [signatureResult, setSignatureResult] = useState<{
+    valid: boolean;
+    expected: string;
+  } | null>(null);
 
   // Rename project
   const [renamingProject, setRenamingProject] = useState<string | null>(null);
@@ -291,8 +316,12 @@ export default function SettingsPage() {
     setProjectIsPublic(selectedProject?.isPublic ?? false);
     setProjectPublicSlug(selectedProject?.publicSlug ?? "");
     setProjectLeaderboardVisible(selectedProject?.leaderboardVisible ?? false);
+    setDailyBudgetLamports(selectedProject?.dailyBudgetLamports ?? "");
+    setMonthlyBudgetLamports(selectedProject?.monthlyBudgetLamports ?? "");
+    setBudgetWarningThresholdPct(selectedProject?.budgetWarningThresholdPct?.toString() ?? "80");
+    setBudgetHardStop(selectedProject?.budgetHardStop ?? false);
     setNotesSaveState("idle");
-  }, [selectedProject?.id, selectedProject?.environment, selectedProject?.notes, selectedProject?.starred, selectedProject?.githubUrl, selectedProject?.isPublic, selectedProject?.publicSlug, selectedProject?.leaderboardVisible]);
+  }, [selectedProject?.id, selectedProject?.environment, selectedProject?.notes, selectedProject?.starred, selectedProject?.githubUrl, selectedProject?.isPublic, selectedProject?.publicSlug, selectedProject?.leaderboardVisible, selectedProject?.dailyBudgetLamports, selectedProject?.monthlyBudgetLamports, selectedProject?.budgetWarningThresholdPct, selectedProject?.budgetHardStop]);
 
   const patchProject = useCallback(async (projectId: string, patch: Record<string, unknown>) => {
     if (!portal.token) return;
@@ -323,6 +352,49 @@ export default function SettingsPage() {
     };
   }, [patchProject, projectNotes, refreshPortal, selectedProject, portal.token]);
 
+  useEffect(() => {
+    if (!portal.token) {
+      setSessionDiagnostics(null);
+      return;
+    }
+    let cancelled = false;
+    getSessionDiagnostics(portal.token)
+      .then((item) => {
+        if (!cancelled) setSessionDiagnostics(item);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionDiagnostics(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [portal.token]);
+
+  useEffect(() => {
+    if (!selectedProject?.id || !portal.token) return;
+    void recordProjectAccessView(selectedProject.id, portal.token).catch(() => undefined);
+  }, [selectedProject?.id, portal.token]);
+
+  async function verifyWebhookSignature() {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(signatureSecret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(signaturePayload));
+    const expected = Array.from(new Uint8Array(signatureBuffer))
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+    const normalizedHeader = signatureHeader.trim().replace(/^sha256=/i, "");
+    setSignatureResult({
+      valid: normalizedHeader.length > 0 && normalizedHeader === expected,
+      expected,
+    });
+  }
+
   async function saveDisplayName() {
     if (!portal.selectedProject) return;
     setDisplayNameSaving(true);
@@ -345,6 +417,10 @@ export default function SettingsPage() {
         isPublic: projectIsPublic,
         publicSlug: projectIsPublic && projectPublicSlug ? projectPublicSlug.trim() : null,
         leaderboardVisible: projectLeaderboardVisible,
+        dailyBudgetLamports: dailyBudgetLamports.trim() ? dailyBudgetLamports.trim() : null,
+        monthlyBudgetLamports: monthlyBudgetLamports.trim() ? monthlyBudgetLamports.trim() : null,
+        budgetWarningThresholdPct: budgetWarningThresholdPct.trim() ? Number(budgetWarningThresholdPct) : null,
+        budgetHardStop,
       });
       await portal.refresh();
     } finally { setProjectFieldsSaving(false); }
@@ -1122,6 +1198,50 @@ export default function SettingsPage() {
           </SettingRow>
         </SectionCard>
 
+        <SectionCard title="Session diagnostics" description="Useful auth and assistant diagnostics for the current wallet session.">
+          {sessionDiagnostics ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-[var(--fyxvo-text)]">Session status</span>
+                  <Badge tone={sessionDiagnostics.sessionActive ? "success" : "warning"}>
+                    {sessionDiagnostics.sessionActive ? "Active" : "Expired"}
+                  </Badge>
+                </div>
+                <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                  <div>Auth mode: {sessionDiagnostics.authMode}</div>
+                  <div>Issued: {sessionDiagnostics.issuedAt ? formatRelativeDate(sessionDiagnostics.issuedAt) : "Unavailable"}</div>
+                  <div>Expires: {sessionDiagnostics.expiresAt ? formatRelativeDate(sessionDiagnostics.expiresAt) : "Unavailable"}</div>
+                  <div>Terms accepted: {sessionDiagnostics.termsAccepted ? "Yes" : "No"}</div>
+                  <div>Onboarding dismissed: {sessionDiagnostics.onboardingDismissed ? "Yes" : "No"}</div>
+                  <div>Assistant available: {sessionDiagnostics.assistantAvailable ? "Yes" : "No"}</div>
+                  <div>Environment: {sessionDiagnostics.environment}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => void portal.refresh()}>
+                    Refresh workspace session
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => void portal.disconnectWallet()}>
+                    Reconnect wallet
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Common fixes</p>
+                {sessionDiagnostics.suggestions.map((suggestion) => (
+                  <p key={suggestion} className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                    {suggestion}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Notice tone="neutral" title="Diagnostics unavailable">
+              Connect and authenticate to inspect session timing, Terms state, onboarding state, and assistant availability.
+            </Notice>
+          )}
+        </SectionCard>
+
         {/* Project Settings */}
         <SectionCard title="Project settings" description="Settings for the currently selected project.">
           <SettingRow label="Project display name" description="Human-readable label shown in the project header.">
@@ -1153,6 +1273,51 @@ export default function SettingsPage() {
                   {env}
                 </button>
               ))}
+            </div>
+          </SettingRow>
+          <SettingRow label="Budgets" description="Optional daily and monthly lamport budgets for billable live requests. Simulation mode remains allowed even when hard stop is on.">
+            <div className="w-full max-w-2xl space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <Input
+                  label="Daily budget (lamports)"
+                  value={dailyBudgetLamports}
+                  onChange={(e) => setDailyBudgetLamports(e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="25000000"
+                  className="h-9 text-sm"
+                />
+                <Input
+                  label="Monthly budget (lamports)"
+                  value={monthlyBudgetLamports}
+                  onChange={(e) => setMonthlyBudgetLamports(e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="500000000"
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="grid gap-3 md:grid-cols-[200px_1fr]">
+                <Input
+                  label="Soft warning %"
+                  value={budgetWarningThresholdPct}
+                  onChange={(e) => setBudgetWarningThresholdPct(e.target.value.replace(/[^\d]/g, ""))}
+                  placeholder="80"
+                  className="h-9 text-sm"
+                />
+                <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--fyxvo-text)]">Hard stop</p>
+                      <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                        Blocks new billable live requests after the budget is exceeded. Simulation mode still works.
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={budgetHardStop}
+                      onChange={(e) => setBudgetHardStop(e.target.checked)}
+                      aria-label="Enable budget hard stop"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </SettingRow>
           <SettingRow label="Star project" description="Starred projects appear at the top of the project list.">
@@ -1552,6 +1717,81 @@ export default function SettingsPage() {
                   </table>
                 </div>
               )}
+            </div>
+          </SectionCard>
+        ) : null}
+
+        {isAuthenticated && portal.selectedProject ? (
+          <SectionCard title="Webhook signature debugger" description="Validate `x-fyxvo-signature` locally before blaming delivery infrastructure.">
+            <div className="space-y-4">
+              <Notice tone="neutral" title="Signing format">
+                Fyxvo signs the raw JSON payload body with HMAC-SHA256 using your webhook secret. Compare the computed hex digest with the `x-fyxvo-signature` header value.
+              </Notice>
+              <textarea
+                value={signaturePayload}
+                onChange={(e) => setSignaturePayload(e.target.value)}
+                rows={8}
+                className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)]"
+                aria-label="Webhook payload"
+              />
+              <div className="grid gap-3 md:grid-cols-2">
+                <Input
+                  label="x-fyxvo-signature"
+                  value={signatureHeader}
+                  onChange={(e) => setSignatureHeader(e.target.value)}
+                  placeholder="sha256=..."
+                  className="h-9 text-sm font-mono"
+                />
+                <Input
+                  label="Webhook secret"
+                  value={signatureSecret}
+                  onChange={(e) => setSignatureSecret(e.target.value)}
+                  placeholder="whsec_..."
+                  className="h-9 text-sm font-mono"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => void verifyWebhookSignature()} disabled={!signatureSecret.trim()}>
+                  Verify signature
+                </Button>
+                <Button asChild variant="secondary" size="sm">
+                  <Link href="/docs#webhooks">Open webhook docs</Link>
+                </Button>
+                <Button asChild variant="secondary" size="sm">
+                  <Link href="/playground?method=webhookTest">Open webhook testing</Link>
+                </Button>
+              </div>
+              {signatureResult ? (
+                <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge tone={signatureResult.valid ? "success" : "warning"}>
+                      {signatureResult.valid ? "Signature valid" : "Signature mismatch"}
+                    </Badge>
+                    <CopyButton text={signatureResult.expected} />
+                  </div>
+                  <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                    Expected signature
+                  </div>
+                  <code className="block break-all rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)]">
+                    {signatureResult.expected}
+                  </code>
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <pre className="overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs text-[var(--fyxvo-text-soft)]">{`import crypto from "node:crypto";
+
+const expected = crypto
+  .createHmac("sha256", process.env.FYXVO_WEBHOOK_SECRET!)
+  .update(rawBody)
+  .digest("hex");`}</pre>
+                    <pre className="overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs text-[var(--fyxvo-text-soft)]">{`import hmac, hashlib
+
+expected = hmac.new(
+    SECRET.encode(),
+    raw_body.encode(),
+    hashlib.sha256,
+).hexdigest()`}</pre>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </SectionCard>
         ) : null}

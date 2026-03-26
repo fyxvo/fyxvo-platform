@@ -795,12 +795,48 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       }
 
       const pricing = calculateRequestPrice(payload, mode, input.env);
-      const [fundingState, spendState, fetchedNodes] = await Promise.all([
+      const [fundingState, spendState, fetchedNodes, budgetUsage] = await Promise.all([
         input.balanceResolver.getProjectFundingState(projectAccess.project),
         input.stateStore.getProjectSpend(projectAccess.project.id),
-        input.repository.listUpstreamNodes(projectAccess.project.id)
+        input.repository.listUpstreamNodes(projectAccess.project.id),
+        input.repository.getProjectBudgetUsage(projectAccess.project.id),
       ]);
       upstreamNodes = fetchedNodes;
+
+      const nextDailySpend = budgetUsage.dailyLamports + pricing.totalPrice;
+      const nextMonthlySpend = budgetUsage.monthlyLamports + pricing.totalPrice;
+      const dailyBudgetExceeded =
+        projectAccess.project.dailyBudgetLamports !== null &&
+        nextDailySpend > projectAccess.project.dailyBudgetLamports;
+      const monthlyBudgetExceeded =
+        projectAccess.project.monthlyBudgetLamports !== null &&
+        nextMonthlySpend > projectAccess.project.monthlyBudgetLamports;
+
+      if (projectAccess.project.budgetHardStop && (dailyBudgetExceeded || monthlyBudgetExceeded)) {
+        throw new GatewayHttpError(
+          402,
+          "budget_exceeded",
+          "This project has exceeded its configured budget for billable requests. Simulation mode is still allowed.",
+          {
+            dailyBudgetLamports: projectAccess.project.dailyBudgetLamports?.toString() ?? null,
+            dailySpendLamports: budgetUsage.dailyLamports.toString(),
+            monthlyBudgetLamports: projectAccess.project.monthlyBudgetLamports?.toString() ?? null,
+            monthlySpendLamports: budgetUsage.monthlyLamports.toString(),
+            attemptedRequestLamports: pricing.totalPrice.toString(),
+            simulationStillAvailable: true,
+          }
+        );
+      }
+
+      const budgetWarningThresholdPct = projectAccess.project.budgetWarningThresholdPct ?? 80;
+      const dailyBudgetWarning =
+        projectAccess.project.dailyBudgetLamports !== null &&
+        projectAccess.project.dailyBudgetLamports > 0n &&
+        Number((nextDailySpend * 100n) / projectAccess.project.dailyBudgetLamports) >= budgetWarningThresholdPct;
+      const monthlyBudgetWarning =
+        projectAccess.project.monthlyBudgetLamports !== null &&
+        projectAccess.project.monthlyBudgetLamports > 0n &&
+        Number((nextMonthlySpend * 100n) / projectAccess.project.monthlyBudgetLamports) >= budgetWarningThresholdPct;
 
       const fundingDecision = chooseFundingAsset({
         funding: fundingState,
@@ -893,6 +929,9 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       reply.header("x-fyxvo-routing-mode", mode);
       reply.header("x-fyxvo-price-credits", pricing.totalPrice.toString());
       reply.header("x-fyxvo-billed-asset", fundingDecision.asset);
+      if (dailyBudgetWarning || monthlyBudgetWarning) {
+        reply.header("x-fyxvo-budget-warning", "true");
+      }
 
       statusCode = routed.statusCode;
       const responseBody = injectSolanaErrorHint(routed.body);

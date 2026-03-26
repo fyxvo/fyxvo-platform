@@ -5,17 +5,9 @@ import { Button, Notice } from "@fyxvo/ui";
 import { usePortal } from "./portal-provider";
 import { webEnv } from "../lib/env";
 import { liveDevnetState } from "../lib/live-state";
+import type { StatusIncident } from "../lib/types";
 
-type Incident = {
-  id: string;
-  serviceName: string;
-  severity: string;
-  description: string;
-  startedAt: string;
-  resolvedAt: string | null;
-};
-
-export function StatusAdminIncidents({ initialIncidents }: { readonly initialIncidents: Incident[] }) {
+export function StatusAdminIncidents({ initialIncidents }: { readonly initialIncidents: StatusIncident[] }) {
   const portal = usePortal();
   const [incidents, setIncidents] = useState(initialIncidents);
   const [serviceName, setServiceName] = useState("gateway");
@@ -23,6 +15,8 @@ export function StatusAdminIncidents({ initialIncidents }: { readonly initialInc
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [updateDrafts, setUpdateDrafts] = useState<Record<string, string>>({});
+  const [affectedServiceDrafts, setAffectedServiceDrafts] = useState<Record<string, string>>({});
 
   const isAdminWallet =
     portal.walletPhase === "authenticated" &&
@@ -44,7 +38,7 @@ export function StatusAdminIncidents({ initialIncidents }: { readonly initialInc
         body: JSON.stringify({ serviceName, severity, description }),
       });
       if (!response.ok) return;
-      const body = (await response.json()) as { item: Incident };
+      const body = (await response.json()) as { item: StatusIncident };
       setIncidents((current) => [body.item, ...current]);
       setDescription("");
     } finally {
@@ -64,8 +58,40 @@ export function StatusAdminIncidents({ initialIncidents }: { readonly initialInc
         body: JSON.stringify(input),
       });
       if (!response.ok) return;
-      const body = (await response.json()) as { item: Incident };
+      const body = (await response.json()) as { item: StatusIncident };
       setIncidents((current) => current.map((incident) => (incident.id === id ? body.item : incident)));
+    } finally {
+      setEditingId(null);
+    }
+  }
+
+  async function postIncidentUpdate(id: string, nextStatus: "update" | "resolved" | "escalated") {
+    const message = updateDrafts[id]?.trim();
+    if (!message || !portal.token) return;
+    setEditingId(id);
+    try {
+      const affectedServices = (affectedServiceDrafts[id] ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const response = await fetch(new URL(`/v1/admin/incidents/${id}/updates`, webEnv.apiBaseUrl), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${portal.token}`,
+        },
+        body: JSON.stringify({
+          message,
+          status: nextStatus,
+          severity: nextStatus === "resolved" ? "info" : undefined,
+          affectedServices,
+        }),
+      });
+      if (!response.ok) return;
+      const body = (await response.json()) as { item: StatusIncident };
+      setIncidents((current) => current.map((incident) => (incident.id === id ? body.item : incident)));
+      setUpdateDrafts((current) => ({ ...current, [id]: "" }));
+      setAffectedServiceDrafts((current) => ({ ...current, [id]: "" }));
     } finally {
       setEditingId(null);
     }
@@ -146,6 +172,35 @@ export function StatusAdminIncidents({ initialIncidents }: { readonly initialInc
                   Resolve
                 </Button>
               </div>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_auto_auto]">
+              <textarea
+                value={updateDrafts[incident.id] ?? ""}
+                onChange={(e) => setUpdateDrafts((current) => ({ ...current, [incident.id]: e.target.value }))}
+                className="min-h-[88px] rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)]"
+                placeholder="Add a timeline update for affected developers"
+              />
+              <input
+                value={affectedServiceDrafts[incident.id] ?? ""}
+                onChange={(e) => setAffectedServiceDrafts((current) => ({ ...current, [incident.id]: e.target.value }))}
+                className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)]"
+                placeholder="Affected services (comma separated)"
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={editingId === incident.id || !(updateDrafts[incident.id] ?? "").trim()}
+                onClick={() => void postIncidentUpdate(incident.id, "update")}
+              >
+                Post update
+              </Button>
+              <Button
+                size="sm"
+                disabled={editingId === incident.id || !(updateDrafts[incident.id] ?? "").trim()}
+                onClick={() => void postIncidentUpdate(incident.id, "resolved")}
+              >
+                Resolve with note
+              </Button>
             </div>
           </div>
         ))}

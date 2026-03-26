@@ -35,11 +35,13 @@ import {
   createBookmark,
   createPlaygroundRecipe,
   downloadProjectSummary,
+  getProjectAccessAudit,
   getProjectActivity,
+  getProjectBudgetStatus,
   updateProject,
 } from "../../../lib/api";
 import { RealtimeFeed } from "./realtime-feed";
-import type { ProjectAnalytics } from "../../../lib/types";
+import type { ProjectAnalytics, ProjectBudgetStatus } from "../../../lib/types";
 
 const requestColumns: readonly TableColumn<ProjectAnalytics["recentRequests"][number]>[] = [
   {
@@ -217,6 +219,8 @@ export default function ProjectPage({
   const [activityLoaded, setActivityLoaded] = useState(false);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [healthHistory, setHealthHistory] = useState<number[]>([]);
+  const [accessAudit, setAccessAudit] = useState<Array<{ id: string; action: string; actorWallet: string | null; createdAt: string; details: Record<string, unknown> | null }>>([]);
+  const [budgetStatus, setBudgetStatus] = useState<ProjectBudgetStatus | null>(null);
   const [embedTheme, setEmbedTheme] = useState<"dark" | "light" | "auto">("dark");
   const [embedSize, setEmbedSize] = useState<"small" | "medium" | "large">("medium");
   const [embedCompact, setEmbedCompact] = useState(false);
@@ -241,6 +245,32 @@ export default function ProjectPage({
         setActivityLoaded(true);
       });
   }, [portal.token, project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!portal.token || !project?.id) {
+      setAccessAudit([]);
+      setBudgetStatus(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      getProjectAccessAudit(project.id, portal.token, 50),
+      getProjectBudgetStatus(project.id, portal.token),
+    ])
+      .then(([auditItems, budget]) => {
+        if (cancelled) return;
+        setAccessAudit(auditItems);
+        setBudgetStatus(budget);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAccessAudit([]);
+        setBudgetStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [portal.token, project?.id]);
 
   useEffect(() => {
     if (!portal.token || !project?.id) return;
@@ -519,6 +549,50 @@ export default function ProjectPage({
         </Card>
       ) : null}
 
+      {portal.walletPhase === "authenticated" && budgetStatus && (budgetStatus.dailyBudgetLamports || budgetStatus.monthlyBudgetLamports) ? (
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Project budgets</CardTitle>
+            <CardDescription>
+              Budget consumption for billable live traffic. Simulation mode remains available even when hard stop is enabled.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-[var(--fyxvo-text)]">Daily budget</span>
+                <Badge tone={budgetStatus.dailyWarningTriggered ? "warning" : "neutral"}>
+                  {budgetStatus.dailyUsagePct !== null ? `${budgetStatus.dailyUsagePct.toFixed(1)}% used` : "Not set"}
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                <div>Used today: {budgetStatus.dailySpendLamports.toLocaleString()} lamports</div>
+                <div>Budget: {budgetStatus.dailyBudgetLamports ?? "Not set"}</div>
+                {budgetStatus.dailyUsagePct !== null ? (
+                  <ProgressBar value={Math.min(100, budgetStatus.dailyUsagePct)} />
+                ) : null}
+              </div>
+            </div>
+            <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-[var(--fyxvo-text)]">Monthly budget</span>
+                <Badge tone={budgetStatus.hardStop ? "warning" : "neutral"}>
+                  {budgetStatus.hardStop ? "Hard stop on" : "Soft alerts only"}
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                <div>Used this month: {budgetStatus.monthlySpendLamports.toLocaleString()} lamports</div>
+                <div>Budget: {budgetStatus.monthlyBudgetLamports ?? "Not set"}</div>
+                {budgetStatus.monthlyUsagePct !== null ? (
+                  <ProgressBar value={Math.min(100, budgetStatus.monthlyUsagePct)} />
+                ) : null}
+                <div>Warning threshold: {budgetStatus.warningThresholdPct}%</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="flex gap-1 border-b border-[var(--fyxvo-border)]">
         {(["overview", "activity", "realtime", "logs"] as const).map((tab) => (
           <button
@@ -589,6 +663,33 @@ export default function ProjectPage({
                 </div>
               </div>
             )}
+            <div className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Access audit log</div>
+                  <div className="text-xs text-[var(--fyxvo-text-muted)]">Settings views, API key lifecycle actions, alert changes, visibility changes, webhooks, team membership, and ownership events.</div>
+                </div>
+                <Badge tone="neutral">{accessAudit.length} events</Badge>
+              </div>
+              {accessAudit.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--fyxvo-text-muted)]">No access audit events recorded yet.</p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {accessAudit.slice(0, 8).map((entry) => (
+                    <div key={entry.id} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="neutral">{entry.action.replace(/\./g, " ")}</Badge>
+                        {entry.actorWallet ? <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">{entry.actorWallet}</span> : null}
+                        <span className="text-xs text-[var(--fyxvo-text-muted)]">{new Date(entry.createdAt).toLocaleString()}</span>
+                      </div>
+                      {entry.details ? (
+                        <p className="mt-2 text-xs text-[var(--fyxvo-text-soft)]">{JSON.stringify(entry.details)}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

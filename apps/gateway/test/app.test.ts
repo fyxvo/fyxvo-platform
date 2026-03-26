@@ -71,6 +71,13 @@ class MemoryGatewayRepository implements GatewayRepository {
     return apiKey === this.apiKey ? this.access : null;
   }
 
+  async getProjectBudgetUsage() {
+    return {
+      dailyLamports: 0n,
+      monthlyLamports: 0n,
+    };
+  }
+
   async listUpstreamNodes(projectId?: string) {
     return projectId ? this.nodes.filter((node) => node.projectId === projectId || node.projectId === null) : this.nodes;
   }
@@ -148,7 +155,11 @@ function createAccessContext(): ProjectAccessContext {
       ownerId: "user-1",
       ownerWalletAddress: "7kbnvuGBxxj8AG9qp8Scn56muWGaRaFqxg1FsRp3PaFT",
       chainProjectId: 1n,
-      onChainProjectPda: "9xQeWvG816bUx9EPfEZ2pFhdvbSQYzHn6n3Ww9wXXA4A"
+      onChainProjectPda: "9xQeWvG816bUx9EPfEZ2pFhdvbSQYzHn6n3Ww9wXXA4A",
+      dailyBudgetLamports: null,
+      monthlyBudgetLamports: null,
+      budgetWarningThresholdPct: 80,
+      budgetHardStop: false,
     }
   };
 }

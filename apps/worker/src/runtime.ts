@@ -7,7 +7,7 @@ import { processNodeHealthMonitoring } from "./jobs/node-health.js";
 import { processRewardCalculation } from "./jobs/rewards.js";
 import { processWalletIndexing } from "./jobs/indexing.js";
 import { processServiceHealthCheck } from "./jobs/service-health.js";
-import { updateReputations, checkErrorRates, generateWeeklyDigests } from "./jobs/maintenance.js";
+import { updateReputations, checkErrorRates, checkBudgetThresholds, generateWeeklyDigests } from "./jobs/maintenance.js";
 import { PrismaWorkerRepository } from "./repository.js";
 import { JsonRpcNodeProbeClient, RpcSolanaIndexerClient } from "./solana.js";
 import type {
@@ -95,6 +95,7 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
   private interval: NodeJS.Timeout | null = null;
   private reputationInterval: NodeJS.Timeout | null = null;
   private errorRateInterval: NodeJS.Timeout | null = null;
+  private budgetInterval: NodeJS.Timeout | null = null;
   private digestInterval: NodeJS.Timeout | null = null;
 
   constructor(private readonly dependencies: WorkerProcessorDependencies) {
@@ -186,6 +187,12 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
         void checkErrorRates(prismaClient, logger, this.dependencies.env.ERROR_RATE_ALERT_THRESHOLD);
       }, 300_000);
 
+      // Budget threshold checks — every 5 minutes
+      void checkBudgetThresholds(prismaClient, logger);
+      this.budgetInterval = setInterval(() => {
+        void checkBudgetThresholds(prismaClient, logger);
+      }, 300_000);
+
       // Weekly digest generation — run once on startup, then weekly
       void generateWeeklyDigests(prismaClient, logger);
       this.digestInterval = setInterval(() => {
@@ -216,6 +223,10 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
     if (this.errorRateInterval) {
       clearInterval(this.errorRateInterval);
       this.errorRateInterval = null;
+    }
+    if (this.budgetInterval) {
+      clearInterval(this.budgetInterval);
+      this.budgetInterval = null;
     }
     if (this.digestInterval) {
       clearInterval(this.digestInterval);

@@ -15,6 +15,7 @@ const MARKETING_PATHS = new Set([
   "/updates",
   "/changelog",
   "/leaderboard",
+  "/explore",
   "/compare",
   "/operators",
   "/security",

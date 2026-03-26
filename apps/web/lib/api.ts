@@ -8,9 +8,11 @@ import type {
   AdminObservability,
   AdminOverview,
   AdminStats,
+  CostBreakdownSummary,
   AlertCenterItem,
   AnalyticsOverview,
   AnalyticsRange,
+  AccessAuditItem,
   ApiKeyAnalytics,
   BookmarkRecord,
   DashboardPreferences,
@@ -32,17 +34,21 @@ import type {
   PortalHealth,
   PortalProject,
   ProjectHealthScore,
+  ProjectBudgetStatus,
   ProjectActivationPreparation,
   ProjectActivationVerification,
   PortalServiceStatus,
+  StatusIncident,
   PortalUser,
   ProjectAnalytics,
   ProjectChecklist,
   PlaygroundRecipe,
   ProjectRequestLogList,
   ReleaseReadinessSummary,
+  RetentionCohortSummary,
   RequestLogRange,
   SavedViewRecord,
+  SessionDiagnostics,
   OnboardingFunnelSummary,
   WebDeploymentStatus
 } from "./types";
@@ -229,6 +235,10 @@ export async function updateProject(input: {
   readonly displayName?: string | null;
   readonly lowBalanceThresholdSol?: number | null;
   readonly dailyRequestAlertThreshold?: number | null;
+  readonly dailyBudgetLamports?: string | null;
+  readonly monthlyBudgetLamports?: string | null;
+  readonly budgetWarningThresholdPct?: number | null;
+  readonly budgetHardStop?: boolean;
   readonly name?: string;
   readonly description?: string | null;
   readonly environment?: "development" | "staging" | "production";
@@ -377,6 +387,15 @@ export async function getMethodBreakdown(projectId: string, token: string, range
   return response.items;
 }
 
+export async function getCostBreakdown(projectId: string, token: string, range: AnalyticsRange = "7d") {
+  const response = await requestApi<{ item: CostBreakdownSummary }>(
+    `/v1/projects/${projectId}/analytics/cost-breakdown?range=${range}`,
+    undefined,
+    token
+  );
+  return response.item;
+}
+
 export async function getErrorLog(projectId: string, token: string) {
   const response = await requestApi<{ items: ErrorLogEntry[] }>(
     `/v1/projects/${projectId}/analytics/errors`,
@@ -412,6 +431,20 @@ export async function getProjectRequestLogs(
     cache: "no-store",
   });
   return parseResponse<ProjectRequestLogList>(response);
+}
+
+export async function getProjectBudgetStatus(projectId: string, token: string) {
+  const response = await requestApi<{ item: ProjectBudgetStatus }>(`/v1/projects/${projectId}/budget`, undefined, token);
+  return response.item;
+}
+
+export async function getProjectAccessAudit(projectId: string, token: string, limit = 100) {
+  const response = await requestApi<{ items: AccessAuditItem[] }>(`/v1/projects/${projectId}/access-audit?limit=${limit}`, undefined, token);
+  return response.items;
+}
+
+export async function recordProjectAccessView(projectId: string, token: string) {
+  return requestApi<{ ok: boolean }>(`/v1/projects/${projectId}/access-audit/view`, { method: "POST" }, token);
 }
 
 export async function downloadProjectRequestLogs(
@@ -538,6 +571,11 @@ export async function getOnboardingFunnel(windowDays: 7 | 30, token: string) {
   return response.item;
 }
 
+export async function getRetentionCohorts(token: string) {
+  const response = await requestApi<{ item: RetentionCohortSummary }>("/v1/admin/retention-cohorts", undefined, token);
+  return response.item;
+}
+
 export async function getFeedbackInbox(
   token: string,
   query: Partial<{ type: FeedbackInboxItem["type"] | "all"; status: FeedbackInboxItem["status"] | "all" }> = {}
@@ -575,6 +613,11 @@ export async function getOperators(token: string) {
 
 export async function getMe(token: string) {
   return requestApi<{ user: PortalUser; projectCount: number }>("/v1/me", undefined, token);
+}
+
+export async function getSessionDiagnostics(token: string) {
+  const response = await requestApi<{ item: SessionDiagnostics }>("/v1/me/session-diagnostics", undefined, token);
+  return response.item;
 }
 
 export async function getDashboardPreferences(token: string) {
@@ -629,7 +672,7 @@ export async function getServiceHealthHistory() {
 }
 
 export async function getIncidents() {
-  const data = await requestApi<{ incidents: Array<{ id: string; serviceName: string; severity: string; description: string; startedAt: string; resolvedAt: string | null }> }>("/v1/incidents");
+  const data = await requestApi<{ incidents: StatusIncident[] }>("/v1/incidents");
   return data.incidents;
 }
 

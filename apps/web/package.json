@@ -8,7 +8,8 @@
     "build": "next build",
     "lint": "eslint app components lib test next.config.ts vitest.config.ts --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests && node ./test/firefox-hydration-regression.mjs"
+    "test": "vitest run --passWithNoTests && node ./test/firefox-hydration-regression.mjs",
+    "perf:budgets": "node ./scripts/performance-budget.mjs"
   },
   "browserslist": [
     "last 2 Chrome versions",

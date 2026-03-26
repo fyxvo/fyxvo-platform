@@ -596,6 +596,42 @@ export default async function StatusPage() {
                       )}
                     </div>
                     <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">{incident.description}</p>
+                    {incident.updates && incident.updates.length > 0 ? (
+                      <div className="mt-4 space-y-3 border-t border-[var(--fyxvo-border)] pt-4">
+                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                          Incident timeline
+                        </div>
+                        <div className="space-y-3">
+                          {incident.updates.map((update, index) => (
+                            <div key={update.id} className="flex gap-3">
+                              <div className="flex w-5 flex-col items-center">
+                                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[var(--fyxvo-brand)]" />
+                                {index < incident.updates!.length - 1 ? (
+                                  <span className="mt-1 h-full w-px bg-[var(--fyxvo-border)]" />
+                                ) : null}
+                              </div>
+                              <div className="flex-1 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fyxvo-text-muted)]">
+                                  <Badge tone={update.status === "resolved" ? "success" : update.status === "escalated" ? "warning" : "neutral"}>
+                                    {update.status}
+                                  </Badge>
+                                  {update.severity ? <span className="capitalize">{update.severity}</span> : null}
+                                  <span>{new Date(update.createdAt).toLocaleString()}</span>
+                                </div>
+                                <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">{update.message}</p>
+                                {update.affectedServices.length > 0 ? (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {update.affectedServices.map((service) => (
+                                      <Badge key={service} tone="neutral">{service}</Badge>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}

@@ -32,6 +32,10 @@ export interface PortalProject {
   readonly publicSlug: string | null;
   readonly leaderboardVisible?: boolean;
   readonly dailyCostAlertLamports?: string | null;
+  readonly dailyBudgetLamports?: string | null;
+  readonly monthlyBudgetLamports?: string | null;
+  readonly budgetWarningThresholdPct?: number | null;
+  readonly budgetHardStop?: boolean;
   readonly archivedAt: string | null;
   readonly firstRequestCelebrationShown?: boolean;
   readonly hasTraffic?: boolean;
@@ -877,6 +881,119 @@ export interface ReleaseReadinessSummary {
     };
     readonly statusSubscriberCount: number;
   };
+}
+
+export interface RetentionCohortWindowSummary {
+  readonly windowDays: number | null;
+  readonly generatedAt: string;
+  readonly newUsersByDay: ReadonlyArray<{ readonly date: string; readonly count: number }>;
+  readonly retained: {
+    readonly day1: number;
+    readonly day7: number;
+    readonly day30: number;
+  };
+  readonly totals: {
+    readonly newUsers: number;
+    readonly firstTrafficProjects: number;
+    readonly repeatTrafficProjects: number;
+    readonly assistantUsers: number;
+    readonly playgroundUsers: number;
+    readonly apiKeyCreators: number;
+    readonly fundedUsers: number;
+    readonly publicSharers: number;
+    readonly requestUsers: number;
+  };
+}
+
+export interface RetentionCohortSummary {
+  readonly sevenDay: RetentionCohortWindowSummary;
+  readonly thirtyDay: RetentionCohortWindowSummary;
+  readonly allTime: RetentionCohortWindowSummary;
+}
+
+export interface CostBreakdownItem {
+  readonly method: string;
+  readonly pricingTier: "standard" | "compute_heavy" | "write" | "priority";
+  readonly count: number;
+  readonly totalLamports: number;
+  readonly estimatedSol: number;
+  readonly shareOfTotalSpend: number;
+}
+
+export interface CostBreakdownSummary {
+  readonly range: AnalyticsRange;
+  readonly totalLamports: number;
+  readonly items: ReadonlyArray<CostBreakdownItem>;
+}
+
+export interface ProjectBudgetStatus {
+  readonly dailyBudgetLamports: string | null;
+  readonly monthlyBudgetLamports: string | null;
+  readonly warningThresholdPct: number;
+  readonly hardStop: boolean;
+  readonly dailySpendLamports: number;
+  readonly monthlySpendLamports: number;
+  readonly dailyUsagePct: number | null;
+  readonly monthlyUsagePct: number | null;
+  readonly dailyWarningTriggered: boolean;
+  readonly monthlyWarningTriggered: boolean;
+}
+
+export interface SessionDiagnostics {
+  readonly sessionActive: boolean;
+  readonly walletAddress: string;
+  readonly authMode: string;
+  readonly issuedAt: string | null;
+  readonly expiresAt: string | null;
+  readonly termsAccepted: boolean;
+  readonly onboardingDismissed: boolean;
+  readonly assistantAvailable: boolean;
+  readonly environment: string;
+  readonly suggestions: readonly string[];
+}
+
+export interface StatusIncidentUpdate {
+  readonly id: string;
+  readonly status: string;
+  readonly severity: string | null;
+  readonly message: string;
+  readonly affectedServices: readonly string[];
+  readonly createdAt: string;
+}
+
+export interface StatusIncident {
+  readonly id: string;
+  readonly serviceName: string;
+  readonly severity: string;
+  readonly description: string;
+  readonly startedAt: string;
+  readonly resolvedAt: string | null;
+  readonly updates?: ReadonlyArray<StatusIncidentUpdate>;
+}
+
+export interface AccessAuditItem {
+  readonly id: string;
+  readonly projectId: string;
+  readonly userId: string | null;
+  readonly action: string;
+  readonly details: Record<string, unknown> | null;
+  readonly createdAt: string;
+  readonly actorWallet: string | null;
+}
+
+export interface ExploreProjectEntry {
+  readonly id: string;
+  readonly projectName: string;
+  readonly publicSlug: string | null;
+  readonly templateType: string;
+  readonly tags: readonly string[];
+  readonly leaderboardVisible: boolean;
+  readonly requestVolume7d: number;
+  readonly averageLatencyMs7d: number;
+  readonly successRate7d: number;
+  readonly healthSummary: string;
+  readonly reputationBadge: string;
+  readonly createdAt: string;
 }
 
 export interface OnboardingFunnelSummary {

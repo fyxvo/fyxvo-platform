@@ -13,6 +13,7 @@ import { shortenAddress } from "../lib/format";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/explore", label: "Explore" },
   { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
   { href: "/enterprise", label: "Enterprise" },

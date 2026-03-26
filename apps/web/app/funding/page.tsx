@@ -17,10 +17,10 @@ import { CopyButton } from "../../components/copy-button";
 import { PageHeader } from "../../components/page-header";
 import { AuthGate } from "../../components/state-panels";
 import { usePortal } from "../../components/portal-provider";
-import { getFundingHistory } from "../../lib/api";
+import { getFundingHistory, getProjectBudgetStatus } from "../../lib/api";
 import { webEnv } from "../../lib/env";
 import { formatRelativeDate, formatSol } from "../../lib/format";
-import type { FundingHistoryItem } from "../../lib/types";
+import type { FundingHistoryItem, ProjectBudgetStatus } from "../../lib/types";
 import { PRICING_LAMPORTS } from "@fyxvo/config/pricing";
 
 const STD_PRICE_LAMPORTS = BigInt(PRICING_LAMPORTS.standard);
@@ -52,6 +52,7 @@ export default function FundingPage() {
   const [tokenAccount, setTokenAccount] = useState("");
   const [history, setHistory] = useState<FundingHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [budgetStatus, setBudgetStatus] = useState<ProjectBudgetStatus | null>(null);
 
   const availableSolCredits = (() => {
     try {
@@ -95,6 +96,24 @@ export default function FundingPage() {
     return () => { cancelled = true; };
   }, [portal.token]);
 
+  useEffect(() => {
+    if (!portal.token || !portal.selectedProject) {
+      setBudgetStatus(null);
+      return;
+    }
+    let cancelled = false;
+    getProjectBudgetStatus(portal.selectedProject.id, portal.token)
+      .then((item) => {
+        if (!cancelled) setBudgetStatus(item);
+      })
+      .catch(() => {
+        if (!cancelled) setBudgetStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [portal.selectedProject, portal.token]);
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -128,6 +147,63 @@ export default function FundingPage() {
           The project still has credits, but the remaining SOL buffer is low. Funding now is the
           safe move if the team is about to test the gateway more heavily.
         </Notice>
+      ) : null}
+
+      {budgetStatus && (budgetStatus.dailyBudgetLamports || budgetStatus.monthlyBudgetLamports) ? (
+        <section className="grid gap-4 md:grid-cols-2">
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Daily budget</CardTitle>
+              <CardDescription>Billable live requests only. Simulation mode remains allowed.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--fyxvo-text-muted)]">Used today</span>
+                <span className="font-mono text-[var(--fyxvo-text)]">{budgetStatus.dailySpendLamports.toLocaleString()} lamports</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--fyxvo-text-muted)]">Budget</span>
+                <span className="font-mono text-[var(--fyxvo-text)]">{budgetStatus.dailyBudgetLamports ?? "Not set"}</span>
+              </div>
+              {budgetStatus.dailyUsagePct !== null ? (
+                <div className="space-y-2">
+                  <div className="h-2 rounded-full bg-[var(--fyxvo-panel-soft)]">
+                    <div className="h-2 rounded-full bg-[var(--fyxvo-brand)]" style={{ width: `${Math.min(100, budgetStatus.dailyUsagePct)}%` }} />
+                  </div>
+                  <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                    {budgetStatus.dailyUsagePct.toFixed(1)}% used · warning at {budgetStatus.warningThresholdPct}%
+                  </p>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+            <CardHeader>
+              <CardTitle>Monthly budget</CardTitle>
+              <CardDescription>
+                {budgetStatus.hardStop ? "Hard stop is enabled for billable live traffic." : "Hard stop is disabled. Alerts still trigger at the configured warning threshold."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--fyxvo-text-muted)]">Used this month</span>
+                <span className="font-mono text-[var(--fyxvo-text)]">{budgetStatus.monthlySpendLamports.toLocaleString()} lamports</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--fyxvo-text-muted)]">Budget</span>
+                <span className="font-mono text-[var(--fyxvo-text)]">{budgetStatus.monthlyBudgetLamports ?? "Not set"}</span>
+              </div>
+              {budgetStatus.monthlyUsagePct !== null ? (
+                <div className="space-y-2">
+                  <div className="h-2 rounded-full bg-[var(--fyxvo-panel-soft)]">
+                    <div className="h-2 rounded-full bg-[var(--fyxvo-brand)]" style={{ width: `${Math.min(100, budgetStatus.monthlyUsagePct)}%` }} />
+                  </div>
+                  <p className="text-xs text-[var(--fyxvo-text-muted)]">{budgetStatus.monthlyUsagePct.toFixed(1)}% used</p>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </section>
       ) : null}
 
       {/* Devnet SOL helper */}

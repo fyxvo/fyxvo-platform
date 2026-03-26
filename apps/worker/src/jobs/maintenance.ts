@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { COMPUTE_HEAVY_METHODS, PRICING_LAMPORTS, WRITE_METHODS } from "@fyxvo/config";
 import { UserRole, type PrismaClientType } from "@fyxvo/database";
 import type { WorkerLogger } from "../types.js";
 
@@ -11,6 +12,41 @@ function resolveReputationLevel(count: number): string {
   if (count >= 10_000) return "Architect";
   if (count >= 1_000) return "Builder";
   return "Explorer";
+}
+
+function startOfUtcDay(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+function startOfUtcMonth(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+function parseLoggedRouteMethods(route: string | null | undefined): string[] {
+  if (!route) return [];
+  const rpcMatch = route.match(/(?:^|\/)(rpc|priority)\/([^/?]+)/i);
+  if (rpcMatch?.[2]) return [rpcMatch[2]];
+  const methodMatch = route.match(/method=([^&]+)/i);
+  if (methodMatch?.[1]) {
+    return methodMatch[1]
+      .split(",")
+      .map((value) => decodeURIComponent(value).trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function requestPriceLamports(route: string | null | undefined, mode: "standard" | "priority" | null | undefined): number {
+  if (mode === "priority") return PRICING_LAMPORTS.priority;
+  const methods = parseLoggedRouteMethods(route);
+  const maxLamports = methods.reduce((currentMax, method) => {
+    if (WRITE_METHODS.has(method)) return Math.max(currentMax, PRICING_LAMPORTS.standard * 4);
+    if (COMPUTE_HEAVY_METHODS.has(method)) return Math.max(currentMax, PRICING_LAMPORTS.computeHeavy);
+    return Math.max(currentMax, PRICING_LAMPORTS.standard);
+  }, 0);
+  return maxLamports || PRICING_LAMPORTS.standard;
 }
 
 export async function updateReputations(
@@ -112,6 +148,111 @@ export async function checkErrorRates(
     logger.error(
       { event: "worker.error_rates.failed", error: error instanceof Error ? error.message : "Unknown error" },
       "Failed to check error rates"
+    );
+  }
+}
+
+export async function checkBudgetThresholds(
+  prisma: PrismaClientType,
+  logger: WorkerLogger
+): Promise<void> {
+  try {
+    const [dailyStart, monthlyStart] = [startOfUtcDay(), startOfUtcMonth()];
+    const projects = await prisma.project.findMany({
+      where: {
+        OR: [
+          { dailyBudgetLamports: { not: null } },
+          { monthlyBudgetLamports: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+        dailyBudgetLamports: true,
+        monthlyBudgetLamports: true,
+        budgetWarningThresholdPct: true,
+      },
+    });
+
+    for (const project of projects) {
+      const warningThresholdPct = project.budgetWarningThresholdPct ?? 80;
+      const [dailyRows, monthlyRows] = await Promise.all([
+        prisma.requestLog.findMany({
+          where: { projectId: project.id, simulated: false, createdAt: { gte: dailyStart } },
+          select: { route: true, mode: true },
+        }),
+        prisma.requestLog.findMany({
+          where: { projectId: project.id, simulated: false, createdAt: { gte: monthlyStart } },
+          select: { route: true, mode: true },
+        }),
+      ]);
+
+      const dailySpendLamports = dailyRows.reduce(
+        (sum, row) => sum + requestPriceLamports(row.route, row.mode === "priority" ? "priority" : "standard"),
+        0,
+      );
+      const monthlySpendLamports = monthlyRows.reduce(
+        (sum, row) => sum + requestPriceLamports(row.route, row.mode === "priority" ? "priority" : "standard"),
+        0,
+      );
+
+      const checks = [
+        {
+          scope: "daily",
+          title: `Daily budget threshold reached · ${dailyStart.toISOString().slice(0, 10)}`,
+          since: dailyStart,
+          spendLamports: dailySpendLamports,
+          budgetLamports: project.dailyBudgetLamports ? Number(project.dailyBudgetLamports) : null,
+        },
+        {
+          scope: "monthly",
+          title: `Monthly budget threshold reached · ${monthlyStart.toISOString().slice(0, 7)}`,
+          since: monthlyStart,
+          spendLamports: monthlySpendLamports,
+          budgetLamports: project.monthlyBudgetLamports ? Number(project.monthlyBudgetLamports) : null,
+        },
+      ] as const;
+
+      for (const check of checks) {
+        if (!check.budgetLamports || check.budgetLamports <= 0) continue;
+        const usagePct = (check.spendLamports / check.budgetLamports) * 100;
+        if (usagePct < warningThresholdPct) continue;
+
+        const existing = await prisma.notification.findFirst({
+          where: {
+            userId: project.ownerId,
+            projectId: project.id,
+            title: check.title,
+            createdAt: { gte: check.since },
+          },
+          select: { id: true },
+        });
+        if (existing) continue;
+
+        await prisma.notification.create({
+          data: {
+            userId: project.ownerId,
+            projectId: project.id,
+            type: "alert",
+            title: check.title,
+            message: `${project.name} has used ${usagePct.toFixed(1)}% of its ${check.scope} budget (${check.spendLamports.toLocaleString()} / ${check.budgetLamports.toLocaleString()} lamports).`,
+            metadata: {
+              budgetScope: check.scope,
+              warningThresholdPct,
+              spendLamports: check.spendLamports,
+              budgetLamports: check.budgetLamports,
+            },
+          },
+        });
+      }
+    }
+
+    logger.info({ event: "worker.budget_thresholds.checked", projects: projects.length }, "Budget threshold check completed");
+  } catch (error) {
+    logger.error(
+      { event: "worker.budget_thresholds.failed", error: error instanceof Error ? error.message : "Unknown error" },
+      "Failed to check budget thresholds"
     );
   }
 }

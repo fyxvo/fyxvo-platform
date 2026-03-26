@@ -19,17 +19,16 @@ import { PageHeader } from "../../components/page-header";
 import { RequestLogExplorer } from "../../components/request-log-explorer";
 import { AuthGate } from "../../components/state-panels";
 import { usePortal } from "../../components/portal-provider";
-import { getProjectAnalytics, downloadAnalyticsExport, getErrorLog, getMethodBreakdown } from "../../lib/api";
+import { getCostBreakdown, getProjectAnalytics, downloadAnalyticsExport, getErrorLog, getMethodBreakdown } from "../../lib/api";
 import { dashboardTrend } from "../../lib/sample-data";
-import { formatDuration, formatInteger, formatPercent, formatRelativeDate } from "../../lib/format";
-import type { AnalyticsRange, ErrorLogEntry, MethodBreakdown, ProjectAnalytics } from "../../lib/types";
+import { formatDuration, formatInteger, formatPercent, formatRelativeDate, lamportsToSol } from "../../lib/format";
+import type { AnalyticsRange, CostBreakdownSummary, ErrorLogEntry, MethodBreakdown, ProjectAnalytics } from "../../lib/types";
 
 interface NodeDistributionEntry {
   readonly nodeUrl: string;
   readonly requestCount: number;
   readonly avgLatencyMs: number;
 }
-import { PRICING_LAMPORTS, COMPUTE_HEAVY_METHODS, WRITE_METHODS } from "@fyxvo/config/pricing";
 import { webEnv } from "../../lib/env";
 import { CopyButton } from "../../components/copy-button";
 
@@ -77,6 +76,20 @@ function toSparklinePath(points: number[], width = 80, height = 24): string {
     .join(" ");
 }
 
+async function fetchSolPriceUsd() {
+  try {
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+      { cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as { solana?: { usd?: number } };
+    return data.solana?.usd ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AnalyticsPage() {
   const portal = usePortal();
   const [range, setRange] = useState<AnalyticsRange>("24h");
@@ -92,6 +105,9 @@ export default function AnalyticsPage() {
   const [loadingNodes, setLoadingNodes] = useState(false);
   const [heatmapData, setHeatmapData] = useState<number[][]>([]);
   const [successTrend, setSuccessTrend] = useState<number[]>([]);
+  const [costBreakdown, setCostBreakdown] = useState<CostBreakdownSummary | null>(null);
+  const [solPriceUsd, setSolPriceUsd] = useState<number | null>(null);
+  const [costSort, setCostSort] = useState<"spend" | "count" | "method">("spend");
 
   const selectedProject = portal.selectedProject;
 
@@ -121,18 +137,23 @@ export default function AnalyticsPage() {
     setLoadingExtra(true);
     Promise.all([
       getMethodBreakdown(selectedProject.id, portal.token, range),
-      getErrorLog(selectedProject.id, portal.token)
+      getErrorLog(selectedProject.id, portal.token),
+      getCostBreakdown(selectedProject.id, portal.token, range),
+      fetchSolPriceUsd()
     ])
-      .then(([m, e]) => {
+      .then(([m, e, costs, liveSolPriceUsd]) => {
         if (!cancelled) {
           setMethods(m);
           setErrors(e);
+          setCostBreakdown(costs);
+          setSolPriceUsd(liveSolPriceUsd);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setMethods([]);
           setErrors([]);
+          setCostBreakdown(null);
         }
       })
       .finally(() => {
@@ -249,6 +270,15 @@ export default function AnalyticsPage() {
 
   const hasData = displayAnalytics.totals.requestLogs > 0;
   const isAuthenticated = portal.walletPhase === "authenticated";
+  const sortedCostItems = [...(costBreakdown?.items ?? [])].sort((left, right) => {
+    if (costSort === "count") {
+      return right.count - left.count;
+    }
+    if (costSort === "method") {
+      return left.method.localeCompare(right.method);
+    }
+    return right.totalLamports - left.totalLamports;
+  });
 
   function triggerDownload(content: string, filename: string, mimeType: string) {
     const blob = new Blob([content], { type: mimeType });
@@ -258,6 +288,30 @@ export default function AnalyticsPage() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportCostBreakdown(format: "csv" | "json") {
+    if (!selectedProject || !costBreakdown) return;
+    if (format === "json") {
+      triggerDownload(
+        JSON.stringify(costBreakdown, null, 2),
+        `cost-breakdown-${selectedProject.slug}-${range}.json`,
+        "application/json"
+      );
+      return;
+    }
+    const header = "method,pricingTier,count,totalLamports,estimatedSol,shareOfTotalSpend\n";
+    const rows = sortedCostItems.map((item) =>
+      [
+        item.method,
+        item.pricingTier,
+        item.count,
+        item.totalLamports,
+        item.estimatedSol.toFixed(6),
+        item.shareOfTotalSpend.toFixed(4),
+      ].join(",")
+    );
+    triggerDownload(header + rows.join("\n"), `cost-breakdown-${selectedProject.slug}-${range}.csv`, "text/csv");
   }
 
   async function exportData(format: "csv" | "excel" | "json") {
@@ -542,88 +596,107 @@ export default function AnalyticsPage() {
         <section>
           <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
             <CardHeader>
-              <CardTitle>Cost breakdown</CardTitle>
-              <CardDescription>
-                Estimated fee spend for the selected range, based on per-request lamport pricing. Route classification uses canonical tier rules.
-              </CardDescription>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <CardTitle>Per-method cost breakdown</CardTitle>
+                  <CardDescription>
+                    Real request spend estimates for the selected range using Fyxvo pricing tiers, share of spend, and optional live USD conversion.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={costSort === "spend" ? "primary" : "secondary"} onClick={() => setCostSort("spend")}>
+                    Sort by spend
+                  </Button>
+                  <Button size="sm" variant={costSort === "count" ? "primary" : "secondary"} onClick={() => setCostSort("count")}>
+                    Sort by count
+                  </Button>
+                  <Button size="sm" variant={costSort === "method" ? "primary" : "secondary"} onClick={() => setCostSort("method")}>
+                    Sort by method
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => exportCostBreakdown("csv")}>
+                    Export CSV
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => exportCostBreakdown("json")}>
+                    Export JSON
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(() => {
-                // Classify methods from the breakdown into tiers
-                let standardCount = 0;
-                let computeHeavyCount = 0;
-                let writeCount = 0;
-                let unknownCount = 0;
-
-                for (const m of methods) {
-                  // Route field is the JSON-RPC method name for gateway requests
-                  if (COMPUTE_HEAVY_METHODS.has(m.route)) {
-                    computeHeavyCount += m.count;
-                  } else if (WRITE_METHODS.has(m.route)) {
-                    writeCount += m.count;
-                  } else if (m.service === "gateway" || m.service === "rpc") {
-                    standardCount += m.count;
-                  } else {
-                    unknownCount += m.count;
-                  }
-                }
-
-                const classified = standardCount + computeHeavyCount + writeCount;
-                const totalFromBreakdown = classified + unknownCount;
-
-                // If we have no method-level classification, fall back to treating all as standard
-                const useFallback = totalFromBreakdown === 0;
-                const effectiveStandard = useFallback
-                  ? displayAnalytics.totals.requestLogs
-                  : standardCount;
-                const effectiveComputeHeavy = useFallback ? 0 : computeHeavyCount;
-                const effectiveWrite = useFallback ? 0 : writeCount;
-
-                const standardLamports = effectiveStandard * PRICING_LAMPORTS.standard;
-                const computeHeavyLamports = effectiveComputeHeavy * PRICING_LAMPORTS.computeHeavy;
-                const writeLamports = effectiveWrite * PRICING_LAMPORTS.standard * 4; // GATEWAY_WRITE_METHOD_MULTIPLIER default
-                const totalLamports = standardLamports + computeHeavyLamports + writeLamports;
-                const totalSol = totalLamports / 1_000_000_000;
-
-                // Extrapolate to monthly based on the range
-                const rangeHours: Record<string, number> = { "1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720 };
-                const hoursInRange = rangeHours[range] ?? 24;
-                const hoursInMonth = 720;
-                const projectedMonthlyLamports = totalLamports * (hoursInMonth / hoursInRange);
-                const projectedMonthlySol = projectedMonthlyLamports / 1_000_000_000;
-
-                return (
-                  <>
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                        <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Est. SOL spent</div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">{totalSol.toFixed(6)}</div>
-                        <div className="text-xs text-[var(--fyxvo-text-muted)]">{totalLamports.toLocaleString()} lamports</div>
+              {costBreakdown === null ? (
+                <Notice tone="neutral" title="Cost data unavailable">
+                  Cost breakdown will appear once this project has billable request history in the selected range.
+                </Notice>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Total spend</div>
+                      <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">
+                        {lamportsToSol(costBreakdown.totalLamports).toFixed(6)} SOL
                       </div>
-                      <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                        <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Projected monthly</div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">{projectedMonthlySol.toFixed(6)}</div>
-                        <div className="text-xs text-[var(--fyxvo-text-muted)]">SOL at current rate</div>
-                      </div>
-                      <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                        <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Standard requests</div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">{effectiveStandard.toLocaleString()}</div>
-                        <div className="text-xs text-[var(--fyxvo-text-muted)]">{PRICING_LAMPORTS.standard} lam each</div>
-                      </div>
-                      <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                        <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Compute-heavy</div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">{effectiveComputeHeavy.toLocaleString()}</div>
-                        <div className="text-xs text-[var(--fyxvo-text-muted)]">{PRICING_LAMPORTS.computeHeavy} lam each</div>
+                      <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                        {formatInteger(costBreakdown.totalLamports)} lamports
                       </div>
                     </div>
-                    {useFallback ? (
-                      <Notice tone="neutral" title="Estimated at standard rate">
-                        No method-level data is available for this range. All requests are estimated at the standard tier rate. Expand the range or send more traffic to see tier classification.
-                      </Notice>
-                    ) : null}
-                  </>
-                );
-              })()}
+                    <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Live USD estimate</div>
+                      <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">
+                        {solPriceUsd != null ? `$${(lamportsToSol(costBreakdown.totalLamports) * solPriceUsd).toFixed(2)}` : "Unavailable"}
+                      </div>
+                      <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                        {solPriceUsd != null ? `SOL price ${solPriceUsd.toFixed(2)} USD` : "CoinGecko price unavailable"}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Top spend driver</div>
+                      <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">
+                        {sortedCostItems[0]?.method ?? "No billable methods"}
+                      </div>
+                      <div className="text-xs text-[var(--fyxvo-text-muted)]">
+                        {sortedCostItems[0] ? `${formatPercent(sortedCostItems[0].shareOfTotalSpend * 100)} of total spend` : "No spend captured yet"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {sortedCostItems.length === 0 ? (
+                    <Notice tone="neutral" title="No billable requests">
+                      Simulation traffic is excluded, so this panel stays focused on real billed relay usage.
+                    </Notice>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b border-[var(--fyxvo-border)]">
+                          <tr>
+                            <th className="pb-3 text-left text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Method</th>
+                            <th className="pb-3 text-left text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Pricing tier</th>
+                            <th className="pb-3 text-right text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Requests</th>
+                            <th className="pb-3 text-right text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Lamports</th>
+                            <th className="pb-3 text-right text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">SOL</th>
+                            <th className="pb-3 text-right text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">USD</th>
+                            <th className="pb-3 text-right text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Spend share</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--fyxvo-border)]">
+                          {sortedCostItems.map((item) => (
+                            <tr key={`${item.method}-${item.pricingTier}`} className="text-[var(--fyxvo-text-soft)]">
+                              <td className="py-3 font-mono text-xs text-[var(--fyxvo-text)]">{item.method}</td>
+                              <td className="py-3 text-xs capitalize">{item.pricingTier.replace("_", " ")}</td>
+                              <td className="py-3 text-right text-xs">{formatInteger(item.count)}</td>
+                              <td className="py-3 text-right text-xs">{formatInteger(item.totalLamports)}</td>
+                              <td className="py-3 text-right text-xs">{item.estimatedSol.toFixed(6)}</td>
+                              <td className="py-3 text-right text-xs">
+                                {solPriceUsd != null ? `$${(item.estimatedSol * solPriceUsd).toFixed(2)}` : "—"}
+                              </td>
+                              <td className="py-3 text-right text-xs">{formatPercent(item.shareOfTotalSpend * 100)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </section>

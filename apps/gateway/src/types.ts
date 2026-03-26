@@ -30,6 +30,10 @@ export interface ProjectAccessContext {
     readonly ownerWalletAddress: string;
     readonly chainProjectId: bigint;
     readonly onChainProjectPda: string;
+    readonly dailyBudgetLamports: bigint | null;
+    readonly monthlyBudgetLamports: bigint | null;
+    readonly budgetWarningThresholdPct: number | null;
+    readonly budgetHardStop: boolean;
   };
 }
 
@@ -118,6 +122,7 @@ export interface GatewayStateStore {
 
 export interface GatewayRepository {
   findProjectAccessByApiKey(apiKey: string): Promise<ProjectAccessContext | null>;
+  getProjectBudgetUsage(projectId: string): Promise<{ readonly dailyLamports: bigint; readonly monthlyLamports: bigint }>;
   listUpstreamNodes(projectId?: string): Promise<RoutedRpcNode[]>;
   touchApiKeyUsage(apiKeyId: string): Promise<void>;
   recordRequestLog(input: {

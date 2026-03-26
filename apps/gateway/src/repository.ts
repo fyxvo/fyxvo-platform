@@ -4,6 +4,7 @@ import {
   NodeNetwork,
   NodeStatus,
   Prisma,
+  type RequestLog,
   type Node as DatabaseNode,
   type PrismaClientType
 } from "@fyxvo/database";
@@ -19,6 +20,59 @@ function networkFromCluster(cluster: "devnet"): DatabaseNode["network"] {
 
 function parseScopes(value: unknown): readonly string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function parseLoggedRouteMethods(route: string) {
+  if (!route.startsWith("batch:")) {
+    return [route];
+  }
+  return route
+    .slice("batch:".length)
+    .split(",")
+    .map((value) => value.trim().replace(/\s+\+\d+$/, ""))
+    .filter((value) => value.length > 0);
+}
+
+function estimateRequestLogLamports(row: Pick<RequestLog, "route" | "mode">) {
+  const methods = parseLoggedRouteMethods(row.route);
+  if (methods.length === 0) {
+    return 0n;
+  }
+  return methods.reduce((sum, method) => {
+    if (row.mode === "priority") {
+      return sum + 5_000n;
+    }
+    if (["sendTransaction", "sendRawTransaction", "simulateTransaction", "requestAirdrop"].includes(method)) {
+      return sum + 4_000n;
+    }
+    if (
+      [
+        "getProgramAccounts",
+        "getLargestAccounts",
+        "getTokenLargestAccounts",
+        "getTokenAccountsByOwner",
+        "getTokenAccountsByDelegate",
+        "getParsedTokenAccountsByOwner",
+        "getParsedTokenAccountsByDelegate",
+        "getMultipleAccounts",
+        "getParsedMultipleAccounts",
+        "getSignaturesForAddress",
+        "getConfirmedSignaturesForAddress2",
+        "getBlockProduction",
+      ].includes(method)
+    ) {
+      return sum + 3_000n;
+    }
+    return sum + 1_000n;
+  }, 0n);
+}
+
+function startOfUtcDay(date = new Date()) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function startOfUtcMonth(date = new Date()) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
 export class PrismaGatewayRepository implements GatewayRepository {
@@ -64,8 +118,39 @@ export class PrismaGatewayRepository implements GatewayRepository {
         ownerId: record.project.ownerId,
         ownerWalletAddress: record.project.owner.walletAddress,
         chainProjectId: record.project.chainProjectId,
-        onChainProjectPda: record.project.onChainProjectPda
+        onChainProjectPda: record.project.onChainProjectPda,
+        dailyBudgetLamports: record.project.dailyBudgetLamports,
+        monthlyBudgetLamports: record.project.monthlyBudgetLamports,
+        budgetWarningThresholdPct: record.project.budgetWarningThresholdPct,
+        budgetHardStop: record.project.budgetHardStop,
       }
+    };
+  }
+
+  async getProjectBudgetUsage(projectId: string) {
+    const now = new Date();
+    const [dailyRows, monthlyRows] = await Promise.all([
+      this.prisma.requestLog.findMany({
+        where: {
+          projectId,
+          simulated: false,
+          createdAt: { gte: startOfUtcDay(now) },
+        },
+        select: { route: true, mode: true },
+      }),
+      this.prisma.requestLog.findMany({
+        where: {
+          projectId,
+          simulated: false,
+          createdAt: { gte: startOfUtcMonth(now) },
+        },
+        select: { route: true, mode: true },
+      }),
+    ]);
+
+    return {
+      dailyLamports: dailyRows.reduce((sum, row) => sum + estimateRequestLogLamports(row), 0n),
+      monthlyLamports: monthlyRows.reduce((sum, row) => sum + estimateRequestLogLamports(row), 0n),
     };
   }
 

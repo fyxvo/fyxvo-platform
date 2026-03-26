@@ -36,6 +36,7 @@ const NAV_SECTIONS = [
   { id: "ci-cd", label: "CI/CD Integration", keywords: "ci cd github actions continuous integration deploy environment variables secrets" },
   { id: "migration-guide", label: "Migration Guide", keywords: "migration guide migrate helius quicknode alchemy switch rpc provider 2-line change" },
   { id: "network-status", label: "Network Status", keywords: "status health uptime live devnet solana network" },
+  { id: "status-api", label: "Status API", keywords: "health status capacity incidents calendar public api response monitoring ops" },
   { id: "changelog", label: "Changelog", keywords: "release updates version changes new features" },
   { id: "migration", label: "Migration (Legacy)", keywords: "migrate helius quicknode alchemy switch rpc provider 2-line change" },
   { id: "rate-limits-reference", label: "Rate Limits Reference", keywords: "rate limit table devnet requests per second 429" },
@@ -385,6 +386,41 @@ curl ${webEnv.gatewayBaseUrl}/v1/status
 
 # Status page
 open ${webEnv.statusPageUrl}`;
+
+  const statusApiHealthCode = `curl ${webEnv.apiBaseUrl}/health
+
+# Public
+# Use when you want the fastest readiness check for the control plane.
+# Returns service, version, timestamp, and assistant availability.`;
+
+  const statusApiStatusCode = `curl ${webEnv.apiBaseUrl}/v1/status
+
+# Public
+# Use when you want richer API runtime context like environment, dependencies,
+# and assistant availability for dashboards or release checks.`;
+
+  const statusApiIncidentsCode = `curl ${webEnv.apiBaseUrl}/v1/incidents
+
+# Public
+# Use when you want the current incident list and timeline updates for each incident.`;
+
+  const statusApiNetworkCode = `curl ${webEnv.apiBaseUrl}/v1/network/stats
+curl ${webEnv.apiBaseUrl}/v1/network/capacity
+curl ${webEnv.apiBaseUrl}/v1/network/health-calendar
+
+# Public
+# Use for high-level usage, capacity posture, and recent health history.`;
+
+  const statusApiPublicProjectCode = `curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public \\
+  -H "x-api-key: YOUR_API_KEY"
+
+# Authenticated with a project API key
+# Use from backend services when you want public-safe project usage stats.`;
+
+  const statusSnapshotCode = `# Status snapshot sharing
+# Open ${webEnv.statusPageUrl}
+# Use "Copy snapshot" to capture current API health, gateway health,
+# protocol readiness, and active incident count as shareable text.`;
 
   const visibleSections = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
@@ -1130,6 +1166,10 @@ const sig = req.headers['x-fyxvo-signature'];
 const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 if (sig !== computed) return res.status(401).send('Unauthorized');`}
               />
+              <Notice tone="neutral" title="Need to debug a signature mismatch?">
+                Open the webhook signature debugger in project settings to paste the payload, secret, and{" "}
+                <code className="font-mono text-xs">x-fyxvo-signature</code> header, verify the computed HMAC, and copy Node.js or Python validation snippets without leaving Fyxvo.
+              </Notice>
               <Notice tone="neutral" title="Retry behavior">
                 If your endpoint is unreachable, Fyxvo retries once after 30 seconds. After two failures the webhook remains active but{" "}
                 <code className="font-mono text-xs">lastTriggeredAt</code> is not updated. URLs must be HTTPS — localhost and private IP ranges are blocked.
@@ -1914,6 +1954,64 @@ curl ${webEnv.apiBaseUrl}/health
                 If the status page shows degraded, check individual health endpoints to isolate
                 whether the issue is the API, gateway, or Solana devnet itself. If devnet is healthy
                 but the gateway is degraded, contact support before scaling traffic.
+              </Notice>
+            </div>
+          </section>
+
+          <section id="status-api">
+            <SectionHeading
+              id="status-api"
+              eyebrow="Reference"
+              title="Status API"
+              description="Public status and network endpoints you can wire into internal dashboards, smoke tests, release checks, or lightweight uptime monitoring."
+            />
+            <div className="space-y-5">
+              <div className="grid gap-4 xl:grid-cols-2">
+                {[
+                  {
+                    title: "GET /health",
+                    code: statusApiHealthCode,
+                    body: "Public. Best for quick release smoke tests and simple uptime checks. Returns overall status, service name, version, timestamp, and assistant availability.",
+                  },
+                  {
+                    title: "GET /v1/status",
+                    code: statusApiStatusCode,
+                    body: "Public. Best for richer diagnostics. Use this for admin readouts, deployment checks, and environment-level status summaries.",
+                  },
+                  {
+                    title: "GET /v1/incidents",
+                    code: statusApiIncidentsCode,
+                    body: "Public. Returns active and historical incidents with timeline updates, affected services, and resolution timestamps. Use this to link platform incidents to project-level alerts.",
+                  },
+                  {
+                    title: "GET /v1/network/stats, /capacity, /health-calendar",
+                    code: statusApiNetworkCode,
+                    body: "Public. Use these for high-level usage trends, capacity posture, and recent service-health history without requiring an authenticated session.",
+                  },
+                  {
+                    title: "Project public stats endpoints",
+                    code: statusApiPublicProjectCode,
+                    body: "API-key authenticated. Use from backend services when you want public-safe project usage stats without exposing a dashboard session.",
+                  },
+                  {
+                    title: "Status snapshot sharing",
+                    code: statusSnapshotCode,
+                    body: "Human-readable handoff, not a separate API endpoint. Use the status page snapshot copy action when you need to share the current platform state quickly in chat, docs, or support threads.",
+                  },
+                ].map((item) => (
+                  <Card key={item.title} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+                    <CardHeader>
+                      <CardTitle>{item.title}</CardTitle>
+                      <CardDescription>{item.body}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <CodeBlock code={item.code} />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <Notice tone="neutral" title="Common operational uses">
+                Use <code className="font-mono text-xs">/health</code> in deploy smoke tests, <code className="font-mono text-xs">/v1/status</code> in richer admin dashboards, <code className="font-mono text-xs">/v1/incidents</code> to explain alert spikes, and the network endpoints when you want public operational context without exposing private project data.
               </Notice>
             </div>
           </section>

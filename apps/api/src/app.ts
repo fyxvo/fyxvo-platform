@@ -6,9 +6,11 @@ import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import type { ApiEnv } from "@fyxvo/config";
 import {
+  COMPUTE_HEAVY_METHODS,
   FREE_TIER_REQUESTS,
   PRICING_LAMPORTS,
   VOLUME_DISCOUNT,
+  WRITE_METHODS,
   normalizeApiKeyScopes,
   resolveAuthorityPlan,
   supportedApiKeyScopes,
@@ -157,6 +159,10 @@ const updateProjectSchema = z.object({
   displayName: z.string().trim().max(128).nullable().optional(),
   lowBalanceThresholdSol: z.number().min(0).max(1000).nullable().optional(),
   dailyRequestAlertThreshold: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  dailyBudgetLamports: z.string().trim().regex(/^\d+$/).nullable().optional(),
+  monthlyBudgetLamports: z.string().trim().regex(/^\d+$/).nullable().optional(),
+  budgetWarningThresholdPct: z.number().int().min(1).max(100).nullable().optional(),
+  budgetHardStop: z.boolean().optional(),
   archivedAt: z.string().datetime().optional().nullable(),
   environment: z.enum(["development", "staging", "production"]).optional(),
   starred: z.boolean().optional(),
@@ -779,6 +785,52 @@ export async function buildApiApp(input: {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   }
 
+  function startOfUtcMonth(date = new Date()) {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  }
+
+  function parseLoggedRouteMethods(route: string) {
+    if (!route.startsWith("batch:")) {
+      return [route];
+    }
+    return route
+      .slice("batch:".length)
+      .split(",")
+      .map((value) => value.trim().replace(/\s+\+\d+$/, ""))
+      .filter((value) => value.length > 0);
+  }
+
+  function requestPriceLamports(route: string, mode: "standard" | "priority" | null | undefined) {
+    const methods = parseLoggedRouteMethods(route);
+    if (methods.length === 0) {
+      return 0;
+    }
+    const total = methods.reduce((sum, rpcMethod) => {
+      if (mode === "priority") {
+        return sum + PRICING_LAMPORTS.priority;
+      }
+      if (WRITE_METHODS.has(rpcMethod)) {
+        return sum + PRICING_LAMPORTS.standard * 4;
+      }
+      if (COMPUTE_HEAVY_METHODS.has(rpcMethod)) {
+        return sum + PRICING_LAMPORTS.computeHeavy;
+      }
+      return sum + PRICING_LAMPORTS.standard;
+    }, 0);
+    return total;
+  }
+
+  function toBigIntOrNull(value: string | null | undefined) {
+    if (value == null || value.trim().length === 0) {
+      return null;
+    }
+    try {
+      return BigInt(value);
+    } catch {
+      return null;
+    }
+  }
+
   await app.register(cors, {
     origin(origin, callback) {
       if (!origin || allowedOrigins.has(origin)) {
@@ -1120,6 +1172,7 @@ export async function buildApiApp(input: {
   app.patch("/v1/admin/incidents/:id", async (request) => {
     const user = requireUser(request);
     requireAdmin(user);
+    const db = requirePrisma();
     const params = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z.object({
       severity: z.enum(["info", "warning", "critical", "degraded"]).optional(),
@@ -1131,7 +1184,64 @@ export async function buildApiApp(input: {
       ...(body.description !== undefined ? { description: body.description } : {}),
       ...(body.status !== undefined ? { resolvedAt: body.status === "resolved" ? new Date() : null } : {}),
     });
+    if (body.severity !== undefined || body.description !== undefined || body.status !== undefined) {
+      await db.incidentUpdate.create({
+        data: {
+          incidentId: params.id,
+          status: body.status === "resolved" ? "resolved" : body.status === "open" ? "reopened" : "update",
+          severity: body.severity ?? incident.severity,
+          message: body.description ?? incident.description,
+          affectedServices: [incident.serviceName],
+        },
+      });
+    }
     return { item: incident };
+  });
+
+  app.post("/v1/admin/incidents/:id/updates", async (request, reply) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const params = z.object({ id: z.string().uuid() }).parse(request.params);
+    const body = z.object({
+      message: z.string().trim().min(5).max(1000),
+      status: z.enum(["update", "escalated", "resolved"]).default("update"),
+      severity: z.enum(["info", "warning", "critical", "degraded"]).optional(),
+      affectedServices: z.array(z.string().trim().min(1).max(64)).max(10).optional(),
+    }).parse(request.body);
+    const existing = await db.incident.findUnique({ where: { id: params.id } });
+    if (!existing) {
+      throw new HttpError(404, "incident_not_found", "The requested incident could not be found.");
+    }
+    await db.incidentUpdate.create({
+      data: {
+        incidentId: params.id,
+        status: body.status,
+        severity: body.severity ?? existing.severity,
+        message: body.message,
+        affectedServices: body.affectedServices?.length ? body.affectedServices : [existing.serviceName],
+      },
+    });
+    if (body.status === "resolved" && existing.resolvedAt == null) {
+      await db.incident.update({
+        where: { id: params.id },
+        data: { resolvedAt: new Date(), ...(body.severity ? { severity: body.severity } : {}) },
+      });
+    }
+    const incident = await db.incident.findUnique({
+      where: { id: params.id },
+      include: {
+        updates: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+    if (!incident) {
+      throw new HttpError(404, "incident_not_found", "The requested incident could not be found.");
+    }
+    return reply.status(201).send({
+      item: serializeForJson(incident),
+    });
   });
 
   // GET /v1/network/health-calendar — public, no auth required
@@ -1195,6 +1305,32 @@ export async function buildApiApp(input: {
         reputationLevel: (fullUser as any)?.reputationLevel ?? 'Explorer',
       },
       projectCount: projects.length
+    };
+  });
+
+  app.get("/v1/me/session-diagnostics", async (request) => {
+    const user = requireUser(request);
+    const fullUser = await input.repository.findUserById(user.id);
+    const decoded = typeof (request as FastifyRequest & { jwtDecode?: () => unknown }).jwtDecode === "function"
+      ? ((request as FastifyRequest & { jwtDecode: () => unknown }).jwtDecode() as { iat?: number; exp?: number } | null)
+      : null;
+    return {
+      item: {
+        sessionActive: true,
+        walletAddress: user.walletAddress,
+        authMode: "wallet_signature_jwt",
+        issuedAt: typeof decoded?.iat === "number" ? new Date(decoded.iat * 1000).toISOString() : null,
+        expiresAt: typeof decoded?.exp === "number" ? new Date(decoded.exp * 1000).toISOString() : null,
+        termsAccepted: Boolean(fullUser?.tosAcceptedAt),
+        onboardingDismissed: Boolean(fullUser?.onboardingDismissed),
+        assistantAvailable: isAssistantConfigured(input.env),
+        environment: input.env.FYXVO_ENV,
+        suggestions: [
+          "If the wallet reconnects but authenticated pages still fail, disconnect and sign in again to rotate the JWT session.",
+          "If a signed session expires, refresh the dashboard or reconnect the wallet to issue a fresh token.",
+          "If assistant availability is false, verify /health and /v1/status before assuming the wallet session is broken.",
+        ],
+      },
     };
   });
 
@@ -1799,6 +1935,10 @@ export async function buildApiApp(input: {
       ...(body.displayName !== undefined ? { displayName: body.displayName } : {}),
       ...(body.lowBalanceThresholdSol !== undefined ? { lowBalanceThresholdSol: body.lowBalanceThresholdSol } : {}),
       ...(body.dailyRequestAlertThreshold !== undefined ? { dailyRequestAlertThreshold: body.dailyRequestAlertThreshold } : {}),
+      ...(body.dailyBudgetLamports !== undefined ? { dailyBudgetLamports: toBigIntOrNull(body.dailyBudgetLamports) } : {}),
+      ...(body.monthlyBudgetLamports !== undefined ? { monthlyBudgetLamports: toBigIntOrNull(body.monthlyBudgetLamports) } : {}),
+      ...(body.budgetWarningThresholdPct !== undefined ? { budgetWarningThresholdPct: body.budgetWarningThresholdPct } : {}),
+      ...(body.budgetHardStop !== undefined ? { budgetHardStop: body.budgetHardStop } : {}),
       ...(body.archivedAt !== undefined ? { archivedAt: body.archivedAt !== null ? new Date(body.archivedAt) : null } : {}),
       ...(body.environment !== undefined ? { environment: body.environment } : {}),
       ...(body.starred !== undefined ? { starred: body.starred } : {}),
@@ -1833,6 +1973,28 @@ export async function buildApiApp(input: {
         userId: user.id,
         action: "project.notes_updated",
         details: { length: body.notes?.length ?? 0 },
+      }).catch(() => undefined);
+    }
+    if (
+      body.lowBalanceThresholdSol !== undefined ||
+      body.dailyRequestAlertThreshold !== undefined ||
+      body.dailyBudgetLamports !== undefined ||
+      body.monthlyBudgetLamports !== undefined ||
+      body.budgetWarningThresholdPct !== undefined ||
+      body.budgetHardStop !== undefined
+    ) {
+      void input.repository.logActivity({
+        projectId: project.id,
+        userId: user.id,
+        action: "project.alerts_updated",
+        details: {
+          lowBalanceThresholdSol: body.lowBalanceThresholdSol ?? null,
+          dailyRequestAlertThreshold: body.dailyRequestAlertThreshold ?? null,
+          dailyBudgetLamports: body.dailyBudgetLamports ?? null,
+          monthlyBudgetLamports: body.monthlyBudgetLamports ?? null,
+          budgetWarningThresholdPct: body.budgetWarningThresholdPct ?? null,
+          budgetHardStop: body.budgetHardStop ?? null,
+        },
       }).catch(() => undefined);
     }
 
@@ -2310,6 +2472,106 @@ export async function buildApiApp(input: {
     };
   });
 
+  app.get("/v1/projects/:projectId/analytics/cost-breakdown", async (request) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ range: z.enum(["1h", "6h", "24h", "7d", "30d"]).default("7d") }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const since = new Date(Date.now() - rangeToMs(query.range));
+    const rows = await db.requestLog.findMany({
+      where: {
+        projectId: params.projectId,
+        simulated: false,
+        createdAt: { gte: since },
+      },
+      select: {
+        route: true,
+        mode: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const monthlyRows = await db.requestLog.findMany({
+      where: {
+        projectId: params.projectId,
+        simulated: false,
+        createdAt: { gte: startOfUtcMonth() },
+      },
+      select: {
+        route: true,
+        mode: true,
+      },
+    });
+
+    const monthlyRequestCount = monthlyRows.length;
+    const grouped = new Map<string, {
+      method: string;
+      pricingTier: "standard" | "compute_heavy" | "write" | "priority";
+      count: number;
+      totalLamports: number;
+    }>();
+
+    for (const row of rows) {
+      const methods = parseLoggedRouteMethods(row.route);
+      for (const method of methods) {
+        const pricingTier =
+          row.mode === "priority"
+            ? "priority"
+            : WRITE_METHODS.has(method)
+              ? "write"
+              : COMPUTE_HEAVY_METHODS.has(method)
+                ? "compute_heavy"
+                : "standard";
+        const baseLamports =
+          pricingTier === "priority"
+            ? PRICING_LAMPORTS.priority
+            : pricingTier === "compute_heavy"
+              ? PRICING_LAMPORTS.computeHeavy
+              : pricingTier === "write"
+                ? PRICING_LAMPORTS.standard * 4
+                : PRICING_LAMPORTS.standard;
+        const discountedLamports = Math.max(1, Math.floor(baseLamports * (10_000 - (monthlyRequestCount >= VOLUME_DISCOUNT.tier2.monthlyRequests
+          ? VOLUME_DISCOUNT.tier2.discountBps
+          : monthlyRequestCount >= VOLUME_DISCOUNT.tier1.monthlyRequests
+            ? VOLUME_DISCOUNT.tier1.discountBps
+            : 0)) / 10_000));
+        const key = `${method}:${pricingTier}`;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.count += 1;
+          existing.totalLamports += discountedLamports;
+        } else {
+          grouped.set(key, {
+            method,
+            pricingTier,
+            count: 1,
+            totalLamports: discountedLamports,
+          });
+        }
+      }
+    }
+
+    const totalLamports = [...grouped.values()].reduce((sum, item) => sum + item.totalLamports, 0);
+    return {
+      item: {
+        range: query.range,
+        totalLamports,
+        items: [...grouped.values()]
+          .sort((left, right) => right.totalLamports - left.totalLamports)
+          .map((item) => ({
+            ...item,
+            estimatedSol: item.totalLamports / 1_000_000_000,
+            shareOfTotalSpend: totalLamports > 0 ? item.totalLamports / totalLamports : 0,
+          })),
+      },
+    };
+  });
+
   app.get("/v1/projects/:projectId/analytics/errors", async (request) => {
     const user = requireUser(request);
     const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
@@ -2340,6 +2602,62 @@ export async function buildApiApp(input: {
     reply.header("content-type", "text/csv");
     reply.header("content-disposition", `attachment; filename="analytics-${project.slug}-${query.range ?? "7d"}.csv"`);
     return reply.send(csv);
+  });
+
+  app.get("/v1/projects/:projectId/budget", async (request) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const [dailyRows, monthlyRows] = await Promise.all([
+      db.requestLog.findMany({
+        where: {
+          projectId: params.projectId,
+          simulated: false,
+          createdAt: { gte: startOfUtcDay() },
+        },
+        select: { route: true, mode: true },
+      }),
+      db.requestLog.findMany({
+        where: {
+          projectId: params.projectId,
+          simulated: false,
+          createdAt: { gte: startOfUtcMonth() },
+        },
+        select: { route: true, mode: true },
+      }),
+    ]);
+
+    const dailySpendLamports = dailyRows.reduce(
+      (sum, row) => sum + requestPriceLamports(row.route, row.mode === "priority" ? "priority" : "standard"),
+      0,
+    );
+    const monthlySpendLamports = monthlyRows.reduce(
+      (sum, row) => sum + requestPriceLamports(row.route, row.mode === "priority" ? "priority" : "standard"),
+      0,
+    );
+    const warningThresholdPct = project.budgetWarningThresholdPct ?? 80;
+    const dailyBudgetLamports = project.dailyBudgetLamports ? Number(project.dailyBudgetLamports) : null;
+    const monthlyBudgetLamports = project.monthlyBudgetLamports ? Number(project.monthlyBudgetLamports) : null;
+
+    return {
+      item: {
+        dailyBudgetLamports: project.dailyBudgetLamports?.toString() ?? null,
+        monthlyBudgetLamports: project.monthlyBudgetLamports?.toString() ?? null,
+        warningThresholdPct,
+        hardStop: project.budgetHardStop ?? false,
+        dailySpendLamports,
+        monthlySpendLamports,
+        dailyUsagePct: dailyBudgetLamports && dailyBudgetLamports > 0 ? Math.min(100, (dailySpendLamports / dailyBudgetLamports) * 100) : null,
+        monthlyUsagePct: monthlyBudgetLamports && monthlyBudgetLamports > 0 ? Math.min(100, (monthlySpendLamports / monthlyBudgetLamports) * 100) : null,
+        dailyWarningTriggered: dailyBudgetLamports && dailyBudgetLamports > 0 ? (dailySpendLamports / dailyBudgetLamports) * 100 >= warningThresholdPct : false,
+        monthlyWarningTriggered: monthlyBudgetLamports && monthlyBudgetLamports > 0 ? (monthlySpendLamports / monthlyBudgetLamports) * 100 >= warningThresholdPct : false,
+      },
+    };
   });
 
   app.get("/v1/projects/:projectId/requests", async (request) => {
@@ -2457,6 +2775,53 @@ export async function buildApiApp(input: {
     return reply.send([header, ...rows].join("\n"));
   });
 
+  app.get("/v1/projects/:projectId/access-audit", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const query = z.object({ limit: z.coerce.number().int().min(1).max(200).default(100) }).parse(request.query);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    const items = await input.repository.listActivityLog(params.projectId, query.limit);
+    return {
+      items: items.filter((item) =>
+        [
+          "settings.viewed",
+          "apikey.created",
+          "apikey.rotated",
+          "apikey.revoked",
+          "project.alerts_updated",
+          "project.public_enabled",
+          "project.public_disabled",
+          "member.invited",
+          "member.accepted",
+          "member.declined",
+          "member.removed",
+          "ownership.transferred",
+          "webhook.created",
+          "webhook.deleted",
+        ].includes(item.action)
+      ),
+    };
+  });
+
+  app.post("/v1/projects/:projectId/access-audit/view", async (request, reply) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+    await input.repository.logActivity({
+      projectId: params.projectId,
+      userId: user.id,
+      action: "settings.viewed",
+      details: { source: "settings-page" },
+    });
+    return reply.status(202).send({ ok: true });
+  });
+
   app.get("/v1/projects/:projectId/checklist", async (request, reply) => {
     const user = requireUser(request);
     const { projectId } = request.params as { projectId: string };
@@ -2552,6 +2917,140 @@ export async function buildApiApp(input: {
     requireAdmin(user);
     return {
       item: await input.repository.getAdminPlatformStats()
+    };
+  });
+
+  app.get("/v1/admin/retention-cohorts", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const now = new Date();
+
+    async function buildSummary(windowDays: number | null) {
+      const since = windowDays === null ? null : new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+      const userWhere = since ? { createdAt: { gte: since } } : {};
+      const users = await db.user.findMany({
+        where: userWhere,
+        select: { id: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      });
+      const requestLogWindowWhere = since ? { createdAt: { gte: since } } : {};
+      const [assistantUsage, playgroundUsage, apiKeyUsage, fundedProjects, publicShares, requestUsage, firstTrafficProjects] = await Promise.all([
+        db.assistantConversation.findMany({
+          where: { ...(since ? { createdAt: { gte: since } } : {}) },
+          select: { userId: true },
+          distinct: ["userId"],
+        }),
+        db.playgroundRecipe.findMany({
+          where: { ...(since ? { updatedAt: { gte: since } } : {}) },
+          select: { project: { select: { ownerId: true } } },
+        }),
+        db.apiKey.findMany({
+          where: { ...(since ? { createdAt: { gte: since } } : {}) },
+          select: { createdById: true },
+          distinct: ["createdById"],
+        }),
+        db.fundingCoordinate.findMany({
+          where: { confirmedAt: { not: null }, ...(since ? { confirmedAt: { gte: since } } : {}) },
+          select: { requestedById: true },
+          distinct: ["requestedById"],
+        }),
+        db.project.findMany({
+          where: {
+            OR: [{ isPublic: true }, { leaderboardVisible: true }],
+            ...(since ? { updatedAt: { gte: since } } : {}),
+          },
+          select: { ownerId: true },
+        }),
+        db.requestLog.findMany({
+          where: { userId: { not: null }, ...(since ? { createdAt: { gte: since } } : {}) },
+          select: { userId: true },
+          distinct: ["userId"],
+        }),
+        db.project.findMany({
+          where: { requestLogs: { some: since ? { createdAt: { gte: since } } : {} } },
+          select: {
+            id: true,
+            _count: { select: { requestLogs: true } },
+          },
+        }),
+      ]);
+      const repeatTrafficProjects = await db.project.findMany({
+        where: { requestLogs: { some: requestLogWindowWhere } },
+        select: {
+          id: true,
+          requestLogs: {
+            ...(since ? { where: requestLogWindowWhere } : {}),
+            take: 2,
+            orderBy: { createdAt: "asc" },
+            select: { id: true },
+          },
+        },
+      });
+
+      const activityByUser = new Map<string, Date[]>();
+      const recordActivity = (userId: string | null | undefined, timestamp: Date) => {
+        if (!userId) return;
+        const existing = activityByUser.get(userId) ?? [];
+        existing.push(timestamp);
+        activityByUser.set(userId, existing);
+      };
+
+      const [assistantEvents, projectEvents, apiKeyEvents, fundingEvents] = await Promise.all([
+        db.assistantConversation.findMany({ where: { userId: { in: users.map((entry) => entry.id) } }, select: { userId: true, createdAt: true } }),
+        db.project.findMany({ where: { ownerId: { in: users.map((entry) => entry.id) } }, select: { ownerId: true, createdAt: true } }),
+        db.apiKey.findMany({ where: { createdById: { in: users.map((entry) => entry.id) } }, select: { createdById: true, createdAt: true } }),
+        db.fundingCoordinate.findMany({
+          where: { requestedById: { in: users.map((entry) => entry.id) }, confirmedAt: { not: null } },
+          select: { requestedById: true, confirmedAt: true, createdAt: true },
+        }),
+      ]);
+      for (const event of assistantEvents) recordActivity(event.userId, event.createdAt);
+      for (const event of projectEvents) recordActivity(event.ownerId, event.createdAt);
+      for (const event of apiKeyEvents) recordActivity(event.createdById, event.createdAt);
+      for (const event of fundingEvents) recordActivity(event.requestedById, event.confirmedAt ?? event.createdAt);
+
+      const returnedAfter = (days: number) =>
+        users.filter((candidate) => {
+          const threshold = candidate.createdAt.getTime() + days * 24 * 60 * 60 * 1000;
+          return (activityByUser.get(candidate.id) ?? []).some((entry) => entry.getTime() >= threshold);
+        }).length;
+
+      const newUsersByDayMap = new Map<string, number>();
+      for (const row of users) {
+        const key = startOfUtcDay(row.createdAt).toISOString().slice(0, 10);
+        newUsersByDayMap.set(key, (newUsersByDayMap.get(key) ?? 0) + 1);
+      }
+
+      return {
+        windowDays,
+        generatedAt: now.toISOString(),
+        newUsersByDay: [...newUsersByDayMap.entries()].map(([date, count]) => ({ date, count })),
+        retained: {
+          day1: returnedAfter(1),
+          day7: returnedAfter(7),
+          day30: returnedAfter(30),
+        },
+        totals: {
+          newUsers: users.length,
+          firstTrafficProjects: firstTrafficProjects.length,
+          repeatTrafficProjects: repeatTrafficProjects.filter((project) => project.requestLogs.length > 1).length,
+          assistantUsers: assistantUsage.length,
+          playgroundUsers: new Set(playgroundUsage.map((row) => row.project.ownerId)).size,
+          apiKeyCreators: apiKeyUsage.length,
+          fundedUsers: fundedProjects.length,
+          publicSharers: new Set(publicShares.map((row) => row.ownerId)).size,
+          requestUsers: requestUsage.length,
+        },
+      };
+    }
+
+    return {
+      item: {
+        sevenDay: await buildSummary(7),
+        thirtyDay: await buildSummary(30),
+        allTime: await buildSummary(null),
+      },
     };
   });
 
@@ -4694,6 +5193,74 @@ ${liveContextLines.join("\n")}
   // ── Leaderboard (public) ──────────────────────────────────────────────────
   app.get("/v1/leaderboard", async () => {
     return { entries: await input.repository.getLeaderboard() };
+  });
+
+  app.get("/v1/explore", async (request) => {
+    const db = requirePrisma();
+    const query = z.object({
+      templateType: z.string().trim().min(1).max(32).optional(),
+      tag: z.string().trim().min(1).max(32).optional(),
+      leaderboardVisible: z.coerce.boolean().optional(),
+      recentTraffic: z.coerce.boolean().optional(),
+      recentlyCreated: z.coerce.boolean().optional(),
+    }).parse(request.query);
+    const recentTrafficSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentCreationSince = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const projects = await db.project.findMany({
+      where: {
+        isPublic: true,
+        publicSlug: { not: null },
+        archivedAt: null,
+        ...(query.templateType ? { templateType: query.templateType } : {}),
+        ...(query.tag ? { tags: { has: query.tag } } : {}),
+        ...(typeof query.leaderboardVisible === "boolean" ? { leaderboardVisible: query.leaderboardVisible } : {}),
+        ...(query.recentlyCreated ? { createdAt: { gte: recentCreationSince } } : {}),
+        ...(query.recentTraffic ? { requestLogs: { some: { createdAt: { gte: recentTrafficSince } } } } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        displayName: true,
+        publicSlug: true,
+        templateType: true,
+        tags: true,
+        leaderboardVisible: true,
+        createdAt: true,
+        owner: { select: { reputationLevel: true } },
+        requestLogs: {
+          where: { createdAt: { gte: recentTrafficSince } },
+          select: { durationMs: true, statusCode: true },
+        },
+      },
+      orderBy: [{ createdAt: "desc" }],
+      take: 200,
+    });
+
+    return {
+      items: projects.map((project) => {
+        const requestCount = project.requestLogs.length;
+        const avgLatencyMs = requestCount > 0
+          ? Math.round(project.requestLogs.reduce((sum, row) => sum + row.durationMs, 0) / requestCount)
+          : 0;
+        const successRate = requestCount > 0
+          ? project.requestLogs.filter((row) => row.statusCode < 400).length / requestCount
+          : 0;
+        return {
+          id: project.id,
+          projectName: project.displayName ?? project.name,
+          publicSlug: project.publicSlug,
+          templateType: project.templateType ?? "blank",
+          tags: project.tags,
+          leaderboardVisible: project.leaderboardVisible,
+          requestVolume7d: requestCount,
+          averageLatencyMs7d: avgLatencyMs,
+          successRate7d: successRate,
+          healthSummary: requestCount === 0 ? "No recent traffic" : successRate >= 0.98 ? "Healthy" : successRate >= 0.9 ? "Needs attention" : "High error pressure",
+          reputationBadge: project.owner.reputationLevel,
+          createdAt: project.createdAt.toISOString(),
+        };
+      }),
+    };
   });
 
   // ── Email verification prep ───────────────────────────────────────────────

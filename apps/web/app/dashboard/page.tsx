@@ -51,6 +51,7 @@ import type {
   PortalProject,
   PortalServiceStatus,
   ReleaseReadinessSummary,
+  RetentionCohortSummary,
   WebDeploymentStatus
 } from "../../lib/types";
 import { webEnv } from "../../lib/env";
@@ -68,6 +69,7 @@ import {
   getFeedbackInbox,
   getNetworkStats,
   getOnboardingFunnel,
+  getRetentionCohorts,
   getReleaseReadiness,
   getWhatsNew,
   listProjectMembers,
@@ -462,6 +464,7 @@ export default function DashboardPage() {
   const [releaseReadiness, setReleaseReadiness] = useState<ReleaseReadinessSummary | null>(null);
   const [onboardingFunnel7d, setOnboardingFunnel7d] = useState<OnboardingFunnelSummary | null>(null);
   const [onboardingFunnel30d, setOnboardingFunnel30d] = useState<OnboardingFunnelSummary | null>(null);
+  const [retentionCohorts, setRetentionCohorts] = useState<RetentionCohortSummary | null>(null);
   const [feedbackInbox, setFeedbackInbox] = useState<FeedbackInboxItem[]>([]);
   const [dashboardPreferences, setDashboardPreferences] = useState<DashboardPreferences>(DEFAULT_DASHBOARD_PREFERENCES);
   const [alertsPreview, setAlertsPreview] = useState<AlertCenterItem[]>([]);
@@ -702,6 +705,7 @@ export default function DashboardPage() {
       setReleaseReadiness(null);
       setOnboardingFunnel7d(null);
       setOnboardingFunnel30d(null);
+      setRetentionCohorts(null);
       setFeedbackInbox([]);
       return;
     }
@@ -710,12 +714,14 @@ export default function DashboardPage() {
       getReleaseReadiness(portal.token),
       getOnboardingFunnel(7, portal.token),
       getOnboardingFunnel(30, portal.token),
+      getRetentionCohorts(portal.token),
       getFeedbackInbox(portal.token),
-    ]).then(([readinessResult, funnel7Result, funnel30Result, feedbackResult]) => {
+    ]).then(([readinessResult, funnel7Result, funnel30Result, retentionResult, feedbackResult]) => {
       if (cancelled) return;
       setReleaseReadiness(readinessResult.status === "fulfilled" ? readinessResult.value : null);
       setOnboardingFunnel7d(funnel7Result.status === "fulfilled" ? funnel7Result.value : null);
       setOnboardingFunnel30d(funnel30Result.status === "fulfilled" ? funnel30Result.value : null);
+      setRetentionCohorts(retentionResult.status === "fulfilled" ? retentionResult.value : null);
       setFeedbackInbox(feedbackResult.status === "fulfilled" ? feedbackResult.value.items.slice(0, 8) : []);
     });
     return () => {
@@ -2486,6 +2492,43 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </section>
+          ) : null}
+
+          {isAdminAuthorityWallet && retentionCohorts ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Retention and usage cohorts</CardTitle>
+                <CardDescription>
+                  Real user return behavior, adoption surfaces, and repeat traffic posture across 7-day, 30-day, and all-time windows.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 xl:grid-cols-3">
+                {[
+                  { label: "7 days", data: retentionCohorts.sevenDay },
+                  { label: "30 days", data: retentionCohorts.thirtyDay },
+                  { label: "All time", data: retentionCohorts.allTime },
+                ].map((window) => (
+                  <div key={window.label} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{window.label}</div>
+                      <Badge tone="neutral">{formatInteger(window.data.totals.newUsers)} new users</Badge>
+                    </div>
+                    <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                      <div>D1 returners: {formatInteger(window.data.retained.day1)}</div>
+                      <div>D7 returners: {formatInteger(window.data.retained.day7)}</div>
+                      <div>D30 returners: {formatInteger(window.data.retained.day30)}</div>
+                      <div>Projects with first traffic: {formatInteger(window.data.totals.firstTrafficProjects)}</div>
+                      <div>Projects with repeat traffic: {formatInteger(window.data.totals.repeatTrafficProjects)}</div>
+                      <div>Assistant users: {formatInteger(window.data.totals.assistantUsers)}</div>
+                      <div>Playground users: {formatInteger(window.data.totals.playgroundUsers)}</div>
+                      <div>API key creators: {formatInteger(window.data.totals.apiKeyCreators)}</div>
+                      <div>Funded users: {formatInteger(window.data.totals.fundedUsers)}</div>
+                      <div>Public sharers / leaderboard opt-ins: {formatInteger(window.data.totals.publicSharers)}</div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           ) : null}
 
           {isAdminAuthorityWallet && feedbackInbox.length > 0 ? (

@@ -178,6 +178,10 @@ model Project {
   isPublic                   Boolean             @default(false)
   publicSlug                 String?             @unique
   leaderboardVisible         Boolean             @default(false)
+  dailyBudgetLamports        BigInt?
+  monthlyBudgetLamports      BigInt?
+  budgetWarningThresholdPct  Int?                @default(80)
+  budgetHardStop             Boolean             @default(false)
   archiveReason              String?
   firstRequestCelebrationShown Boolean           @default(false)
   tags                       String[]            @default([])
@@ -584,9 +588,24 @@ model Incident {
   resolvedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  updates     IncidentUpdate[]
 
   @@index([serviceName, startedAt])
   @@index([resolvedAt, startedAt])
+}
+
+model IncidentUpdate {
+  id               String   @id @default(uuid()) @db.Uuid
+  incidentId       String   @db.Uuid
+  status           String   @default("update")
+  severity         String?
+  message          String
+  affectedServices String[] @default([])
+  createdAt        DateTime @default(now())
+  incident         Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ReferralClick {

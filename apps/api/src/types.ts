@@ -71,6 +71,10 @@ export interface UpdateProjectInput {
   readonly displayName?: string | null;
   readonly lowBalanceThresholdSol?: number | null;
   readonly dailyRequestAlertThreshold?: number | null;
+  readonly dailyBudgetLamports?: bigint | null;
+  readonly monthlyBudgetLamports?: bigint | null;
+  readonly budgetWarningThresholdPct?: number | null;
+  readonly budgetHardStop?: boolean;
   readonly archivedAt?: Date | null;
   readonly environment?: "development" | "staging" | "production";
   readonly starred?: boolean;
@@ -587,6 +591,14 @@ export interface IncidentItem {
   readonly description: string;
   readonly startedAt: string;
   readonly resolvedAt: string | null;
+  readonly updates?: ReadonlyArray<{
+    readonly id: string;
+    readonly status: string;
+    readonly severity: string | null;
+    readonly message: string;
+    readonly affectedServices: readonly string[];
+    readonly createdAt: string;
+  }>;
 }
 
 export interface ReferralStats {
