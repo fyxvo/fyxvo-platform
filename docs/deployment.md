@@ -204,6 +204,7 @@ Keep the live program discoverable and verifiable after protocol releases.
 3. Publish verified build information for the released program binary.
 4. Re-check the public explorer after upload so it no longer shows missing `security.txt`, missing verified build information, or missing domain metadata.
 5. Use [`docs/program-metadata.md`](./program-metadata.md) for the exact commands and the expected public trust surfaces.
+6. If the current upgrade authority is unavailable, use [`docs/governed-devnet-redeployment.md`](./governed-devnet-redeployment.md) and stage a fresh controlled devnet program instead of faking canonical writes from the admin signer.
 
 ## 7. Environment Reference
 
@@ -211,7 +212,8 @@ Use the environment examples this way:
 
 1. [`apps/web/.env.example`](../apps/web/.env.example), [`apps/api/.env.example`](../apps/api/.env.example), [`apps/gateway/.env.example`](../apps/gateway/.env.example), and [`apps/worker/.env.example`](../apps/worker/.env.example) are for local development.
 2. [`apps/web/.env.devnet-hosted.example`](../apps/web/.env.devnet-hosted.example), [`apps/api/.env.devnet-hosted.example`](../apps/api/.env.devnet-hosted.example), [`apps/gateway/.env.devnet-hosted.example`](../apps/gateway/.env.devnet-hosted.example), and [`apps/worker/.env.devnet-hosted.example`](../apps/worker/.env.devnet-hosted.example) are the hosted devnet deployment baselines.
-3. The `.env.mainnet.example` files are planning references only. The current shared runtime remains devnet-only until mainnet support is intentionally added.
+3. [`apps/api/.env.devnet-governed.example`](../apps/api/.env.devnet-governed.example), [`apps/gateway/.env.devnet-governed.example`](../apps/gateway/.env.devnet-governed.example), and [`apps/worker/.env.devnet-governed.example`](../apps/worker/.env.devnet-governed.example) are the replacement-program staging baselines when the current upgrade authority is unavailable.
+4. The `.env.mainnet.example` files are planning references only. The current shared runtime remains devnet-only until mainnet support is intentionally added.
 
 ### 7.1 Shared Runtime
 

@@ -47,3 +47,5 @@ If the live program upgrade-authority key cannot be recovered, do not pretend th
 5. Prepare a new governed deployment under keys or multisig that the team actually controls, then migrate traffic deliberately.
 
 The admin surfaces should record both the intended upgrade authority hint and the actual on-chain upgrade authority so this mismatch is visible before any release decision.
+
+Use [Governed Devnet Redeployment Plan](./governed-devnet-redeployment.md) for the concrete replacement-program flow.

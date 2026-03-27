@@ -29,6 +29,7 @@
     "solana:program:metadata:write:security": "sh -lc 'test -n \"$FYXVO_UPGRADE_KEY\" && npx -y @solana-program/program-metadata@latest -k \"$FYXVO_UPGRADE_KEY\" write security FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa ./security.json --rpc https://api.devnet.solana.com'",
     "solana:program:metadata:write:idl": "sh -lc 'test -n \"$FYXVO_UPGRADE_KEY\" && npx -y @solana-program/program-metadata@latest -k \"$FYXVO_UPGRADE_KEY\" write idl FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa ./target/idl/fyxvo.json --rpc https://api.devnet.solana.com'",
     "solana:program:verify-build": "solana-verify verify-from-repo --current-dir -u https://api.devnet.solana.com --program-id FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa --library-name fyxvo https://github.com/fyxvo/fyxvo-platform -- --manifest-path programs/fyxvo/Cargo.toml",
+    "solana:governed:plan": "pnpm exec tsx scripts/solana/plan-governed-deployment.ts",
     "solana:protocol:init": "pnpm exec tsx scripts/solana/initialize-protocol.ts",
     "solana:protocol:verify": "pnpm exec tsx scripts/solana/verify-protocol.ts",
     "solana:protocol:addresses": "pnpm exec tsx scripts/solana/print-protocol-addresses.ts",
