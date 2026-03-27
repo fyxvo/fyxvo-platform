@@ -195,6 +195,16 @@ pnpm solana:operator:seed:managed --project-owner <wallet> --chain-project-id <n
 8. Keep `FYXVO_ENABLE_USDC=false` unless you have explicitly enabled the runtime flag for the already-initialized devnet mint path and intentionally want to expose token funding in the product. SOL funding is the live default path.
 9. Run `pnpm solana:flow:devnet-live` to verify a fresh wallet-auth, project activation, SOL funding, gateway access, request logging, and analytics cycle.
 
+## 6.1 Program metadata and explorer trust surfaces
+
+Keep the live program discoverable and verifiable after protocol releases.
+
+1. Upload canonical security metadata using [`security.json`](../security.json).
+2. Upload canonical IDL metadata using [`target/idl/fyxvo.json`](../target/idl/fyxvo.json).
+3. Publish verified build information for the released program binary.
+4. Re-check the public explorer after upload so it no longer shows missing `security.txt`, missing verified build information, or missing domain metadata.
+5. Use [`docs/program-metadata.md`](./program-metadata.md) for the exact commands and the expected public trust surfaces.
+
 ## 7. Environment Reference
 
 Use the environment examples this way:

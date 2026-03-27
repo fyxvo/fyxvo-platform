@@ -1,8 +1,18 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
+use solana_security_txt::security_txt;
 
 declare_id!("FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa");
+
+security_txt! {
+    name: "Fyxvo",
+    project_url: "https://www.fyxvo.com",
+    contacts: "email:security@fyxvo.com,link:https://www.fyxvo.com/security,discord:https://discord.gg/Uggu236Jgj,twitter:https://x.com/fyxvo",
+    policy: "https://www.fyxvo.com/security",
+    source_code: "https://github.com/fyxvo/fyxvo-platform",
+    preferred_languages: "en"
+}
 
 const BASIS_POINTS_DENOMINATOR: u128 = 10_000;
 const PROTOCOL_CONFIG_SEED: &[u8] = b"protocol-config";

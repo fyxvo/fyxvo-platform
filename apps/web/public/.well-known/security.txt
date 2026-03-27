@@ -1,0 +1,7 @@
+Contact: mailto:security@fyxvo.com
+Contact: https://www.fyxvo.com/security
+Canonical: https://www.fyxvo.com/.well-known/security.txt
+Policy: https://www.fyxvo.com/security
+Preferred-Languages: en
+Expires: 2027-03-27T00:00:00.000Z
+Hiring: https://www.fyxvo.com/contact

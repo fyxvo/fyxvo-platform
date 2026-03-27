@@ -35,3 +35,11 @@ Use this checklist after important releases so the live platform matches the rep
 
 - [ ] Open the live frontend and verify the latest UI is actually being served, not a stale deployment.
 - [ ] Run one authenticated browser smoke test through the most important flow touched by the release.
+
+## Program metadata and verification
+
+- [ ] Run `pnpm solana:program:metadata:fetch:security` and confirm the canonical security metadata account exists for the live program.
+- [ ] Run `pnpm solana:program:metadata:fetch:idl` and confirm the canonical IDL metadata account exists for the live program.
+- [ ] If either account is missing, upload them as the real program upgrade authority using the commands in [`docs/program-metadata.md`](./program-metadata.md).
+- [ ] Confirm `https://www.fyxvo.com/.well-known/security.txt` is serving the public contact policy.
+- [ ] Confirm verified build information is uploaded for the live program authority after any released program binary change.

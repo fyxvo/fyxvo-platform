@@ -1,0 +1,19 @@
+{
+  "name": "Fyxvo",
+  "logo": "https://www.fyxvo.com/brand/logo.png",
+  "description": "Fyxvo is a Solana infrastructure control surface for funded gateway access, request tracing, alerts, and operator-aware devnet workflows.",
+  "project_url": "https://www.fyxvo.com",
+  "contacts": [
+    "email:security@fyxvo.com",
+    "link:https://www.fyxvo.com/security",
+    "discord:https://discord.gg/Uggu236Jgj",
+    "twitter:https://x.com/fyxvo"
+  ],
+  "policy": "https://www.fyxvo.com/security",
+  "preferred_languages": [
+    "en"
+  ],
+  "source_code": "https://github.com/fyxvo/fyxvo-platform",
+  "source_release": "main",
+  "version": "0.1.0"
+}
