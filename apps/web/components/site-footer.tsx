@@ -90,9 +90,14 @@ export function SiteFooter() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)]">
                   Program
                 </p>
-                <p className="mt-2 font-mono text-xs text-[var(--fyxvo-text)]">
+                <Link
+                  href="https://explorer.solana.com/address/Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc?cluster=devnet"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 block font-mono text-xs text-[var(--fyxvo-brand)] hover:underline break-all"
+                >
                   Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc
-                </p>
+                </Link>
                 <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">
                   Governed staged program now backing the hosted devnet stack.
                 </p>

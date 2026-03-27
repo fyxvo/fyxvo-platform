@@ -13,8 +13,7 @@ export function NewsletterSignup() {
     if (!email || submitState === "loading") return;
     setSubmitState("loading");
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-      const res = await fetch(`${apiBase}/v1/newsletter/subscribe`, {
+      const res = await fetch("/api/status-subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn, Button } from "@fyxvo/ui";
@@ -38,6 +38,13 @@ export function SiteHeader() {
   const pathname = usePathname();
   const portal = usePortal();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    function onScroll() { setScrolled(window.scrollY > 8); }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const walletLabel = useMemo(
     () => (portal.walletAddress ? shortenAddress(portal.walletAddress, 4, 4) : null),
@@ -45,7 +52,12 @@ export function SiteHeader() {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--fyxvo-border)] bg-[color-mix(in_srgb,var(--fyxvo-bg)_82%,transparent)] backdrop-blur-xl">
+    <header className={cn(
+      "sticky top-0 z-50 border-b border-[var(--fyxvo-border)] backdrop-blur-xl transition-[background-color,box-shadow] duration-300",
+      scrolled
+        ? "bg-[color-mix(in_srgb,var(--fyxvo-bg)_95%,transparent)] shadow-sm"
+        : "bg-[color-mix(in_srgb,var(--fyxvo-bg)_82%,transparent)]"
+    )}>
       <div className="border-b border-[var(--fyxvo-border)]/60 bg-[var(--fyxvo-panel-soft)]/70">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)] sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">

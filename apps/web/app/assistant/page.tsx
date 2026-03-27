@@ -2,12 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Notice } from "@fyxvo/ui";
-import { usePortal } from "../../components/portal-provider";
-import { webEnv } from "../../lib/env";
-import type {
-  AssistantConversationMessage,
-  AssistantRateLimitStatus,
-} from "../../lib/types";
 
 // ---------------------------------------------------------------------------
 // Suggested starter prompts
@@ -21,10 +15,144 @@ const STARTER_PROMPTS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Message bubble component
+// Minimal markdown renderer (code blocks, inline code, bold, bullets)
 // ---------------------------------------------------------------------------
 
-function MessageBubble({ message }: { readonly message: AssistantConversationMessage }) {
+function renderMarkdown(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const lines = text.split("\n");
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+
+    // Fenced code block
+    if (line.startsWith("```")) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !(lines[i] ?? "").startsWith("```")) {
+        codeLines.push(lines[i] ?? "");
+        i++;
+      }
+      nodes.push(
+        <pre
+          key={`code-${i}`}
+          className="my-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 font-mono text-xs leading-6 text-[var(--fyxvo-text)]"
+        >
+          {codeLines.join("\n")}
+        </pre>,
+      );
+      i++;
+      continue;
+    }
+
+    // Empty line
+    if (line.trim() === "") {
+      nodes.push(<br key={`br-${i}`} />);
+      i++;
+      continue;
+    }
+
+    // Heading
+    const headingMatch = /^(#{1,3})\s+(.+)$/.exec(line);
+    if (headingMatch) {
+      nodes.push(
+        <p key={`h-${i}`} className="font-semibold text-[var(--fyxvo-text)]">
+          {headingMatch[2] ?? ""}
+        </p>,
+      );
+      i++;
+      continue;
+    }
+
+    // Bullet
+    const bulletMatch = /^[-*]\s+(.+)$/.exec(line);
+    if (bulletMatch) {
+      nodes.push(
+        <div key={`li-${i}`} className="flex gap-2">
+          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--fyxvo-text-muted)]" />
+          <span>{renderInline(bulletMatch[1] ?? "")}</span>
+        </div>,
+      );
+      i++;
+      continue;
+    }
+
+    // Regular paragraph line
+    nodes.push(<span key={`p-${i}`}>{renderInline(line)}</span>);
+    nodes.push("\n");
+    i++;
+  }
+
+  return nodes;
+}
+
+function renderInline(text: string): React.ReactNode[] {
+  const result: React.ReactNode[] = [];
+  // Matches: `code`, **bold**, *italic*
+  const regex = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) {
+      result.push(text.slice(last, match.index));
+    }
+    const chunk = match[0];
+    if (chunk.startsWith("`")) {
+      result.push(
+        <code
+          key={match.index}
+          className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs text-[var(--fyxvo-text)]"
+        >
+          {chunk.slice(1, -1)}
+        </code>,
+      );
+    } else if (chunk.startsWith("**")) {
+      result.push(
+        <strong key={match.index} className="font-semibold text-[var(--fyxvo-text)]">
+          {chunk.slice(2, -2)}
+        </strong>,
+      );
+    } else {
+      result.push(
+        <em key={match.index} className="italic">
+          {chunk.slice(1, -1)}
+        </em>,
+      );
+    }
+    last = match.index + chunk.length;
+  }
+
+  if (last < text.length) {
+    result.push(text.slice(last));
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Message bubble
+// ---------------------------------------------------------------------------
+
+function MessageBubble({
+  message,
+  streaming,
+}: {
+  readonly message: ChatMessage;
+  readonly streaming?: boolean;
+}) {
   const isUser = message.role === "user";
   const timestamp = new Date(message.createdAt).toLocaleTimeString([], {
     hour: "2-digit",
@@ -51,9 +179,9 @@ function MessageBubble({ message }: { readonly message: AssistantConversationMes
             {isUser ? "You" : "Fyxvo Assistant"}
           </span>
           <span className="font-mono text-xs text-[var(--fyxvo-text-soft)]">{timestamp}</span>
-          {message.responseTimeMs && !isUser && (
-            <span className="font-mono text-xs text-[var(--fyxvo-text-soft)]">
-              {message.responseTimeMs}ms
+          {streaming && (
+            <span className="font-mono text-xs text-[var(--fyxvo-text-soft)] animate-pulse">
+              typing…
             </span>
           )}
         </div>
@@ -64,25 +192,13 @@ function MessageBubble({ message }: { readonly message: AssistantConversationMes
               ? "bg-[var(--fyxvo-brand)] text-white"
               : "border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)]"
           }`}
-          style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
         >
-          {message.content}
+          {isUser ? (
+            <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{message.content}</span>
+          ) : (
+            <div style={{ wordBreak: "break-word" }}>{renderMarkdown(message.content)}</div>
+          )}
         </div>
-
-        {/* Suggested actions */}
-        {message.suggestedActions && message.suggestedActions.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {message.suggestedActions.map((action) => (
-              <a
-                key={action.id}
-                href={action.href}
-                className="inline-flex items-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-              >
-                {action.label}
-              </a>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -93,41 +209,19 @@ function MessageBubble({ message }: { readonly message: AssistantConversationMes
 // ---------------------------------------------------------------------------
 
 export default function AssistantPage() {
-  const portal = usePortal();
-
-  const [messages, setMessages] = useState<AssistantConversationMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [rateLimit, setRateLimit] = useState<AssistantRateLimitStatus | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Fetch rate limit on mount
-  useEffect(() => {
-    async function fetchRateLimit() {
-      if (!portal.token) return;
-      try {
-        const res = await fetch(new URL("/v1/assistant/rate-limit", webEnv.apiBaseUrl), {
-          headers: { authorization: `Bearer ${portal.token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setRateLimit(data as AssistantRateLimitStatus);
-        }
-      } catch {
-        // non-critical
-      }
-    }
-    void fetchRateLimit();
-  }, [portal.token]);
+  }, [messages, streamingContent]);
 
   const sendMessage = useCallback(async () => {
     if (!input.trim() || sending) return;
@@ -136,103 +230,81 @@ export default function AssistantPage() {
     setSending(true);
     setError(null);
 
-    const tempUserMsg: AssistantConversationMessage = {
-      id: `temp-${Date.now()}`,
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
       role: "user",
       content: userMessage,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, tempUserMsg]);
+    setMessages((prev) => [...prev, userMsg]);
 
     try {
-      let convId = conversationId;
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
-      if (!convId) {
-        const createRes = await fetch(
-          new URL("/v1/assistant/conversations", webEnv.apiBaseUrl),
-          {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              ...(portal.token ? { authorization: `Bearer ${portal.token}` } : {}),
-            },
-            body: JSON.stringify({ title: userMessage.slice(0, 60) }),
-          },
-        );
-        if (createRes.ok) {
-          const conv = await createRes.json();
-          convId = conv.id as string;
-          setConversationId(convId);
-        }
-      }
-
-      const endpoint = convId
-        ? new URL(
-            `/v1/assistant/conversations/${convId}/messages`,
-            webEnv.apiBaseUrl,
-          )
-        : new URL("/v1/assistant/chat", webEnv.apiBaseUrl);
-
-      const msgRes = await fetch(endpoint, {
+      const res = await fetch("/api/assistant", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...(portal.token ? { authorization: `Bearer ${portal.token}` } : {}),
-        },
-        body: JSON.stringify({ content: userMessage }),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: userMessage, history }),
       });
 
-      if (!msgRes.ok) {
-        const errData = await msgRes.json().catch(() => ({})) as Record<string, unknown>;
-        throw new Error(
-          typeof errData.error === "string"
-            ? errData.error
-            : `Request failed: ${msgRes.status}`,
-        );
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(errData.error ?? `Request failed: ${res.status}`);
       }
 
-      const data = await msgRes.json() as Record<string, unknown>;
+      if (!res.body) throw new Error("No response body.");
 
-      if (data.message || data.content) {
-        const msgData = data.message as Record<string, unknown> | undefined;
-        const assistantMsg = {
-          id: typeof data.id === "string" ? data.id : `assist-${Date.now()}`,
-          role: "assistant" as const,
-          content:
-            (msgData?.content as string) ??
-            (data.content as string) ??
-            "",
-          createdAt:
-            (msgData?.createdAt as string) ??
-            (data.createdAt as string) ??
-            new Date().toISOString(),
-          responseTimeMs:
-            (msgData?.responseTimeMs as number | null) ?? null,
-        } as AssistantConversationMessage;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accText = "";
+      let buffer = "";
 
-        setMessages((prev) => [
-          ...prev.filter((m) => m.id !== tempUserMsg.id),
-          tempUserMsg,
-          assistantMsg,
-        ]);
+      setStreamingContent("");
 
-        // Refresh rate limit after each message
-        if (portal.token) {
-          fetch(new URL("/v1/assistant/rate-limit", webEnv.apiBaseUrl), {
-            headers: { authorization: `Bearer ${portal.token}` },
-          })
-            .then((r) => r.json())
-            .then((d) => setRateLimit(d as AssistantRateLimitStatus))
-            .catch(() => undefined);
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (data === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(data) as {
+              type?: string;
+              delta?: { type?: string; text?: string };
+            };
+            if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
+              accText += parsed.delta.text ?? "";
+              setStreamingContent(accText);
+            }
+          } catch {
+            // ignore malformed SSE lines
+          }
         }
       }
+
+      const assistantMsg: ChatMessage = {
+        id: `assist-${Date.now()}`,
+        role: "assistant",
+        content: accText || "(no response)",
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+      setStreamingContent(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message");
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+      setError(err instanceof Error ? err.message : "Failed to send message.");
+      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+      setStreamingContent(null);
     } finally {
       setSending(false);
     }
-  }, [input, sending, conversationId, portal.token]);
+  }, [input, sending, messages]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -241,49 +313,37 @@ export default function AssistantPage() {
     }
   }
 
-  const isAuthenticated = portal.walletPhase === "authenticated";
   const hasMessages = messages.length > 0;
+
+  // Synthetic streaming message for display
+  const streamingMsg: ChatMessage | null =
+    streamingContent !== null
+      ? {
+          id: "streaming",
+          role: "assistant",
+          content: streamingContent,
+          createdAt: new Date().toISOString(),
+        }
+      : null;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
       {/* Header */}
       <div className="flex-shrink-0 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-6 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-              Assistant
-            </h1>
-            <p className="text-xs leading-5 text-[var(--fyxvo-text-muted)]">
-              Ask questions about the Fyxvo API, pricing, or Solana devnet infrastructure.
-            </p>
-          </div>
-          {rateLimit && (
-            <div className="text-right">
-              <p className="font-mono text-xs text-[var(--fyxvo-text-soft)]">
-                {rateLimit.messagesRemainingThisHour} / {rateLimit.limit} remaining
-              </p>
-              <p className="text-xs text-[var(--fyxvo-text-muted)]">this hour</p>
-            </div>
-          )}
+        <div className="mx-auto max-w-3xl">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Assistant
+          </h1>
+          <p className="text-xs leading-5 text-[var(--fyxvo-text-muted)]">
+            Ask questions about the Fyxvo API, pricing, or Solana devnet infrastructure.
+          </p>
         </div>
       </div>
-
-      {/* Auth notice */}
-      {!isAuthenticated && (
-        <div className="flex-shrink-0 border-b border-[var(--fyxvo-border)] px-6 py-3">
-          <div className="mx-auto max-w-3xl">
-            <Notice tone="neutral">
-              Connect a wallet to enable conversation history and higher rate limits. The assistant
-              is still available without authentication.
-            </Notice>
-          </div>
-        </div>
-      )}
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 py-6">
-          {!hasMessages ? (
+          {!hasMessages && streamingContent === null ? (
             /* Empty / welcome state */
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
@@ -320,7 +380,11 @@ export default function AssistantPage() {
                 <MessageBubble key={message.id} message={message} />
               ))}
 
-              {sending && (
+              {streamingMsg && (
+                <MessageBubble message={streamingMsg} streaming />
+              )}
+
+              {sending && streamingContent === null && (
                 <div className="flex gap-3">
                   <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-xs font-semibold text-[var(--fyxvo-text-muted)]">
                     F
@@ -345,7 +409,7 @@ export default function AssistantPage() {
       {error && (
         <div className="flex-shrink-0 border-t border-[var(--fyxvo-border)] bg-rose-500/5 px-6 py-3">
           <div className="mx-auto max-w-3xl">
-            <p className="text-sm text-rose-400">{error}</p>
+            <Notice tone="warning">{error}</Notice>
           </div>
         </div>
       )}
@@ -359,7 +423,7 @@ export default function AssistantPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question... (Enter to send, Shift+Enter for a new line)"
+              placeholder="Ask a question… (Enter to send, Shift+Enter for a new line)"
               rows={1}
               className="flex-1 resize-none rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40 leading-6"
               style={{ minHeight: "2.75rem", maxHeight: "10rem", overflowY: "auto" }}
@@ -373,16 +437,10 @@ export default function AssistantPage() {
               Send
             </button>
           </div>
-          <div className="mt-2 flex items-center justify-between">
-            <p className="text-xs text-[var(--fyxvo-text-soft)]">
-              {rateLimit
-                ? `${rateLimit.messagesRemainingThisHour} messages remaining this hour`
-                : "Responses are generated by the Fyxvo backend."}
-            </p>
-            <p className="font-mono text-xs text-[var(--fyxvo-text-soft)]">
-              {input.length} chars
-            </p>
-          </div>
+          <p className="mt-2 text-xs text-[var(--fyxvo-text-soft)]">
+            Responses are generated by the Fyxvo backend.{" "}
+            <span className="font-mono">{input.length} chars</span>
+          </p>
         </div>
       </div>
     </div>

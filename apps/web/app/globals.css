@@ -131,7 +131,54 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Keyframes
+ * --------------------------------------------------------------------------- */
+
+@keyframes fyxvo-fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fyxvo-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fyxvo-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--fyxvo-success) 50%, transparent); }
+  50%       { box-shadow: 0 0 0 6px color-mix(in srgb, var(--fyxvo-success) 0%, transparent); }
+}
+
 @layer utilities {
+  /* Animations — only apply when user has not requested reduced motion */
+  .fyxvo-fade-in-up {
+    /* visible by default — animation is progressive enhancement */
+  }
+  .fyxvo-fade-in { }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .fyxvo-fade-in-up { animation: fyxvo-fade-in-up 0.5s ease both; }
+    .fyxvo-fade-in    { animation: fyxvo-fade-in 0.5s ease both; }
+    .fyxvo-stagger-1  { animation-delay: 0ms; }
+    .fyxvo-stagger-2  { animation-delay: 80ms; }
+    .fyxvo-stagger-3  { animation-delay: 160ms; }
+    .fyxvo-stagger-4  { animation-delay: 240ms; }
+    .fyxvo-stagger-5  { animation-delay: 320ms; }
+
+    .fyxvo-status-healthy {
+      animation: fyxvo-status-pulse 2.5s ease-in-out infinite;
+    }
+
+    .fyxvo-hover-lift {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .fyxvo-hover-lift:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px color-mix(in srgb, var(--fyxvo-brand) 12%, rgba(0, 0, 0, 0.12));
+    }
+  }
+
   .fyxvo-surface {
     background:
       linear-gradient(

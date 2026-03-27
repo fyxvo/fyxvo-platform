@@ -106,7 +106,9 @@ export default async function StatusPage() {
         <div className="flex items-center gap-3">
           <span
             className={`h-4 w-4 rounded-full shadow-lg ${
-              healthy ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"
+              healthy
+                ? "bg-[var(--fyxvo-success)] fyxvo-status-healthy"
+                : "bg-[var(--fyxvo-warning)]"
             }`}
           />
           <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl">
@@ -253,9 +255,14 @@ export default async function StatusPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-[var(--fyxvo-text)]">
+              <Link
+                href={`https://explorer.solana.com/address/${liveDevnetState.programId}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-sm text-[var(--fyxvo-brand)] hover:underline"
+              >
                 {shortenAddress(liveDevnetState.programId)}
-              </span>
+              </Link>
               <CopyButton value={liveDevnetState.programId} />
             </div>
             <p className="text-xs text-[var(--fyxvo-text-muted)]">Program ID</p>
@@ -603,9 +610,14 @@ export default async function StatusPage() {
                     {label}
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="font-mono text-sm text-[var(--fyxvo-text)] break-all">
+                    <Link
+                      href={`https://explorer.solana.com/address/${value}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-sm text-[var(--fyxvo-brand)] hover:underline break-all"
+                    >
                       {shortenAddress(value)}
-                    </span>
+                    </Link>
                     <CopyButton value={value} />
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../components/copy-button";
 import { NewsletterSignup } from "../components/newsletter-signup";
+import { FadeIn } from "../components/fade-in";
 import { getStatusSnapshot } from "../lib/server-status";
 import { getNetworkStats } from "../lib/api";
 import { liveDevnetState } from "../lib/live-state";
@@ -130,28 +131,33 @@ export default async function HomePage() {
       <section className="border-b border-[var(--fyxvo-border)] py-24 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-lg border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--fyxvo-brand)]">
+            <div className="fyxvo-fade-in-up fyxvo-stagger-1 mb-8 inline-flex items-center gap-2 rounded-lg border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--fyxvo-brand)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--fyxvo-brand)]" />
               Devnet private alpha
             </div>
 
-            <h1 className="font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
+            <h1 className="fyxvo-fade-in-up fyxvo-stagger-2 font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
               Real Solana infrastructure{" "}
               <span className="fyxvo-text-gradient">for funded relay traffic.</span>
             </h1>
 
-            <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
+            <p className="fyxvo-fade-in-up fyxvo-stagger-3 mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
               Fyxvo is purpose-built devnet infrastructure that routes funded Solana relay traffic through a managed gateway. Every project is activated on chain, every request is logged, and every balance movement is verifiable. Nothing is simulated.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="fyxvo-fade-in-up fyxvo-stagger-4 mt-8 flex flex-wrap items-center gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                 Program ID
               </p>
               <div className="flex items-center gap-2 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1.5">
-                <code className="font-mono text-xs text-[var(--fyxvo-text-soft)] break-all">
+                <Link
+                  href={`https://explorer.solana.com/address/${liveDevnetState.programId}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-xs text-[var(--fyxvo-brand)] hover:underline break-all"
+                >
                   {liveDevnetState.programId}
-                </code>
+                </Link>
                 <CopyButton value={liveDevnetState.programId} className="shrink-0" />
               </div>
             </div>
@@ -258,31 +264,34 @@ export default async function HomePage() {
       {/* Navigation groups */}
       <section className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-              Platform
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              Everything in one place
-            </h2>
-            <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Fyxvo is a complete devnet infrastructure platform. The pages below cover every surface from initial setup to ongoing operations.
-            </p>
-          </div>
+          <FadeIn>
+            <div className="mb-12">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Platform
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+                Everything in one place
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
+                Fyxvo is a complete devnet infrastructure platform. The pages below cover every surface from initial setup to ongoing operations.
+              </p>
+            </div>
+          </FadeIn>
 
           <div className="grid gap-12 lg:grid-cols-2">
             {NAV_GROUPS.map((group) => (
-              <div key={group.heading}>
-                <p className="mb-6 font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-                  {group.heading}
-                </p>
-                <div className="space-y-3">
-                  {group.links.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="flex items-start gap-4 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
-                    >
+              <FadeIn key={group.heading}>
+                <div>
+                  <p className="mb-6 font-display text-xl font-semibold text-[var(--fyxvo-text)]">
+                    {group.heading}
+                  </p>
+                  <div className="space-y-3">
+                    {group.links.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className="fyxvo-hover-lift flex items-start gap-4 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
+                      >
                       <div className="min-w-0 flex-1">
                         <p className="font-display text-sm font-semibold text-[var(--fyxvo-text)]">
                           {link.label}
@@ -308,7 +317,8 @@ export default async function HomePage() {
                   ))}
                 </div>
               </div>
-            ))}
+            </FadeIn>
+          ))}
           </div>
         </div>
       </section>
@@ -316,20 +326,22 @@ export default async function HomePage() {
       {/* Newsletter signup */}
       <section className="border-t border-[var(--fyxvo-border)] py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-              Stay close
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              Stay close to the rollout
-            </h2>
-            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Fyxvo sends product updates, infrastructure changes, and release notes. No noise, no marketing filler, only the things that matter to people running Solana devnet traffic.
-            </p>
-            <div className="mt-8">
-              <NewsletterSignup />
+          <FadeIn>
+            <div className="mx-auto max-w-2xl">
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Stay close
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+                Stay close to the rollout
+              </h2>
+              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+                Fyxvo sends product updates, infrastructure changes, and release notes. No noise, no marketing filler, only the things that matter to people running Solana devnet traffic.
+              </p>
+              <div className="mt-8">
+                <NewsletterSignup />
+              </div>
             </div>
-          </div>
+          </FadeIn>
         </div>
       </section>
     </div>

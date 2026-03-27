@@ -4,8 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { Notice } from "@fyxvo/ui";
 import { SocialLinks } from "../../components/social-links";
-import { submitInterest, submitFeedback } from "../../lib/api";
-import type { InterestSubmissionInput, FeedbackSubmissionInput } from "../../lib/types";
 
 const INTEREST_AREAS = [
   "Standard RPC",
@@ -59,18 +57,26 @@ function InterestForm() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const input: InterestSubmissionInput = {
-        name: name.trim(),
-        email: email.trim(),
-        role: role.trim(),
-        ...(team.trim() ? { team: team.trim() } : {}),
-        useCase: useCase.trim(),
-        expectedRequestVolume: volume,
-        interestAreas: areas as readonly string[],
-        operatorInterest: areas.includes("Operator participation"),
-        source: "contact-page-interest",
-      };
-      await submitInterest(input);
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "interest",
+          name: name.trim(),
+          email: email.trim(),
+          role: role.trim(),
+          ...(team.trim() ? { team: team.trim() } : {}),
+          useCase: useCase.trim(),
+          expectedRequestVolume: volume,
+          interestAreas: areas,
+          operatorInterest: areas.includes("Operator participation"),
+          source: "contact-page-interest",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Something went wrong. Please try again.");
+      }
       setState("success");
     } catch (err) {
       setErrorMessage(
@@ -243,17 +249,25 @@ function FeedbackForm() {
     setState("loading");
     setErrorMessage(null);
     try {
-      const input: FeedbackSubmissionInput = {
-        name: name.trim(),
-        email: email.trim(),
-        ...(role.trim() ? { role: role.trim() } : {}),
-        ...(team.trim() ? { team: team.trim() } : {}),
-        category,
-        message: message.trim(),
-        source: "contact-page-feedback",
-        page: "/contact",
-      };
-      await submitFeedback(input);
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "feedback",
+          name: name.trim(),
+          email: email.trim(),
+          ...(role.trim() ? { role: role.trim() } : {}),
+          ...(team.trim() ? { team: team.trim() } : {}),
+          category,
+          message: message.trim(),
+          source: "contact-page-feedback",
+          page: "/contact",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Something went wrong. Please try again.");
+      }
       setState("success");
     } catch (err) {
       setErrorMessage(
