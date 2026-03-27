@@ -4,7 +4,40 @@ import { usePathname } from "next/navigation";
 import { SiteHeader } from "./site-header";
 import { SiteFooter } from "./site-footer";
 import { DashShell } from "./dash-shell";
-import { isMarketingRoute } from "../lib/routes";
+
+const MARKETING_PATHS = new Set([
+  "/",
+  "/pricing",
+  "/docs",
+  "/status",
+  "/contact",
+  "/enterprise",
+  "/updates",
+  "/changelog",
+  "/leaderboard",
+  "/explore",
+  "/compare",
+  "/operators",
+  "/security",
+  "/reliability",
+  "/privacy",
+  "/terms",
+  "/cookies",
+]);
+
+function isMarketingRoute(pathname: string) {
+  if (MARKETING_PATHS.has(pathname)) {
+    return true;
+  }
+
+  return (
+    pathname.startsWith("/p/") ||
+    pathname.startsWith("/invite/") ||
+    pathname.startsWith("/join/") ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/widget/project/")
+  );
+}
 
 export function AppFrame({ children }: { readonly children: React.ReactNode }) {
   const pathname = usePathname();
