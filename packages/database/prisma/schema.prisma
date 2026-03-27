@@ -107,6 +107,7 @@ model User {
   supportTickets     SupportTicket[]
   assistantConversations AssistantConversation[]
   assistantFeedback  AssistantFeedback[]
+  armedMainnetReleaseGates MainnetReleaseGate[]
   digestSchedule     DigestSchedule?
   digestRecords      DigestRecord[]
 
@@ -548,6 +549,21 @@ model FeedbackInboxTriage {
 
   @@unique([itemType, itemId])
   @@index([status, updatedAt])
+}
+
+model MainnetReleaseGate {
+  id                  String    @id @default(uuid()) @db.Uuid
+  environment         String    @unique
+  targetReserveLamports BigInt  @default(100000000000)
+  armed               Boolean   @default(false)
+  armedAt             DateTime?
+  armedByUserId       String?   @db.Uuid
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  armedByUser         User?     @relation(fields: [armedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([armed, updatedAt])
 }
 
 model OperatorRewardSnapshot {

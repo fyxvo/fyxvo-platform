@@ -827,6 +827,45 @@ export interface AdminDeploymentReadiness {
   };
 }
 
+export interface MainnetReadinessGateSummary {
+  readonly timestamp: string;
+  readonly environment: string;
+  readonly targetReserveLamports: string;
+  readonly confirmedFundingLamports: string;
+  readonly treasurySolBalanceLamports: string | null;
+  readonly assistantAvailable: boolean;
+  readonly emailDeliveryConfigured: boolean;
+  readonly authorityMode: "single-signer" | "multisig" | "governed";
+  readonly upgradeAuthorityConfigured: boolean;
+  readonly protocolReady: boolean;
+  readonly activeIncidentCount: number;
+  readonly supportBacklogCount: number;
+  readonly pendingMigrations: {
+    readonly checkedAt: string;
+    readonly detected: boolean;
+    readonly count: number;
+    readonly names: readonly string[];
+    readonly error: string | null;
+  };
+  readonly treasuryWarnings: readonly string[];
+  readonly paidBetaEligible: boolean;
+  readonly mainnetBetaEligible: boolean;
+  readonly paidBetaBlockers: readonly string[];
+  readonly mainnetBetaBlockers: readonly string[];
+  readonly checks: ReadonlyArray<{
+    readonly key: string;
+    readonly label: string;
+    readonly status: "healthy" | "needs_attention" | "blocked";
+    readonly detail: string;
+  }>;
+  readonly gate: {
+    readonly armed: boolean;
+    readonly armedAt: string | null;
+    readonly armedByWallet: string | null;
+    readonly notes: string | null;
+  };
+}
+
 export interface ReleaseReadinessSummary {
   readonly timestamp: string;
   readonly environment: string;

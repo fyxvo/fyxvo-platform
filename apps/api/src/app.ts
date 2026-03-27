@@ -535,6 +535,187 @@ function buildAdminProtocolOverview(input: {
   } satisfies AdminOverview["protocol"];
 }
 
+const DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS = 100_000_000_000n;
+const MAINNET_SUPPORT_BACKLOG_LIMIT = 10;
+
+async function buildMainnetReleaseGateSnapshot(input: {
+  readonly env: ApiEnv;
+  readonly prisma: PrismaClientType;
+  readonly blockchain: BlockchainClient;
+}) {
+  const environment = input.env.FYXVO_ENV;
+  const authorityPlan = resolveAuthorityPlan({
+    source: process.env,
+    protocolAuthorityFallback: input.env.FYXVO_ADMIN_AUTHORITY,
+  });
+  const [gate, readiness, pendingMigrations, activeIncidentCount, supportBacklogCount, confirmedFundingRows] =
+    await Promise.all([
+      input.prisma.mainnetReleaseGate.findUnique({
+        where: { environment },
+        include: {
+          armedByUser: {
+            select: { walletAddress: true },
+          },
+        },
+      }),
+      input.blockchain.getProtocolReadiness().catch(() => null),
+      detectPendingPrismaMigrations(input.prisma),
+      input.prisma.incident.count({ where: { resolvedAt: null } }),
+      input.prisma.supportTicket.count({ where: { status: { in: ["open", "in_progress"] } } }),
+      input.prisma.fundingCoordinate.findMany({
+        where: {
+          asset: "SOL",
+          confirmedAt: { not: null },
+        },
+        select: { amount: true },
+      }),
+    ]);
+
+  const targetReserveLamports = gate?.targetReserveLamports ?? DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS;
+  const confirmedFundingLamports = confirmedFundingRows.reduce((total, row) => total + BigInt(row.amount.toString()), 0n);
+  const treasuryOverview = buildAdminProtocolOverview({
+    env: input.env,
+    readiness,
+  }).treasury;
+  const treasurySolBalanceLamports = treasuryOverview.solBalance;
+  const assistantAvailable = isAssistantConfigured(input.env);
+  const emailDeliveryConfigured = isEmailDeliveryEnabled({
+    apiKey: input.env.RESEND_API_KEY,
+    from: input.env.EMAIL_FROM,
+  });
+  const reserveReady = confirmedFundingLamports >= targetReserveLamports;
+  const protocolReady = readiness?.ready ?? false;
+
+  const paidBetaBlockers = [
+    !assistantAvailable ? "Assistant availability is not healthy yet." : null,
+    !emailDeliveryConfigured ? "Email delivery is not configured for verification, digests, and incident communication." : null,
+    activeIncidentCount > 0
+      ? `${activeIncidentCount} active incident${activeIncidentCount === 1 ? "" : "s"} must be resolved first.`
+      : null,
+    pendingMigrations.detected
+      ? `${pendingMigrations.count} pending Prisma migration${pendingMigrations.count === 1 ? "" : "s"} remain unapplied.`
+      : null,
+    supportBacklogCount > MAINNET_SUPPORT_BACKLOG_LIMIT
+      ? `Support backlog is high at ${supportBacklogCount} open items.`
+      : null,
+  ].filter((item): item is string => Boolean(item));
+
+  const mainnetBetaBlockers = [
+    ...paidBetaBlockers,
+    !protocolReady ? "Protocol readiness is not fully green on the current cluster." : null,
+    !reserveReady
+      ? `Confirmed SOL funding is ${confirmedFundingLamports.toString()} lamports, below the target reserve of ${targetReserveLamports.toString()} lamports.`
+      : null,
+    authorityPlan.mode === "single-signer"
+      ? "Authority mode is still single-signer. Governed or multisig control is required before mainnet beta."
+      : null,
+    authorityPlan.upgradeAuthorityHint == null
+      ? "Upgrade authority is not documented in runtime config yet."
+      : null,
+    ...treasuryOverview.reconciliationWarnings,
+  ].filter((item): item is string => Boolean(item));
+
+  const checks = [
+    {
+      key: "confirmed_reserve",
+      label: "Confirmed reserve",
+      status: reserveReady ? "healthy" : "needs_attention",
+      detail: `${confirmedFundingLamports.toString()} / ${targetReserveLamports.toString()} lamports confirmed`,
+    },
+    {
+      key: "assistant",
+      label: "Assistant availability",
+      status: assistantAvailable ? "healthy" : "blocked",
+      detail: assistantAvailable ? "Assistant is configured for production." : "Assistant is not configured in the current runtime.",
+    },
+    {
+      key: "email_delivery",
+      label: "Email delivery",
+      status: emailDeliveryConfigured ? "healthy" : "needs_attention",
+      detail: emailDeliveryConfigured ? "Verification, digest, and incident email paths are configured." : "Email delivery is missing provider configuration.",
+    },
+    {
+      key: "pending_migrations",
+      label: "Pending migrations",
+      status: pendingMigrations.detected ? "blocked" : "healthy",
+      detail: pendingMigrations.detected
+        ? `${pendingMigrations.count} pending migration${pendingMigrations.count === 1 ? "" : "s"} detected.`
+        : "No unapplied Prisma migrations detected.",
+    },
+    {
+      key: "incidents",
+      label: "Incidents",
+      status: activeIncidentCount > 0 ? "blocked" : "healthy",
+      detail:
+        activeIncidentCount > 0
+          ? `${activeIncidentCount} active incident${activeIncidentCount === 1 ? "" : "s"} need attention.`
+          : "No active incidents are open.",
+    },
+    {
+      key: "support_backlog",
+      label: "Support backlog",
+      status: supportBacklogCount > MAINNET_SUPPORT_BACKLOG_LIMIT ? "needs_attention" : "healthy",
+      detail: `${supportBacklogCount} open support ticket${supportBacklogCount === 1 ? "" : "s"}.`,
+    },
+    {
+      key: "authority_mode",
+      label: "Authority posture",
+      status: authorityPlan.mode === "single-signer" ? "blocked" : "healthy",
+      detail: `Current authority mode: ${authorityPlan.mode}.`,
+    },
+    {
+      key: "upgrade_authority",
+      label: "Upgrade authority hint",
+      status: authorityPlan.upgradeAuthorityHint ? "healthy" : "needs_attention",
+      detail: authorityPlan.upgradeAuthorityHint
+        ? `Recorded as ${authorityPlan.upgradeAuthorityHint}.`
+        : "Upgrade authority is not documented in runtime config.",
+    },
+    {
+      key: "protocol_readiness",
+      label: "Protocol readiness",
+      status: protocolReady ? "healthy" : "blocked",
+      detail: protocolReady ? "Protocol readiness checks are green." : "Protocol readiness is not fully green.",
+    },
+    {
+      key: "treasury_reconciliation",
+      label: "Treasury reconciliation",
+      status: treasuryOverview.reconciliationWarnings.length > 0 ? "needs_attention" : "healthy",
+      detail:
+        treasuryOverview.reconciliationWarnings[0] ??
+        "Treasury balance and reserve checks do not show reconciliation warnings.",
+    },
+  ] as const;
+
+  return {
+    timestamp: new Date().toISOString(),
+    environment,
+    targetReserveLamports: targetReserveLamports.toString(),
+    confirmedFundingLamports: confirmedFundingLamports.toString(),
+    treasurySolBalanceLamports,
+    assistantAvailable,
+    emailDeliveryConfigured,
+    authorityMode: authorityPlan.mode,
+    upgradeAuthorityConfigured: authorityPlan.upgradeAuthorityHint != null,
+    protocolReady,
+    activeIncidentCount,
+    supportBacklogCount,
+    pendingMigrations,
+    treasuryWarnings: treasuryOverview.reconciliationWarnings,
+    paidBetaEligible: paidBetaBlockers.length === 0,
+    mainnetBetaEligible: mainnetBetaBlockers.length === 0,
+    paidBetaBlockers,
+    mainnetBetaBlockers,
+    checks,
+    gate: {
+      armed: gate?.armed ?? false,
+      armedAt: gate?.armedAt?.toISOString() ?? null,
+      armedByWallet: gate?.armedByUser?.walletAddress ?? null,
+      notes: gate?.notes ?? null,
+    },
+  };
+}
+
 async function withBlockchainErrors<T>(action: () => Promise<T>) {
   try {
     return await action();
@@ -3793,6 +3974,134 @@ export async function buildApiApp(input: {
         assistantAvailable: isAssistantConfigured(input.env),
         pendingMigrations: await detectPendingPrismaMigrations(input.prisma)
       }
+    };
+  });
+
+  app.get("/v1/admin/mainnet-readiness-gate", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+
+    return {
+      item: await buildMainnetReleaseGateSnapshot({
+        env: input.env,
+        prisma: db,
+        blockchain: input.blockchain,
+      }),
+    };
+  });
+
+  app.patch("/v1/admin/mainnet-readiness-gate", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const body = z.object({
+      targetReserveLamports: z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]).optional(),
+      armed: z.boolean().optional(),
+      notes: z
+        .union([z.string().trim().max(1200), z.null()])
+        .optional()
+        .transform((value) => {
+          if (value == null) return value;
+          return value.length > 0 ? value : null;
+        }),
+    }).parse(request.body);
+
+    const environment = input.env.FYXVO_ENV;
+    const existingGate = await db.mainnetReleaseGate.findUnique({
+      where: { environment },
+      select: { id: true, armed: true },
+    });
+
+    const baseUpdate = {
+      ...(body.targetReserveLamports !== undefined
+        ? {
+            targetReserveLamports:
+              typeof body.targetReserveLamports === "number"
+                ? BigInt(body.targetReserveLamports)
+                : BigInt(body.targetReserveLamports),
+          }
+        : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {}),
+    };
+
+    if (Object.keys(baseUpdate).length > 0) {
+      await db.mainnetReleaseGate.upsert({
+        where: { environment },
+        create: {
+          environment,
+          ...baseUpdate,
+        },
+        update: baseUpdate,
+      });
+    }
+
+    if (body.armed === true) {
+      const snapshot = await buildMainnetReleaseGateSnapshot({
+        env: input.env,
+        prisma: db,
+        blockchain: input.blockchain,
+      });
+      if (!snapshot.mainnetBetaEligible) {
+        throw new HttpError(
+          409,
+          "mainnet_gate_blocked",
+          "Mainnet release cannot be armed until the live readiness checks are green.",
+          snapshot
+        );
+      }
+
+      await db.mainnetReleaseGate.upsert({
+        where: { environment },
+        create: {
+          environment,
+          targetReserveLamports:
+            typeof body.targetReserveLamports === "number"
+              ? BigInt(body.targetReserveLamports)
+              : typeof body.targetReserveLamports === "string"
+                ? BigInt(body.targetReserveLamports)
+                : DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS,
+          notes: body.notes ?? null,
+          armed: true,
+          armedAt: new Date(),
+          armedByUserId: user.id,
+        },
+        update: {
+          armed: true,
+          armedAt: new Date(),
+          armedByUserId: user.id,
+        },
+      });
+    } else if (body.armed === false && (existingGate || Object.keys(baseUpdate).length > 0)) {
+      await db.mainnetReleaseGate.upsert({
+        where: { environment },
+        create: {
+          environment,
+          targetReserveLamports:
+            typeof body.targetReserveLamports === "number"
+              ? BigInt(body.targetReserveLamports)
+              : typeof body.targetReserveLamports === "string"
+                ? BigInt(body.targetReserveLamports)
+                : DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS,
+          notes: body.notes ?? null,
+          armed: false,
+          armedAt: null,
+          armedByUserId: null,
+        },
+        update: {
+          armed: false,
+          armedAt: null,
+          armedByUserId: null,
+        },
+      });
+    }
+
+    return {
+      item: await buildMainnetReleaseGateSnapshot({
+        env: input.env,
+        prisma: db,
+        blockchain: input.blockchain,
+      }),
     };
   });
 

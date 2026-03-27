@@ -42,6 +42,7 @@ import { QuickstartLauncher } from "../../components/quickstart-launcher";
 import type {
   AdminEmailDeliveryStatus,
   AdminDeploymentReadiness,
+  MainnetReadinessGateSummary,
   AdminObservability,
   AdminOverview,
   AlertCenterItem,
@@ -69,6 +70,7 @@ import {
   getAdminDeploymentReadiness,
   getDashboardPreferences,
   getFeedbackInbox,
+  getMainnetReadinessGate,
   getNetworkStats,
   getOnboardingFunnel,
   getRetentionCohorts,
@@ -76,6 +78,7 @@ import {
   getWhatsNew,
   listProjectMembers,
   updateFeedbackInboxItem,
+  updateMainnetReadinessGate,
   updateDashboardPreferences
 } from "../../lib/api";
 
@@ -239,6 +242,26 @@ function formatLamportStringAsSol(value: string | null) {
 function formatCommitSha(value: string | null | undefined) {
   if (!value) return "Unavailable";
   return value.slice(0, 7);
+}
+
+function lamportsStringToSolInput(value: string | null | undefined) {
+  if (!value) return "100";
+  try {
+    const sol = Number(BigInt(value)) / 1_000_000_000;
+    if (!Number.isFinite(sol)) return "100";
+    return Number.isInteger(sol) ? String(sol) : sol.toFixed(2).replace(/\.?0+$/, "");
+  } catch {
+    return "100";
+  }
+}
+
+function solInputToLamportsString(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (!/^\d+(\.\d{1,9})?$/.test(normalized)) return null;
+  const [whole, fraction = ""] = normalized.split(".");
+  const lamports = `${whole}${fraction.padEnd(9, "0")}`.replace(/^0+(?=\d)/, "");
+  return lamports.length > 0 ? lamports : "0";
 }
 
 function OpsTimeline({
@@ -467,6 +490,11 @@ export default function DashboardPage() {
   const [gatewayDeploymentStatus, setGatewayDeploymentStatus] = useState<PortalServiceStatus | null>(null);
   const [deploymentReadiness, setDeploymentReadiness] = useState<AdminDeploymentReadiness | null>(null);
   const [adminEmailDeliveryStatus, setAdminEmailDeliveryStatus] = useState<AdminEmailDeliveryStatus | null>(null);
+  const [mainnetReadinessGate, setMainnetReadinessGate] = useState<MainnetReadinessGateSummary | null>(null);
+  const [mainnetGateReserveTargetSol, setMainnetGateReserveTargetSol] = useState("100");
+  const [mainnetGateNotes, setMainnetGateNotes] = useState("");
+  const [mainnetGateSaving, setMainnetGateSaving] = useState(false);
+  const [mainnetGateError, setMainnetGateError] = useState<string | null>(null);
   const [adminObservability, setAdminObservability] = useState<AdminObservability | null>(null);
   const [releaseReadiness, setReleaseReadiness] = useState<ReleaseReadinessSummary | null>(null);
   const [onboardingFunnel7d, setOnboardingFunnel7d] = useState<OnboardingFunnelSummary | null>(null);
@@ -532,6 +560,31 @@ export default function DashboardPage() {
     isAdminAuthorityWallet,
     portal.adminOverview,
     releaseReadiness,
+    webDeploymentStatus?.commit,
+  ]);
+  const mainnetGateView = useMemo(() => {
+    if (!mainnetReadinessGate) return null;
+    const deploymentCommits = [
+      webDeploymentStatus?.commit,
+      apiDeploymentStatus?.commit ?? deploymentReadiness?.commit,
+      gatewayDeploymentStatus?.commit,
+    ].filter((value): value is string => Boolean(value));
+    const uniqueCommits = [...new Set(deploymentCommits)];
+    const deploymentAligned = uniqueCommits.length <= 1;
+    const deploymentBlocker = deploymentAligned
+      ? []
+      : ["Web, API, and gateway are not all on the same deployed commit."];
+    return {
+      deploymentAligned,
+      liveCommit: uniqueCommits[0] ?? null,
+      mainnetEligibleWithDeployments: mainnetReadinessGate.mainnetBetaEligible && deploymentAligned,
+      mainnetBlockers: [...mainnetReadinessGate.mainnetBetaBlockers, ...deploymentBlocker],
+    };
+  }, [
+    apiDeploymentStatus?.commit,
+    deploymentReadiness?.commit,
+    gatewayDeploymentStatus?.commit,
+    mainnetReadinessGate,
     webDeploymentStatus?.commit,
   ]);
 
@@ -771,6 +824,10 @@ export default function DashboardPage() {
       setOnboardingFunnel30d(null);
       setRetentionCohorts(null);
       setFeedbackInbox([]);
+      setMainnetReadinessGate(null);
+      setMainnetGateReserveTargetSol("100");
+      setMainnetGateNotes("");
+      setMainnetGateError(null);
       return;
     }
     let cancelled = false;
@@ -780,13 +837,21 @@ export default function DashboardPage() {
       getOnboardingFunnel(30, portal.token),
       getRetentionCohorts(portal.token),
       getFeedbackInbox(portal.token),
-    ]).then(([readinessResult, funnel7Result, funnel30Result, retentionResult, feedbackResult]) => {
+      getMainnetReadinessGate(portal.token),
+    ]).then(([readinessResult, funnel7Result, funnel30Result, retentionResult, feedbackResult, mainnetGateResult]) => {
       if (cancelled) return;
       setReleaseReadiness(readinessResult.status === "fulfilled" ? readinessResult.value : null);
       setOnboardingFunnel7d(funnel7Result.status === "fulfilled" ? funnel7Result.value : null);
       setOnboardingFunnel30d(funnel30Result.status === "fulfilled" ? funnel30Result.value : null);
       setRetentionCohorts(retentionResult.status === "fulfilled" ? retentionResult.value : null);
       setFeedbackInbox(feedbackResult.status === "fulfilled" ? feedbackResult.value.items.slice(0, 8) : []);
+      if (mainnetGateResult.status === "fulfilled") {
+        setMainnetReadinessGate(mainnetGateResult.value.item);
+        setMainnetGateReserveTargetSol(lamportsStringToSolInput(mainnetGateResult.value.item.targetReserveLamports));
+        setMainnetGateNotes(mainnetGateResult.value.item.gate.notes ?? "");
+      } else {
+        setMainnetReadinessGate(null);
+      }
     });
     return () => {
       cancelled = true;
@@ -1120,6 +1185,41 @@ export default function DashboardPage() {
       });
     } finally {
       setAnnouncementSaving(false);
+    }
+  }
+
+  async function persistMainnetGate(input: {
+    readonly armed?: boolean;
+  } = {}) {
+    if (!portal.token) return;
+    const targetReserveLamports = solInputToLamportsString(mainnetGateReserveTargetSol);
+    if (!targetReserveLamports) {
+      setMainnetGateError("Reserve target must be a valid SOL amount with up to 9 decimals.");
+      return;
+    }
+    if (input.armed === true && mainnetGateView && !mainnetGateView.deploymentAligned) {
+      setMainnetGateError("Deployments must be aligned before the mainnet release can be armed.");
+      return;
+    }
+
+    setMainnetGateSaving(true);
+    setMainnetGateError(null);
+    try {
+      const response = await updateMainnetReadinessGate(
+        {
+          targetReserveLamports,
+          notes: mainnetGateNotes.trim().length > 0 ? mainnetGateNotes.trim() : null,
+          ...(input.armed !== undefined ? { armed: input.armed } : {}),
+        },
+        portal.token
+      );
+      setMainnetReadinessGate(response.item);
+      setMainnetGateReserveTargetSol(lamportsStringToSolInput(response.item.targetReserveLamports));
+      setMainnetGateNotes(response.item.gate.notes ?? "");
+    } catch (error) {
+      setMainnetGateError(error instanceof Error ? error.message : "Unable to update the mainnet readiness gate.");
+    } finally {
+      setMainnetGateSaving(false);
     }
   }
 
@@ -2679,6 +2779,174 @@ export default function DashboardPage() {
                         <div>• No blocker detected. Keep access limited and operate it as a managed beta first.</div>
                       )}
                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isAdminAuthorityWallet && mainnetReadinessGate && mainnetGateView ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Mainnet readiness gate</CardTitle>
+                <CardDescription>
+                  Automatic checks decide whether Fyxvo is eligible for a limited mainnet beta. Arming this gate records explicit admin approval intent, but it does not deploy mainnet by itself.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Target reserve</div>
+                      <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                        {formatLamportStringAsSol(mainnetReadinessGate.targetReserveLamports)}
+                      </div>
+                      <div className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
+                        Confirmed funding: {formatLamportStringAsSol(mainnetReadinessGate.confirmedFundingLamports)}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Manual gate</div>
+                        <Badge tone={mainnetReadinessGate.gate.armed ? "success" : "neutral"}>
+                          {mainnetReadinessGate.gate.armed ? "armed" : "not armed"}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                        {mainnetReadinessGate.gate.armed
+                          ? `Armed ${mainnetReadinessGate.gate.armedAt ? formatRelativeDate(mainnetReadinessGate.gate.armedAt) : "recently"}${mainnetReadinessGate.gate.armedByWallet ? ` by ${shortenAddress(mainnetReadinessGate.gate.armedByWallet)}` : ""}.`
+                          : "Leave this disarmed until the checks below are green and you are intentionally ready to run a limited mainnet beta."}
+                      </div>
+                      <div className="mt-3 text-xs text-[var(--fyxvo-text-muted)]">
+                        {mainnetGateView.liveCommit ? `Latest aligned commit ${formatCommitSha(mainnetGateView.liveCommit)}` : "Live commit metadata unavailable"}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Protocol treasury</div>
+                      <div className="mt-2 text-xl font-semibold text-[var(--fyxvo-text)]">
+                        {formatLamportStringAsSol(mainnetReadinessGate.treasurySolBalanceLamports)}
+                      </div>
+                      <div className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
+                        Authority mode: {mainnetReadinessGate.authorityMode}
+                        {" · "}
+                        {mainnetReadinessGate.upgradeAuthorityConfigured ? "upgrade authority documented" : "upgrade authority missing"}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Eligibility</div>
+                        <Badge tone={rolloutToneForBlocked(!mainnetGateView.mainnetEligibleWithDeployments)}>
+                          {mainnetGateView.mainnetEligibleWithDeployments ? "ready to arm" : "blocked"}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                        {mainnetGateView.mainnetEligibleWithDeployments
+                          ? "Every current check is green, including deployment alignment. Manual approval is the last step."
+                          : "At least one live check is still blocking the limited mainnet beta gate."}
+                      </div>
+                      <div className="mt-3 text-xs text-[var(--fyxvo-text-muted)]">
+                        Assistant {mainnetReadinessGate.assistantAvailable ? "healthy" : "degraded"} · email {mainnetReadinessGate.emailDeliveryConfigured ? "configured" : "not configured"} · incidents {mainnetReadinessGate.activeIncidentCount}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Manual release controls</div>
+                        <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+                          Save reserve planning and notes now. Arm only when the gate is green.
+                        </div>
+                      </div>
+                      <Badge tone={mainnetGateView.deploymentAligned ? "success" : "warning"}>
+                        {mainnetGateView.deploymentAligned ? "deployments aligned" : "deployment drift"}
+                      </Badge>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                      <label className="block">
+                        <div className="mb-2 text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Target reserve in SOL</div>
+                        <Input
+                          value={mainnetGateReserveTargetSol}
+                          onChange={(event) => setMainnetGateReserveTargetSol(event.target.value)}
+                          inputMode="decimal"
+                          placeholder="100"
+                        />
+                      </label>
+                      <label className="block">
+                        <div className="mb-2 text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Release notes</div>
+                        <textarea
+                          value={mainnetGateNotes}
+                          onChange={(event) => setMainnetGateNotes(event.target.value)}
+                          rows={5}
+                          className="w-full rounded-[1.1rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-surface)] px-3 py-3 text-sm text-[var(--fyxvo-text)] outline-none transition focus:border-[var(--fyxvo-accent)] focus:ring-2 focus:ring-[var(--fyxvo-accent)]/20"
+                          placeholder="Record the operator decision, treasury sign-off, or rollout note for this gate."
+                        />
+                      </label>
+                      {mainnetGateError ? (
+                        <Notice tone="warning" title="Gate update failed">
+                          {mainnetGateError}
+                        </Notice>
+                      ) : null}
+                      <div className="flex flex-wrap gap-3">
+                        <Button onClick={() => void persistMainnetGate()} loading={mainnetGateSaving}>
+                          Save gate settings
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => void persistMainnetGate({ armed: mainnetReadinessGate.gate.armed ? false : true })}
+                          disabled={mainnetGateSaving || (!mainnetReadinessGate.gate.armed && !mainnetGateView.mainnetEligibleWithDeployments)}
+                        >
+                          {mainnetReadinessGate.gate.armed ? "Disarm release gate" : "Arm mainnet release"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                  <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Live checks</div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {mainnetReadinessGate.checks.map((check) => (
+                        <div key={check.key} className="rounded-[1.15rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-surface)] px-4 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{check.label}</div>
+                            <Badge tone={check.status === "healthy" ? "success" : check.status === "blocked" ? "danger" : "warning"}>
+                              {check.status.replace("_", " ")}
+                            </Badge>
+                          </div>
+                          <div className="mt-2 text-xs leading-5 text-[var(--fyxvo-text-soft)]">{check.detail}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Paid beta blockers</div>
+                      <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                        {mainnetReadinessGate.paidBetaBlockers.length ? (
+                          mainnetReadinessGate.paidBetaBlockers.map((item) => <div key={item}>• {item}</div>)
+                        ) : (
+                          <div>• No blocker detected. Paid devnet beta can keep running under budgets, alerts, and hard stops.</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Mainnet beta blockers</div>
+                      <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                        {mainnetGateView.mainnetBlockers.length ? (
+                          mainnetGateView.mainnetBlockers.map((item) => <div key={item}>• {item}</div>)
+                        ) : (
+                          <div>• No blocker detected. Keep the release narrow and run post-deploy smoke checks immediately.</div>
+                        )}
+                      </div>
+                    </div>
+                    {mainnetReadinessGate.treasuryWarnings.length ? (
+                      <div className="md:col-span-2">
+                        <Notice tone="warning" title="Treasury reconciliation still needs review">
+                          {mainnetReadinessGate.treasuryWarnings[0]}
+                        </Notice>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </CardContent>

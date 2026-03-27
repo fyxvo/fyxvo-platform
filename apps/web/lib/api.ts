@@ -6,6 +6,7 @@ import type {
   AssistantRateLimitStatus,
   AdminEmailDeliveryStatus,
   AdminDeploymentReadiness,
+  MainnetReadinessGateSummary,
   AdminObservability,
   AdminOverview,
   AdminStats,
@@ -900,6 +901,25 @@ export async function getAdminEmailDeliveryStatus(token: string) {
 
 export async function getAdminDeploymentReadiness(token: string) {
   return requestApi<{ item: AdminDeploymentReadiness }>("/v1/admin/deployment-readiness", undefined, token);
+}
+
+export async function getMainnetReadinessGate(token: string) {
+  return requestApi<{ item: MainnetReadinessGateSummary }>("/v1/admin/mainnet-readiness-gate", undefined, token);
+}
+
+export async function updateMainnetReadinessGate(
+  input: {
+    readonly targetReserveLamports?: string;
+    readonly armed?: boolean;
+    readonly notes?: string | null;
+  },
+  token: string
+) {
+  return requestApi<{ item: MainnetReadinessGateSummary }>(
+    "/v1/admin/mainnet-readiness-gate",
+    { method: "PATCH", body: JSON.stringify(input) },
+    token
+  );
 }
 
 export async function listWebhooks(projectId: string, token: string) {

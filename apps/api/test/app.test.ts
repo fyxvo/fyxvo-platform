@@ -3019,6 +3019,151 @@ describe("Fyxvo API service", () => {
     });
   });
 
+  it("reports and arms the mainnet readiness gate when live checks are green", async () => {
+    const previousAuthorityMode = process.env.FYXVO_AUTHORITY_MODE;
+    const previousProtocolAuthority = process.env.FYXVO_PROTOCOL_AUTHORITY;
+    const previousPauseAuthority = process.env.FYXVO_PAUSE_AUTHORITY;
+    const previousUpgradeAuthorityHint = process.env.FYXVO_UPGRADE_AUTHORITY_HINT;
+    process.env.FYXVO_AUTHORITY_MODE = "governed";
+    process.env.FYXVO_PROTOCOL_AUTHORITY = Keypair.generate().publicKey.toBase58();
+    process.env.FYXVO_PAUSE_AUTHORITY = Keypair.generate().publicKey.toBase58();
+    process.env.FYXVO_UPGRADE_AUTHORITY_HINT = Keypair.generate().publicKey.toBase58();
+
+    try {
+    let armedByWallet: string | null = null;
+    let gateRow: {
+      id: string;
+      environment: string;
+      targetReserveLamports: bigint;
+      armed: boolean;
+      armedAt: Date | null;
+      notes: string | null;
+      armedByUser: { walletAddress: string } | null;
+    } | null = null;
+
+    const prisma = {
+      mainnetReleaseGate: {
+        findUnique: vi.fn(async () => gateRow),
+        upsert: vi.fn(async ({ create, update }: { create: Record<string, unknown>; update: Record<string, unknown> }) => {
+          if (!gateRow) {
+            gateRow = {
+              id: randomUUID(),
+              environment: String(create.environment),
+              targetReserveLamports:
+                "targetReserveLamports" in create ? BigInt(create.targetReserveLamports as string | number | bigint) : 100_000_000_000n,
+              armed: Boolean(create.armed ?? false),
+              armedAt: (create.armedAt as Date | null | undefined) ?? null,
+              notes: (create.notes as string | null | undefined) ?? null,
+              armedByUser:
+                create.armedByUserId && armedByWallet ? { walletAddress: armedByWallet } : null,
+            };
+          } else {
+            gateRow = {
+              ...gateRow,
+              ...update,
+              targetReserveLamports:
+                "targetReserveLamports" in update
+                  ? BigInt(update.targetReserveLamports as string | number | bigint)
+                  : gateRow.targetReserveLamports,
+              armedAt:
+                "armedAt" in update
+                  ? ((update.armedAt as Date | null | undefined) ?? null)
+                  : gateRow.armedAt,
+              notes:
+                "notes" in update
+                  ? ((update.notes as string | null | undefined) ?? null)
+                  : gateRow.notes,
+              armedByUser:
+                "armedByUserId" in update
+                  ? update.armedByUserId && armedByWallet
+                    ? { walletAddress: armedByWallet }
+                    : null
+                  : gateRow.armedByUser,
+            };
+          }
+          return gateRow;
+        }),
+      },
+      incident: {
+        count: vi.fn().mockResolvedValue(0),
+      },
+      supportTicket: {
+        count: vi.fn().mockResolvedValue(0),
+      },
+      fundingCoordinate: {
+        findMany: vi.fn().mockResolvedValue([{ amount: 120_000_000_000n }]),
+      },
+      $queryRaw: vi.fn().mockResolvedValue([]),
+    };
+
+    const context = await createTestApp({
+      envOverrides: {
+        ANTHROPIC_API_KEY: "anthropic-test-key",
+        RESEND_API_KEY: "resend-test-key",
+        EMAIL_FROM: "alerts@fyxvo.com",
+      },
+      prisma: prisma as never,
+    });
+    appsToClose.add(context.app);
+    const auth = await authenticateWallet({ app: context.app, repository: context.repository, role: "OWNER" });
+    armedByWallet = auth.walletAddress;
+
+    const initialResponse = await context.app.inject({
+      method: "GET",
+      url: "/v1/admin/mainnet-readiness-gate",
+      headers: {
+        authorization: `Bearer ${auth.token}`,
+      },
+    });
+
+    expect(initialResponse.statusCode).toBe(200);
+    expect(initialResponse.json()).toMatchObject({
+      item: {
+        paidBetaEligible: true,
+        mainnetBetaEligible: true,
+        targetReserveLamports: "100000000000",
+        confirmedFundingLamports: "120000000000",
+        gate: {
+          armed: false,
+        },
+      },
+    });
+
+    const armResponse = await context.app.inject({
+      method: "PATCH",
+      url: "/v1/admin/mainnet-readiness-gate",
+      headers: {
+        authorization: `Bearer ${auth.token}`,
+      },
+      payload: {
+        targetReserveLamports: "100000000000",
+        notes: "Ready for the next manual approval review.",
+        armed: true,
+      },
+    });
+
+    expect(armResponse.statusCode).toBe(200);
+    expect(armResponse.json()).toMatchObject({
+      item: {
+        mainnetBetaEligible: true,
+        gate: {
+          armed: true,
+          notes: "Ready for the next manual approval review.",
+        },
+      },
+    });
+    } finally {
+      if (previousAuthorityMode === undefined) delete process.env.FYXVO_AUTHORITY_MODE;
+      else process.env.FYXVO_AUTHORITY_MODE = previousAuthorityMode;
+      if (previousProtocolAuthority === undefined) delete process.env.FYXVO_PROTOCOL_AUTHORITY;
+      else process.env.FYXVO_PROTOCOL_AUTHORITY = previousProtocolAuthority;
+      if (previousPauseAuthority === undefined) delete process.env.FYXVO_PAUSE_AUTHORITY;
+      else process.env.FYXVO_PAUSE_AUTHORITY = previousPauseAuthority;
+      if (previousUpgradeAuthorityHint === undefined) delete process.env.FYXVO_UPGRADE_AUTHORITY_HINT;
+      else process.env.FYXVO_UPGRADE_AUTHORITY_HINT = previousUpgradeAuthorityHint;
+    }
+  });
+
   it("enforces API key scope dependencies when creating keys", async () => {
     const context = await createTestApp();
     appsToClose.add(context.app);
