@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "ci:install": "pnpm install --frozen-lockfile",
     "ci:verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "prod:verify": "pnpm exec tsx scripts/verify-production.ts",
     "test:anchor": "anchor test",
     "bootstrap": "bash ./scripts/bootstrap.sh",
     "solana:program:sync-id": "pnpm exec tsx scripts/solana/sync-program-id.ts",
