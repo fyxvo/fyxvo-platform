@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Button } from "@fyxvo/ui";
-import { CopyButton } from "../components/copy-button";
-import { NewsletterSignup } from "../components/newsletter-signup";
-import { FadeIn } from "../components/fade-in";
-import { getStatusSnapshot } from "../lib/server-status";
-import { getNetworkStats } from "../lib/api";
-import { liveDevnetState } from "../lib/live-state";
 import { webEnv } from "../lib/env";
+import { LiveStatusStrip } from "../components/live-status-strip";
 
 export const metadata: Metadata = {
   title: {
@@ -36,314 +30,172 @@ export const metadata: Metadata = {
   }
 };
 
-const NAV_GROUPS = [
+const WHERE_TO_START = [
   {
-    heading: "Start here",
-    links: [
-      {
-        label: "Dashboard",
-        href: "/dashboard",
-        description:
-          "Create projects, fund balances, issue API keys, and manage the live workspace."
-      },
-      {
-        label: "Quickstart",
-        href: "/docs",
-        description:
-          "Step-by-step guidance from wallet connection to your first routed devnet request."
-      },
-      {
-        label: "Pricing",
-        href: "/pricing",
-        description:
-          "Published request pricing, funding mechanics, and volume discounts."
-      },
-      {
-        label: "Assistant",
-        href: "/assistant",
-        description:
-          "Project-aware help for onboarding, debugging, funding, and relay operations."
-      },
-      {
-        label: "Playground",
-        href: "/playground",
-        description:
-          "Send live JSON-RPC calls through the relay and inspect the response instantly."
-      }
-    ]
+    title: "Dashboard",
+    href: "/dashboard",
+    description: "Create projects, fund balances, issue API keys, and manage your live workspace."
   },
   {
-    heading: "Operate",
-    links: [
-      {
-        label: "Status",
-        href: "/status",
-        description:
-          "Live health for the API, gateway, protocol readiness, and active incidents."
-      },
-      {
-        label: "Alerts",
-        href: "/alerts",
-        description:
-          "Review balance, error-rate, webhook, and request-volume alerts by project."
-      },
-      {
-        label: "Analytics",
-        href: "/analytics",
-        description:
-          "Track request volume, latency, failures, and method mix across your traffic."
-      },
-      {
-        label: "Explore",
-        href: "/explore",
-        description:
-          "Browse public projects, protocol state, and the operator-facing trust surface."
-      },
-      {
-        label: "Changelog",
-        href: "/changelog",
-        description:
-          "Shipping notes, platform changes, and rollout milestones in chronological order."
-      }
-    ]
+    title: "Docs",
+    href: "/docs",
+    description: "Step-by-step guidance from wallet connection to your first routed devnet request."
+  },
+  {
+    title: "Pricing",
+    href: "/pricing",
+    description: "Published request pricing, funding mechanics, and automatic volume discounts."
+  },
+  {
+    title: "Assistant",
+    href: "/assistant",
+    description: "Project-aware help for onboarding, debugging, funding, and relay operations."
+  },
+  {
+    title: "Playground",
+    href: "/playground",
+    description: "Send live JSON-RPC calls through the relay and inspect the response in real time."
+  },
+  {
+    title: "Status",
+    href: "/status",
+    description: "Live health for the API, gateway, protocol readiness, and active incidents."
   }
 ];
 
 export default async function HomePage() {
-  const [statusResult, networkStats] = await Promise.all([
-    getStatusSnapshot().catch(() => null),
-    getNetworkStats().catch(() => null)
-  ]);
-
-  const apiOk = statusResult?.apiHealth.status === "ok";
-  const gatewayOk = statusResult?.gatewayHealth.status === "ok";
-  const protocolReady = Boolean(statusResult?.apiStatus.protocolReadiness?.ready);
-  const gatewayLatency =
-    statusResult?.gatewayStatus.metrics?.standard?.averageLatencyMs;
-  const totalRequests =
-    networkStats?.totalRequests ??
-    statusResult?.gatewayStatus.metrics?.totals?.requests ??
-    0;
-
   return (
-    <div>
+    <div style={{ backgroundColor: "#0a0a0f" }} className="min-h-screen">
       {/* Hero */}
-      <section className="border-b border-[var(--fyxvo-border)] py-24 lg:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl">
-            <div className="fyxvo-fade-in-up fyxvo-stagger-1 mb-8 inline-flex items-center gap-2 rounded-lg border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--fyxvo-brand)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--fyxvo-brand)]" />
-              Devnet private alpha
-            </div>
-
-            <h1 className="fyxvo-fade-in-up fyxvo-stagger-2 font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-              The control plane{" "}
-              <span className="fyxvo-text-gradient">for funded Solana traffic.</span>
-            </h1>
-
-            <p className="fyxvo-fade-in-up fyxvo-stagger-3 mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Fyxvo helps teams activate a project, fund it with devnet SOL, generate scoped API keys, and send RPC traffic through a managed relay with analytics, alerts, and assistant support layered on top.
-            </p>
-
-            <div className="fyxvo-fade-in-up fyxvo-stagger-4 mt-8 flex flex-wrap items-center gap-3">
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                Live program
-              </p>
-              <div className="flex items-center gap-2 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1.5">
-                <Link
-                  href={`https://explorer.solana.com/address/${liveDevnetState.programId}?cluster=devnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-xs text-[var(--fyxvo-brand)] hover:underline break-all"
-                >
-                  {liveDevnetState.programId}
-                </Link>
-                <CopyButton value={liveDevnetState.programId} className="shrink-0" />
-              </div>
-            </div>
-
-            <div className="mt-10 flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link href="/dashboard">Open workspace</Link>
-              </Button>
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/docs">Read docs</Link>
-              </Button>
-              <Button asChild size="lg" variant="secondary">
-                <Link href="/pricing">See pricing</Link>
-              </Button>
-              <Button asChild size="lg" variant="ghost">
-                <Link href="/assistant">Try the assistant</Link>
-              </Button>
-              <Button asChild size="lg" variant="ghost">
-                <Link href="/playground">Open playground</Link>
-              </Button>
-            </div>
+      <section className="py-24 lg:py-36 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#f97316]/25 bg-[#f97316]/10 px-4 py-1.5 text-xs font-medium text-[#f97316] mb-10">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#f97316] animate-pulse" />
+            Devnet private alpha · Now live
           </div>
-        </div>
-      </section>
 
-      {/* Live status strip */}
-      <section className="border-b border-[var(--fyxvo-border)]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 py-3.5">
-            <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-              Live network
-            </span>
-            <div className="flex items-center gap-2">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${apiOk ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"}`}
-              />
-              <span className="text-sm text-[var(--fyxvo-text-soft)]">
-                Control plane{" "}
-                <span
-                  className={
-                    apiOk
-                      ? "text-[var(--fyxvo-success)]"
-                      : "text-[var(--fyxvo-warning)]"
-                  }
-                >
-                  {apiOk ? "operational" : "degraded"}
-                </span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${gatewayOk ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"}`}
-              />
-              <span className="text-sm text-[var(--fyxvo-text-soft)]">
-                Relay gateway{" "}
-                <span
-                  className={
-                    gatewayOk
-                      ? "text-[var(--fyxvo-success)]"
-                      : "text-[var(--fyxvo-warning)]"
-                  }
-                >
-                  {gatewayOk ? "operational" : "degraded"}
-                </span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${protocolReady ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"}`}
-              />
-              <span className="text-sm text-[var(--fyxvo-text-soft)]">
-                Protocol{" "}
-                <span
-                  className={
-                    protocolReady
-                      ? "text-[var(--fyxvo-success)]"
-                      : "text-[var(--fyxvo-warning)]"
-                  }
-                >
-                  {protocolReady ? "ready" : "attention"}
-                </span>
-              </span>
-            </div>
-            {typeof gatewayLatency === "number" && gatewayLatency > 0 ? (
-              <span className="text-sm text-[var(--fyxvo-text-muted)]">
-                {gatewayLatency.toFixed(0)}ms avg latency
-              </span>
-            ) : null}
-            {totalRequests > 0 ? (
-              <span className="text-sm text-[var(--fyxvo-text-muted)]">
-                {totalRequests.toLocaleString()} requests
-              </span>
-            ) : null}
+          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-semibold leading-[1.04] tracking-tight text-[#f1f5f9] max-w-4xl">
+            Build on Solana devnet{" "}
+            <span className="text-[#f97316]">without the guesswork</span>
+          </h1>
+
+          <p className="mt-7 text-lg leading-8 text-[#64748b] max-w-2xl font-sans">
+            Connect a wallet, activate a project on chain, generate API keys, and relay real JSON-RPC
+            traffic through a managed gateway with analytics and alerts.
+          </p>
+
+          <div className="mt-10 flex flex-wrap gap-4">
             <Link
-              href="/status"
-              className="ml-auto text-xs font-medium text-[var(--fyxvo-brand)] transition-colors hover:text-[var(--fyxvo-brand-soft)]"
+              href="/dashboard"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#f97316]/20 transition hover:bg-[#f97316]/90 hover:shadow-[#f97316]/30"
             >
-              Full status
+              Open workspace
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
+            <Link
+              href="/docs"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-6 py-3 text-sm font-semibold text-[#f1f5f9] transition hover:bg-white/[0.07] hover:border-white/[0.14]"
+            >
+              Read the docs
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Navigation groups */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <FadeIn>
-            <div className="mb-12">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-                Platform
-              </p>
-              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                Run the whole workflow in one surface
-              </h2>
-              <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                From activation and funding to request traces, alerts, and support, the pages below map the live product end to end.
-              </p>
-            </div>
-          </FadeIn>
+      {/* Live status strip */}
+      <section className="border-b border-white/[0.08]">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <LiveStatusStrip />
+        </div>
+      </section>
 
-          <div className="grid gap-12 lg:grid-cols-2">
-            {NAV_GROUPS.map((group) => (
-              <FadeIn key={group.heading}>
-                <div>
-                  <p className="mb-6 font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-                    {group.heading}
-                  </p>
-                  <div className="space-y-3">
-                    {group.links.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        className="fyxvo-hover-lift flex items-start gap-4 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
-                      >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-display text-sm font-semibold text-[var(--fyxvo-text)]">
-                          {link.label}
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                          {link.description}
-                        </p>
-                      </div>
-                      <svg
-                        className="mt-0.5 h-4 w-4 shrink-0 text-[var(--fyxvo-text-muted)]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </Link>
-                  ))}
+      {/* Where to start */}
+      <section className="py-20 lg:py-28 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div className="mb-14">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
+              Navigate the platform
+            </p>
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight">
+              Where to start
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {WHERE_TO_START.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 transition-transform hover:-translate-y-1 hover:border-white/[0.14] hover:bg-white/[0.05]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-display text-base font-semibold text-[#f1f5f9]">
+                    {item.title}
+                  </h3>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    className="w-4 h-4 shrink-0 text-[#64748b] mt-0.5 transition-colors group-hover:text-[#f97316]"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-              </div>
-            </FadeIn>
-          ))}
+                <p className="mt-3 text-sm leading-6 text-[#64748b] font-sans">
+                  {item.description}
+                </p>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Newsletter signup */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <FadeIn>
-            <div className="mx-auto max-w-2xl">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-                Stay close
-              </p>
-              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                Get rollout notes without the noise
-              </h2>
-              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                Fyxvo sends product notes, operational changes, and release milestones that matter to teams actively testing Solana devnet traffic.
-              </p>
-              <div className="mt-8">
-                <NewsletterSignup />
-              </div>
-            </div>
-          </FadeIn>
+      {/* Newsletter */}
+      <section className="py-20 lg:py-28">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-10 sm:p-14">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
+              Stay informed
+            </p>
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight max-w-xl">
+              Get rollout notes without the noise
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[#64748b] font-sans max-w-lg">
+              Product notes, operational changes, and release milestones for teams actively
+              testing Solana devnet traffic. Low volume, high signal.
+            </p>
+            <NewsletterInlineForm apiBaseUrl={webEnv.apiBaseUrl} />
+          </div>
         </div>
       </section>
     </div>
+  );
+}
+
+function NewsletterInlineForm({ apiBaseUrl }: { readonly apiBaseUrl: string }) {
+  // This is a server component so we render a plain HTML form
+  return (
+    <form
+      method="POST"
+      action={`${apiBaseUrl}/v1/newsletter/subscribe`}
+      className="mt-8 flex flex-col sm:flex-row gap-3 max-w-md"
+    >
+      <input
+        type="email"
+        name="email"
+        required
+        placeholder="your@email.com"
+        className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]/40"
+      />
+      <button
+        type="submit"
+        className="inline-flex items-center justify-center rounded-xl bg-[#f97316] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#f97316]/90 whitespace-nowrap"
+      >
+        Subscribe
+      </button>
+    </form>
   );
 }

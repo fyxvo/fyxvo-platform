@@ -1,240 +1,148 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn, Button } from "@fyxvo/ui";
 import { BrandLogo } from "./brand-logo";
 import { ThemeToggle } from "./theme-toggle";
 import { WalletConnectButton } from "./wallet-connect-button";
-import { CloseIcon, MenuIcon, SearchIcon } from "./icons";
-import { usePortal } from "./portal-provider";
-import { shortenAddress } from "../lib/format";
 
-const primaryLinks = [
-  { href: "/", label: "Home", description: "Control plane" },
-  { href: "/dashboard", label: "Dashboard", description: "Projects and keys" },
-  { href: "/explore", label: "Explore", description: "Public registry" },
-  { href: "/docs", label: "Docs", description: "Quickstart and API" },
-  { href: "/pricing", label: "Pricing", description: "Funding model" },
-  { href: "/status", label: "Status", description: "Network health" },
-] as const;
-
-const secondaryLinks = [
+const NAV_LINKS = [
+  { href: "/", label: "Home" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/explore", label: "Explore" },
+  { href: "/docs", label: "Docs" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/status", label: "Status" },
   { href: "/enterprise", label: "Enterprise" },
   { href: "/contact", label: "Contact" },
 ] as const;
 
-function isActive(pathname: string, href: string) {
+function linkIsActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(href);
-}
-
-function openCommandPalette() {
-  window.dispatchEvent(new Event("fyxvo:open-command-palette"));
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const portal = usePortal();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
-    function onScroll() { setScrolled(window.scrollY > 8); }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    function handleScroll() {
+      setScrolled(window.scrollY > 60);
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const walletLabel = useMemo(
-    () => (portal.walletAddress ? shortenAddress(portal.walletAddress, 4, 4) : null),
-    [portal.walletAddress]
-  );
-
   return (
-    <header className={cn(
-      "sticky top-0 z-50 border-b border-[var(--fyxvo-border)] backdrop-blur-xl transition-[background-color,box-shadow] duration-300",
-      scrolled
-        ? "bg-[color-mix(in_srgb,var(--fyxvo-bg)_95%,transparent)] shadow-sm"
-        : "bg-[color-mix(in_srgb,var(--fyxvo-bg)_82%,transparent)]"
-    )}>
-      <div className="border-b border-[var(--fyxvo-border)]/60 bg-[var(--fyxvo-panel-soft)]/70">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)] sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[var(--fyxvo-success)]" />
-            <span>Devnet private alpha</span>
+    <>
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 h-16 transition-all duration-300 ${
+          scrolled
+            ? "backdrop-blur-md bg-[#0a0a0f]/90 border-b border-white/[0.08] shadow-sm shadow-black/20"
+            : "bg-transparent border-b border-transparent"
+        }`}
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-full flex items-center gap-4">
+          {/* Logo */}
+          <div className="flex-shrink-0">
+            <BrandLogo priority />
           </div>
-          <div className="hidden items-center gap-2 sm:flex">
-            <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-[10px] tracking-[0.18em]">
-              Wallet auth
-            </span>
-            <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-[10px] tracking-[0.18em]">
-              Funded projects
-            </span>
-            <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-[10px] tracking-[0.18em]">
-              Request traces
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <div className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-4 lg:gap-8">
-          <BrandLogo priority className="min-w-0" />
-          <nav className="hidden items-center gap-1 xl:flex">
-            {primaryLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "group rounded-2xl px-3 py-2.5 transition-colors",
-                  isActive(pathname, link.href)
-                    ? "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
-                    : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
-                )}
-              >
-                <div className="text-sm font-medium">{link.label}</div>
-                <div className="text-[11px] text-[var(--fyxvo-text-muted)] transition-colors group-hover:text-[var(--fyxvo-text-soft)]">
-                  {link.description}
-                </div>
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        <div className="hidden items-center gap-2 lg:flex">
-          {secondaryLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-                isActive(pathname, link.href)
-                  ? "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"
-                  : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            className="hidden items-center gap-2 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)] xl:flex"
-            aria-label="Open command palette"
-          >
-            <SearchIcon className="h-4 w-4" />
-            <span>Search</span>
-            <span className="rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-soft)]">
-              Ctrl K
-            </span>
-          </button>
-          <ThemeToggle />
-          {portal.walletPhase === "authenticated" ? (
-            <div className="flex items-center gap-2">
-              {walletLabel ? (
-                <span className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text-muted)]">
-                  {walletLabel}
-                </span>
-              ) : null}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void portal.disconnectWallet()}
-                className="text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-              >
-                Disconnect
-              </Button>
-            </div>
-          ) : (
-            <WalletConnectButton compact />
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 lg:hidden">
-          <ThemeToggle />
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            aria-label="Open command palette"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]"
-          >
-            <SearchIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]"
-            onClick={() => setMobileOpen((value) => !value)}
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          >
-            {mobileOpen ? <CloseIcon className="h-4 w-4" /> : <MenuIcon className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-
-      {mobileOpen ? (
-        <div className="border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 px-4 py-4 backdrop-blur-xl lg:hidden">
-          <div className="mx-auto max-w-7xl space-y-5 sm:px-2">
-            <div className="grid gap-2 sm:grid-cols-2">
-              {primaryLinks.map((link) => (
+          {/* Center nav — hidden on mobile */}
+          <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
+            {NAV_LINKS.map((link) => {
+              const active = linkIsActive(pathname, link.href);
+              return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "rounded-2xl border px-4 py-3 transition-colors",
-                    isActive(pathname, link.href)
-                      ? "border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)]"
-                      : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
-                  )}
-                >
-                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{link.label}</div>
-                  <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{link.description}</div>
-                </Link>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {secondaryLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text-muted)]"
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors font-medium ${
+                    active
+                      ? "text-[#f97316] bg-[#f97316]/10"
+                      : "text-[#64748b] hover:text-[#f1f5f9] hover:bg-white/[0.05]"
+                  }`}
                 >
                   {link.label}
                 </Link>
-              ))}
+              );
+            })}
+          </nav>
+
+          {/* Right side */}
+          <div className="flex items-center gap-2 ml-auto">
+            <ThemeToggle />
+            <div className="hidden md:block">
+              <WalletConnectButton compact />
             </div>
 
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                Session
-              </p>
-              {portal.walletPhase === "authenticated" ? (
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">Wallet session active</p>
-                    <p className="font-mono text-xs text-[var(--fyxvo-text-muted)]">{walletLabel}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void portal.disconnectWallet()}
-                    className="text-xs text-[var(--fyxvo-text-muted)]"
-                  >
-                    Disconnect
-                  </Button>
-                </div>
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              aria-label={drawerOpen ? "Close menu" : "Open menu"}
+              aria-expanded={drawerOpen}
+              onClick={() => setDrawerOpen((v) => !v)}
+              className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] text-[#64748b] hover:text-[#f1f5f9] transition-colors"
+            >
+              {drawerOpen ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               ) : (
-                <div className="mt-3">
-                  <WalletConnectButton />
-                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
               )}
-            </div>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile drawer */}
+      {drawerOpen ? (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setDrawerOpen(false)}
+          />
+
+          {/* Drawer panel */}
+          <div className="absolute top-16 left-0 right-0 border-b border-white/[0.08] bg-[#0a0a0f] shadow-xl">
+            <nav className="flex flex-col py-3">
+              {NAV_LINKS.map((link) => {
+                const active = linkIsActive(pathname, link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setDrawerOpen(false)}
+                    className={`px-5 py-3 text-sm font-medium transition-colors ${
+                      active
+                        ? "text-[#f97316] bg-[#f97316]/10"
+                        : "text-[#64748b] hover:text-[#f1f5f9] hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+              <div className="px-5 py-3 border-t border-white/[0.08] mt-2">
+                <WalletConnectButton />
+              </div>
+            </nav>
           </div>
         </div>
       ) : null}
-    </header>
+
+      {/* Spacer so content clears the fixed header */}
+      <div className="h-16" aria-hidden="true" />
+    </>
   );
 }

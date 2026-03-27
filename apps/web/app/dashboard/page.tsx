@@ -2,182 +2,100 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Modal,
-  Notice,
-} from "@fyxvo/ui";
-import { CopyButton } from "../../components/copy-button";
-import { PageHeader } from "../../components/page-header";
-import { EmptyProjectState, LoadingGrid } from "../../components/state-panels";
-import { WalletConnectButton } from "../../components/wallet-connect-button";
+import { Badge, Button, Modal, Notice } from "@fyxvo/ui";
 import { usePortal } from "../../components/portal-provider";
-import {
-  formatDuration,
-  formatInteger,
-  formatRelativeDate,
-  shortenAddress,
-} from "../../lib/format";
-import type { PortalApiKey, PortalProject } from "../../lib/types";
+import { WalletConnectButton } from "../../components/wallet-connect-button";
+import type { PortalProject } from "../../lib/types";
 
-const SCOPE_OPTIONS = [
-  { value: "standard_rpc", label: "Standard RPC", description: "Access to standard JSON-RPC methods on the Fyxvo devnet gateway." },
-  { value: "priority_relay", label: "Priority relay", description: "Submit transactions through the priority relay for faster inclusion." },
-  { value: "analytics_read", label: "Analytics read", description: "Read request logs and analytics data for this project." },
-] as const;
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
-function computeSuccessRate(statusCodes: Array<{ statusCode: number; count: number }>) {
-  const total = statusCodes.reduce((sum, s) => sum + s.count, 0);
-  if (total === 0) return null;
-  const success = statusCodes
-    .filter((s) => s.statusCode >= 200 && s.statusCode < 300)
-    .reduce((sum, s) => sum + s.count, 0);
-  return (success / total) * 100;
+function deriveSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-");
 }
 
-function ApiKeyStatusBadge({ status }: { readonly status: string }) {
-  const lower = status.toLowerCase();
-  if (lower === "active") return <Badge tone="success">Active</Badge>;
-  if (lower === "revoked") return <Badge tone="danger">Revoked</Badge>;
-  return <Badge tone="neutral">{status}</Badge>;
-}
-
-function FundProjectSection({
-  project: _project,
-  transactionState,
-  onPrepare,
-}: {
-  readonly project: PortalProject;
-  readonly transactionState: { phase: string; message: string; explorerUrl?: string };
-  readonly onPrepare: (amount: string) => void;
-}) {
-  const [amount, setAmount] = useState("");
-
+function isProjectActive(project: PortalProject): boolean {
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-sm text-[var(--fyxvo-text-muted)]">
-          Funding adds SOL credits to your on-chain project account. These credits are consumed as
-          your API keys relay transactions through the gateway.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[140px]">
-          <label
-            htmlFor="fund-amount"
-            className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]"
-          >
-            Amount (SOL)
-          </label>
-          <Input
-            id="fund-amount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            placeholder="0.25"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </div>
-        <Button
-          onClick={() => {
-            if (amount) onPrepare(amount);
-          }}
-          disabled={
-            !amount ||
-            Number(amount) <= 0 ||
-            transactionState.phase === "preparing" ||
-            transactionState.phase === "awaiting_signature" ||
-            transactionState.phase === "submitting"
-          }
-          loading={
-            transactionState.phase === "preparing" ||
-            transactionState.phase === "awaiting_signature" ||
-            transactionState.phase === "submitting"
-          }
-        >
-          Prepare funding transaction
-        </Button>
-      </div>
+    !!project.onChainProjectPda &&
+    project.onChainProjectPda.length > 10 &&
+    !project.archivedAt
+  );
+}
 
-      {transactionState.phase !== "idle" && transactionState.message ? (
-        <Notice
-          tone={
-            transactionState.phase === "confirmed"
-              ? "success"
-              : transactionState.phase === "error"
-              ? "danger"
-              : "brand"
-          }
-          title={
-            transactionState.phase === "confirmed"
-              ? "Transaction confirmed"
-              : transactionState.phase === "error"
-              ? "Transaction failed"
-              : "Transaction in progress"
-          }
-        >
-          {transactionState.message}
-          {transactionState.explorerUrl ? (
-            <span>
-              {" "}
-              <a
-                href={transactionState.explorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                View on Solana Explorer
-              </a>
-            </span>
-          ) : null}
-        </Notice>
-      ) : null}
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+
+function SkeletonCards() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={i}
+          className="h-36 rounded-2xl bg-white/[0.04] animate-pulse border border-white/[0.06]"
+        />
+      ))}
     </div>
   );
 }
 
-function CreateApiKeyModal({
+// ─── Create project modal ─────────────────────────────────────────────────────
+
+const TEMPLATES = [
+  { value: "blank", label: "Blank", description: "Empty project, no preconfigured scopes." },
+  { value: "defi", label: "DeFi", description: "Optimised for swap, lending, and DEX traffic." },
+  { value: "indexing", label: "Indexing", description: "Heavy read traffic and program account scans." },
+] as const;
+
+function CreateProjectModal({
   open,
   onClose,
   onSubmit,
-  submitting,
-  lastGeneratedKey,
+  creationState,
 }: {
   readonly open: boolean;
   readonly onClose: () => void;
-  readonly onSubmit: (label: string, scopes: string[]) => Promise<void>;
-  readonly submitting: boolean;
-  readonly lastGeneratedKey: string | null;
+  readonly onSubmit: (slug: string, name: string, description: string) => Promise<void>;
+  readonly creationState: { phase: string; message: string; explorerUrl?: string };
 }) {
-  const [label, setLabel] = useState("");
-  const [scopes, setScopes] = useState<string[]>(["standard_rpc"]);
-  const [submitted, setSubmitted] = useState(false);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [description, setDescription] = useState("");
+  const [template, setTemplate] = useState<"blank" | "defi" | "indexing">("blank");
 
-  function toggleScope(scope: string) {
-    setScopes((current) =>
-      current.includes(scope) ? current.filter((s) => s !== scope) : [...current, scope]
-    );
+  function handleNameChange(value: string) {
+    setName(value);
+    if (!slugEdited) setSlug(deriveSlug(value));
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!label.trim() || scopes.length === 0) return;
-    await onSubmit(label.trim(), scopes);
-    setSubmitted(true);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !slug.trim()) return;
+    await onSubmit(slug.trim(), name.trim(), description.trim());
   }
+
+  const busy =
+    creationState.phase === "preparing" ||
+    creationState.phase === "awaiting_signature" ||
+    creationState.phase === "submitting";
+
+  const phaseMap: Record<string, string> = {
+    preparing: "Preparing on-chain transaction…",
+    awaiting_signature: "Waiting for wallet signature…",
+    submitting: "Submitting to Solana devnet…",
+    confirmed: "Project created successfully.",
+    error: "Project creation failed.",
+  };
 
   function handleClose() {
-    setLabel("");
-    setScopes(["standard_rpc"]);
-    setSubmitted(false);
+    if (busy) return;
+    setName("");
+    setSlug("");
+    setSlugEdited(false);
+    setDescription("");
+    setTemplate("blank");
     onClose();
   }
 
@@ -185,627 +103,377 @@ function CreateApiKeyModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Create API key"
-      description="A new key will be generated for this project. The full key value is only shown once."
+      title="Create a project"
+      description="Each project maps to an on-chain account on Solana devnet. Creating one requires a wallet signature to register it with the Fyxvo protocol."
     >
-      {submitted && lastGeneratedKey ? (
-        <div className="space-y-4">
-          <Notice tone="success" title="API key created">
-            Copy this key now. It will not be shown again after you close this dialog.
-          </Notice>
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
-            <code className="flex-1 break-all font-mono text-xs text-[var(--fyxvo-text)]">
-              {lastGeneratedKey}
-            </code>
-            <CopyButton value={lastGeneratedKey} />
-          </div>
-          <Button onClick={handleClose} variant="secondary">
-            Done
-          </Button>
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+        {/* Name */}
+        <div>
+          <label className="block mb-1.5 text-sm font-medium text-[#f1f5f9]">
+            Project name
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="My devnet project"
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            disabled={busy}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]/40 disabled:opacity-60"
+          />
         </div>
-      ) : (
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-          <div>
-            <label
-              htmlFor="key-label"
-              className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]"
-            >
-              Label
-            </label>
-            <Input
-              id="key-label"
-              placeholder="Production backend"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              required
-            />
-            <p className="mt-1.5 text-xs text-[var(--fyxvo-text-muted)]">
-              A descriptive name to identify where this key is used.
-            </p>
-          </div>
 
-          <div>
-            <p className="mb-2 text-sm font-medium text-[var(--fyxvo-text)]">Scopes</p>
-            <div className="space-y-2">
-              {SCOPE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3 transition hover:border-[var(--fyxvo-border-strong)]"
+        {/* Slug */}
+        <div>
+          <label className="block mb-1.5 text-sm font-medium text-[#f1f5f9]">Slug</label>
+          <input
+            type="text"
+            required
+            placeholder="my-devnet-project"
+            value={slug}
+            onChange={(e) => {
+              setSlugEdited(true);
+              setSlug(deriveSlug(e.target.value));
+            }}
+            disabled={busy}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-mono text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]/40 disabled:opacity-60"
+          />
+          <p className="mt-1.5 text-xs text-[#64748b]">
+            Used in API endpoints and on-chain identifiers. Lowercase letters, numbers, and hyphens only.
+          </p>
+        </div>
+
+        {/* Template */}
+        <div>
+          <p className="mb-2 text-sm font-medium text-[#f1f5f9]">Template</p>
+          <div className="grid grid-cols-3 gap-2">
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                disabled={busy}
+                onClick={() => setTemplate(t.value)}
+                className={`rounded-xl border p-3 text-left text-xs transition-colors disabled:opacity-60 ${
+                  template === t.value
+                    ? "border-[#f97316]/40 bg-[#f97316]/10 text-[#f97316]"
+                    : "border-white/[0.08] bg-white/[0.03] text-[#64748b] hover:border-white/[0.14]"
+                }`}
+              >
+                <p className="font-semibold">{t.label}</p>
+                <p className="mt-1 opacity-80">{t.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block mb-1.5 text-sm font-medium text-[#f1f5f9]">
+            Description <span className="text-[#64748b] font-normal">(optional)</span>
+          </label>
+          <textarea
+            rows={3}
+            placeholder="Describe how this project uses the devnet gateway."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={busy}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]/40 disabled:opacity-60 resize-none"
+          />
+        </div>
+
+        {/* Status notice */}
+        {creationState.phase !== "idle" ? (
+          <Notice
+            tone={
+              creationState.phase === "confirmed"
+                ? "success"
+                : creationState.phase === "error"
+                  ? "danger"
+                  : "brand"
+            }
+            title={phaseMap[creationState.phase] ?? creationState.phase}
+          >
+            {creationState.message}
+            {creationState.explorerUrl ? (
+              <span>
+                {" "}
+                <a
+                  href={creationState.explorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
                 >
-                  <input
-                    type="checkbox"
-                    checked={scopes.includes(opt.value)}
-                    onChange={() => toggleScope(opt.value)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--fyxvo-brand)]"
-                  />
-                  <div>
-                    <div className="text-sm font-medium text-[var(--fyxvo-text)]">{opt.label}</div>
-                    <div className="text-xs text-[var(--fyxvo-text-muted)]">{opt.description}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
+                  View on Explorer
+                </a>
+              </span>
+            ) : null}
+          </Notice>
+        ) : null}
 
+        <div className="flex gap-3">
           <Button
             type="submit"
-            loading={submitting}
-            disabled={!label.trim() || scopes.length === 0 || submitting}
+            loading={busy}
+            disabled={!name.trim() || !slug.trim() || busy}
           >
-            Create key
+            {busy ? "Creating…" : "Create project"}
           </Button>
-        </form>
-      )}
+          <Button type="button" variant="secondary" onClick={handleClose} disabled={busy}>
+            Cancel
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 }
 
-function ApiKeyRow({
-  apiKey,
-  onRevoke,
-  revoking,
+// ─── Project card ─────────────────────────────────────────────────────────────
+
+function ProjectCard({
+  project,
+  selected,
+  onSelect,
 }: {
-  readonly apiKey: PortalApiKey;
-  readonly onRevoke: (id: string) => Promise<void>;
-  readonly revoking: boolean;
+  readonly project: PortalProject;
+  readonly selected: boolean;
+  readonly onSelect: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const active = isProjectActive(project);
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-      <div className="min-w-0 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-[var(--fyxvo-text)]">{apiKey.label}</span>
-          <ApiKeyStatusBadge status={apiKey.status} />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <code className="rounded bg-[var(--fyxvo-panel)] px-2 py-0.5 font-mono text-xs text-[var(--fyxvo-text-muted)]">
-            {apiKey.prefix}...
-          </code>
-          <CopyButton value={apiKey.prefix} />
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {apiKey.scopes.map((scope) => (
-            <Badge key={scope} tone="neutral">
-              {scope}
-            </Badge>
-          ))}
-        </div>
-        <p className="text-xs text-[var(--fyxvo-text-muted)]">
-          {apiKey.lastUsedAt
-            ? `Last used ${formatRelativeDate(apiKey.lastUsedAt)}`
-            : "Never used"}
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`w-full rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 ${
+        selected
+          ? "border-[#f97316]/50 bg-[#f97316]/8 shadow-md shadow-[#f97316]/10"
+          : "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.05]"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <p className="font-display text-base font-semibold text-[#f1f5f9] truncate">
+          {project.name}
         </p>
-      </div>
-      {apiKey.status !== "revoked" && apiKey.status !== "REVOKED" ? (
-        <div className="flex items-center gap-2">
-          {confirming ? (
-            <>
-              <span className="text-xs text-[var(--fyxvo-text-muted)]">Revoke this key?</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirming(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={revoking}
-                onClick={async () => {
-                  await onRevoke(apiKey.id);
-                  setConfirming(false);
-                }}
-              >
-                Confirm revoke
-              </Button>
-            </>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {active ? (
+            <Badge tone="success">Active</Badge>
           ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setConfirming(true)}
-            >
-              Revoke
-            </Button>
+            <Badge tone="warning">Inactive</Badge>
           )}
         </div>
+      </div>
+      <p className="text-xs font-mono text-[#64748b] mb-3 truncate">/{project.slug}</p>
+      {project._count ? (
+        <div className="flex gap-4 text-xs text-[#64748b]">
+          <span>{project._count.apiKeys} keys</span>
+          <span>{project._count.requestLogs.toLocaleString()} reqs</span>
+        </div>
       ) : null}
-    </div>
+      {selected ? (
+        <div className="mt-3 pt-3 border-t border-[#f97316]/20">
+          <Link
+            href={`/projects/${project.slug}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-xs text-[#f97316] hover:underline font-medium"
+          >
+            View project details →
+          </Link>
+        </div>
+      ) : null}
+    </button>
   );
 }
 
-function CreateProjectForm({
-  onSubmit,
-  projectCreationState,
-}: {
-  readonly onSubmit: (slug: string, name: string, description: string) => Promise<void>;
-  readonly projectCreationState: { phase: string; message: string; explorerUrl?: string };
-}) {
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [description, setDescription] = useState("");
-  const [slugEdited, setSlugEdited] = useState(false);
-
-  function derivedSlug(value: string) {
-    return value
-      .toLowerCase()
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-");
-  }
-
-  function handleNameChange(value: string) {
-    setName(value);
-    if (!slugEdited) {
-      setSlug(derivedSlug(value));
-    }
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!name.trim() || !slug.trim()) return;
-    await onSubmit(slug.trim(), name.trim(), description.trim());
-  }
-
-  const busy =
-    projectCreationState.phase === "preparing" ||
-    projectCreationState.phase === "awaiting_signature" ||
-    projectCreationState.phase === "submitting";
-
-  const phaseLabel: Record<string, string> = {
-    preparing: "Preparing transaction...",
-    awaiting_signature: "Waiting for wallet signature...",
-    submitting: "Submitting to chain...",
-    confirmed: "Project created.",
-    error: "Creation failed.",
-  };
-
-  return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-      <div>
-        <label
-          htmlFor="project-name"
-          className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]"
-        >
-          Project name
-        </label>
-        <Input
-          id="project-name"
-          placeholder="My devnet project"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          required
-          disabled={busy}
-        />
-      </div>
-      <div>
-        <label
-          htmlFor="project-slug"
-          className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]"
-        >
-          Project slug
-        </label>
-        <Input
-          id="project-slug"
-          placeholder="my-devnet-project"
-          value={slug}
-          onChange={(e) => {
-            setSlugEdited(true);
-            setSlug(derivedSlug(e.target.value));
-          }}
-          required
-          disabled={busy}
-        />
-        <p className="mt-1.5 text-xs text-[var(--fyxvo-text-muted)]">
-          Used in API endpoint URLs and on-chain identifiers. Lowercase letters, numbers, and hyphens only.
-        </p>
-      </div>
-      <div>
-        <label
-          htmlFor="project-description"
-          className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]"
-        >
-          Description
-          <span className="ml-1 font-normal text-[var(--fyxvo-text-muted)]">(optional)</span>
-        </label>
-        <textarea
-          id="project-description"
-          placeholder="Describe how this project uses the devnet gateway."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          disabled={busy}
-          className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2.5 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40 disabled:opacity-60"
-        />
-      </div>
-
-      {projectCreationState.phase !== "idle" ? (
-        <Notice
-          tone={
-            projectCreationState.phase === "confirmed"
-              ? "success"
-              : projectCreationState.phase === "error"
-              ? "danger"
-              : "brand"
-          }
-          title={phaseLabel[projectCreationState.phase] ?? projectCreationState.phase}
-        >
-          {projectCreationState.message}
-          {projectCreationState.explorerUrl ? (
-            <span>
-              {" "}
-              <a
-                href={projectCreationState.explorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                View transaction
-              </a>
-            </span>
-          ) : null}
-        </Notice>
-      ) : null}
-
-      <Button
-        type="submit"
-        loading={busy}
-        disabled={!name.trim() || !slug.trim() || busy}
-      >
-        Create project
-      </Button>
-    </form>
-  );
-}
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const portal = usePortal();
-  const [createKeyOpen, setCreateKeyOpen] = useState(false);
-  const [keyCreating, setKeyCreating] = useState(false);
-  const [keyRevoking, setKeyRevoking] = useState<string | null>(null);
-  const [showCreateProject, setShowCreateProject] = useState(false);
-  const [fundOpen, setFundOpen] = useState(false);
-
-  const selectedProject = portal.selectedProject;
-  const snapshot = portal.onchainSnapshot;
-  const analytics = portal.projectAnalytics;
-
-  const isActivated =
-    selectedProject !== null &&
-    !!selectedProject.onChainProjectPda &&
-    selectedProject.onChainProjectPda.length > 10 &&
-    !selectedProject.archivedAt;
-
-  const successRate = analytics
-    ? computeSuccessRate(analytics.statusCodes)
-    : null;
-
-  async function handleCreateKey(label: string, scopes: string[]) {
-    setKeyCreating(true);
-    try {
-      await portal.createApiKey({ label, scopes });
-    } finally {
-      setKeyCreating(false);
-    }
-  }
-
-  async function handleRevokeKey(id: string) {
-    setKeyRevoking(id);
-    try {
-      await portal.revokeApiKey(id);
-    } finally {
-      setKeyRevoking(null);
-    }
-  }
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   async function handleCreateProject(slug: string, name: string, description: string) {
     await portal.createProject({ slug, name, ...(description ? { description } : {}) });
   }
 
-  function handlePrepareFunding(amount: string) {
-    void portal.prepareFunding({ asset: "SOL", amount, submit: true });
-  }
-
+  // ── Not authenticated ──
   if (portal.walletPhase !== "authenticated") {
     return (
-      <div className="space-y-10">
-        <div className="mx-auto max-w-2xl space-y-6 pt-16 text-center">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-            Connect your wallet to access your workspace
-          </h1>
-          <p className="text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Fyxvo uses your Solana wallet as your identity. Connecting signs a short authentication
-            challenge that proves ownership of your address without exposing your private key. Once
-            authenticated, your projects, API keys, funding history, and analytics all load from the
-            same session.
-          </p>
-          <p className="text-sm text-[var(--fyxvo-text-muted)]">
-            Supported wallets: Phantom, Solflare, Backpack, and any Wallet Standard compatible
-            wallet detected in your browser.
-          </p>
-          <div className="flex justify-center">
-            <WalletConnectButton />
+      <div
+        style={{ backgroundColor: "#0a0a0f" }}
+        className="min-h-screen flex items-center justify-center px-5"
+      >
+        <div className="text-center max-w-lg">
+          <div className="w-20 h-20 rounded-3xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-8">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-10 h-10 text-[#64748b]">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 12v.75m15.75-3a2.25 2.25 0 00-2.25-2.25H7.5A2.25 2.25 0 005.25 9.75m13.5 0V6.75A2.25 2.25 0 0016.5 4.5h-9A2.25 2.25 0 005.25 6.75v3M3 12v6.75A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V12" />
+            </svg>
           </div>
+          <h1 className="font-display text-3xl font-semibold text-[#f1f5f9] mb-4 tracking-tight">
+            Connect your Solana wallet
+          </h1>
+          <p className="text-base leading-7 text-[#64748b] mb-8">
+            Fyxvo uses your Solana wallet as your identity. Connecting signs a short authentication
+            challenge that proves ownership without exposing your private key. Once authenticated,
+            your projects, API keys, funding history, and analytics all load from the same session.
+          </p>
+          <WalletConnectButton />
         </div>
       </div>
     );
   }
 
+  // ── Loading ──
   if (portal.loading) {
     return (
-      <div className="space-y-8">
-        <div className="h-28 animate-pulse rounded-[1.75rem] bg-[var(--fyxvo-panel-soft)]" />
-        <LoadingGrid />
+      <div style={{ backgroundColor: "#0a0a0f" }} className="min-h-screen py-12 px-5">
+        <div className="mx-auto max-w-6xl">
+          <div className="h-24 rounded-2xl bg-white/[0.04] animate-pulse mb-8" />
+          <SkeletonCards />
+        </div>
       </div>
     );
   }
 
+  const selectedProject = portal.selectedProject;
+  const snapshot = portal.onchainSnapshot;
+  const analytics = portal.projectAnalytics;
+
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Workspace"
-        title="Dashboard"
-        description="Manage your on-chain projects, API keys, funding, and request analytics from one place."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm text-[var(--fyxvo-text)]">
-              {portal.user?.displayName ? (
-                <span className="font-medium">{portal.user.displayName}</span>
-              ) : null}
-              {portal.walletAddress ? (
-                <>
-                  <code className="font-mono text-[var(--fyxvo-text-muted)]">
-                    {shortenAddress(portal.walletAddress)}
-                  </code>
-                  <CopyButton value={portal.walletAddress} />
-                </>
-              ) : null}
-              <Badge tone="success">Connected</Badge>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowCreateProject((v) => !v)}
-            >
-              New project
-            </Button>
-          </div>
-        }
-      />
+    <div style={{ backgroundColor: "#0a0a0f" }} className="min-h-screen py-12">
+      <div className="mx-auto max-w-6xl px-5 sm:px-8 space-y-10">
 
-      {showCreateProject ? (
-        <Card className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-          <CardHeader>
-            <CardTitle>Create a project</CardTitle>
-            <CardDescription>
-              Each project maps to an on-chain account on Solana devnet. Creating a project requires
-              a wallet signature to register it with the Fyxvo protocol.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CreateProjectForm
-              onSubmit={handleCreateProject}
-              projectCreationState={portal.projectCreationState}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {portal.projects.length === 0 && !showCreateProject ? (
-        <div className="space-y-4">
-          <EmptyProjectState />
-          <div className="text-center">
-            <Button onClick={() => setShowCreateProject(true)}>Create your first project</Button>
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-1">
+              Workspace
+            </p>
+            <h1 className="font-display text-3xl font-semibold text-[#f1f5f9] tracking-tight">
+              Dashboard
+            </h1>
+            {portal.walletAddress ? (
+              <p className="mt-1 text-sm font-mono text-[#64748b]">
+                {portal.walletAddress.slice(0, 8)}…{portal.walletAddress.slice(-6)}
+              </p>
+            ) : null}
           </div>
+          <Button onClick={() => setCreateModalOpen(true)}>
+            + New project
+          </Button>
         </div>
-      ) : null}
 
-      {portal.projects.length > 0 ? (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-              Projects
+        {/* Empty state */}
+        {portal.projects.length === 0 ? (
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#f97316]/10 border border-[#f97316]/20 flex items-center justify-center mx-auto mb-6">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-7 h-7 text-[#f97316]">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </div>
+            <h2 className="font-display text-xl font-semibold text-[#f1f5f9] mb-3">
+              Create your first project
             </h2>
+            <p className="text-sm text-[#64748b] max-w-sm mx-auto mb-8">
+              Projects are on-chain Solana accounts. Creating one requires a wallet signature to
+              register it with the Fyxvo protocol.
+            </p>
+            <Button onClick={() => setCreateModalOpen(true)}>Create a project</Button>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {portal.projects.map((project) => {
-              const selected = portal.selectedProject?.id === project.id;
-              const activated =
-                !!project.onChainProjectPda &&
-                project.onChainProjectPda.length > 10 &&
-                !project.archivedAt;
-              return (
-                <button
-                  key={project.id}
-                  type="button"
-                  onClick={() => portal.selectProject(project.id)}
-                  className={`rounded-xl border p-4 text-left transition ${
-                    selected
-                      ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand)]/5"
-                      : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] hover:border-[var(--fyxvo-border-strong)]"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-[var(--fyxvo-text)]">{project.name}</span>
-                    {activated ? (
-                      <Badge tone="success">Active</Badge>
-                    ) : (
-                      <Badge tone="warning">Inactive</Badge>
-                    )}
-                    <Badge tone="neutral">devnet</Badge>
-                  </div>
-                  <div className="mt-1 text-xs uppercase tracking-widest text-[var(--fyxvo-text-muted)]">
-                    {project.slug}
-                  </div>
-                  {project._count ? (
-                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-[var(--fyxvo-text-muted)]">
-                      <span>{formatInteger(project._count.apiKeys)} keys</span>
-                      <span>{formatInteger(project._count.requestLogs)} requests</span>
-                    </div>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
+        ) : null}
 
-      {selectedProject ? (
-        <>
+        {/* Project grid */}
+        {portal.projects.length > 0 ? (
           <section className="space-y-4">
-            <h2 className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-              {selectedProject.name}
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Card className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="text-xs uppercase tracking-widest text-[var(--fyxvo-text-muted)]">
+            <h2 className="font-display text-lg font-semibold text-[#f1f5f9]">Your projects</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {portal.projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  selected={portal.selectedProject?.id === project.id}
+                  onSelect={() => portal.selectProject(project.id)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* Selected project metrics */}
+        {selectedProject ? (
+          <section className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h2 className="font-display text-lg font-semibold text-[#f1f5f9]">
+                {selectedProject.name}
+              </h2>
+              <div className="flex items-center gap-2">
+                {isProjectActive(selectedProject) ? (
+                  <Badge tone="success">Active on devnet</Badge>
+                ) : (
+                  <Badge tone="warning">Awaiting activation</Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-[#64748b] mb-2">
                   On-chain balance
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {snapshot
-                    ? `${snapshot.treasurySolBalance.toFixed(4)} SOL`
-                    : "—"}
+                <p className="font-display text-2xl font-semibold text-[#f1f5f9]">
+                  {snapshot ? `${snapshot.treasurySolBalance.toFixed(4)}` : "—"}
+                  {snapshot ? (
+                    <span className="text-sm font-normal text-[#64748b] ml-1">SOL</span>
+                  ) : null}
                 </p>
-                {snapshot?.balances ? (
-                  <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-                    {snapshot.balances.availableSolCredits} credits available
-                  </p>
-                ) : null}
-              </Card>
+              </div>
 
-              <Card className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="text-xs uppercase tracking-widest text-[var(--fyxvo-text-muted)]">
-                  Status
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-[#64748b] mb-2">
+                  API keys
                 </p>
-                <div className="mt-2 flex items-center gap-2">
-                  {isActivated ? (
-                    <Badge tone="success">Active</Badge>
-                  ) : (
-                    <Badge tone="warning">Inactive</Badge>
-                  )}
-                  <Badge tone="neutral">devnet</Badge>
-                </div>
-                <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-                  {isActivated
-                    ? "On-chain account confirmed"
-                    : "Awaiting on-chain activation"}
+                <p className="font-display text-2xl font-semibold text-[#f1f5f9]">
+                  {portal.apiKeys.length}
                 </p>
-              </Card>
+              </div>
 
-              <Card className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="text-xs uppercase tracking-widest text-[var(--fyxvo-text-muted)]">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-[#64748b] mb-2">
                   Total requests
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {analytics ? formatInteger(analytics.totals.requestLogs) : "—"}
+                <p className="font-display text-2xl font-semibold text-[#f1f5f9]">
+                  {analytics ? analytics.totals.requestLogs.toLocaleString() : "—"}
                 </p>
-                {successRate !== null ? (
-                  <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-                    {successRate.toFixed(1)}% success rate
-                  </p>
-                ) : null}
-              </Card>
+              </div>
 
-              <Card className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="text-xs uppercase tracking-widest text-[var(--fyxvo-text-muted)]">
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+                <p className="text-xs uppercase tracking-[0.14em] text-[#64748b] mb-2">
                   Avg latency
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {analytics ? formatDuration(analytics.latency.averageMs) : "—"}
+                <p className="font-display text-2xl font-semibold text-[#f1f5f9]">
+                  {analytics?.latency.averageMs ? `${analytics.latency.averageMs.toFixed(0)}ms` : "—"}
                 </p>
-                {analytics?.latency.p95Ms ? (
-                  <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-                    p95: {formatDuration(analytics.latency.p95Ms)}
-                  </p>
-                ) : null}
-              </Card>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setFundOpen((v) => !v)}
-              >
-                Fund project
-              </Button>
+            <div className="flex flex-wrap gap-3">
               <Button asChild variant="secondary" size="sm">
                 <Link href="/analytics">View analytics</Link>
               </Button>
-            </div>
-
-            {fundOpen ? (
-              <Card className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <h3 className="mb-3 font-semibold text-[var(--fyxvo-text)]">Fund this project</h3>
-                <FundProjectSection
-                  project={selectedProject}
-                  transactionState={portal.transactionState}
-                  onPrepare={handlePrepareFunding}
-                />
-              </Card>
-            ) : null}
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-                API keys
-              </h2>
-              <Button size="sm" onClick={() => setCreateKeyOpen(true)}>
-                Create new API key
+              <Button asChild variant="secondary" size="sm">
+                <Link href={`/projects/${selectedProject.slug}`}>Manage project</Link>
               </Button>
             </div>
-
-            {portal.apiKeys.length === 0 ? (
-              <Notice tone="neutral" title="No API keys yet">
-                Create your first API key to start sending requests through the Fyxvo devnet
-                gateway. Each key can be scoped to specific capabilities.
-              </Notice>
-            ) : (
-              <div className="space-y-3">
-                {portal.apiKeys.map((key) => (
-                  <ApiKeyRow
-                    key={key.id}
-                    apiKey={key}
-                    onRevoke={handleRevokeKey}
-                    revoking={keyRevoking === key.id}
-                  />
-                ))}
-              </div>
-            )}
-
-            <CreateApiKeyModal
-              open={createKeyOpen}
-              onClose={() => setCreateKeyOpen(false)}
-              onSubmit={handleCreateKey}
-              submitting={keyCreating}
-              lastGeneratedKey={portal.lastGeneratedApiKey}
-            />
           </section>
-        </>
-      ) : null}
+        ) : null}
+
+      </div>
+
+      {/* Create project modal */}
+      <CreateProjectModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSubmit={handleCreateProject}
+        creationState={portal.projectCreationState}
+      />
     </div>
   );
 }

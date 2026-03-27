@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@fyxvo/ui";
 
 const TIERS = [
   {
@@ -10,177 +9,163 @@ const TIERS = [
     tag: "standard",
     lamports: 1000,
     description:
-      "Covers the everyday JSON-RPC reads most apps depend on, such as getBalance, getAccountInfo, getBlock, and getTransaction. Requests still pass through key validation, funding checks, rate controls, and upstream failover.",
+      "Covers everyday JSON-RPC reads: getBalance, getAccountInfo, getBlock, getTransaction. Full key validation, funding checks, rate controls, and upstream failover.",
+    style: "outlined" as const,
   },
   {
     name: "Compute-heavy",
     tag: "compute-heavy",
     lamports: 3000,
     description:
-      "Handles methods that place more load on upstream nodes, including getProgramAccounts, getTokenAccountsByOwner, and getSignaturesForAddress. The higher rate reflects the heavier work those requests trigger.",
+      "For methods that place more load on upstream nodes: getProgramAccounts, getTokenAccountsByOwner, getSignaturesForAddress. Higher rate reflects the heavier upstream work.",
+    style: "featured" as const,
   },
   {
     name: "Priority relay",
     tag: "priority",
     lamports: 5000,
     description:
-      "Uses the priority relay path with its own rate controls and pricing. It is designed for traffic that needs a tighter latency budget or a different request lane than the standard relay.",
+      "Dedicated priority relay path with its own rate controls and pricing. Designed for traffic needing tighter latency budgets or a separate request lane.",
+    style: "heavy" as const,
   },
 ] as const;
 
-const FAQ_ITEMS = [
-  {
-    q: "How does the funding model work?",
-    a: "You create a project and activate it with an on-chain Solana transaction. Once active, you fund the project by signing a SOL transfer on devnet. Your spendable balance updates immediately after the signature is verified. Every request deducts from that on-chain-backed balance at the published per-request lamport rate for the tier used.",
-  },
-  {
-    q: "What happens when my balance runs low?",
-    a: "The dashboard shows a low-balance warning when your project balance approaches the threshold you configure. Requests continue being processed until the balance is fully depleted. Once empty, requests are rejected with a 402 response until you top up. Your API key stays valid the entire time and resumes immediately after funding.",
-  },
-  {
-    q: "Is there a free tier?",
-    a: "There is no free tier in the current deployment. Getting started requires a small SOL deposit on devnet, which is inexpensive given devnet SOL can be obtained from public faucets. This design keeps the funding model honest: every request is backed by a real on-chain balance, not a simulated credit.",
-  },
-  {
-    q: "What counts as a compute-heavy request?",
-    a: "The compute-heavy tier applies to Solana methods that generate significantly more upstream load on the node pool. This includes getProgramAccounts, getTokenAccountsByOwner, getTokenAccountsByDelegate, and getSignaturesForAddress. The full list is documented in the quickstart and will be updated as the method taxonomy evolves.",
-  },
-  {
-    q: "Can I use USDC to fund my project?",
-    a: "USDC funding is implemented in the protocol but is currently disabled behind a configuration flag. The SOL path is fully operational. USDC will be enabled in a future deployment once the additional custody and verification logic has been thoroughly validated on devnet.",
-  },
-  {
-    q: "How are volume discounts applied?",
-    a: "Volume discounts are applied automatically based on your project's request count within the current calendar month. At one million requests the per-request cost drops by 20 percent. At ten million requests it drops by 40 percent. There is nothing to negotiate or opt into. The discount applies to all requests above the threshold as they happen.",
-  },
-];
+const REVENUE_SPLITS = [
+  { label: "Node operators", pct: 80, color: "#f97316" },
+  { label: "Protocol treasury", pct: 10, color: "#10b981" },
+  { label: "Infrastructure", pct: 10, color: "#38bdf8" },
+] as const;
 
 export default function PricingPage() {
   const [solPrice, setSolPrice] = useState<number | null>(null);
-  const [volume, setVolume] = useState(100000);
-  const [standardPct, setStandardPct] = useState(70);
-  const [computePct, setComputePct] = useState(20);
-  const [priorityPct, setPriorityPct] = useState(10);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [requestVolume, setRequestVolume] = useState(100_000);
+  const [enterpriseForm, setEnterpriseForm] = useState({
+    name: "",
+    email: "",
+    companyName: "",
+    estimatedMonthlyRequests: "",
+    useCase: "",
+  });
+  const [formState, setFormState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-    )
+    fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
       .then((r) => r.json())
-      .then((data: { solana?: { usd?: number } }) =>
-        setSolPrice(data?.solana?.usd ?? null)
-      )
+      .then((data: { solana?: { usd?: number } }) => {
+        setSolPrice(data?.solana?.usd ?? null);
+      })
       .catch(() => null);
   }, []);
 
-  // Estimator calculations
-  const standardLamports = volume * (standardPct / 100) * 1000;
-  const computeLamports = volume * (computePct / 100) * 3000;
-  const priorityLamports = volume * (priorityPct / 100) * 5000;
-  const totalLamports = standardLamports + computeLamports + priorityLamports;
-  const discount =
-    volume >= 10_000_000 ? 0.4 : volume >= 1_000_000 ? 0.2 : 0;
-  const finalLamports = Math.round(totalLamports * (1 - discount));
-  const finalSol = finalLamports / 1e9;
-  const finalUsd = solPrice != null ? finalSol * solPrice : null;
+  function calcCost(lamports: number, reqs: number, discount: number): { sol: number; usd: number | null } {
+    const totalLamports = lamports * reqs * (1 - discount);
+    const sol = totalLamports / 1_000_000_000;
+    return { sol, usd: solPrice !== null ? sol * solPrice : null };
+  }
 
-  function adjustPct(
-    field: "standard" | "compute" | "priority",
-    value: number
-  ) {
-    const clamped = Math.max(0, Math.min(100, value));
-    if (field === "standard") {
-      const rem = 100 - clamped;
-      const ratio = computePct + priorityPct > 0 ? computePct / (computePct + priorityPct) : 0.5;
-      setStandardPct(clamped);
-      setComputePct(Math.round(rem * ratio));
-      setPriorityPct(rem - Math.round(rem * ratio));
-    } else if (field === "compute") {
-      const rem = 100 - clamped;
-      const ratio = standardPct + priorityPct > 0 ? standardPct / (standardPct + priorityPct) : 0.5;
-      setComputePct(clamped);
-      setStandardPct(Math.round(rem * ratio));
-      setPriorityPct(rem - Math.round(rem * ratio));
-    } else {
-      const rem = 100 - clamped;
-      const ratio = standardPct + computePct > 0 ? standardPct / (standardPct + computePct) : 0.5;
-      setPriorityPct(clamped);
-      setStandardPct(Math.round(rem * ratio));
-      setComputePct(rem - Math.round(rem * ratio));
+  const discount =
+    requestVolume >= 10_000_000 ? 0.4 : requestVolume >= 1_000_000 ? 0.2 : 0;
+
+  async function handleEnterpriseSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormState("loading");
+    setFormError("");
+    try {
+      const res = await fetch("https://api.fyxvo.com/v1/enterprise/interest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...enterpriseForm,
+          estimatedMonthlyRequests: Number(enterpriseForm.estimatedMonthlyRequests),
+        }),
+      });
+      if (!res.ok) throw new Error("Submission failed. Please try again.");
+      setFormState("success");
+    } catch (err) {
+      setFormState("error");
+      setFormError(err instanceof Error ? err.message : "Something went wrong.");
     }
   }
 
+  const inputClass =
+    "w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]/40";
+
   return (
-    <div>
+    <div style={{ backgroundColor: "#0a0a0f" }} className="min-h-screen">
+
       {/* Hero */}
-      <section className="border-b border-[var(--fyxvo-border)] py-24 lg:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+      <section className="py-24 lg:py-32 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
             Pricing
           </p>
-          <h1 className="mt-3 font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-            Pricing that stays tied to real usage
+          <h1 className="font-display text-5xl sm:text-6xl font-semibold tracking-tight text-[#f1f5f9] max-w-3xl leading-[1.04]">
+            Per-request pricing tied to real usage
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Fyxvo charges per request in lamports. You fund a project with devnet SOL, the relay debits published rates as traffic passes through, and volume discounts apply automatically as usage grows.
+          <p className="mt-6 text-lg leading-8 text-[#64748b] max-w-2xl font-sans">
+            Fund a project with devnet SOL, relay requests through the managed gateway, and pay
+            published lamport rates per request. Volume discounts apply automatically.
           </p>
-          {solPrice != null ? (
-            <div className="mt-6 flex items-center gap-2 text-sm text-[var(--fyxvo-text-muted)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--fyxvo-success)]" />
-              Live SOL price:{" "}
-              <span className="font-medium text-[var(--fyxvo-text)]">
-                ${solPrice.toFixed(2)}
-              </span>
-              <span className="text-xs opacity-60">via CoinGecko</span>
+          {solPrice !== null ? (
+            <div className="mt-6 inline-flex items-center gap-2.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Live SOL price: <strong>${solPrice.toFixed(2)}</strong>
+              <span className="text-emerald-400/60 text-xs">via CoinGecko</span>
             </div>
           ) : null}
         </div>
       </section>
 
       {/* Tier cards */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+      <section className="py-20 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
             Request tiers
           </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight mb-10">
             Published rates for every request class
           </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            The gateway classifies traffic by method profile and applies the matching lamport rate. Pricing stays visible in the product and docs instead of hiding behind a generic plan label.
-          </p>
-          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {TIERS.map((tier) => {
-              const solPerReq = tier.lamports / 1e9;
-              const usdPerReq = solPrice != null ? solPerReq * solPrice : null;
+              const solPerReq = tier.lamports / 1_000_000_000;
+              const usdPerReq = solPrice !== null ? solPerReq * solPrice : null;
+              const isFeatured = tier.style === "featured";
+              const isHeavy = tier.style === "heavy";
+
               return (
                 <div
                   key={tier.tag}
-                  className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6"
+                  className={`rounded-2xl p-6 transition-transform hover:-translate-y-1 ${
+                    isFeatured
+                      ? "border-2 border-[#f97316]/60 bg-[#f97316]/8 shadow-xl shadow-[#f97316]/10"
+                      : isHeavy
+                        ? "border-2 border-white/[0.14] bg-white/[0.04]"
+                        : "border border-white/[0.08] bg-white/[0.03]"
+                  }`}
                 >
-                  <h3 className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
+                  {isFeatured ? (
+                    <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[#f97316]/30 bg-[#f97316]/15 px-3 py-1 text-xs font-medium text-[#f97316]">
+                      Most common
+                    </div>
+                  ) : null}
+                  <h3 className="font-display text-xl font-semibold text-[#f1f5f9] mb-4">
                     {tier.name}
                   </h3>
-                  <div className="mt-4 space-y-1">
-                    <p className="font-display text-3xl font-semibold text-[var(--fyxvo-text)]">
-                      {tier.lamports.toLocaleString()}{" "}
-                      <span className="text-base font-normal text-[var(--fyxvo-text-muted)]">
-                        lamports
-                      </span>
+                  <div className="space-y-1 mb-5">
+                    <p className="font-display text-4xl font-semibold text-[#f1f5f9]">
+                      {tier.lamports.toLocaleString()}
+                      <span className="text-base font-normal text-[#64748b] ml-2">lam</span>
                     </p>
-                    <p className="text-sm text-[var(--fyxvo-text-muted)]">
-                      &asymp; {solPerReq.toFixed(7)} SOL per request
+                    <p className="text-sm text-[#64748b]">
+                      ≈ {solPerReq.toFixed(7)} SOL / req
                     </p>
-                    {usdPerReq != null ? (
-                      <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                        &asymp; ${usdPerReq.toFixed(6)} USD per request
-                      </p>
+                    {usdPerReq !== null ? (
+                      <p className="text-xs text-[#64748b]">≈ ${usdPerReq.toFixed(6)} USD / req</p>
                     ) : null}
                   </div>
-                  <p className="mt-5 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                    {tier.description}
-                  </p>
+                  <p className="text-sm leading-6 text-[#64748b] font-sans">{tier.description}</p>
                 </div>
               );
             })}
@@ -188,64 +173,105 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Getting started */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-              Getting started
-            </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              Start with a funded devnet project
-            </h2>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Getting started means creating a project, activating it on chain, and depositing devnet SOL. That keeps every request backed by a verifiable funded balance rather than an internal credit counter.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="/dashboard">Open dashboard</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/docs">Read the quickstart</Link>
-              </Button>
+      {/* Cost estimator */}
+      <section className="py-20 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
+            Cost estimator
+          </p>
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight mb-10">
+            See your estimated monthly cost
+          </h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+              <label className="block mb-3">
+                <span className="text-sm font-medium text-[#f1f5f9]">
+                  Monthly requests:{" "}
+                  <span className="text-[#f97316]">{requestVolume.toLocaleString()}</span>
+                </span>
+              </label>
+              <input
+                type="range"
+                min={1000}
+                max={10_000_000}
+                step={1000}
+                value={requestVolume}
+                onChange={(e) => setRequestVolume(Number(e.target.value))}
+                className="w-full accent-[#f97316] cursor-pointer"
+              />
+              <div className="flex justify-between text-xs text-[#64748b] mt-1.5">
+                <span>1K</span>
+                <span>1M</span>
+                <span>10M</span>
+              </div>
+              {discount > 0 ? (
+                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-400">
+                  {discount * 100}% volume discount applied automatically
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-3">
+              {TIERS.map((tier) => {
+                const { sol, usd } = calcCost(tier.lamports, requestVolume, discount);
+                return (
+                  <div
+                    key={tier.tag}
+                    className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5"
+                  >
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div>
+                        <p className="text-sm font-semibold text-[#f1f5f9]">{tier.name}</p>
+                        <p className="text-xs text-[#64748b] mt-0.5">
+                          {tier.lamports.toLocaleString()} lam/req
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono text-base font-semibold text-[#f1f5f9]">
+                          {sol.toFixed(5)} SOL
+                        </p>
+                        {usd !== null ? (
+                          <p className="font-mono text-xs text-[#64748b]">${usd.toFixed(4)} USD</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       </section>
 
       {/* Volume discounts */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+      <section className="py-20 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
             Volume discounts
           </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight mb-10">
             Automatic discounts as traffic grows
           </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Volume discounts apply automatically when your project crosses a monthly threshold. You do not need to switch plans or renegotiate the basic pricing model.
-          </p>
-          <div className="mt-10 grid gap-6 sm:grid-cols-2">
-            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-              <p className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-                1M+ requests per month
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8">
+              <p className="font-display text-lg font-semibold text-[#f1f5f9] mb-2">
+                1M+ requests / month
               </p>
-              <p className="mt-2 font-display text-3xl font-semibold text-[var(--fyxvo-success)]">
-                20% off
-              </p>
-              <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                Once your project crosses one million requests in a calendar month, all subsequent requests in that month are charged at 80 percent of the standard per-tier rate.
+              <p className="font-display text-5xl font-semibold text-emerald-400 mb-4">20% off</p>
+              <p className="text-sm leading-6 text-[#64748b]">
+                Once your project crosses one million requests in a calendar month, all subsequent
+                requests in that month are charged at 80% of the published tier rate.
               </p>
             </div>
-            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-              <p className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
-                10M+ requests per month
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8">
+              <p className="font-display text-lg font-semibold text-[#f1f5f9] mb-2">
+                10M+ requests / month
               </p>
-              <p className="mt-2 font-display text-3xl font-semibold text-[var(--fyxvo-success)]">
-                40% off
-              </p>
-              <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                Projects exceeding ten million monthly requests receive a 40 percent reduction across all tiers for the remainder of that month. The higher discount fully supersedes the 20 percent tier.
+              <p className="font-display text-5xl font-semibold text-emerald-400 mb-4">40% off</p>
+              <p className="text-sm leading-6 text-[#64748b]">
+                Projects exceeding ten million monthly requests receive a 40% reduction across all
+                tiers for the remainder of that month. Fully supersedes the 20% tier.
               </p>
             </div>
           </div>
@@ -253,427 +279,196 @@ export default function PricingPage() {
       </section>
 
       {/* Revenue split */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+      <section className="py-20 border-b border-white/[0.08]">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
             Revenue split
           </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            How request fees are allocated
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight mb-10">
+            How request fees are distributed
           </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Request fees are split according to the protocol and operating model behind the network. The goal is to keep the flow understandable instead of hiding it inside a bundled subscription.
-          </p>
-          <div className="mt-10 grid gap-6 sm:grid-cols-3">
-            {[
-              {
-                label: "Node operators",
-                pct: 80,
-                color: "bg-[var(--fyxvo-brand)]",
-                description:
-                  "The majority of each fee goes directly to the nodes routing traffic. This aligns operator incentives with network quality.",
-              },
-              {
-                label: "Protocol treasury",
-                pct: 10,
-                color: "bg-emerald-500",
-                description:
-                  "A small share accrues to the protocol treasury to fund ongoing development, audits, and governance over time.",
-              },
-              {
-                label: "Infrastructure fund",
-                pct: 10,
-                color: "bg-sky-500",
-                description:
-                  "The remaining share goes to a dedicated infrastructure fund that covers gateway hosting, monitoring, and operational costs.",
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6"
-              >
-                <div className="mb-4 h-1.5 w-full rounded-full bg-[var(--fyxvo-border)]">
-                  <div
-                    className={`h-1.5 rounded-full ${item.color}`}
-                    style={{ width: `${item.pct}%` }}
+
+          {/* Bar chart */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 mb-8">
+            <div className="flex h-8 rounded-xl overflow-hidden mb-5">
+              {REVENUE_SPLITS.map((item) => (
+                <div
+                  key={item.label}
+                  style={{ width: `${item.pct}%`, backgroundColor: item.color }}
+                  className="transition-all"
+                  title={`${item.label}: ${item.pct}%`}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-5">
+              {REVENUE_SPLITS.map((item) => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span
+                    className="h-3 w-3 rounded-sm"
+                    style={{ backgroundColor: item.color }}
                   />
-                </div>
-                <p className="font-display text-3xl font-semibold text-[var(--fyxvo-text)]">
-                  {item.pct}%
-                </p>
-                <p className="mt-1 font-display text-base font-semibold text-[var(--fyxvo-text)]">
-                  {item.label}
-                </p>
-                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                  {item.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Interactive cost estimator */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-            Cost estimator
-          </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Estimate your monthly cost
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Adjust the sliders to match your expected traffic mix. Costs update in real time. Volume discounts are factored in automatically.
-          </p>
-          <div className="mt-10 grid gap-8 lg:grid-cols-2">
-            <div className="space-y-6">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-[var(--fyxvo-text)]">
-                    Monthly request volume
-                  </label>
-                  <span className="font-mono text-sm text-[var(--fyxvo-text-muted)]">
-                    {volume.toLocaleString()}
+                  <span className="text-sm text-[#64748b]">
+                    {item.label}{" "}
+                    <span className="font-semibold text-[#f1f5f9]">{item.pct}%</span>
                   </span>
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={10_000_000}
-                  step={10000}
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-full accent-[var(--fyxvo-brand)]"
-                />
-                <div className="mt-1 flex justify-between text-xs text-[var(--fyxvo-text-muted)]">
-                  <span>0</span>
-                  <span>1M</span>
-                  <span>10M</span>
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-[var(--fyxvo-text)]">
-                    Standard RPC
-                  </label>
-                  <span className="font-mono text-sm text-[var(--fyxvo-text-muted)]">
-                    {standardPct}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={standardPct}
-                  onChange={(e) => adjustPct("standard", Number(e.target.value))}
-                  className="w-full accent-[var(--fyxvo-brand)]"
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-[var(--fyxvo-text)]">
-                    Compute-heavy
-                  </label>
-                  <span className="font-mono text-sm text-[var(--fyxvo-text-muted)]">
-                    {computePct}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={computePct}
-                  onChange={(e) => adjustPct("compute", Number(e.target.value))}
-                  className="w-full accent-[var(--fyxvo-brand)]"
-                />
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-sm font-medium text-[var(--fyxvo-text)]">
-                    Priority relay
-                  </label>
-                  <span className="font-mono text-sm text-[var(--fyxvo-text-muted)]">
-                    {priorityPct}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={priorityPct}
-                  onChange={(e) => adjustPct("priority", Number(e.target.value))}
-                  className="w-full accent-[var(--fyxvo-brand)]"
-                />
-              </div>
-
-              <div className="flex gap-2 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2.5">
-                <span className="text-sm text-[var(--fyxvo-text-muted)]">
-                  Mix total:
-                </span>
-                <span
-                  className={`text-sm font-medium ${standardPct + computePct + priorityPct === 100 ? "text-[var(--fyxvo-success)]" : "text-[var(--fyxvo-warning)]"}`}
-                >
-                  {standardPct + computePct + priorityPct}%
-                </span>
-              </div>
+              ))}
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                  Monthly estimate
-                </p>
-                {discount > 0 ? (
-                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-[var(--fyxvo-success)]/30 bg-[var(--fyxvo-success)]/10 px-2.5 py-1 text-xs font-medium text-[var(--fyxvo-success)]">
-                    {discount * 100}% volume discount applied
-                  </div>
-                ) : null}
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-end justify-between">
-                    <span className="text-sm text-[var(--fyxvo-text-muted)]">
-                      Lamports
-                    </span>
-                    <span className="font-mono text-lg font-semibold text-[var(--fyxvo-text)]">
-                      {finalLamports.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <span className="text-sm text-[var(--fyxvo-text-muted)]">
-                      SOL
-                    </span>
-                    <span className="font-mono text-lg font-semibold text-[var(--fyxvo-text)]">
-                      {finalSol.toFixed(6)}
-                    </span>
-                  </div>
-                  {finalUsd != null ? (
-                    <div className="flex items-end justify-between">
-                      <span className="text-sm text-[var(--fyxvo-text-muted)]">
-                        USD (est.)
-                      </span>
-                      <span className="font-mono text-lg font-semibold text-[var(--fyxvo-text)]">
-                        ${finalUsd.toFixed(4)}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                  Mix breakdown
-                </p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-[var(--fyxvo-text-muted)]">
-                      Standard ({standardPct}%)
-                    </span>
-                    <span className="font-mono text-[var(--fyxvo-text-soft)]">
-                      {Math.round(standardLamports).toLocaleString()} lam
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--fyxvo-text-muted)]">
-                      Compute-heavy ({computePct}%)
-                    </span>
-                    <span className="font-mono text-[var(--fyxvo-text-soft)]">
-                      {Math.round(computeLamports).toLocaleString()} lam
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--fyxvo-text-muted)]">
-                      Priority ({priorityPct}%)
-                    </span>
-                    <span className="font-mono text-[var(--fyxvo-text-soft)]">
-                      {Math.round(priorityLamports).toLocaleString()} lam
-                    </span>
-                  </div>
-                </div>
-              </div>
-              {solPrice == null ? (
-                <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                  USD estimate unavailable. SOL price could not be fetched from CoinGecko.
-                </p>
-              ) : null}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+              <p className="font-display text-3xl font-semibold mb-1" style={{ color: "#f97316" }}>
+                80%
+              </p>
+              <p className="font-semibold text-[#f1f5f9] mb-2">Node operators</p>
+              <p className="text-sm leading-6 text-[#64748b]">
+                The majority of each fee goes directly to the nodes routing traffic, aligning
+                operator incentives with network quality.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+              <p className="font-display text-3xl font-semibold mb-1" style={{ color: "#10b981" }}>
+                10%
+              </p>
+              <p className="font-semibold text-[#f1f5f9] mb-2">Protocol treasury</p>
+              <p className="text-sm leading-6 text-[#64748b]">
+                A small share accrues to the protocol treasury for ongoing development, audits, and
+                governance.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+              <p className="font-display text-3xl font-semibold mb-1" style={{ color: "#38bdf8" }}>
+                10%
+              </p>
+              <p className="font-semibold text-[#f1f5f9] mb-2">Infrastructure</p>
+              <p className="text-sm leading-6 text-[#64748b]">
+                The remaining share funds gateway hosting, monitoring, and operational costs.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Comparison table */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-            Comparison
-          </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            How Fyxvo compares
-          </h2>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            A quick orientation for teams deciding between a funded relay workflow and more traditional shared RPC options.
-          </p>
-          <div className="mt-10 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--fyxvo-border)]">
-                  <th className="py-3 pr-6 text-left font-medium text-[var(--fyxvo-text-muted)] w-56">
-                    Feature
-                  </th>
-                  <th className="py-3 px-4 text-center font-semibold text-[var(--fyxvo-text)] bg-[var(--fyxvo-brand-subtle)] rounded-t-xl">
-                    Fyxvo
-                  </th>
-                  <th className="py-3 px-4 text-center font-medium text-[var(--fyxvo-text-muted)]">
-                    Public RPC
-                  </th>
-                  <th className="py-3 px-4 text-center font-medium text-[var(--fyxvo-text-muted)]">
-                    Generic RPC
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    feature: "Per-request pricing",
-                    fyxvo: "Lamports, published",
-                    pub: "Free, throttled",
-                    generic: "Opaque tiers",
-                  },
-                  {
-                    feature: "Rate limits",
-                    fyxvo: "Per-key and per-project",
-                    pub: "Hard shared caps",
-                    generic: "Plan-based",
-                  },
-                  {
-                    feature: "Request logging",
-                    fyxvo: "Built in, per-request",
-                    pub: "None",
-                    generic: "Paid tier only",
-                  },
-                  {
-                    feature: "Analytics",
-                    fyxvo: "Built-in, real-time",
-                    pub: "None",
-                    generic: "Paid add-on",
-                  },
-                  {
-                    feature: "Priority routing",
-                    fyxvo: "Dedicated endpoint",
-                    pub: "Not offered",
-                    generic: "Not offered",
-                  },
-                  {
-                    feature: "On-chain funding",
-                    fyxvo: "SOL-native, verifiable",
-                    pub: "No",
-                    generic: "Credit card only",
-                  },
-                  {
-                    feature: "Project management",
-                    fyxvo: "Projects, keys, funding, traces",
-                    pub: "No",
-                    generic: "Varies",
-                  },
-                ].map((row) => (
-                  <tr
-                    key={row.feature}
-                    className="border-b border-[var(--fyxvo-border)]"
-                  >
-                    <td className="py-3 pr-6 text-[var(--fyxvo-text-muted)]">
-                      {row.feature}
-                    </td>
-                    <td className="py-3 px-4 text-center bg-[var(--fyxvo-brand-subtle)] font-medium text-[var(--fyxvo-text)]">
-                      {row.fyxvo}
-                    </td>
-                    <td className="py-3 px-4 text-center text-[var(--fyxvo-text-muted)]">
-                      {row.pub}
-                    </td>
-                    <td className="py-3 px-4 text-center text-[var(--fyxvo-text-muted)]">
-                      {row.generic}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* Enterprise contact */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 sm:p-12">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+      {/* Enterprise contact form */}
+      <section className="py-20">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8 sm:p-12">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f97316] mb-3">
               Enterprise
             </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold text-[#f1f5f9] tracking-tight mb-4">
               Need a higher-throughput rollout path?
             </h2>
-            <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Teams that need sustained high volume, isolated routing, or closer operational support can talk with us directly about an enterprise rollout path.
+            <p className="text-base leading-7 text-[#64748b] max-w-xl mb-10">
+              Teams that need sustained high volume, isolated routing, or closer operational support
+              can submit interest here and we&apos;ll follow up directly.
             </p>
-            <div className="mt-8">
-              <Button asChild>
-                <Link href="/enterprise">Talk to us about enterprise</Link>
-              </Button>
-            </div>
+
+            {formState === "success" ? (
+              <div className="rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-6">
+                <p className="font-semibold text-emerald-400 mb-1">Request received</p>
+                <p className="text-sm text-emerald-400/80">
+                  We&apos;ll be in touch shortly to discuss your requirements.
+                </p>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => void handleEnterpriseSubmit(e)}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-5"
+              >
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-[#f1f5f9]">Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Alex Chen"
+                    value={enterpriseForm.name}
+                    onChange={(e) => setEnterpriseForm((f) => ({ ...f, name: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-[#f1f5f9]">Email</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="you@company.com"
+                    value={enterpriseForm.email}
+                    onChange={(e) => setEnterpriseForm((f) => ({ ...f, email: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-[#f1f5f9]">
+                    Company name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Acme Labs"
+                    value={enterpriseForm.companyName}
+                    onChange={(e) =>
+                      setEnterpriseForm((f) => ({ ...f, companyName: e.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 text-sm font-medium text-[#f1f5f9]">
+                    Estimated monthly requests
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    placeholder="5000000"
+                    value={enterpriseForm.estimatedMonthlyRequests}
+                    onChange={(e) =>
+                      setEnterpriseForm((f) => ({
+                        ...f,
+                        estimatedMonthlyRequests: e.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block mb-2 text-sm font-medium text-[#f1f5f9]">Use case</label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Describe your use case and infrastructure requirements."
+                    value={enterpriseForm.useCase}
+                    onChange={(e) =>
+                      setEnterpriseForm((f) => ({ ...f, useCase: e.target.value }))
+                    }
+                    className={`${inputClass} resize-none`}
+                  />
+                </div>
+
+                {formState === "error" ? (
+                  <div className="sm:col-span-2 text-sm text-red-400">{formError}</div>
+                ) : null}
+
+                <div className="sm:col-span-2 flex flex-wrap gap-4 items-center">
+                  <button
+                    type="submit"
+                    disabled={formState === "loading"}
+                    className="rounded-xl bg-[#f97316] px-8 py-3 text-sm font-semibold text-white transition hover:bg-[#f97316]/90 disabled:opacity-60"
+                  >
+                    {formState === "loading" ? "Submitting…" : "Submit interest"}
+                  </button>
+                  <Link href="/contact" className="text-sm text-[#64748b] hover:text-[#f1f5f9] transition-colors">
+                    Or contact us directly
+                  </Link>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="border-t border-[var(--fyxvo-border)] py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-            FAQ
-          </p>
-          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Frequently asked questions
-          </h2>
-          <div className="mt-10 space-y-3">
-            {FAQ_ITEMS.map((item, i) => (
-              <div
-                key={item.q}
-                className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden"
-              >
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                >
-                  <span className="font-display text-base font-semibold text-[var(--fyxvo-text)]">
-                    {item.q}
-                  </span>
-                  <svg
-                    className={`h-4 w-4 shrink-0 text-[var(--fyxvo-text-muted)] transition-transform duration-150 ${openFaq === i ? "rotate-180" : ""}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </button>
-                {openFaq === i ? (
-                  <div className="border-t border-[var(--fyxvo-border)] px-5 pb-5 pt-4">
-                    <p className="text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                      {item.a}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
