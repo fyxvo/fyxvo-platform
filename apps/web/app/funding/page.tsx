@@ -26,6 +26,12 @@ import { PRICING_LAMPORTS } from "@fyxvo/config/pricing";
 const STD_PRICE_LAMPORTS = BigInt(PRICING_LAMPORTS.standard);
 const CH_PRICE_LAMPORTS = BigInt(PRICING_LAMPORTS.computeHeavy);
 const PRIORITY_PRICE_LAMPORTS = BigInt(PRICING_LAMPORTS.priority);
+const DEPOSIT_FEE_BPS = 500;
+const DEFAULT_RUNWAY_DAYS = 30;
+const MAINNET_BETA_RESERVE_SOL = 100;
+const MAINNET_BETA_LIQUIDITY_SOL = 50;
+const MAINNET_BETA_OPS_SOL = 25;
+const MAINNET_BETA_SAFETY_SOL = 25;
 
 function estimateRequests(lamports: bigint): { standard: string; computeHeavy: string; priority: string } {
   function fmt(n: bigint): string {
@@ -50,6 +56,10 @@ export default function FundingPage() {
   const [asset, setAsset] = useState<"SOL" | "USDC">("SOL");
   const [amount, setAmount] = useState("1000000000");
   const [tokenAccount, setTokenAccount] = useState("");
+  const [plannerStandardDaily, setPlannerStandardDaily] = useState("100000");
+  const [plannerComputeDaily, setPlannerComputeDaily] = useState("25000");
+  const [plannerPriorityDaily, setPlannerPriorityDaily] = useState("10000");
+  const [plannerRunwayDays, setPlannerRunwayDays] = useState(String(DEFAULT_RUNWAY_DAYS));
   const [history, setHistory] = useState<FundingHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [budgetStatus, setBudgetStatus] = useState<ProjectBudgetStatus | null>(null);
@@ -84,6 +94,20 @@ export default function FundingPage() {
   const amountLamports = (() => {
     try { return BigInt(amount); } catch { return 0n; }
   })();
+  const plannerStandardCount = Math.max(0, Number.parseInt(plannerStandardDaily || "0", 10) || 0);
+  const plannerComputeCount = Math.max(0, Number.parseInt(plannerComputeDaily || "0", 10) || 0);
+  const plannerPriorityCount = Math.max(0, Number.parseInt(plannerPriorityDaily || "0", 10) || 0);
+  const plannerDays = Math.max(1, Number.parseInt(plannerRunwayDays || "0", 10) || DEFAULT_RUNWAY_DAYS);
+  const plannerDailyLamports =
+    BigInt(plannerStandardCount) * STD_PRICE_LAMPORTS +
+    BigInt(plannerComputeCount) * CH_PRICE_LAMPORTS +
+    BigInt(plannerPriorityCount) * PRIORITY_PRICE_LAMPORTS;
+  const plannerTargetLamports = plannerDailyLamports * BigInt(plannerDays);
+  const plannerGrossLamports = plannerTargetLamports * 10_000n / BigInt(10_000 - DEPOSIT_FEE_BPS);
+  const plannerTargetSol = Number(plannerTargetLamports) / Number(SOL_DECIMALS);
+  const plannerGrossSol = Number(plannerGrossLamports) / Number(SOL_DECIMALS);
+  const plannerNeededLamports = plannerGrossLamports > availableSolCredits ? plannerGrossLamports - availableSolCredits : 0n;
+  const plannerNeededSol = Number(plannerNeededLamports) / Number(SOL_DECIMALS);
 
   useEffect(() => {
     if (!portal.token) return;
@@ -274,6 +298,91 @@ await connection.requestAirdrop(pubkey, 2 * LAMPORTS_PER_SOL);`}</pre>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)] xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Paid beta reserve planner</CardTitle>
+            <CardDescription>
+              Best next step: operate a paid devnet beta first, then move to a limited mainnet beta only after governance and operations gates are closed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Input
+                  label="Standard requests / day"
+                  inputMode="numeric"
+                  value={plannerStandardDaily}
+                  onChange={(event) => setPlannerStandardDaily(event.target.value)}
+                  hint={`${PRICING_LAMPORTS.standard.toLocaleString()} lamports each`}
+                />
+                <Input
+                  label="Compute-heavy / day"
+                  inputMode="numeric"
+                  value={plannerComputeDaily}
+                  onChange={(event) => setPlannerComputeDaily(event.target.value)}
+                  hint={`${PRICING_LAMPORTS.computeHeavy.toLocaleString()} lamports each`}
+                />
+                <Input
+                  label="Priority / day"
+                  inputMode="numeric"
+                  value={plannerPriorityDaily}
+                  onChange={(event) => setPlannerPriorityDaily(event.target.value)}
+                  hint={`${PRICING_LAMPORTS.priority.toLocaleString()} lamports each`}
+                />
+                <Input
+                  label="Runway days"
+                  inputMode="numeric"
+                  value={plannerRunwayDays}
+                  onChange={(event) => setPlannerRunwayDays(event.target.value)}
+                  hint="Use 30 for a calm beta reserve"
+                />
+              </div>
+
+              <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      Suggested reserve
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                      {plannerGrossSol.toFixed(3)} SOL
+                    </div>
+                  </div>
+                  <Badge tone={plannerNeededLamports > 0n ? "warning" : "success"}>
+                    {plannerNeededLamports > 0n ? `${plannerNeededSol.toFixed(3)} SOL short` : "Current balance covers it"}
+                  </Badge>
+                </div>
+                <div className="mt-4 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Usable traffic reserve</span>
+                    <span className="font-mono text-[var(--fyxvo-text)]">{plannerTargetSol.toFixed(3)} SOL</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Gross with current 5% fee path</span>
+                    <span className="font-mono text-[var(--fyxvo-text)]">{plannerGrossSol.toFixed(3)} SOL</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Current spendable credits</span>
+                    <span className="font-mono text-[var(--fyxvo-text)]">{(Number(availableSolCredits) / Number(SOL_DECIMALS)).toFixed(3)} SOL</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Notice tone="neutral" title="Recommended now: paid devnet beta">
+                Use small but real devnet funding, enforce budgets and hard stops, verify alerts, and prove one repeatable request workflow with real teams before talking about mainnet revenue.
+              </Notice>
+              <Notice tone="neutral" title="Recommended later: limited mainnet beta">
+                A conservative founder reserve is about {MAINNET_BETA_RESERVE_SOL} SOL total: {MAINNET_BETA_LIQUIDITY_SOL} SOL for traffic liquidity, {MAINNET_BETA_OPS_SOL} SOL for ops and incident buffer, and {MAINNET_BETA_SAFETY_SOL} SOL for treasury and reconciliation safety margin.
+              </Notice>
+              <Notice tone="warning" title="Do not skip the gates">
+                Mainnet beta should wait for governed authority control, migration discipline, treasury reconciliation, incident drills, and clear support ownership. Those are operational gates, not marketing milestones.
+              </Notice>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Funding request</CardTitle>

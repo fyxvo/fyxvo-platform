@@ -1360,6 +1360,10 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
             <div className="grid gap-4 md:grid-cols-2">
               {[
                 {
+                  title: "Run a paid devnet beta first",
+                  body: "The next honest commercial step is a managed paid beta on devnet: pre-funded project credits, budgets, hard stops, alerts, and direct operator support before any mainnet claim.",
+                },
+                {
                   title: "Go from zero to first request",
                   body: "Connect a wallet, create a project, activate it, fund it with a small devnet SOL amount, create one API key, and send one standard RPC request through the hosted gateway.",
                 },
@@ -1383,6 +1387,10 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
                   title: "Prepare for mainnet honestly",
                   body: "Treat the current devnet phase as operational rehearsal: tighten runbooks, scopes, alerts, and collaboration habits now so the product and your integration are better prepared for future mainnet work.",
                 },
+                {
+                  title: "Use a conservative beta reserve",
+                  body: "A calm limited mainnet beta should be planned with reserve, not hope. A practical founder starting point is about 100 SOL total across traffic liquidity, ops buffer, and treasury/reconciliation safety margin.",
+                },
               ].map((item) => (
                 <div
                   key={item.title}
@@ -1395,6 +1403,9 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
             </div>
             <Notice tone="neutral" title="Release habit">
               Before any larger rollout, confirm live status, funded balance, request logs, alert thresholds, webhook handling, and one real request in the authenticated product — not just local code or mock traffic.
+            </Notice>
+            <Notice tone="warning" title="Mainnet gate">
+              Do not treat deployment alone as launch readiness. Mainnet beta should wait for governed authority control, reviewed treasury operations, migration discipline, verified incident handling, and a support model that is repeatable without manual founder intervention.
             </Notice>
           </section>
 

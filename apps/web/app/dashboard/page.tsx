@@ -99,6 +99,10 @@ function healthColor(score: number): string {
   return "text-red-600 dark:text-red-400 border-red-500/20 bg-red-500/5";
 }
 
+function rolloutToneForBlocked(isBlocked: boolean) {
+  return isBlocked ? "danger" : "success";
+}
+
 const projectColumns: readonly TableColumn<PortalProject>[] = [
   {
     key: "name",
@@ -477,6 +481,59 @@ export default function DashboardPage() {
     portal.walletPhase === "authenticated" &&
     portal.walletAddress === liveDevnetState.adminAuthority &&
     Boolean(portal.token);
+  const rolloutGate = useMemo(() => {
+    if (!isAdminAuthorityWallet || !releaseReadiness || !portal.adminOverview) return null;
+
+    const deploymentCommits = [
+      webDeploymentStatus?.commit,
+      apiDeploymentStatus?.commit ?? deploymentReadiness?.commit,
+      gatewayDeploymentStatus?.commit,
+    ].filter((value): value is string => Boolean(value));
+    const uniqueCommits = [...new Set(deploymentCommits)];
+
+    const paidBetaBlockers = [
+      !releaseReadiness.infrastructure.assistantAvailable ? "Assistant availability is degraded." : null,
+      releaseReadiness.operations.pendingMigrations.detected
+        ? `${releaseReadiness.operations.pendingMigrations.count} pending Prisma migration${releaseReadiness.operations.pendingMigrations.count === 1 ? "" : "s"}.`
+        : null,
+      !adminEmailDeliveryStatus?.configured ? "Email delivery is not configured for verification, digests, and incident communication." : null,
+      releaseReadiness.infrastructure.currentIncidentCount > 0
+        ? `${releaseReadiness.infrastructure.currentIncidentCount} active incident${releaseReadiness.infrastructure.currentIncidentCount === 1 ? "" : "s"} need closure first.`
+        : null,
+      uniqueCommits.length > 1 ? "Web, API, and gateway are not all on the same deployed commit." : null,
+    ].filter((item): item is string => Boolean(item));
+
+    const mainnetBetaBlockers = [
+      ...paidBetaBlockers,
+      portal.adminOverview.protocol.authorityPlan.mode === "single-signer"
+        ? "Authority mode is still single-signer. Governed or multisig control is required before mainnet beta."
+        : null,
+      portal.adminOverview.protocol.authorityPlan.upgradeAuthorityHint == null
+        ? "Upgrade authority is not recorded in runtime config yet."
+        : null,
+      releaseReadiness.infrastructure.supportBacklogCount > 10
+        ? `Support backlog is high at ${releaseReadiness.infrastructure.supportBacklogCount} open items.`
+        : null,
+    ].filter((item): item is string => Boolean(item));
+
+    return {
+      paidBetaReady: paidBetaBlockers.length === 0,
+      mainnetBetaReady: mainnetBetaBlockers.length === 0,
+      paidBetaBlockers,
+      mainnetBetaBlockers,
+      deploymentAligned: uniqueCommits.length <= 1,
+      liveCommit: uniqueCommits[0] ?? null,
+    };
+  }, [
+    adminEmailDeliveryStatus,
+    apiDeploymentStatus?.commit,
+    deploymentReadiness?.commit,
+    gatewayDeploymentStatus?.commit,
+    isAdminAuthorityWallet,
+    portal.adminOverview,
+    releaseReadiness,
+    webDeploymentStatus?.commit,
+  ]);
 
   useEffect(() => {
     void getNetworkStats().then(setNetworkStats).catch(() => {});
@@ -2561,6 +2618,71 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </section>
+          ) : null}
+
+          {isAdminAuthorityWallet && rolloutGate ? (
+            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+              <CardHeader>
+                <CardTitle>Rollout gate</CardTitle>
+                <CardDescription>
+                  Recommended path: run a paid devnet beta now, then move to a limited mainnet beta only after governance and operational gates are closed.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Paid devnet beta</div>
+                      <Badge tone={rolloutToneForBlocked(!rolloutGate.paidBetaReady)}>
+                        {rolloutGate.paidBetaReady ? "ready" : "blocked"}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                      Best near-term move for Fyxvo. Teams pay by funded project credits while the stack stays honest about devnet posture and operational rehearsal.
+                    </p>
+                    <div className="mt-4 text-xs text-[var(--fyxvo-text-muted)]">
+                      {rolloutGate.liveCommit ? `Live commit ${formatCommitSha(rolloutGate.liveCommit)}` : "Live commit unavailable"}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Limited mainnet beta</div>
+                      <Badge tone={rolloutToneForBlocked(!rolloutGate.mainnetBetaReady)}>
+                        {rolloutGate.mainnetBetaReady ? "ready" : "blocked"}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                      Hold this until authority control is governed, migrations are disciplined, treasury operations are rehearsed, and incident/support handling no longer depends on founder memory.
+                    </p>
+                    <div className="mt-4 text-xs text-[var(--fyxvo-text-muted)]">
+                      Recommended reserve planning: about 100 SOL total before a calm limited beta.
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Paid beta blockers</div>
+                    <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                      {rolloutGate.paidBetaBlockers.length ? (
+                        rolloutGate.paidBetaBlockers.map((item) => <div key={item}>• {item}</div>)
+                      ) : (
+                        <div>• No blocker detected. Keep budgets, hard stops, and alerts enabled on paid beta projects.</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Mainnet beta blockers</div>
+                    <div className="mt-3 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
+                      {rolloutGate.mainnetBetaBlockers.length ? (
+                        rolloutGate.mainnetBetaBlockers.map((item) => <div key={item}>• {item}</div>)
+                      ) : (
+                        <div>• No blocker detected. Keep access limited and operate it as a managed beta first.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ) : null}
 
           {isAdminAuthorityWallet && retentionCohorts ? (

@@ -64,6 +64,18 @@ The current codebase supports an honest staged rollout path.
 6. Paid launch
    Open paid usage only after governance, treasury operations, monitoring, rate-limit policy, support workflows, and reconciliation are all treated as production disciplines rather than founder memory.
 
+### Recommended commercial next step
+
+The best next move is not public paid mainnet. It is a paid devnet beta with explicit budgets, hard stops, real alerting, and direct support while the team rehearses production operations.
+
+Use a conservative reserve target for eventual mainnet beta planning:
+
+1. 50 SOL for customer traffic liquidity.
+2. 25 SOL for ops and incident buffer.
+3. 25 SOL for treasury and reconciliation safety margin.
+
+That puts a calm limited mainnet beta planning target around 100 SOL total reserve before broader public commitments are made.
+
 ## 4. Must Be Complete Before Paid Mainnet Launch
 
 These are the hard gates, not nice-to-haves.
