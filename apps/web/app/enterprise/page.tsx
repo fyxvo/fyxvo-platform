@@ -8,34 +8,34 @@ import { submitInterest } from "../../lib/api";
 
 const FEATURES = [
   {
-    title: "Priority SLA",
+    title: "Capacity planning",
     description:
-      "Formal uptime commitments backed by defined incident response windows. Enterprise customers receive documented SLA terms with a 99.9 percent uptime target and escalation paths that bypass the standard support queue.",
+      "We work through expected request shape, relay mode, and rollout constraints before widening usage. The goal is to match the traffic profile to the right operating path instead of forcing every team into the same defaults.",
   },
   {
-    title: "Dedicated nodes",
+    title: "Isolated traffic paths",
     description:
-      "Your traffic runs through dedicated routing infrastructure that is completely separate from the shared node pool. No noisy-neighbor effects, no contention with other projects, and consistent latency profiles that reflect your workload rather than the aggregate.",
+      "For sensitive workloads we can discuss routing that is separated from the shared relay path. That helps teams validate stricter latency or contention requirements during rollout.",
   },
   {
-    title: "Custom rate limits",
+    title: "Custom request policies",
     description:
-      "Per-key and per-project rate limits configured around how your application actually behaves, not constrained to a generic plan ceiling. Burst windows, sustained throughput caps, and method-level overrides are all available as part of the enterprise configuration.",
+      "Enterprise conversations can include tighter request budgets, workload-specific rate controls, and lane selection for traffic that does not fit the standard shared posture.",
   },
   {
-    title: "Team and RBAC",
+    title: "Operational reviews",
     description:
-      "Full role-based access control across your organization with owner, admin, member, and viewer roles. Every privileged action generates an immutable audit log entry, giving your security team the visibility they need for compliance and incident review.",
+      "We can review project setup, funding flow, key management, alerts, and webhook usage with your team so the operational model is clear before more traffic moves onto the platform.",
   },
   {
-    title: "Advanced analytics",
+    title: "Retention and exports",
     description:
-      "Extended log retention, exportable raw request data, custom dashboard views, and deeper method-level breakdowns than the standard analytics surface. Enterprise teams can pull data into their own tooling through structured exports.",
+      "If you need deeper history or data movement into your own tooling, we can scope retention, exports, and reporting needs as part of the engagement.",
   },
   {
-    title: "Dedicated support",
+    title: "Direct support channel",
     description:
-      "A private support channel with a guaranteed response SLA and a named contact who understands your deployment. Support is direct, not forum-based, and covers infrastructure questions, architecture review, and incident coordination.",
+      "Enterprise work is handled directly with the team operating the stack, which keeps debugging, rollout questions, and incident coordination close to the source.",
   },
 ];
 
@@ -98,11 +98,11 @@ export default function EnterprisePage() {
               Enterprise
             </div>
             <h1 className="font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-              Ready for{" "}
-              <span className="fyxvo-text-gradient">serious traffic</span>
+              For teams that need a{" "}
+              <span className="fyxvo-text-gradient">closer operating relationship</span>
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Enterprise plans give high-volume teams dedicated Solana devnet infrastructure that is entirely separate from the shared relay pool. You get formal SLA backing, custom rate limit configuration, role-based team management, and a direct support line rather than a help forum.
+              Fyxvo&apos;s enterprise track is for private-alpha teams that need more throughput guidance, rollout support, or operational alignment than the shared surface provides by default.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -123,10 +123,10 @@ export default function EnterprisePage() {
             What you get
           </p>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Built for teams operating at scale
+            What enterprise engagements focus on
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Six capabilities that go beyond what the standard shared infrastructure offers. Each one is designed for teams where reliability, visibility, and control are non-negotiable.
+            These are the common areas we shape with teams that need a more hands-on rollout path.
           </p>
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (
@@ -153,16 +153,16 @@ export default function EnterprisePage() {
             <div className="grid gap-10 sm:grid-cols-3 text-center">
               {[
                 {
-                  stat: "10M+",
-                  description: "Requests handled daily through the managed relay infrastructure.",
+                  stat: "Private alpha",
+                  description: "Best fit for teams validating a funded devnet workflow before wider launch.",
                 },
                 {
-                  stat: "<50ms",
-                  description: "p95 relay latency under normal operating conditions across devnet.",
+                  stat: "Shared or isolated",
+                  description: "We can scope traffic on the shared relay or discuss separated paths for more sensitive workloads.",
                 },
                 {
-                  stat: "99.9%",
-                  description: "Uptime target backed by formal SLA for enterprise deployments.",
+                  stat: "Human support",
+                  description: "Conversations are handled directly with the team operating the platform.",
                 },
               ].map(({ stat, description }) => (
                 <div key={stat}>
@@ -194,21 +194,21 @@ export default function EnterprisePage() {
                 Talk to us about your use case
               </h2>
               <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                Tell us about your company, your expected traffic, and what you are building. We usually respond within one business day and the conversation will be with someone who understands the Fyxvo infrastructure stack, not a sales script.
+                Tell us about your traffic shape, rollout timeline, and the operational constraints you care about. We usually respond within one business day, and the conversation stays with someone close to the stack.
               </p>
               <div className="mt-8 space-y-4">
                 {[
                   {
-                    heading: "Dedicated infrastructure",
-                    body: "Enterprise customers get routing infrastructure that is entirely isolated from the shared relay pool.",
+                    heading: "Capacity planning",
+                    body: "We can help map your expected traffic and relay mode to a rollout path that stays realistic.",
                   },
                   {
-                    heading: "Flexible volume pricing",
-                    body: "High-volume teams can negotiate per-request rates that go beyond the standard automatic discount tiers.",
+                    heading: "Rollout guardrails",
+                    body: "Funding flow, alerts, request policies, and support expectations can be worked through up front.",
                   },
                   {
-                    heading: "Direct support channel",
-                    body: "A private support line with a real person and a guaranteed response window, not a community forum.",
+                    heading: "Hands-on support",
+                    body: "You get direct conversation with the team operating the platform rather than a generic intake queue.",
                   },
                 ].map((item) => (
                   <div

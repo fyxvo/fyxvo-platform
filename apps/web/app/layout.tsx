@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: webEnv.socialImageUrl,
-        alt: `${webEnv.appName} devnet infrastructure preview`
+        alt: `${webEnv.appName} devnet control plane preview`
       }
     ]
   },

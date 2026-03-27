@@ -452,11 +452,10 @@ async fn main() -> anyhow::Result<()> {
             <SectionHeading id="introduction" title="Introduction" />
             <Prose>
               <p>
-                Fyxvo is a Solana devnet infrastructure platform built for teams and individual
-                developers who need more than a shared public RPC node. Rather than competing for
-                capacity on a best-effort endpoint, Fyxvo projects run on dedicated relay
-                infrastructure that is funded on-chain, scoped per API key, and observable in
-                real time through an analytics dashboard.
+                Fyxvo is a Solana devnet control plane built for teams and individual developers
+                who need more than a shared public RPC node. Instead of sending traffic to a
+                best-effort endpoint with little visibility, Fyxvo gives each project a funded
+                relay path, scoped API keys, request traces, and operational views in one place.
               </p>
               <p>
                 The platform is currently in private alpha. Access is granted on a rolling basis
@@ -1495,7 +1494,7 @@ jobs:
                 </strong>
                 Fyxvo currently operates exclusively on Solana devnet. Mainnet support is on the
                 roadmap but there is no confirmed date. During the private alpha phase the focus
-                is on hardening the devnet infrastructure and collecting developer feedback.
+                is on hardening the devnet control plane and collecting developer feedback.
               </p>
               <p>
                 <strong className="block font-semibold text-[var(--fyxvo-text)]">

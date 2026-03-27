@@ -72,9 +72,8 @@ export function SiteFooter() {
           <div className="space-y-5">
             <BrandLogo />
             <p className="max-w-sm text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-              Real Solana infrastructure for teams that want funded relay traffic, honest
-              operational visibility, and product surfaces that stay close to what is
-              actually live.
+              Fyxvo is a Solana devnet control plane for funded RPC access, project operations,
+              request traces, alerts, and assistant-guided support.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
@@ -83,7 +82,7 @@ export function SiteFooter() {
                 </p>
                 <p className="mt-2 text-sm font-semibold text-[var(--fyxvo-text)]">Devnet private alpha</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">
-                  Wallet-authenticated control, funded request flow, and public status surfaces.
+                  Wallet auth, project funding, API keys, analytics, and public status surfaces.
                 </p>
               </div>
               <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
@@ -99,7 +98,7 @@ export function SiteFooter() {
                   Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc
                 </Link>
                 <p className="mt-1 text-xs leading-5 text-[var(--fyxvo-text-muted)]">
-                  Governed staged program now backing the hosted devnet stack.
+                  Live devnet protocol state with explorer-verifiable addresses and public trust links.
                 </p>
               </div>
             </div>
@@ -119,10 +118,10 @@ export function SiteFooter() {
                 Stay close to the rollout
               </p>
               <h3 className="mt-2 font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-                Get product updates, launch notes, and operational changes in one place.
+                Get rollout notes without the filler.
               </h3>
               <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-                The newsletter covers shipped product depth, infrastructure changes, and the next release gates.
+                The newsletter covers shipped product changes, reliability updates, and launch milestones that affect real usage.
               </p>
             </div>
             <div className="w-full max-w-xl">

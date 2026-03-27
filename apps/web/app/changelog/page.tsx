@@ -50,7 +50,7 @@ const entries: ChangelogEntry[] = [
     version: "0.1.5",
     date: "March 2026",
     prose:
-      "The Fyxvo Assistant launched as a streaming chat interface available from the dashboard. The assistant has full context of the platform: available endpoints, pricing tiers, relay architecture, and common developer workflows for Solana. It can generate code examples, explain funding mechanics, and answer questions about the devnet infrastructure. Conversation history is preserved for the duration of your session.",
+      "The Fyxvo Assistant launched as a streaming chat interface available from the dashboard. The assistant has full context of the platform: available endpoints, pricing tiers, relay architecture, and common developer workflows for Solana. It can generate code examples, explain funding mechanics, and answer questions about the devnet control plane. Conversation history is preserved for the duration of your session.",
   },
   {
     version: "0.1.4",

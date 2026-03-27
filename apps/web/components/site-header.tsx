@@ -12,12 +12,12 @@ import { usePortal } from "./portal-provider";
 import { shortenAddress } from "../lib/format";
 
 const primaryLinks = [
-  { href: "/", label: "Home", description: "Solana devnet" },
-  { href: "/dashboard", label: "Dashboard", description: "Workspace" },
-  { href: "/explore", label: "Explore", description: "Public projects" },
-  { href: "/docs", label: "Docs", description: "Guides and API" },
-  { href: "/pricing", label: "Pricing", description: "Relay costs" },
-  { href: "/status", label: "Status", description: "Live health" },
+  { href: "/", label: "Home", description: "Control plane" },
+  { href: "/dashboard", label: "Dashboard", description: "Projects and keys" },
+  { href: "/explore", label: "Explore", description: "Public registry" },
+  { href: "/docs", label: "Docs", description: "Quickstart and API" },
+  { href: "/pricing", label: "Pricing", description: "Funding model" },
+  { href: "/status", label: "Status", description: "Network health" },
 ] as const;
 
 const secondaryLinks = [
@@ -62,17 +62,17 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)] sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[var(--fyxvo-success)]" />
-            <span>Live devnet control surface</span>
+            <span>Devnet private alpha</span>
           </div>
           <div className="hidden items-center gap-2 sm:flex">
             <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-[10px] tracking-[0.18em]">
               Wallet auth
             </span>
             <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-[10px] tracking-[0.18em]">
-              On-chain funded
+              Funded projects
             </span>
             <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2 py-1 text-[10px] tracking-[0.18em]">
-              Request logs
+              Request traces
             </span>
           </div>
         </div>
@@ -214,7 +214,7 @@ export function SiteHeader() {
               {portal.walletPhase === "authenticated" ? (
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">Wallet connected</p>
+                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">Wallet session active</p>
                     <p className="font-mono text-xs text-[var(--fyxvo-text-muted)]">{walletLabel}</p>
                   </div>
                   <Button

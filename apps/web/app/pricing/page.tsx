@@ -10,21 +10,21 @@ const TIERS = [
     tag: "standard",
     lamports: 1000,
     description:
-      "Covers the everyday JSON-RPC reads your application relies on, including getBalance, getAccountInfo, getBlock, and getTransaction. Requests go through full key validation, balance checks, rate limiting, and automatic multi-node failover.",
+      "Covers the everyday JSON-RPC reads most apps depend on, such as getBalance, getAccountInfo, getBlock, and getTransaction. Requests still pass through key validation, funding checks, rate controls, and upstream failover.",
   },
   {
     name: "Compute-heavy",
     tag: "compute-heavy",
     lamports: 3000,
     description:
-      "Handles the heavier Solana methods that demand more upstream compute, such as getProgramAccounts, getTokenAccountsByOwner, and getSignaturesForAddress. Priced to reflect the real cost these queries place on the node pool.",
+      "Handles methods that place more load on upstream nodes, including getProgramAccounts, getTokenAccountsByOwner, and getSignaturesForAddress. The higher rate reflects the heavier work those requests trigger.",
   },
   {
     name: "Priority relay",
     tag: "priority",
     lamports: 5000,
     description:
-      "A dedicated routing endpoint with its own rate window and separate pricing tier. Built specifically for latency-sensitive operations like DeFi transactions where every millisecond matters and contention with standard traffic is unacceptable.",
+      "Uses the priority relay path with its own rate controls and pricing. It is designed for traffic that needs a tighter latency budget or a different request lane than the standard relay.",
   },
 ] as const;
 
@@ -120,10 +120,10 @@ export default function PricingPage() {
             Pricing
           </p>
           <h1 className="mt-3 font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-            Simple, transparent pricing
+            Pricing that stays tied to real usage
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Fyxvo charges per request in lamports with no subscriptions, no platform fees, and no billing cycles. Fund your project on chain with SOL and your balance decrements as you use it. Volume discounts apply automatically at one million and ten million requests per month.
+            Fyxvo charges per request in lamports. You fund a project with devnet SOL, the relay debits published rates as traffic passes through, and volume discounts apply automatically as usage grows.
           </p>
           {solPrice != null ? (
             <div className="mt-6 flex items-center gap-2 text-sm text-[var(--fyxvo-text-muted)]">
@@ -145,10 +145,10 @@ export default function PricingPage() {
             Request tiers
           </p>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Three tiers, one price per request
+            Published rates for every request class
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Each request is classified at the gateway and billed at the rate for that tier. There is no ambiguity about which tier a method falls into.
+            The gateway classifies traffic by method profile and applies the matching lamport rate. Pricing stays visible in the product and docs instead of hiding behind a generic plan label.
           </p>
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
             {TIERS.map((tier) => {
@@ -196,10 +196,10 @@ export default function PricingPage() {
               Getting started
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              On-chain funding, no subscriptions
+              Start with a funded devnet project
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              There is no free tier. Getting started requires creating a project, activating it on chain, and depositing a small amount of devnet SOL. Devnet SOL is available from public faucets and costs nothing to obtain. This keeps every request backed by a verifiable on-chain balance rather than a simulated credit.
+              Getting started means creating a project, activating it on chain, and depositing devnet SOL. That keeps every request backed by a verifiable funded balance rather than an internal credit counter.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild>
@@ -220,10 +220,10 @@ export default function PricingPage() {
             Volume discounts
           </p>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Automatic discounts at scale
+            Automatic discounts as traffic grows
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Volume discounts apply automatically when your project crosses a monthly threshold. You do not need to sign up for a different plan or negotiate a contract.
+            Volume discounts apply automatically when your project crosses a monthly threshold. You do not need to switch plans or renegotiate the basic pricing model.
           </p>
           <div className="mt-10 grid gap-6 sm:grid-cols-2">
             <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
@@ -259,10 +259,10 @@ export default function PricingPage() {
             Revenue split
           </p>
           <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Where the fees go
+            How request fees are allocated
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            Every request fee is divided on chain according to fixed protocol-level ratios. There is no off-platform fee or hidden margin.
+            Request fees are split according to the protocol and operating model behind the network. The goal is to keep the flow understandable instead of hiding it inside a bundled subscription.
           </p>
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
             {[
@@ -514,7 +514,7 @@ export default function PricingPage() {
             How Fyxvo compares
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            A straightforward comparison based on publicly available information. This is context for decision-making, not marketing copy.
+            A quick orientation for teams deciding between a funded relay workflow and more traditional shared RPC options.
           </p>
           <div className="mt-10 overflow-x-auto">
             <table className="w-full text-sm">
@@ -550,7 +550,7 @@ export default function PricingPage() {
                   },
                   {
                     feature: "Request logging",
-                    fyxvo: "Live, per-request",
+                    fyxvo: "Built in, per-request",
                     pub: "None",
                     generic: "Paid tier only",
                   },
@@ -574,7 +574,7 @@ export default function PricingPage() {
                   },
                   {
                     feature: "Project management",
-                    fyxvo: "On-chain projects, RBAC",
+                    fyxvo: "Projects, keys, funding, traces",
                     pub: "No",
                     generic: "Varies",
                   },
@@ -611,10 +611,10 @@ export default function PricingPage() {
               Enterprise
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              Need volume pricing?
+              Need a higher-throughput rollout path?
             </h2>
             <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Teams with high-volume requirements, custom rate limit needs, or dedicated infrastructure requests should reach out directly. Enterprise plans include priority SLA, dedicated node allocation, custom analytics retention, and a direct support channel.
+              Teams that need sustained high volume, isolated routing, or closer operational support can talk with us directly about an enterprise rollout path.
             </p>
             <div className="mt-8">
               <Button asChild>

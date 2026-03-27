@@ -8,35 +8,35 @@ const STEPS = [
   {
     step: 1,
     title: "Welcome to Fyxvo",
-    body: "Fyxvo is a high-performance Solana RPC gateway on devnet. You get a dedicated endpoint, analytics, and API key management — all in one place.",
+    body: "Fyxvo is a Solana devnet control plane for funded RPC access, project operations, request traces, alerts, and assistant-guided support.",
     action: null,
     isCode: false,
   },
   {
     step: 2,
     title: "Create your first project",
-    body: "Projects are the billing and configuration unit. Each project gets its own on-chain account, endpoint, and API keys. Create one from the Dashboard.",
+    body: "Projects are the operating unit inside Fyxvo. Each one gets its own funding state, endpoint path, API keys, analytics, and settings.",
     action: { label: "Go to Dashboard", href: "/dashboard" },
     isCode: false,
   },
   {
     step: 3,
-    title: "Fund with SOL",
-    body: "Requests are paid for in SOL from your project's on-chain treasury. Fund at least 0.01 SOL to start making requests. Unused balance is always withdrawable.",
+    title: "Fund with devnet SOL",
+    body: "Requests are paid from your project's funded balance. Top up with devnet SOL to validate the real accounting flow before you ship broader usage.",
     action: { label: "Fund a project", href: "/funding" },
     isCode: false,
   },
   {
     step: 4,
     title: "Create an API key",
-    body: "API keys are scoped credentials that authenticate your gateway requests. Create a key with rpc:request scope to start relaying.",
+    body: "API keys are project-scoped credentials for the relay. Create a key with the scopes your app needs, then rotate or revoke it from the workspace whenever required.",
     action: { label: "Create API key", href: "/api-keys" },
     isCode: false,
   },
   {
     step: 5,
     title: "Make your first request",
-    body: "Replace any Solana RPC URL with your Fyxvo endpoint.",
+    body: "Start with the standard relay path and add your project key in the request headers.",
     action: { label: "Read the docs", href: "/docs" },
     isCode: true,
   },
@@ -73,9 +73,9 @@ export function WelcomeModal({ onDismiss }: { onDismiss: () => void }) {
           <h2 className="font-display text-xl font-semibold text-[var(--fyxvo-text)] mb-3">{current.title}</h2>
           {current.isCode ? (
             <div>
-              <p className="text-sm text-[var(--fyxvo-text-muted)] mb-3">Replace any Solana RPC URL with your Fyxvo endpoint:</p>
+              <p className="text-sm text-[var(--fyxvo-text-muted)] mb-3">Start with the standard relay endpoint:</p>
               <pre className="rounded-xl bg-[var(--fyxvo-bg)] border border-[var(--fyxvo-border)] p-4 text-xs text-[var(--fyxvo-text)] overflow-x-auto">
-                {`const connection = new Connection("https://rpc.fyxvo.com", {\n  httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" }\n});`}
+                {`const connection = new Connection("https://rpc.fyxvo.com/rpc", {\n  httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" }\n});`}
               </pre>
             </div>
           ) : (
@@ -97,7 +97,7 @@ export function WelcomeModal({ onDismiss }: { onDismiss: () => void }) {
             {step < STEPS.length - 1 ? (
               <Button size="sm" onClick={() => setStep(step + 1)}>Next</Button>
             ) : (
-              <Button size="sm" onClick={onDismiss}>Get started</Button>
+              <Button size="sm" onClick={onDismiss}>Open workspace</Button>
             )}
           </div>
         </div>

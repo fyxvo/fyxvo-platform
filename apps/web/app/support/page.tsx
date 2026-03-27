@@ -52,7 +52,7 @@ interface FaqItem {
 const CATEGORY_LABELS: Record<TicketCategory, string> = {
   BUG_REPORT: "Bug Report",
   SUPPORT_REQUEST: "Support Request",
-  ONBOARDING_FRICTION: "Onboarding Issue",
+  ONBOARDING_FRICTION: "Onboarding Friction",
   PRODUCT_FEEDBACK: "Product Feedback",
 };
 
@@ -89,91 +89,91 @@ const DOCS_FAQ: FaqItem[] = [
     category: "getting-started",
     question: "How do I create my first project?",
     answer:
-      'After signing in, go to the Dashboard and click "New Project". Enter a project name, choose your target network (mainnet or devnet), and confirm. Your project endpoint will be generated instantly.',
+      'Connect a wallet, open the Dashboard, and create a project. Fyxvo will prepare the project record and guide you through the activation transaction so the project becomes live on devnet.',
   },
   {
     category: "getting-started",
     question: "What is fyxvo and what does it do?",
     answer:
-      "fyxvo is a Solana RPC gateway that provides high-availability endpoints for your dApps and bots. You fund a project with SOL, receive an API key, and use it to route JSON-RPC calls through our globally distributed infrastructure.",
+      "Fyxvo is a Solana devnet control plane for funded RPC access. It combines project activation, funding, API keys, request traces, alerts, and assistant workflows around a managed relay.",
   },
   {
     category: "getting-started",
     question: "Which Solana networks are supported?",
     answer:
-      "fyxvo supports Solana mainnet-beta and devnet. Testnet support is on the roadmap. You can create separate projects for each network.",
+      "The current hosted deployment is devnet-only. Mainnet is not publicly launched yet, and the product copy, pricing, and operational flow are all aligned to the devnet private alpha.",
   },
   {
     category: "api-keys",
     question: "How do I generate an API key?",
     answer:
-      'In your project settings, open the "API Keys" tab and click "Generate Key". Keys are scoped to a single project. You can create up to 5 keys per project and revoke any at any time.',
+      'Open your project workspace and create a key from the API key controls. Keys are project-scoped, carry explicit scopes, and can be revoked or rotated whenever you need to change access.',
   },
   {
     category: "api-keys",
     question: "My API key stopped working — what should I check?",
     answer:
-      "First verify the key is active in Project Settings → API Keys. Check whether your project balance has been exhausted. Also confirm you're passing the key in the x-api-key header, not as a query parameter.",
+      "Check that the key is still active, the project has funded balance available, and the request is using the correct relay path. Also confirm the key is being sent in the x-api-key header.",
   },
   {
     category: "api-keys",
     question: "Can I restrict an API key to specific IP addresses?",
     answer:
-      "IP allowlisting is available on the Pro plan and above. In API key settings you can add up to 10 CIDR ranges. Requests from outside those ranges will receive a 403 response.",
+      "IP-based restrictions are not part of the default public alpha flow today. If you need tighter access controls around key usage, reach out and we can talk through the current options.",
   },
   {
     category: "funding",
     question: "How do I top up my project balance?",
     answer:
-      "Connect your Solana wallet, navigate to Project → Billing, and send SOL to your project vault address. The balance updates on-chain confirmation (usually within 2–5 seconds on mainnet).",
+      "Connect your wallet, open the funding flow for the project, and sign the top-up transaction with devnet SOL. The balance updates after confirmation and becomes available to the relay immediately afterward.",
   },
   {
     category: "funding",
     question: "What does 0.05 SOL get me in request volume?",
     answer:
-      "At the standard rate, 0.05 SOL covers approximately 50,000 standard RPC calls. Priority calls (e.g. sendTransaction with higher commitment) consume more credits per request.",
+      "At the standard 1,000-lamport rate, 0.05 SOL covers roughly 50,000 standard requests. Compute-heavy and priority traffic consume more, so your exact runway depends on the mix you send.",
   },
   {
     category: "funding",
     question: "Is there a free tier or trial?",
     answer:
-      "New accounts receive 10,000 free requests on devnet to explore the platform. Mainnet usage requires a funded project. There is no time-limited trial — unused devnet credits carry over indefinitely.",
+      "There is no free tier in the current alpha. The live path is to fund a project with devnet SOL so request accounting, alerts, and relay behavior all reflect the real product flow.",
   },
   {
     category: "gateway",
     question: "What RPC methods does the gateway support?",
     answer:
-      "fyxvo proxies all standard Solana JSON-RPC methods including getLatestBlockhash, sendTransaction, getAccountInfo, getProgramAccounts, simulateTransaction, and every method in the Solana v1 RPC spec.",
+      "Fyxvo supports the standard Solana JSON-RPC flow through the relay, with request classification layered on top for standard, compute-heavy, and priority traffic. The docs call out the main paths and examples.",
   },
   {
     category: "gateway",
     question: "What is the rate limit on the gateway?",
     answer:
-      "Standard plan allows 100 requests/second per API key. Pro allows 500 req/s. Enterprise has custom limits. Burst capacity is available — contact us if you need short-term higher throughput.",
+      "Rate controls are enforced at the project and key level. The exact ceiling depends on the current alpha posture and the route you are using, so if you need sustained higher throughput it is best to contact us directly.",
   },
   {
     category: "analytics",
     question: "How do I view request analytics for my project?",
     answer:
-      "Go to Project → Analytics. You'll see request volume over time, success/error rates, method breakdown, and latency percentiles. Data is retained for 30 days on standard, 90 days on Pro.",
+      "Open the Analytics view for your project. You can review request volume, success and failure rates, method breakdowns, latency trends, and related operational signals from the same workspace.",
   },
   {
     category: "webhooks",
     question: "How do webhooks work on fyxvo?",
     answer:
-      "fyxvo can push real-time events (balance low, error spike, key revoked) to an HTTPS endpoint you configure. Go to Project → Webhooks, add your URL, select event types, and save. We sign every payload with HMAC-SHA256.",
+      "Fyxvo can send project events such as low balance, key changes, and delivery failures to an HTTPS endpoint you configure. Add the destination in project settings, choose the events you want, and test deliveries from the workspace.",
   },
   {
     category: "webhooks",
     question: "How do I verify webhook signatures?",
     answer:
-      "Each webhook POST includes an x-fyxvo-signature header containing an HMAC-SHA256 hex digest. Compute the HMAC of the raw request body using your webhook secret and compare it to the header value.",
+      "Each delivery includes an x-fyxvo-signature header. Compute the HMAC-SHA256 digest of the raw request body with your webhook secret and compare it to that header before accepting the payload.",
   },
   {
     category: "team",
     question: "Can I invite team members to my project?",
     answer:
-      "Team collaboration is available on the Pro plan. In Project Settings → Team, you can invite members by wallet address. Roles available are Owner, Editor (can manage keys/billing), and Viewer.",
+      "Yes. Project owners can invite teammates from settings, review pending invitations, and manage collaboration around keys, notes, webhooks, alerts, and other project operations.",
   },
 ];
 
@@ -222,7 +222,7 @@ const SUPPORT_CATEGORIES: SupportCategoryDef[] = [
   },
   {
     id: "gateway",
-    label: "Gateway Issues",
+    label: "Gateway & RPC",
     icon: (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
         <path
@@ -247,7 +247,7 @@ const SUPPORT_CATEGORIES: SupportCategoryDef[] = [
   },
   {
     id: "webhooks",
-    label: "Webhooks",
+    label: "Webhooks & Alerts",
     icon: (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
         <path
@@ -482,7 +482,7 @@ export default function SupportPage() {
       <PageHeader
         eyebrow="Help"
         title="Support"
-        description="Submit a support ticket and track your requests."
+        description="Search answers, submit a ticket, and track support updates."
       />
 
       {submitted && (
@@ -498,7 +498,7 @@ export default function SupportPage() {
         <div className="border-b border-[var(--fyxvo-border)] px-6 py-4">
           <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Search Help Articles</h2>
           <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)]">
-            Search through our FAQ to find instant answers.
+            Search the help library for setup, funding, keys, webhooks, and alerts.
           </p>
         </div>
         <div className="px-6 py-5">
@@ -518,7 +518,7 @@ export default function SupportPage() {
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search FAQ — e.g. &quot;api key&quot;, &quot;top up&quot;, &quot;webhook&quot;…"
+              placeholder="Search FAQ — e.g. &quot;api key&quot;, &quot;funding&quot;, &quot;webhook&quot;…"
               className="w-full rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] py-2.5 pl-9 pr-4 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-brand)]"
             />
           </div>
@@ -617,7 +617,7 @@ export default function SupportPage() {
         <div className="border-b border-[var(--fyxvo-border)] px-6 py-4">
           <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">New Ticket</h2>
           <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)]">
-            Describe your issue and our team will get back to you.
+            Describe the issue, affected project, and any useful traces or errors you already have.
           </p>
         </div>
 
@@ -730,7 +730,7 @@ export default function SupportPage() {
               disabled={submitting || !formValid}
               className="rounded-md bg-[var(--fyxvo-brand)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? "Submitting…" : "Submit Ticket"}
+              {submitting ? "Submitting…" : "Submit ticket"}
             </button>
           </div>
         </form>

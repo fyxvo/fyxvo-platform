@@ -7,7 +7,7 @@
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "lint": "eslint app components lib test next.config.ts vitest.config.ts --max-warnings=0",
-    "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
+    "typecheck": "mkdir -p .next/types && next typegen && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests && node ./test/firefox-hydration-regression.mjs",
     "perf:budgets": "node ./scripts/performance-budget.mjs",
     "prod:smoke": "node ./scripts/production-smoke.mjs"

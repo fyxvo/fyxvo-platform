@@ -11,17 +11,17 @@ import { webEnv } from "../lib/env";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Fyxvo — Solana devnet infrastructure"
+    absolute: "Fyxvo — Solana devnet control plane"
   },
   description:
-    "Fyxvo is real Solana devnet infrastructure for funded relay traffic with honest operational visibility. Create a project, fund it on chain, and start routing devnet requests in minutes.",
+    "Fyxvo is a Solana devnet control plane for funded RPC access, project activation, API keys, request traces, alerts, and assistant-guided support.",
   alternates: {
     canonical: webEnv.siteUrl
   },
   openGraph: {
-    title: "Fyxvo — Solana devnet infrastructure",
+    title: "Fyxvo — Solana devnet control plane",
     description:
-      "Real Solana devnet infrastructure for funded relay traffic with honest operational visibility.",
+      "Funded RPC access, project operations, request traces, alerts, and assistant support for Solana devnet teams.",
     url: webEnv.siteUrl,
     siteName: "Fyxvo",
     type: "website",
@@ -29,9 +29,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fyxvo — Solana devnet infrastructure",
+    title: "Fyxvo — Solana devnet control plane",
     description:
-      "Real Solana devnet infrastructure for funded relay traffic with honest operational visibility.",
+      "Funded RPC access, project operations, request traces, alerts, and assistant support for Solana devnet teams.",
     images: [webEnv.socialImageUrl]
   }
 };
@@ -44,31 +44,31 @@ const NAV_GROUPS = [
         label: "Dashboard",
         href: "/dashboard",
         description:
-          "Create and manage projects, fund balances, generate API keys, and monitor usage in one place."
+          "Create projects, fund balances, issue API keys, and manage the live workspace."
       },
       {
         label: "Quickstart",
         href: "/docs",
         description:
-          "Step-by-step guide from wallet connection to your first verified devnet request."
+          "Step-by-step guidance from wallet connection to your first routed devnet request."
       },
       {
         label: "Pricing",
         href: "/pricing",
         description:
-          "Per-request lamport pricing across three tiers with automatic volume discounts."
+          "Published request pricing, funding mechanics, and volume discounts."
       },
       {
         label: "Assistant",
         href: "/assistant",
         description:
-          "An AI assistant with full context about the Fyxvo platform and Solana development."
+          "Project-aware help for onboarding, debugging, funding, and relay operations."
       },
       {
         label: "Playground",
         href: "/playground",
         description:
-          "Send live JSON-RPC requests through the gateway directly from your browser."
+          "Send live JSON-RPC calls through the relay and inspect the response instantly."
       }
     ]
   },
@@ -79,31 +79,31 @@ const NAV_GROUPS = [
         label: "Status",
         href: "/status",
         description:
-          "Live health for the control API, relay gateway, and protocol readiness indicators."
+          "Live health for the API, gateway, protocol readiness, and active incidents."
       },
       {
         label: "Alerts",
         href: "/alerts",
         description:
-          "Configure low-balance thresholds and daily request alerts per project."
+          "Review balance, error-rate, webhook, and request-volume alerts by project."
       },
       {
         label: "Analytics",
         href: "/analytics",
         description:
-          "Request volume, latency distribution, error rates, and method-level breakdowns."
+          "Track request volume, latency, failures, and method mix across your traffic."
       },
       {
         label: "Explore",
         href: "/explore",
         description:
-          "Browse the on-chain project registry and operator infrastructure from a public view."
+          "Browse public projects, protocol state, and the operator-facing trust surface."
       },
       {
         label: "Changelog",
         href: "/changelog",
         description:
-          "Protocol updates, gateway releases, and infrastructure changes in chronological order."
+          "Shipping notes, platform changes, and rollout milestones in chronological order."
       }
     ]
   }
@@ -137,17 +137,17 @@ export default async function HomePage() {
             </div>
 
             <h1 className="fyxvo-fade-in-up fyxvo-stagger-2 font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-              Real Solana infrastructure{" "}
-              <span className="fyxvo-text-gradient">for funded relay traffic.</span>
+              The control plane{" "}
+              <span className="fyxvo-text-gradient">for funded Solana traffic.</span>
             </h1>
 
             <p className="fyxvo-fade-in-up fyxvo-stagger-3 mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Fyxvo is purpose-built devnet infrastructure that routes funded Solana relay traffic through a managed gateway. Every project is activated on chain, every request is logged, and every balance movement is verifiable. Nothing is simulated.
+              Fyxvo helps teams activate a project, fund it with devnet SOL, generate scoped API keys, and send RPC traffic through a managed relay with analytics, alerts, and assistant support layered on top.
             </p>
 
             <div className="fyxvo-fade-in-up fyxvo-stagger-4 mt-8 flex flex-wrap items-center gap-3">
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                Program ID
+                Live program
               </p>
               <div className="flex items-center gap-2 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1.5">
                 <Link
@@ -164,13 +164,13 @@ export default async function HomePage() {
 
             <div className="mt-10 flex flex-wrap gap-3">
               <Button asChild size="lg">
-                <Link href="/dashboard">Open dashboard</Link>
+                <Link href="/dashboard">Open workspace</Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
-                <Link href="/docs">Read the quickstart</Link>
+                <Link href="/docs">Read docs</Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
-                <Link href="/pricing">Review pricing</Link>
+                <Link href="/pricing">See pricing</Link>
               </Button>
               <Button asChild size="lg" variant="ghost">
                 <Link href="/assistant">Try the assistant</Link>
@@ -270,10 +270,10 @@ export default async function HomePage() {
                 Platform
               </p>
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                Everything in one place
+                Run the whole workflow in one surface
               </h2>
               <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                Fyxvo is a complete devnet infrastructure platform. The pages below cover every surface from initial setup to ongoing operations.
+                From activation and funding to request traces, alerts, and support, the pages below map the live product end to end.
               </p>
             </div>
           </FadeIn>
@@ -332,10 +332,10 @@ export default async function HomePage() {
                 Stay close
               </p>
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                Stay close to the rollout
+                Get rollout notes without the noise
               </h2>
               <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                Fyxvo sends product updates, infrastructure changes, and release notes. No noise, no marketing filler, only the things that matter to people running Solana devnet traffic.
+                Fyxvo sends product notes, operational changes, and release milestones that matter to teams actively testing Solana devnet traffic.
               </p>
               <div className="mt-8">
                 <NewsletterSignup />
