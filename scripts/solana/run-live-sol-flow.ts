@@ -211,7 +211,7 @@ async function main() {
     idempotencyKey: `api-key-${projectSlug}`,
     body: {
       label: "Live Devnet Gateway Key",
-      scopes: ["rpc:read", "rpc:write"]
+      scopes: ["rpc:request", "priority:relay"]
     }
   });
 
