@@ -34,7 +34,7 @@ console.log("Current slot:", slotResult);
 // Get the balance of a wallet
 const balance = await fyxvo.rpc<{ value: number }>({
   method: "getBalance",
-  params: ["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"]
+  params: ["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"]
 });
 console.log("Balance (lamports):", balance.value);
 ```

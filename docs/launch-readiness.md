@@ -35,7 +35,7 @@ Status key: COMPLETE | IN PROGRESS | NOT STARTED | N/A
 
 ## Protocol Requirements
 
-- [x] On-chain program deployed to devnet: COMPLETE (FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa)
+- [x] On-chain program deployed to devnet: COMPLETE (Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc)
 - [x] SOL funding flow working: COMPLETE
 - [ ] USDC funding flow: NOT STARTED (gated — requires USDC vault initialization)
 - [ ] Mainnet program deployment: NOT STARTED

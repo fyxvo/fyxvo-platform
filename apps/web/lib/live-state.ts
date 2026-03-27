@@ -1,10 +1,10 @@
 export const liveDevnetState = {
-  programId: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",
+  programId: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",
   adminAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
-  protocolConfig: "GCWgmpoS2booNCp5VNP6z9HdYmkXpoXpM3rPK8kziqKX",
-  treasury: "3JaVp2CsJASutTAzVAjNfXi4yAR5f8uH1zoXAgaSh3px",
-  operatorRegistry: "Df3tPaGGietrQdqjX7FGkuYb1XF6o36Vat2q92BmioWC",
-  treasuryUsdcVault: "31xqm4gxzqQhxLr8RpBpMggr4DywGUnMLDWPKdR5Baa9",
+  protocolConfig: "J4uiLhB3qaYUFvu6YAT6oTrBbe7qXfwZFfLm2ph5GTAH",
+  treasury: "HvgY6dGviH5xosaHvVBNKwt2gTTnJYJ9aG7dWC4wqST1",
+  operatorRegistry: "9k4Xr4qfVMSN14aNkFdDFHbd74syujkyYcGKGTWYxmRQ",
+  treasuryUsdcVault: "2epkxnyGfX6FPYRmPa2tystcd1UrvjYFR5wJh6uKZj5i",
   managedOperatorWallet: "8TZ1Q5TqNmbDkza57ZssfmufMxX8hxoKV28uhWg4Qnph",
   managedOperatorAccount: "5DnhYryvZAKWLY6kuzQKYrUdNBCskQ3oZgnrMmj6Fwi6",
   managedRewardAccount: "HM3HHtkJDY4gYzeixSfEQp2Hk7VrE8mQoouNhM7q3TEG"

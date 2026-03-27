@@ -18,11 +18,11 @@ The deployment flow is intentionally split into two tracks:
 
 The devnet protocol is now live with these fixed addresses:
 
-1. Program ID `FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa`
-2. Protocol config `GCWgmpoS2booNCp5VNP6z9HdYmkXpoXpM3rPK8kziqKX`
-3. Treasury `3JaVp2CsJASutTAzVAjNfXi4yAR5f8uH1zoXAgaSh3px`
-4. Operator registry `Df3tPaGGietrQdqjX7FGkuYb1XF6o36Vat2q92BmioWC`
-5. Treasury USDC vault `31xqm4gxzqQhxLr8RpBpMggr4DywGUnMLDWPKdR5Baa9`
+1. Program ID `Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc`
+2. Protocol config `J4uiLhB3qaYUFvu6YAT6oTrBbe7qXfwZFfLm2ph5GTAH`
+3. Treasury `HvgY6dGviH5xosaHvVBNKwt2gTTnJYJ9aG7dWC4wqST1`
+4. Operator registry `9k4Xr4qfVMSN14aNkFdDFHbd74syujkyYcGKGTWYxmRQ`
+5. Treasury USDC vault `2epkxnyGfX6FPYRmPa2tystcd1UrvjYFR5wJh6uKZj5i`
 
 ## 2. Frontend on Vercel
 
@@ -226,7 +226,7 @@ Use the environment examples this way:
 | `DATABASE_LOG_QUERIES` | Prisma package | No | `false` | Enables Prisma query logs |
 | `REDIS_URL` | API, gateway, worker | Yes | Local Redis URL | Redis connection string |
 | `SOLANA_CLUSTER` | API, gateway, worker | No | `devnet` | Only `devnet` is supported by shared config today |
-| `FYXVO_PROGRAM_ID` | API, gateway, worker, scripts | Yes | `FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa` | Target Anchor program ID for devnet |
+| `FYXVO_PROGRAM_ID` | API, gateway, worker, scripts | Yes | `Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc` | Target Anchor program ID for devnet |
 | `FYXVO_ADMIN_AUTHORITY` | API, gateway, worker, scripts | Yes | `AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem` | Current live protocol authority expectation used by readiness checks |
 | `FYXVO_AUTHORITY_MODE` | API, gateway, worker | No | `single-signer` | Honest governance posture indicator for operations surfaces |
 | `FYXVO_PROTOCOL_AUTHORITY` | API, gateway, worker | No | Falls back to `FYXVO_ADMIN_AUTHORITY` | Intended protocol authority signer for migration planning |

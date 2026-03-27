@@ -51,11 +51,11 @@ The product is split into clear operational layers:
 ## Current On-Chain State
 
 Current live devnet program:
-- Program ID: `FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa`
+- Program ID: `Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc`
 - Protocol admin authority: `AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem`
-- Protocol config: `GCWgmpoS2booNCp5VNP6z9HdYmkXpoXpM3rPK8kziqKX`
-- Treasury: `3JaVp2CsJASutTAzVAjNfXi4yAR5f8uH1zoXAgaSh3px`
-- Operator registry: `Df3tPaGGietrQdqjX7FGkuYb1XF6o36Vat2q92BmioWC`
+- Protocol config: `J4uiLhB3qaYUFvu6YAT6oTrBbe7qXfwZFfLm2ph5GTAH`
+- Treasury: `HvgY6dGviH5xosaHvVBNKwt2gTTnJYJ9aG7dWC4wqST1`
+- Operator registry: `9k4Xr4qfVMSN14aNkFdDFHbd74syujkyYcGKGTWYxmRQ`
 
 Important truth:
 - The original live upgrade authority is not the admin authority

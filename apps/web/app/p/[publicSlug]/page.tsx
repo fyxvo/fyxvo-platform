@@ -139,7 +139,7 @@ export default async function PublicProjectPage({
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <a
-                href="https://explorer.solana.com/address/FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa?cluster=devnet"
+                href="https://explorer.solana.com/address/Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc?cluster=devnet"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"

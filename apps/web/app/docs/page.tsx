@@ -2325,7 +2325,7 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         params: "[pubkey]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"]}'`,
+  -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"]}'`,
                       },
                       {
                         name: "getAccountInfo",
@@ -2335,7 +2335,7 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         params: "[pubkey]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",{"encoding":"base58"}]}'`,
+  -d '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",{"encoding":"base58"}]}'`,
                       },
                       {
                         name: "getMultipleAccounts",
@@ -2525,7 +2525,7 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                         params: "[address]",
                         example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
   -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSignaturesForAddress","params":["FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",{"limit":10}]}'`,
+  -d '{"jsonrpc":"2.0","id":1,"method":"getSignaturesForAddress","params":["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",{"limit":10}]}'`,
                       },
                       {
                         name: "getSignatureStatuses",

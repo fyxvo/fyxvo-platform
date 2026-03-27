@@ -1,0 +1,12 @@
+services:
+  solana-verify:
+    build:
+      context: .
+      dockerfile: Dockerfile.verify-build
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      HOME: /tmp
+    entrypoint: ["solana-verify"]

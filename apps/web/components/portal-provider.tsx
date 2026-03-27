@@ -333,7 +333,7 @@ export function PortalProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const [keys, overview, analytics, onchain] = await Promise.all([
+    const [keysResult, overviewResult, analyticsResult, onchainResult] = await Promise.allSettled([
       listApiKeys(projectId, sessionToken),
       getAnalyticsOverview(sessionToken),
       getProjectAnalytics(projectId, sessionToken),
@@ -341,10 +341,18 @@ export function PortalProvider({ children }: PropsWithChildren) {
     ]);
 
     startTransition(() => {
-      setApiKeys(keys);
-      setAnalyticsOverview(overview);
-      setProjectAnalytics(analytics);
-      setOnchainSnapshot(onchain);
+      if (keysResult.status === "fulfilled") {
+        setApiKeys(keysResult.value);
+      }
+      if (overviewResult.status === "fulfilled") {
+        setAnalyticsOverview(overviewResult.value);
+      }
+      if (analyticsResult.status === "fulfilled") {
+        setProjectAnalytics(analyticsResult.value);
+      }
+      if (onchainResult.status === "fulfilled") {
+        setOnchainSnapshot(onchainResult.value);
+      }
     });
   }
 
@@ -369,10 +377,21 @@ export function PortalProvider({ children }: PropsWithChildren) {
       const refreshedUser = meResult?.user ?? user;
       const effectiveRole = refreshedUser?.role ?? user?.role;
 
-      const [stats, overview, nextOperators] =
-        effectiveRole === "OWNER" || effectiveRole === "ADMIN"
-          ? await Promise.all([getAdminStats(token), getAdminOverview(token), getOperators(token)])
-          : [null, null, []];
+      let stats: AdminStats | null = null;
+      let overview: AdminOverview | null = null;
+      let nextOperators: OperatorSummary[] = [];
+
+      if (effectiveRole === "OWNER" || effectiveRole === "ADMIN") {
+        const [statsResult, overviewResult, operatorsResult] = await Promise.allSettled([
+          getAdminStats(token),
+          getAdminOverview(token),
+          getOperators(token)
+        ]);
+
+        stats = statsResult.status === "fulfilled" ? statsResult.value : null;
+        overview = overviewResult.status === "fulfilled" ? overviewResult.value : null;
+        nextOperators = operatorsResult.status === "fulfilled" ? operatorsResult.value : [];
+      }
 
       if (nextSelectedProjectId) {
         await refreshProjectScopedData(token, nextSelectedProjectId);

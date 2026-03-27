@@ -3,7 +3,7 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 use solana_security_txt::security_txt;
 
-declare_id!("FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa");
+declare_id!("Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc");
 
 security_txt! {
     name: "Fyxvo",

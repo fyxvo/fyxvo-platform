@@ -16,14 +16,14 @@ The current program supports:
 
 The implementation lives in [`programs/fyxvo/src/lib.rs`](../programs/fyxvo/src/lib.rs).
 
-For devnet activation, the deployed program ID is `FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa` and the configured admin authority is `AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem`.
+For devnet activation, the deployed program ID is `Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc` and the configured admin authority is `AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem`.
 
 The live devnet protocol addresses are:
 
-1. `ProtocolConfig`: `GCWgmpoS2booNCp5VNP6z9HdYmkXpoXpM3rPK8kziqKX`
-2. `Treasury`: `3JaVp2CsJASutTAzVAjNfXi4yAR5f8uH1zoXAgaSh3px`
-3. `OperatorRegistry`: `Df3tPaGGietrQdqjX7FGkuYb1XF6o36Vat2q92BmioWC`
-4. Treasury USDC vault: `31xqm4gxzqQhxLr8RpBpMggr4DywGUnMLDWPKdR5Baa9`
+1. `ProtocolConfig`: `J4uiLhB3qaYUFvu6YAT6oTrBbe7qXfwZFfLm2ph5GTAH`
+2. `Treasury`: `HvgY6dGviH5xosaHvVBNKwt2gTTnJYJ9aG7dWC4wqST1`
+3. `OperatorRegistry`: `9k4Xr4qfVMSN14aNkFdDFHbd74syujkyYcGKGTWYxmRQ`
+4. Treasury USDC vault: `2epkxnyGfX6FPYRmPa2tystcd1UrvjYFR5wJh6uKZj5i`
 
 ## 2. Accounts and PDA Layout
 

@@ -102,7 +102,7 @@ Should show `status: "ok"` with all dependencies green.
 **Symptoms:** Treasury balance unexpectedly low, funding transactions not being credited, unusual on-chain activity.
 
 **Steps:**
-1. Check on-chain state immediately: `solana balance FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa --url devnet`
+1. Check on-chain state immediately: `solana balance Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc --url devnet`
 2. Check treasury account: known PDA for treasury.
 3. **If exploit is suspected — pause the protocol immediately:**
    ```bash

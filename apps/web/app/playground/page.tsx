@@ -97,7 +97,7 @@ const RPC_METHODS: RpcMethod[] = [
     description: "Returns the lamport balance of the account.",
     params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }],
     examples: [
-      { label: "Devnet faucet", params: { pubkey: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa" } },
+      { label: "Devnet faucet", params: { pubkey: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc" } },
     ],
     responseSchema: [
       { key: "value", type: "number", description: "Balance in lamports (divide by 1e9 for SOL)" },
@@ -110,7 +110,7 @@ const RPC_METHODS: RpcMethod[] = [
     description: "Returns all information associated with the account.",
     params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }],
     examples: [
-      { label: "Devnet faucet", params: { pubkey: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa" } },
+      { label: "Devnet faucet", params: { pubkey: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc" } },
     ],
     responseSchema: [
       { key: "value.lamports", type: "number", description: "Lamports assigned to account" },
@@ -163,7 +163,7 @@ const RPC_METHODS: RpcMethod[] = [
     description: "Returns confirmed signatures for transactions involving an address.",
     params: [{ name: "pubkey", placeholder: "Base58 account public key", required: true }],
     examples: [
-      { label: "Devnet faucet", params: { pubkey: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa" } },
+      { label: "Devnet faucet", params: { pubkey: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc" } },
     ],
     responseSchema: [
       { key: "[].signature", type: "string", description: "Transaction signature" },
@@ -822,7 +822,7 @@ function PlaygroundContent() {
     setBenchmarkResults([]);
     setBenchmarkNetworkAvg(null);
 
-    const BENCH_ADDRESS = "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa";
+    const BENCH_ADDRESS = "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc";
     const methodParams: Record<string, unknown[]> = {
       getSlot: [],
       getLatestBlockhash: [],

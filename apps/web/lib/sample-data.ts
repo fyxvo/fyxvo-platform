@@ -206,16 +206,16 @@ export const previewAdminOverview: AdminOverview = {
     readiness: {
       ready: true,
       cluster: "devnet",
-      programId: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",
-      expectedProgramId: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",
+      programId: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",
+      expectedProgramId: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",
       expectedAdminAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
       expectedUsdcMint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
       addresses: {
-        programId: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa",
-        protocolConfig: "GCWgmpoS2booNCp5VNP6z9HdYmkXpoXpM3rPK8kziqKX",
-        treasury: "3JaVp2CsJASutTAzVAjNfXi4yAR5f8uH1zoXAgaSh3px",
-        operatorRegistry: "Df3tPaGGietrQdqjX7FGkuYb1XF6o36Vat2q92BmioWC",
-        treasuryUsdcVault: "31xqm4gxzqQhxLr8RpBpMggr4DywGUnMLDWPKdR5Baa9"
+        programId: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",
+        protocolConfig: "J4uiLhB3qaYUFvu6YAT6oTrBbe7qXfwZFfLm2ph5GTAH",
+        treasury: "HvgY6dGviH5xosaHvVBNKwt2gTTnJYJ9aG7dWC4wqST1",
+        operatorRegistry: "9k4Xr4qfVMSN14aNkFdDFHbd74syujkyYcGKGTWYxmRQ",
+        treasuryUsdcVault: "2epkxnyGfX6FPYRmPa2tystcd1UrvjYFR5wJh6uKZj5i"
       },
       checks: {
         programDeployed: true,
@@ -237,13 +237,13 @@ export const previewAdminOverview: AdminOverview = {
       reasons: []
     },
     authorityPlan: {
-      mode: "single-signer",
+      mode: "governed",
       protocolAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
       pauseAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
-      upgradeAuthorityHint: null,
+      upgradeAuthorityHint: "H61YTCJ6yEtmUBN6c66DgjdEyXs8Eqbq5kJJGQyooqN1",
       actualUpgradeAuthority: null,
       warnings: [
-        "Single-signer authority is still configured. Move protocol, pause, and upgrade control behind a governed signer before mainnet beta."
+        "Pause authority still matches protocol authority. Split them before mainnet where possible."
       ]
     },
     treasury: {

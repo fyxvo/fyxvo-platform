@@ -4,7 +4,7 @@
 
 The following components are in scope for security reports:
 
-- **Anchor program** (`FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa`) — fund accounting, project activation, treasury management
+- **Anchor program** (`Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc`) — fund accounting, project activation, treasury management
 - **API** (`api.fyxvo.com`) — authentication, authorization, project and API key management, webhook delivery
 - **Gateway** (`rpc.fyxvo.com`) — API key validation, scope enforcement, request routing, rate limiting
 - **Frontend** (`www.fyxvo.com`) — XSS, CSRF, information disclosure, authentication bypass

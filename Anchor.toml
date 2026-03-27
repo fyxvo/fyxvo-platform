@@ -8,10 +8,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-fyxvo = "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"
+fyxvo = "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"
 
 [programs.devnet]
-fyxvo = "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"
+fyxvo = "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"
 
 [workspace]
 members = ["programs/*"]

@@ -1,6 +1,6 @@
 # Governed Devnet Staging Snapshot
 
-This records the replacement devnet program staged under keys the team controls. It is not the current hosted cutover yet.
+This records the governed devnet program now backing the hosted stack under keys the team controls.
 
 ## Staged Replacement Program
 
@@ -27,11 +27,11 @@ This records the replacement devnet program staged under keys the team controls.
 2. Protocol initialization succeeded and readiness returned green.
 3. Canonical `security` metadata upload succeeded.
 4. Canonical `idl` metadata upload succeeded.
-5. The hosted stack still points at the previous live devnet program until a deliberate cutover updates service env and validates the staged flow end to end.
+5. The hosted API, gateway, and worker are now cut over to this governed devnet program after end-to-end hosted verification.
 
-## Next Cutover Steps
+## Post-cutover follow-up
 
-1. Stage API, gateway, and worker with the governed env examples and the staged program ID.
-2. Run `pnpm solana:flow:devnet-live` against the staged program path.
-3. Verify hosted funding, gateway billing, alerts, analytics, request logs, and assistant flows.
-4. Only then update hosted `FYXVO_PROGRAM_ID` values and deployment metadata together.
+1. Keep commit metadata, runtime config, and docs aligned with the governed program ID.
+2. Continue running `pnpm solana:flow:devnet-live` as a hosted regression check.
+3. Publish verified-build data from a Docker-capable machine.
+4. Move pause authority away from protocol authority before any mainnet path.

@@ -57,13 +57,19 @@ Verified build information must also be uploaded by the real program authority. 
 cargo install solana-verify --version 0.4.11 --locked
 docker --version
 pnpm solana:program:verify-build
+
+If Docker is not available locally, use the repo helper:
+
+```bash
+pnpm solana:program:verify-build:docker
+```
 ```
 
 The verified-build flow requires Docker in the environment because `solana-verify` performs the deterministic build inside a container. If Docker is not installed, the verification upload cannot complete from that machine.
 
 Use the same released source tree and program artifact that produced the deployed binary. The verified-build flow should point at:
 
-1. program id `FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa`
+1. program id `Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc`
 2. repository `https://github.com/fyxvo/fyxvo-platform`
 3. crate / library name `fyxvo`
 

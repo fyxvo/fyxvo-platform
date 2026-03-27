@@ -23,7 +23,7 @@ export const solanaDevnetConfig: SolanaNetworkConfig = {
   explorerBaseUrl: "https://explorer.solana.com",
   commitment: DEFAULT_SOLANA_COMMITMENT,
   programIds: {
-    fyxvo: "FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa"
+    fyxvo: "Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"
   },
   adminAuthority: FYXVO_DEVNET_ADMIN_AUTHORITY,
   usdcMintAddress: FYXVO_DEVNET_USDC_MINT_ADDRESS

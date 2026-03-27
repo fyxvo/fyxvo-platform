@@ -12,9 +12,5 @@ coverage
 .anchor
 target
 tests
-programs
-Cargo.toml
-Cargo.lock
-Anchor.toml
 logo.png
 logo.svg
