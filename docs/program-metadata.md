@@ -29,7 +29,8 @@ If the canonical metadata accounts do not exist yet, the CLI reports `Account no
 Run this as the real program upgrade authority:
 
 ```bash
-pnpm solana:program:metadata:write:security -- --keypair ~/.config/solana/<upgrade-authority>.json
+export FYXVO_UPGRADE_KEY=~/.config/solana/<upgrade-authority>.json
+pnpm solana:program:metadata:write:security
 ```
 
 The uploaded metadata points users and researchers to:
@@ -44,7 +45,8 @@ The uploaded metadata points users and researchers to:
 Run this as the real program upgrade authority after the latest Anchor build:
 
 ```bash
-pnpm solana:program:metadata:write:idl -- --keypair ~/.config/solana/<upgrade-authority>.json
+export FYXVO_UPGRADE_KEY=~/.config/solana/<upgrade-authority>.json
+pnpm solana:program:metadata:write:idl
 ```
 
 ## Verified build upload
@@ -53,10 +55,11 @@ Verified build information must also be uploaded by the real program authority. 
 
 ```bash
 cargo install solana-verify --version 0.4.11 --locked
-solana-verify build
-solana-verify verify-from-repo -u https://api.devnet.solana.com --program-id FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa --library-name fyxvo --commit-hash <release-commit> https://github.com/fyxvo/fyxvo-platform
-solana-verify remote submit-job --program-id FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa --uploader <pubkey-that-uploaded-build-data>
+docker --version
+pnpm solana:program:verify-build
 ```
+
+The verified-build flow requires Docker in the environment because `solana-verify` performs the deterministic build inside a container. If Docker is not installed, the verification upload cannot complete from that machine.
 
 Use the same released source tree and program artifact that produced the deployed binary. The verified-build flow should point at:
 
