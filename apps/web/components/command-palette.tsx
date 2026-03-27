@@ -4,6 +4,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePortal } from "./portal-provider";
 import { webEnv } from "../lib/env";
+import { commandPaletteRoutes } from "../lib/routes";
 
 interface BackendSearchResult {
   type: "project" | "api_key" | "request";
@@ -27,20 +28,11 @@ interface NavEntry {
 }
 
 function buildNavEntries(selectedProjectSlug?: string | null): NavEntry[] {
-  const entries: NavEntry[] = [
-    { label: "Dashboard", href: "/dashboard", description: "Overview, projects, and operational timelines" },
-    { label: "Projects", href: "/projects", description: "Manage and create projects" },
-    { label: "API Keys", href: "/api-keys", description: "Issue and revoke scoped credentials" },
-    { label: "Funding", href: "/funding", description: "Fund project treasury with SOL" },
-    { label: "Analytics", href: "/analytics", description: "Request volume, latency, and error rates" },
-    { label: "Operators", href: "/operators", description: "Node operator details and infrastructure" },
-    { label: "Settings", href: "/settings", description: "Wallet, appearance, and security settings" },
-    { label: "Docs", href: "/docs", description: "Quickstart, API reference, and integration guides" },
-    { label: "Status", href: "/status", description: "Live service health and protocol readiness" },
-    { label: "Pricing", href: "/pricing", description: "Request pricing and SOL funding mechanics" },
-    { label: "Enterprise", href: "/enterprise", description: "Dedicated capacity, custom SLAs, and team features" },
-    { label: "Contact", href: "/contact", description: "Talk to the founder or submit feedback" },
-  ];
+  const entries: NavEntry[] = commandPaletteRoutes.map((route) => ({
+    label: route.label,
+    href: route.href,
+    ...(route.description ? { description: route.description } : {}),
+  }));
 
   if (selectedProjectSlug) {
     entries.splice(2, 0, {
