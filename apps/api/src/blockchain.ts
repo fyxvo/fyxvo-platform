@@ -56,12 +56,14 @@ export class SolanaBlockchainClient implements BlockchainClient {
   private readonly programId: PublicKey;
   private readonly usdcMint: PublicKey;
   private readonly expectedAdminAuthority: PublicKey;
+  private readonly expectedUpgradeAuthorityHint: string | null;
   private readonly network = getSolanaNetworkConfig("devnet");
 
   constructor(input: {
     readonly rpcUrl?: string;
     readonly programId?: string;
     readonly expectedAdminAuthority: string;
+    readonly expectedUpgradeAuthorityHint?: string | null;
     readonly usdcMintAddress: string;
     readonly connection?: Connection;
   }) {
@@ -69,6 +71,7 @@ export class SolanaBlockchainClient implements BlockchainClient {
     this.programId = new PublicKey(input.programId ?? this.network.programIds.fyxvo);
     this.usdcMint = new PublicKey(input.usdcMintAddress);
     this.expectedAdminAuthority = new PublicKey(input.expectedAdminAuthority);
+    this.expectedUpgradeAuthorityHint = input.expectedUpgradeAuthorityHint ?? null;
   }
 
   async getLatestBlockhash() {
@@ -80,6 +83,7 @@ export class SolanaBlockchainClient implements BlockchainClient {
       connection: this.connection,
       programId: this.programId.toBase58(),
       expectedAdminAuthority: this.expectedAdminAuthority.toBase58(),
+      expectedUpgradeAuthorityHint: this.expectedUpgradeAuthorityHint,
       expectedUsdcMint: this.usdcMint.toBase58()
     });
   }

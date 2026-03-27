@@ -396,6 +396,7 @@ export interface AdminProtocolOverview {
     readonly protocolAuthority: string;
     readonly pauseAuthority: string;
     readonly upgradeAuthorityHint: string | null;
+    readonly actualUpgradeAuthority: string | null;
     readonly warnings: readonly string[];
   };
   readonly treasury: {

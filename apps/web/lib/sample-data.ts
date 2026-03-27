@@ -241,6 +241,7 @@ export const previewAdminOverview: AdminOverview = {
       protocolAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
       pauseAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
       upgradeAuthorityHint: null,
+      actualUpgradeAuthority: null,
       warnings: [
         "Single-signer authority is still configured. Move protocol, pause, and upgrade control behind a governed signer before mainnet beta."
       ]

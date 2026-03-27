@@ -15,6 +15,7 @@ export const FYXVO_DEVNET_MANAGED_REWARD_ACCOUNT = "HM3HHtkJDY4gYzeixSfEQp2Hk7Vr
 const protocolConfigDiscriminator = anchorAccountDiscriminator("ProtocolConfig");
 const treasuryDiscriminator = anchorAccountDiscriminator("Treasury");
 const operatorRegistryDiscriminator = anchorAccountDiscriminator("OperatorRegistry");
+const bpfLoaderUpgradeableProgramId = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
 
 export interface FyxvoProtocolAddresses {
   readonly programId: PublicKey;
@@ -58,7 +59,10 @@ export interface FyxvoProtocolReadiness {
   readonly programId: string;
   readonly expectedProgramId: string;
   readonly expectedAdminAuthority: string;
+  readonly expectedUpgradeAuthorityHint: string | null;
   readonly expectedUsdcMint: string;
+  readonly programDataAddress: string | null;
+  readonly programUpgradeAuthority: string | null;
   readonly addresses: {
     readonly programId: string;
     readonly protocolConfig: string;
@@ -74,6 +78,8 @@ export interface FyxvoProtocolReadiness {
     readonly operatorRegistryExists: boolean;
     readonly treasuryUsdcVaultExists: boolean;
     readonly adminAuthorityMatches: boolean;
+    readonly upgradeAuthorityKnown: boolean;
+    readonly upgradeAuthorityMatchesHint: boolean | null;
     readonly usdcMintMatches: boolean;
     readonly treasuryMatches: boolean;
     readonly treasuryUsdcVaultMatches: boolean;
@@ -87,6 +93,27 @@ export interface FyxvoProtocolReadiness {
   readonly treasury: FyxvoTreasuryState | null;
   readonly operatorRegistry: FyxvoOperatorRegistryState | null;
   readonly reasons: string[];
+}
+
+function decodeUpgradeableProgramDataAddress(data: Buffer): string | null {
+  if (data.length < 36 || data.readUInt32LE(0) !== 2) {
+    return null;
+  }
+
+  return new PublicKey(data.subarray(4, 36)).toBase58();
+}
+
+function decodeUpgradeableProgramAuthority(data: Buffer): string | null {
+  if (data.length < 16 || data.readUInt32LE(0) !== 3) {
+    return null;
+  }
+
+  const option = data.readUInt32LE(12);
+  if (option !== 1 || data.length < 48) {
+    return null;
+  }
+
+  return new PublicKey(data.subarray(16, 48)).toBase58();
 }
 
 export function deriveFyxvoProtocolAddresses(input: {
@@ -174,10 +201,12 @@ export async function fetchFyxvoProtocolReadiness(input: {
   readonly connection: Pick<Connection, "getAccountInfo">;
   readonly programId: string;
   readonly expectedAdminAuthority?: string;
+  readonly expectedUpgradeAuthorityHint?: string | null;
   readonly expectedUsdcMint?: string;
   readonly commitment?: Commitment;
 }): Promise<FyxvoProtocolReadiness> {
   const expectedAdminAuthority = input.expectedAdminAuthority ?? FYXVO_DEVNET_ADMIN_AUTHORITY;
+  const expectedUpgradeAuthorityHint = input.expectedUpgradeAuthorityHint ?? null;
   const expectedUsdcMint = input.expectedUsdcMint ?? FYXVO_DEVNET_USDC_MINT_ADDRESS;
   const addresses = deriveFyxvoProtocolAddresses({
     programId: input.programId,
@@ -193,6 +222,17 @@ export async function fetchFyxvoProtocolReadiness(input: {
       input.connection.getAccountInfo(addresses.operatorRegistry, commitment).catch(() => null),
       input.connection.getAccountInfo(addresses.treasuryUsdcVault!, commitment).catch(() => null)
     ]);
+  const programDataAddress =
+    programInfo?.owner?.equals(bpfLoaderUpgradeableProgramId) === true
+      ? decodeUpgradeableProgramDataAddress(Buffer.from(programInfo.data))
+      : null;
+  const programDataInfo = programDataAddress
+    ? await input.connection.getAccountInfo(new PublicKey(programDataAddress), commitment).catch(() => null)
+    : null;
+  const programUpgradeAuthority =
+    programDataInfo?.owner?.equals(bpfLoaderUpgradeableProgramId) === true
+      ? decodeUpgradeableProgramAuthority(Buffer.from(programDataInfo.data))
+      : null;
 
   let protocolConfig: FyxvoProtocolConfigState | null = null;
   let treasury: FyxvoTreasuryState | null = null;
@@ -231,6 +271,13 @@ export async function fetchFyxvoProtocolReadiness(input: {
     operatorRegistryExists: operatorRegistry !== null,
     treasuryUsdcVaultExists: treasuryUsdcVaultInfo !== null,
     adminAuthorityMatches: protocolConfig?.authority === expectedAdminAuthority,
+    upgradeAuthorityKnown: programUpgradeAuthority !== null,
+    upgradeAuthorityMatchesHint:
+      expectedUpgradeAuthorityHint == null
+        ? null
+        : programUpgradeAuthority == null
+          ? false
+          : programUpgradeAuthority === expectedUpgradeAuthorityHint,
     usdcMintMatches: protocolConfig?.usdcMint === expectedUsdcMint,
     treasuryMatches:
       protocolConfig?.treasury === addresses.treasury.toBase58() &&
@@ -271,6 +318,20 @@ export async function fetchFyxvoProtocolReadiness(input: {
     );
   }
 
+  if (expectedUpgradeAuthorityHint && programUpgradeAuthority == null) {
+    reasons.push("Program upgrade authority could not be decoded from the deployed program.");
+  }
+
+  if (
+    expectedUpgradeAuthorityHint &&
+    programUpgradeAuthority &&
+    programUpgradeAuthority !== expectedUpgradeAuthorityHint
+  ) {
+    reasons.push(
+      `Program upgrade authority is ${programUpgradeAuthority}, expected ${expectedUpgradeAuthorityHint}.`
+    );
+  }
+
   if (protocolConfig && !checks.usdcMintMatches) {
     reasons.push(`Protocol USDC mint is ${protocolConfig.usdcMint}, expected ${expectedUsdcMint}.`);
   }
@@ -304,7 +365,10 @@ export async function fetchFyxvoProtocolReadiness(input: {
     programId: input.programId,
     expectedProgramId: input.programId,
     expectedAdminAuthority,
+    expectedUpgradeAuthorityHint,
     expectedUsdcMint,
+    programDataAddress,
+    programUpgradeAuthority,
     addresses: {
       programId: addresses.programId.toBase58(),
       protocolConfig: addresses.protocolConfig.toBase58(),

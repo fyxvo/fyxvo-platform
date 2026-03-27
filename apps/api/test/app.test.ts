@@ -1571,6 +1571,7 @@ async function createTestApp(options: {
   const blockchain = new SolanaBlockchainClient({
     rpcUrl: env.SOLANA_RPC_URL,
     expectedAdminAuthority: env.FYXVO_ADMIN_AUTHORITY,
+    expectedUpgradeAuthorityHint: process.env.FYXVO_UPGRADE_AUTHORITY_HINT ?? null,
     programId: getSolanaNetworkConfig(env.SOLANA_CLUSTER).programIds.fyxvo,
     usdcMintAddress: env.USDC_MINT_ADDRESS,
     connection: {

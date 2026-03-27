@@ -147,7 +147,10 @@ export interface PortalProtocolReadiness {
   readonly programId: string;
   readonly expectedProgramId: string;
   readonly expectedAdminAuthority: string;
+  readonly expectedUpgradeAuthorityHint?: string | null;
   readonly expectedUsdcMint: string;
+  readonly programDataAddress?: string | null;
+  readonly programUpgradeAuthority?: string | null;
   readonly addresses: {
     readonly programId: string;
     readonly protocolConfig: string;
@@ -163,6 +166,8 @@ export interface PortalProtocolReadiness {
     readonly operatorRegistryExists: boolean;
     readonly treasuryUsdcVaultExists: boolean;
     readonly adminAuthorityMatches: boolean;
+    readonly upgradeAuthorityKnown?: boolean;
+    readonly upgradeAuthorityMatchesHint?: boolean | null;
     readonly usdcMintMatches: boolean;
     readonly treasuryMatches: boolean;
     readonly treasuryUsdcVaultMatches: boolean;
@@ -191,6 +196,7 @@ export interface PortalServiceStatus {
     readonly protocolAuthority?: string;
     readonly pauseAuthority?: string;
     readonly upgradeAuthorityHint?: string | null;
+    readonly actualUpgradeAuthority?: string | null;
     readonly warnings?: readonly string[];
   };
   readonly programId?: string;
@@ -444,6 +450,7 @@ export interface AdminOverview {
       readonly protocolAuthority: string;
       readonly pauseAuthority: string;
       readonly upgradeAuthorityHint: string | null;
+      readonly actualUpgradeAuthority: string | null;
       readonly warnings: readonly string[];
     };
     readonly treasury: {

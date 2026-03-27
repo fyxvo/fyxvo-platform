@@ -2261,6 +2261,14 @@ export default function DashboardPage() {
                       {portal.adminOverview.protocol.authorityPlan.pauseAuthority}
                     </div>
                   </div>
+                  <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4 md:col-span-2">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+                      Live upgrade authority
+                    </div>
+                    <div className="mt-2 break-all text-sm font-medium text-[var(--fyxvo-text)]">
+                      {portal.adminOverview.protocol.authorityPlan.actualUpgradeAuthority ?? "Unavailable from current readiness check"}
+                    </div>
+                  </div>
                 </div>
                 <Notice
                   tone={

@@ -480,10 +480,29 @@ function buildAdminProtocolOverview(input: {
   readonly env: ApiEnv;
   readonly readiness: Awaited<ReturnType<BlockchainClient["getProtocolReadiness"]>> | null;
 }) {
-  const authorityPlan = resolveAuthorityPlan({
+  const baseAuthorityPlan = resolveAuthorityPlan({
     source: process.env,
     protocolAuthorityFallback: input.env.FYXVO_ADMIN_AUTHORITY
   });
+  const authorityWarnings = [...baseAuthorityPlan.warnings];
+  const actualUpgradeAuthority = input.readiness?.programUpgradeAuthority ?? null;
+  if (actualUpgradeAuthority == null) {
+    authorityWarnings.push(
+      "The live upgrade authority could not be confirmed from the deployed program. Do not assume the admin signer can manage canonical metadata or upgrades."
+    );
+  } else if (
+    baseAuthorityPlan.upgradeAuthorityHint &&
+    actualUpgradeAuthority !== baseAuthorityPlan.upgradeAuthorityHint
+  ) {
+    authorityWarnings.push(
+      `Live upgrade authority is ${actualUpgradeAuthority}, but runtime config records ${baseAuthorityPlan.upgradeAuthorityHint}.`
+    );
+  }
+  const authorityPlan = {
+    ...baseAuthorityPlan,
+    actualUpgradeAuthority,
+    warnings: authorityWarnings,
+  };
   const treasury = input.readiness?.treasury;
   const reconciliationWarnings: string[] = [];
 
@@ -577,6 +596,7 @@ async function buildMainnetReleaseGateSnapshot(input: {
     env: input.env,
     readiness,
   }).treasury;
+  const actualUpgradeAuthority = readiness?.programUpgradeAuthority ?? null;
   const treasurySolBalanceLamports = treasuryOverview.solBalance;
   const assistantAvailable = isAssistantConfigured(input.env);
   const emailDeliveryConfigured = isEmailDeliveryEnabled({
@@ -611,6 +631,11 @@ async function buildMainnetReleaseGateSnapshot(input: {
       : null,
     authorityPlan.upgradeAuthorityHint == null
       ? "Upgrade authority is not documented in runtime config yet."
+      : null,
+    authorityPlan.upgradeAuthorityHint &&
+    actualUpgradeAuthority &&
+    authorityPlan.upgradeAuthorityHint !== actualUpgradeAuthority
+      ? `On-chain upgrade authority is ${actualUpgradeAuthority}, but runtime config records ${authorityPlan.upgradeAuthorityHint}.`
       : null,
     ...treasuryOverview.reconciliationWarnings,
   ].filter((item): item is string => Boolean(item));
@@ -666,10 +691,20 @@ async function buildMainnetReleaseGateSnapshot(input: {
     {
       key: "upgrade_authority",
       label: "Upgrade authority hint",
-      status: authorityPlan.upgradeAuthorityHint ? "healthy" : "needs_attention",
-      detail: authorityPlan.upgradeAuthorityHint
-        ? `Recorded as ${authorityPlan.upgradeAuthorityHint}.`
-        : "Upgrade authority is not documented in runtime config.",
+      status:
+        authorityPlan.upgradeAuthorityHint == null
+          ? "needs_attention"
+          : actualUpgradeAuthority && authorityPlan.upgradeAuthorityHint !== actualUpgradeAuthority
+            ? "blocked"
+            : "healthy",
+      detail:
+        authorityPlan.upgradeAuthorityHint == null
+          ? "Upgrade authority is not documented in runtime config."
+          : actualUpgradeAuthority && authorityPlan.upgradeAuthorityHint !== actualUpgradeAuthority
+            ? `Recorded as ${authorityPlan.upgradeAuthorityHint}, but the deployed program is controlled by ${actualUpgradeAuthority}.`
+            : actualUpgradeAuthority
+              ? `Recorded as ${authorityPlan.upgradeAuthorityHint}, matching the deployed program.`
+              : `Recorded as ${authorityPlan.upgradeAuthorityHint}.`,
     },
     {
       key: "protocol_readiness",
@@ -1400,6 +1435,10 @@ export async function buildApiApp(input: {
       source: process.env,
       protocolAuthorityFallback: input.env.FYXVO_ADMIN_AUTHORITY
     });
+    const statusAuthorityPlan = {
+      ...authorityPlan,
+      actualUpgradeAuthority: readiness?.programUpgradeAuthority ?? null,
+    };
     const overallStatus = readiness?.ready === false ? "degraded" : "ok";
     return {
       status: overallStatus,
@@ -1414,7 +1453,7 @@ export async function buildApiApp(input: {
       solanaRpcUrl: network.rpcUrl,
       programId: input.env.FYXVO_PROGRAM_ID,
       adminAuthority: input.env.FYXVO_ADMIN_AUTHORITY,
-      authorityPlan,
+      authorityPlan: statusAuthorityPlan,
       acceptedAssets: {
         sol: true,
         usdcEnabled: input.env.FYXVO_ENABLE_USDC,
@@ -6044,6 +6083,7 @@ export async function buildProductionApiApp(input: {
   const blockchain = new SolanaBlockchainClient({
     rpcUrl: input.env.SOLANA_RPC_URL,
     expectedAdminAuthority: input.env.FYXVO_ADMIN_AUTHORITY,
+    expectedUpgradeAuthorityHint: process.env.FYXVO_UPGRADE_AUTHORITY_HINT ?? null,
     usdcMintAddress: input.env.USDC_MINT_ADDRESS,
     programId: input.env.FYXVO_PROGRAM_ID
   });
