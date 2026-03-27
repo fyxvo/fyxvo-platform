@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Badge, Button, Notice } from "@fyxvo/ui";
+import { Button } from "@fyxvo/ui";
 
 const TIERS = [
   {

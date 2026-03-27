@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Button, Input, Notice } from "@fyxvo/ui";
+import { Notice } from "@fyxvo/ui";
 import { usePortal } from "../../components/portal-provider";
 import { webEnv } from "../../lib/env";
 import type {
@@ -195,7 +195,6 @@ export default function AssistantPage() {
 
       if (data.message || data.content) {
         const msgData = data.message as Record<string, unknown> | undefined;
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
         const assistantMsg = {
           id: typeof data.id === "string" ? data.id : `assist-${Date.now()}`,
           role: "assistant" as const,

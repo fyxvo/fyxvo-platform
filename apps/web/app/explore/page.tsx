@@ -123,7 +123,7 @@ export default function ExplorePage() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
 
-  function loadProjects() {
+  function triggerLoad() {
     setLoading(true);
     setError(false);
     fetch(new URL("/v1/public/projects", webEnv.apiBaseUrl).toString())
@@ -137,7 +137,20 @@ export default function ExplorePage() {
   }
 
   useEffect(() => {
-    loadProjects();
+    let cancelled = false;
+    async function run() {
+      try {
+        const r = await fetch(new URL("/v1/public/projects", webEnv.apiBaseUrl).toString());
+        const data: unknown = r.ok ? await r.json() : [];
+        if (!cancelled) setProjects(Array.isArray(data) ? (data as ExploreProjectEntry[]) : []);
+      } catch {
+        if (!cancelled) { setProjects([]); setError(true); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void run();
+    return () => { cancelled = true; };
   }, []);
 
   const filtered = projects.filter((p) =>
@@ -187,7 +200,7 @@ export default function ExplorePage() {
           </p>
           <button
             type="button"
-            onClick={loadProjects}
+            onClick={triggerLoad}
             className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm font-medium text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand)]"
           >
             Try again

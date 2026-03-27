@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button, Input, Badge } from "@fyxvo/ui";
+import { Badge } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
 import { webEnv } from "../../lib/env";
 

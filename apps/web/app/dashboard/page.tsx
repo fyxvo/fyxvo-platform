@@ -16,7 +16,7 @@ import {
 } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
 import { PageHeader } from "../../components/page-header";
-import { AuthGate, EmptyProjectState, LoadingGrid } from "../../components/state-panels";
+import { EmptyProjectState, LoadingGrid } from "../../components/state-panels";
 import { WalletConnectButton } from "../../components/wallet-connect-button";
 import { usePortal } from "../../components/portal-provider";
 import {
@@ -50,7 +50,7 @@ function ApiKeyStatusBadge({ status }: { readonly status: string }) {
 }
 
 function FundProjectSection({
-  project,
+  project: _project,
   transactionState,
   onPrepare,
 }: {

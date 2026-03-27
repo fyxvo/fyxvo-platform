@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, Input, Notice } from "@fyxvo/ui";
+import { Badge, Notice } from "@fyxvo/ui";
 import { AuthGate } from "../../../components/state-panels";
 import { PageHeader } from "../../../components/page-header";
 import { usePortal } from "../../../components/portal-provider";

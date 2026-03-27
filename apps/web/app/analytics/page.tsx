@@ -197,12 +197,11 @@ function ProjectAnalyticsSection({
 export default function AnalyticsPage() {
   const portal = usePortal();
   const [freshOverview, setFreshOverview] = useState<AnalyticsOverview | null>(null);
-  const [loadingFresh, setLoadingFresh] = useState(false);
+  const [loadingFresh, setLoadingFresh] = useState(true);
 
   useEffect(() => {
     if (!portal.token) return;
     let cancelled = false;
-    setLoadingFresh(true);
     getAnalyticsOverview(portal.token)
       .then((data) => {
         if (!cancelled) setFreshOverview(data);
