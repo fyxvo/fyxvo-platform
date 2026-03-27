@@ -976,6 +976,19 @@ export interface EmailDeliveryStatus {
   readonly statusSubscriberActive: boolean;
 }
 
+export interface AdminEmailDeliveryStatus {
+  readonly configured: boolean;
+  readonly provider: "resend" | "unconfigured";
+  readonly fromAddress: string | null;
+  readonly replyToAddress: string | null;
+  readonly verifiedUsers: number;
+  readonly digestEnabledUsers: number;
+  readonly activeDigestSchedules: number;
+  readonly statusSubscribers: number;
+  readonly latestDigestGeneratedAt: string | null;
+  readonly latestDigestSentAt: string | null;
+}
+
 export interface StatusIncidentUpdate {
   readonly id: string;
   readonly status: string;

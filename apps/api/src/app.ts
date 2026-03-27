@@ -114,6 +114,31 @@ function buildIncidentSubscriberMessage(input: {
   };
 }
 
+function buildEmailDeliveryTestMessage(input: {
+  readonly walletAddress: string;
+  readonly timestamp: string;
+}) {
+  return {
+    subject: "Fyxvo email delivery test",
+    text:
+      `This is a live Fyxvo email delivery test.\n\n` +
+      `Wallet: ${input.walletAddress}\n` +
+      `Sent at: ${input.timestamp}\n\n` +
+      `If you received this email, verification, digest delivery, and operational notices can reach this inbox.`,
+    html:
+      `<div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">` +
+      `<p style="margin:0 0 8px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">Fyxvo delivery check</p>` +
+      `<h1 style="font-size:24px;line-height:1.2;margin:0 0 12px;">Your email delivery is working</h1>` +
+      `<p style="font-size:15px;line-height:1.7;margin:0 0 16px;">This is a live test email for wallet <strong>${input.walletAddress}</strong>.</p>` +
+      `<div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;">` +
+      `<p style="margin:0 0 8px;font-size:13px;color:#475569;">Sent at</p>` +
+      `<p style="margin:0;font-size:14px;color:#0f172a;">${input.timestamp}</p>` +
+      `</div>` +
+      `<p style="font-size:13px;line-height:1.6;color:#475569;margin:16px 0 0;">If you received this email, Fyxvo can reach this inbox for verification links, weekly digests, and operational notices.</p>` +
+      `</div>`,
+  };
+}
+
 function getRuntimeCommitSha() {
   const commit =
     process.env.RAILWAY_GIT_COMMIT_SHA ??
@@ -3200,6 +3225,49 @@ export async function buildApiApp(input: {
     return { item: await input.repository.getAssistantStats() };
   });
 
+  app.get("/v1/admin/email-delivery", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const db = requirePrisma();
+    const emailDeliveryDb = db as PrismaClientType & {
+      digestSchedule: {
+        count: () => Promise<number>;
+      };
+      digestRecord: {
+        findFirst: (input: {
+          orderBy: { generatedAt: "desc" };
+          select: { generatedAt: true; sentAt: true };
+        }) => Promise<{ generatedAt: Date; sentAt: Date | null } | null>;
+      };
+    };
+    const configured = isEmailDeliveryEnabled({ apiKey: input.env.RESEND_API_KEY, from: input.env.EMAIL_FROM });
+    const [verifiedUsers, digestEnabledUsers, activeDigestSchedules, statusSubscribers, latestDigestRecord] = await Promise.all([
+      db.user.count({ where: { emailVerified: true } }),
+      db.user.count({ where: { emailVerified: true, notifyWeeklySummary: true } }),
+      emailDeliveryDb.digestSchedule.count(),
+      db.statusSubscriber.count({ where: { active: true } }),
+      emailDeliveryDb.digestRecord.findFirst({
+        orderBy: { generatedAt: "desc" },
+        select: { generatedAt: true, sentAt: true },
+      }),
+    ]);
+
+    return {
+      item: {
+        configured,
+        provider: configured ? "resend" : "unconfigured",
+        fromAddress: input.env.EMAIL_FROM ?? null,
+        replyToAddress: input.env.EMAIL_REPLY_TO ?? null,
+        verifiedUsers,
+        digestEnabledUsers,
+        activeDigestSchedules,
+        statusSubscribers,
+        latestDigestGeneratedAt: latestDigestRecord?.generatedAt?.toISOString() ?? null,
+        latestDigestSentAt: latestDigestRecord?.sentAt?.toISOString() ?? null,
+      },
+    };
+  });
+
   app.get("/v1/admin/observability", async (request) => {
     const user = requireUser(request);
     requireAdmin(user);
@@ -4147,6 +4215,13 @@ ${projectContext?.gatewayStatus ? `- Current gateway status: ${projectContext.ga
 
 ## LIVE FYXVO CONTEXT
 ${liveContextLines.join("\n")}
+
+## RESPONSE SHAPE
+- Start with a direct answer in 1 to 3 short sentences.
+- If the user asked for code, configuration, curl, or RPC usage, follow with exactly one primary copy-pasteable example in a fenced code block.
+- If the answer should send the user somewhere inside Fyxvo, end with one best next step sentence. Prefer one destination, not a list of many pages.
+- If the user is asking for debugging help, say what to check first before offering deeper follow-up steps.
+- Use short headings only when they materially improve scanability for a longer answer.
 
 ## GUIDELINES
 1. You are an AI. Be honest about uncertainty — if you don't know something specific to Fyxvo, say so.
@@ -5501,6 +5576,48 @@ ${liveContextLines.join("\n")}
     return {
       item: await input.repository.getEmailDeliveryStatus(user.id, configured),
     };
+  });
+
+  app.post("/v1/me/email-delivery/test", async (request, reply) => {
+    const user = requireUser(request);
+    const configured = isEmailDeliveryEnabled({ apiKey: input.env.RESEND_API_KEY, from: input.env.EMAIL_FROM });
+    const deliveryStatus = await input.repository.getEmailDeliveryStatus(user.id, configured);
+    if (!deliveryStatus.email) {
+      return reply.status(400).send({
+        error: "email_missing",
+        message: "Add an email address before sending a test email.",
+      });
+    }
+    if (!deliveryStatus.emailVerified) {
+      return reply.status(403).send({
+        error: "email_not_verified",
+        message: "Verify this email address before sending a delivery test.",
+      });
+    }
+    if (!configured) {
+      return reply.status(503).send({
+        error: "email_delivery_not_enabled",
+        message: "Email delivery is not configured in this environment.",
+      });
+    }
+
+    const message = buildEmailDeliveryTestMessage({
+      walletAddress: user.walletAddress,
+      timestamp: new Date().toISOString(),
+    });
+
+    await deliverEmail({
+      to: deliveryStatus.email,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    });
+
+    return reply.status(202).send({
+      sent: true,
+      recipient: deliveryStatus.email,
+      message: "Test email sent.",
+    });
   });
 
   app.get("/v1/me/tos-status", async (request) => {

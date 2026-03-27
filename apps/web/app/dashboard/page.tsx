@@ -40,6 +40,7 @@ import { TosModal } from "../../components/tos-modal";
 import { FirstRequestCelebration } from "../../components/first-request-celebration";
 import { QuickstartLauncher } from "../../components/quickstart-launcher";
 import type {
+  AdminEmailDeliveryStatus,
   AdminDeploymentReadiness,
   AdminObservability,
   AdminOverview,
@@ -63,6 +64,7 @@ import {
   fetchGatewayStatus,
   fetchWebDeploymentStatus,
   getActiveAnnouncement,
+  getAdminEmailDeliveryStatus,
   getAdminObservability,
   getAdminDeploymentReadiness,
   getDashboardPreferences,
@@ -460,6 +462,7 @@ export default function DashboardPage() {
   const [apiDeploymentStatus, setApiDeploymentStatus] = useState<PortalServiceStatus | null>(null);
   const [gatewayDeploymentStatus, setGatewayDeploymentStatus] = useState<PortalServiceStatus | null>(null);
   const [deploymentReadiness, setDeploymentReadiness] = useState<AdminDeploymentReadiness | null>(null);
+  const [adminEmailDeliveryStatus, setAdminEmailDeliveryStatus] = useState<AdminEmailDeliveryStatus | null>(null);
   const [adminObservability, setAdminObservability] = useState<AdminObservability | null>(null);
   const [releaseReadiness, setReleaseReadiness] = useState<ReleaseReadinessSummary | null>(null);
   const [onboardingFunnel7d, setOnboardingFunnel7d] = useState<OnboardingFunnelSummary | null>(null);
@@ -623,6 +626,7 @@ export default function DashboardPage() {
       setApiDeploymentStatus(null);
       setGatewayDeploymentStatus(null);
       setDeploymentReadiness(null);
+      setAdminEmailDeliveryStatus(null);
       setAdminObservability(null);
       return;
     }
@@ -633,15 +637,17 @@ export default function DashboardPage() {
       fetchWebDeploymentStatus(),
       fetchApiStatus(),
       fetchGatewayStatus(),
-      getAdminDeploymentReadiness(portal.token)
+      getAdminDeploymentReadiness(portal.token),
+      getAdminEmailDeliveryStatus(portal.token),
     ])
-      .then(([webResult, apiResult, gatewayResult, readinessResult]) => {
+      .then(([webResult, apiResult, gatewayResult, readinessResult, emailResult]) => {
         if (cancelled) return;
 
         setWebDeploymentStatus(webResult.status === "fulfilled" ? webResult.value : null);
         setApiDeploymentStatus(apiResult.status === "fulfilled" ? apiResult.value : null);
         setGatewayDeploymentStatus(gatewayResult.status === "fulfilled" ? gatewayResult.value : null);
         setDeploymentReadiness(readinessResult.status === "fulfilled" ? readinessResult.value.item : null);
+        setAdminEmailDeliveryStatus(emailResult.status === "fulfilled" ? emailResult.value.item : null);
       })
       .catch(() => {
         if (cancelled) return;
@@ -649,6 +655,7 @@ export default function DashboardPage() {
         setApiDeploymentStatus(null);
         setGatewayDeploymentStatus(null);
         setDeploymentReadiness(null);
+        setAdminEmailDeliveryStatus(null);
       });
 
     return () => {
@@ -2365,6 +2372,68 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+
+                {adminEmailDeliveryStatus ? (
+                  <div className="rounded-[1.25rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs uppercase tracking-[0.14em] text-[color:var(--fyxvo-text-muted)]">
+                          Email delivery
+                        </div>
+                        <div className="mt-2 text-sm text-[color:var(--fyxvo-text-muted)]">
+                          Verification, digests, and operational notices from the live provider.
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone={adminEmailDeliveryStatus.configured ? "success" : "warning"}>
+                          {adminEmailDeliveryStatus.configured ? "Configured" : "Not configured"}
+                        </Badge>
+                        <Badge tone={adminEmailDeliveryStatus.digestEnabledUsers > 0 ? "success" : "neutral"}>
+                          {adminEmailDeliveryStatus.digestEnabledUsers} digest users
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {[
+                        {
+                          label: "Verified inboxes",
+                          value: formatInteger(adminEmailDeliveryStatus.verifiedUsers),
+                          detail: adminEmailDeliveryStatus.fromAddress ?? "No sender configured",
+                        },
+                        {
+                          label: "Digest schedules",
+                          value: formatInteger(adminEmailDeliveryStatus.activeDigestSchedules),
+                          detail: `${formatInteger(adminEmailDeliveryStatus.statusSubscribers)} status subscribers`,
+                        },
+                        {
+                          label: "Latest generated digest",
+                          value: adminEmailDeliveryStatus.latestDigestGeneratedAt
+                            ? formatRelativeDate(adminEmailDeliveryStatus.latestDigestGeneratedAt)
+                            : "None yet",
+                          detail: adminEmailDeliveryStatus.latestDigestSentAt
+                            ? `Sent ${formatRelativeDate(adminEmailDeliveryStatus.latestDigestSentAt)}`
+                            : "No sent digest recorded",
+                        },
+                        {
+                          label: "Reply-to",
+                          value: adminEmailDeliveryStatus.replyToAddress ?? "Default sender",
+                          detail: `Provider ${adminEmailDeliveryStatus.provider}`,
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          className="rounded-[1.1rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-bg)] px-4 py-4"
+                        >
+                          <div className="text-xs uppercase tracking-[0.14em] text-[color:var(--fyxvo-text-muted)]">
+                            {item.label}
+                          </div>
+                          <div className="mt-2 text-base font-semibold text-[color:var(--fyxvo-text)]">{item.value}</div>
+                          <div className="mt-1 text-xs text-[color:var(--fyxvo-text-muted)]">{item.detail}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

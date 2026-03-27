@@ -18,7 +18,7 @@ import { usePortal } from "../../components/portal-provider";
 import { ThemeToggle } from "../../components/theme-toggle";
 import { formatRelativeDate, shortenAddress } from "../../lib/format";
 import { webEnv } from "../../lib/env";
-import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember, getEmailDeliveryStatus, getSessionDiagnostics, recordProjectAccessView } from "../../lib/api";
+import { revokeApiKey, getReferralStats, generateReferralCode, getNotificationPreferences, updateNotificationPreferences, listWebhooks, createWebhook, deleteWebhook, listProjectMembers, inviteProjectMember, removeProjectMember, getEmailDeliveryStatus, getSessionDiagnostics, recordProjectAccessView, sendEmailDeliveryTest } from "../../lib/api";
 import type { EmailDeliveryStatus } from "../../lib/types";
 
 function buildProjectNotesTemplate(projectName: string) {
@@ -223,6 +223,8 @@ export default function SettingsPage() {
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailVerificationSending, setEmailVerificationSending] = useState(false);
   const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null);
+  const [emailTestSending, setEmailTestSending] = useState(false);
+  const [emailTestMessage, setEmailTestMessage] = useState<string | null>(null);
 
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState<{
@@ -439,6 +441,7 @@ export default function SettingsPage() {
   async function saveEmail() {
     if (!portal.token) return;
     setEmailSaving(true);
+    setEmailTestMessage(null);
     try {
       await updateNotificationPreferences({ email: emailValue || null }, portal.token);
       const [_, delivery] = await Promise.all([
@@ -457,6 +460,7 @@ export default function SettingsPage() {
     if (!portal.token || !emailValue.trim()) return;
     setEmailVerificationSending(true);
     setEmailVerificationMessage(null);
+    setEmailTestMessage(null);
     try {
       const response = await fetch(new URL("/v1/me/verify-email/request", webEnv.apiBaseUrl), {
         method: "POST",
@@ -476,6 +480,22 @@ export default function SettingsPage() {
       setEmailVerificationMessage("Unable to send verification email right now.");
     } finally {
       setEmailVerificationSending(false);
+    }
+  }
+
+  async function handleSendEmailTest() {
+    if (!portal.token) return;
+    setEmailTestSending(true);
+    setEmailTestMessage(null);
+    try {
+      const response = await sendEmailDeliveryTest(portal.token);
+      setEmailTestMessage(response.message ?? `Test email sent to ${response.recipient}.`);
+      const delivery = await getEmailDeliveryStatus(portal.token).catch(() => null);
+      if (delivery) setEmailDeliveryStatus(delivery);
+    } catch (error) {
+      setEmailTestMessage(error instanceof Error ? error.message : "Unable to send a test email right now.");
+    } finally {
+      setEmailTestSending(false);
     }
   }
 
@@ -1054,6 +1074,24 @@ export default function SettingsPage() {
               ) : null}
               {emailVerificationMessage ? (
                 <p className="text-xs text-[var(--fyxvo-text-muted)]">{emailVerificationMessage}</p>
+              ) : null}
+              {emailDeliveryStatus?.configured && emailDeliveryStatus.emailVerified ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleSendEmailTest()}
+                    disabled={emailTestSending || !portal.token}
+                  >
+                    {emailTestSending ? "Sending test…" : "Send test email"}
+                  </Button>
+                  <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                    Confirm this inbox can receive live verification, digest, and status messages.
+                  </span>
+                </div>
+              ) : null}
+              {emailTestMessage ? (
+                <p className="text-xs text-[var(--fyxvo-text-muted)]">{emailTestMessage}</p>
               ) : null}
               {emailDeliveryStatus ? (
                 <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-3 text-xs text-[var(--fyxvo-text-muted)]">

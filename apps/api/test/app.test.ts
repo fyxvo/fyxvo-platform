@@ -1541,6 +1541,7 @@ function createAssistantSseResponse(chunks: readonly string[]) {
 async function createTestApp(options: {
   rateLimitMax?: number;
   envOverrides?: Partial<Record<string, string>>;
+  prisma?: unknown;
 } = {}) {
   const env = makeEnv({
     ...(options.rateLimitMax !== undefined ? { API_RATE_LIMIT_MAX: String(options.rateLimitMax) } : {}),
@@ -1692,6 +1693,7 @@ async function createTestApp(options: {
     env,
     repository,
     blockchain,
+    ...(options.prisma ? { prisma: options.prisma as never } : {}),
     healthcheck: async () => true,
     logger: false
   });
@@ -2013,6 +2015,59 @@ describe("Fyxvo API service", () => {
     });
   });
 
+  it("reports admin email delivery diagnostics", async () => {
+    const context = await createTestApp({
+      envOverrides: {
+        RESEND_API_KEY: "resend-test-key",
+        EMAIL_FROM: "alerts@fyxvo.com",
+        EMAIL_REPLY_TO: "support@fyxvo.com",
+      },
+      prisma: {
+        user: {
+          count: vi.fn()
+            .mockResolvedValueOnce(4)
+            .mockResolvedValueOnce(2),
+        },
+        digestSchedule: {
+          count: vi.fn().mockResolvedValue(2),
+        },
+        statusSubscriber: {
+          count: vi.fn().mockResolvedValue(5),
+        },
+        digestRecord: {
+          findFirst: vi.fn().mockResolvedValue({
+            generatedAt: new Date("2026-03-27T10:00:00.000Z"),
+            sentAt: new Date("2026-03-27T10:05:00.000Z"),
+          }),
+        },
+      },
+    });
+    appsToClose.add(context.app);
+    const auth = await authenticateWallet({ app: context.app, repository: context.repository, role: "OWNER" });
+
+    const response = await context.app.inject({
+      method: "GET",
+      url: "/v1/admin/email-delivery",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      item: {
+        configured: true,
+        provider: "resend",
+        fromAddress: "alerts@fyxvo.com",
+        replyToAddress: "support@fyxvo.com",
+        verifiedUsers: 4,
+        digestEnabledUsers: 2,
+        activeDigestSchedules: 2,
+        statusSubscribers: 5,
+        latestDigestGeneratedAt: "2026-03-27T10:00:00.000Z",
+        latestDigestSentAt: "2026-03-27T10:05:00.000Z",
+      },
+    });
+  });
+
   it("sends verification email requests when delivery is configured", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ id: "email-1" }), {
@@ -2042,6 +2097,75 @@ describe("Fyxvo API service", () => {
     expect(response.json()).toMatchObject({
       requested: true,
       message: "Verification email sent.",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.resend.com/emails",
+      expect.objectContaining({
+        method: "POST",
+      })
+    );
+  });
+
+  it("sends a test email only after verification and when delivery is configured", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "email-test-1" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const context = await createTestApp({
+      envOverrides: {
+        RESEND_API_KEY: "resend-test-key",
+        EMAIL_FROM: "alerts@fyxvo.com",
+      },
+    });
+    appsToClose.add(context.app);
+    const auth = await authenticateWallet({ app: context.app, repository: context.repository });
+    context.repository.setUserEmail(auth.wallet.publicKey.toBase58(), "alerts@example.com");
+
+    const unverifiedResponse = await context.app.inject({
+      method: "POST",
+      url: "/v1/me/email-delivery/test",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+    expect(unverifiedResponse.statusCode).toBe(403);
+    expect(unverifiedResponse.json()).toMatchObject({
+      error: "email_not_verified",
+    });
+
+    const requestResponse = await context.app.inject({
+      method: "POST",
+      url: "/v1/me/verify-email/request",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+    expect(requestResponse.statusCode).toBe(202);
+    const repositoryUsers = (context.repository as unknown as {
+      users: Map<string, User & { emailVerificationToken?: string | null }>;
+    }).users;
+    const verificationToken = [...repositoryUsers.values()].find(
+      (candidate) => candidate.walletAddress === auth.wallet.publicKey.toBase58()
+    )?.emailVerificationToken;
+    expect(verificationToken).toEqual(expect.any(String));
+
+    const confirmResponse = await context.app.inject({
+      method: "POST",
+      url: "/v1/me/verify-email/confirm",
+      payload: { token: verificationToken },
+    });
+    expect(confirmResponse.statusCode).toBe(200);
+
+    const verifiedResponse = await context.app.inject({
+      method: "POST",
+      url: "/v1/me/email-delivery/test",
+      headers: { authorization: `Bearer ${auth.token}` },
+    });
+    expect(verifiedResponse.statusCode).toBe(202);
+    expect(verifiedResponse.json()).toMatchObject({
+      sent: true,
+      recipient: "alerts@example.com",
+      message: "Test email sent.",
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.resend.com/emails",

@@ -19,6 +19,7 @@ Use this checklist after important releases so the live platform matches the rep
 ## Health and routing checks
 
 - [ ] Run `pnpm prod:verify` and confirm the live web, API, gateway, and assistant surfaces all pass.
+- [ ] Run `pnpm prod:smoke` for a browser-level check of the live landing, pricing, docs, status, and assistant surfaces.
 - [ ] Check `https://api.fyxvo.com/health`.
 - [ ] Check `https://api.fyxvo.com/v1/status`.
 - [ ] Check `https://rpc.fyxvo.com/health`.

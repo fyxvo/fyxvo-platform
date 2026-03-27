@@ -4,6 +4,7 @@ import type {
   AssistantConversationSummary,
   AssistantMessageFeedback,
   AssistantRateLimitStatus,
+  AdminEmailDeliveryStatus,
   AdminDeploymentReadiness,
   AdminObservability,
   AdminOverview,
@@ -881,6 +882,20 @@ export async function getAdminAssistantStats(token: string) {
 export async function getEmailDeliveryStatus(token: string) {
   const response = await requestApi<{ item: EmailDeliveryStatus }>("/v1/me/email-delivery-status", undefined, token);
   return response.item;
+}
+
+export async function sendEmailDeliveryTest(token: string) {
+  return requestApi<{ sent: boolean; recipient: string; message: string }>(
+    "/v1/me/email-delivery/test",
+    {
+      method: "POST",
+    },
+    token
+  );
+}
+
+export async function getAdminEmailDeliveryStatus(token: string) {
+  return requestApi<{ item: AdminEmailDeliveryStatus }>("/v1/admin/email-delivery", undefined, token);
 }
 
 export async function getAdminDeploymentReadiness(token: string) {

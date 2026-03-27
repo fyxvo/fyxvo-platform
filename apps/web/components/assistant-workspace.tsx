@@ -723,6 +723,8 @@ export function AssistantWorkspace() {
   const [adminAssistantStats, setAdminAssistantStats] = useState<AssistantAdminStats | null>(null);
   const [feedbackDraft, setFeedbackDraft] = useState<{ messageId: string; rating: "up" | "down"; note: string } | null>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState<string | null>(null);
+  const [lastSubmittedPrompt, setLastSubmittedPrompt] = useState<string | null>(null);
+  const [assistantRequestIssue, setAssistantRequestIssue] = useState<{ message: string; retryable: boolean } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
   const isAuthenticated = portal.walletPhase === "authenticated";
@@ -1088,16 +1090,25 @@ export function AssistantWorkspace() {
     window.location.href = `/playground?${params.toString()}`;
   }
 
+  function handleRetryLastPrompt() {
+    if (!lastSubmittedPrompt || composer.isStreaming) return;
+    void sendMessage(lastSubmittedPrompt);
+  }
+
   async function sendMessage(content: string) {
-    if (!content.trim() || composer.isStreaming || !portal.token) return;
+    const trimmedContent = content.trim();
+    if (!trimmedContent || composer.isStreaming || !portal.token) return;
     setActiveTab("messages");
+    setLastSubmittedPrompt(trimmedContent);
+    setAssistantRequestIssue(null);
 
     let conversationId = activeConversationId;
+    let accumulated = "";
 
     const userMessage: AssistantConversationMessage = {
       id: `local-user-${Date.now()}`,
       role: "user",
-      content: content.trim(),
+      content: trimmedContent,
       createdAt: new Date().toISOString(),
     };
     const nextMessages = [...messages, userMessage];
@@ -1115,7 +1126,7 @@ export function AssistantWorkspace() {
 
     try {
       if (!conversationId) {
-        const created = await createAssistantConversation(content.trim().slice(0, 60), portal.token);
+        const created = await createAssistantConversation(trimmedContent.slice(0, 60), portal.token);
         conversationId = created.item.id;
         setActiveConversationId(conversationId);
         setConversations((current) => [created.item, ...current.filter((item) => item.id !== created.item.id)]);
@@ -1164,19 +1175,21 @@ export function AssistantWorkspace() {
           setAssistantAvailable(false);
           setAssistantStatusMessage(errorContent);
         }
+        setAssistantRequestIssue({ message: errorContent, retryable: true });
         replaceLastAssistantMessage(errorContent);
         return;
       }
 
       if (!response.body || !contentType.includes("text/event-stream")) {
         const errorPayload = await parseAssistantErrorPayload(response);
-        replaceLastAssistantMessage(getAssistantErrorMessage(response.status || 500, errorPayload));
+        const errorContent = getAssistantErrorMessage(response.status || 500, errorPayload);
+        setAssistantRequestIssue({ message: errorContent, retryable: true });
+        replaceLastAssistantMessage(errorContent);
         return;
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let accumulated = "";
       let buffer = "";
       let streamError: string | null = null;
 
@@ -1223,8 +1236,11 @@ export function AssistantWorkspace() {
         }
       }
 
-      if (streamError && accumulated.length === 0) {
-        replaceLastAssistantMessage(streamError);
+      if (streamError) {
+        setAssistantRequestIssue({ message: streamError, retryable: true });
+        replaceLastAssistantMessage(
+          accumulated.length > 0 ? `${accumulated}\n\n_${streamError}_` : streamError
+        );
       }
 
       if (conversationId && portal.token) {
@@ -1234,9 +1250,18 @@ export function AssistantWorkspace() {
         }
       }
 
+      setAssistantRequestIssue(null);
       await refreshConversationState();
     } catch {
-      replaceLastAssistantMessage("The assistant connection was interrupted before a response completed. Try again in a moment.");
+      const interruptionMessage =
+        accumulated.length > 0
+          ? `${accumulated}\n\n_The response stream was interrupted before it finished. Retry to continue._`
+          : "The assistant connection was interrupted before a response completed. Try again in a moment.";
+      setAssistantRequestIssue({
+        message: "The assistant stream was interrupted before the reply finished.",
+        retryable: true,
+      });
+      replaceLastAssistantMessage(interruptionMessage);
     } finally {
       setComposer((current) => ({ ...current, isStreaming: false }));
     }
@@ -2138,6 +2163,21 @@ export function AssistantWorkspace() {
             {returnBanner ? (
               <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
                 Returned from Playground with your prepared request ready.
+              </div>
+            ) : null}
+
+            {assistantRequestIssue ? (
+              <div className="mt-4">
+                <Notice tone="warning" title="Assistant request needs attention">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>{assistantRequestIssue.message}</span>
+                    {assistantRequestIssue.retryable && lastSubmittedPrompt ? (
+                      <Button size="sm" variant="secondary" onClick={handleRetryLastPrompt} disabled={composer.isStreaming}>
+                        Retry last prompt
+                      </Button>
+                    ) : null}
+                  </div>
+                </Notice>
               </div>
             ) : null}
 
