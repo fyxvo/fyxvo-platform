@@ -1,2707 +1,1938 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
-import { PageHeader } from "../../components/page-header";
-import { SocialLinkButtons } from "../../components/social-links";
-import { ApiExplorer } from "../../components/api-explorer";
 import { webEnv } from "../../lib/env";
-import { PRICING_LAMPORTS } from "@fyxvo/config/pricing";
+import { MenuIcon, CloseIcon } from "../../components/icons";
 
-const NAV_SECTIONS = [
-  { id: "introduction", label: "Introduction", keywords: "overview what is fyxvo devnet rpc relay product" },
-  { id: "quickstart", label: "Quickstart", keywords: "start connect wallet create project fund api key request curl" },
-  { id: "quickstarts", label: "Quickstarts", keywords: "framework nextjs react node nodejs python rust sdk guide quickstart" },
-  { id: "authentication", label: "Authentication", keywords: "wallet auth challenge verify token jwt bearer solana phantom" },
-  { id: "funding", label: "Funding", keywords: "sol lamports treasury deposit balance credits prepare sign transaction" },
-  { id: "standard-rpc", label: "Standard RPC", keywords: "rpc request jsonrpc endpoint gateway x-api-key getHealth getSlot" },
-  { id: "priority-relay", label: "Priority Relay", keywords: "priority relay high throughput fast latency /priority scope" },
-  { id: "analytics", label: "Analytics", keywords: "analytics overview stats requests latency error rate monitoring project" },
-  { id: "analytics-api", label: "Analytics API", keywords: "analytics stats requests latency error rate monitoring project" },
-  { id: "public-stats", label: "Public Stats API", keywords: "public stats api curl node python fetch x-api-key backend service" },
-  { id: "api-explorer", label: "API Explorer", keywords: "try it interactive request curl live test endpoint" },
-  { id: "webhooks", label: "Webhooks", keywords: "webhook http callback post event funding apikey hmac signature" },
-  { id: "team-collaboration", label: "Team Workflows", keywords: "team member invite wallet collaboration owner role notes runbook recipes alerts health archive restore" },
-  { id: "playground", label: "Playground", keywords: "playground rpc methods test compare mode schema panel share url examples" },
-  { id: "operations-guide", label: "Operations Guide", keywords: "operations monitoring alerts traces webhooks latency success rate cache hit request logs" },
-  { id: "release-guide", label: "Release Guide", keywords: "release readiness zero to first request devnet simulation alerts logs health score mainnet preparation" },
-  { id: "public-profiles", label: "Public Project Pages", keywords: "public profile page slug badge readme status latency" },
-  { id: "sdk-reference", label: "SDK Reference", keywords: "sdk library reference types api endpoint paths" },
-  { id: "rate-limits", label: "Rate Limits", keywords: "rate limit 429 throttle bandwidth quota scope" },
-  { id: "simulation-mode", label: "Simulation Mode", keywords: "simulation mode simulate free devnet canned response getHealth getSlot getBalance getLatestBlockhash" },
-  { id: "api-versioning", label: "API Versioning", keywords: "api versioning v1 breaking changes deprecation header x-fyxvo-api-version" },
-  { id: "troubleshooting", label: "Troubleshooting", keywords: "error debug fix 401 403 402 500 403 common issues" },
-  { id: "error-reference", label: "Error Reference", keywords: "error reference codes 401 403 402 429 503 gateway api errors" },
-  { id: "ci-cd", label: "CI/CD Integration", keywords: "ci cd github actions continuous integration deploy environment variables secrets" },
-  { id: "migration-guide", label: "Migration Guide", keywords: "migration guide migrate helius quicknode alchemy switch rpc provider 2-line change" },
-  { id: "network-status", label: "Network Status", keywords: "status health uptime live devnet solana network" },
-  { id: "status-api", label: "Status API", keywords: "health status capacity incidents calendar public api response monitoring ops" },
-  { id: "changelog", label: "Changelog", keywords: "release updates version changes new features" },
-  { id: "migration", label: "Migration (Legacy)", keywords: "migrate helius quicknode alchemy switch rpc provider 2-line change" },
-  { id: "rate-limits-reference", label: "Rate Limits Reference", keywords: "rate limit table devnet requests per second 429" },
-  { id: "error-codes", label: "Error Codes", keywords: "error codes 401 403 402 429 503 gateway api errors reference" },
-  { id: "faq", label: "FAQ", keywords: "frequently asked questions faq devnet solana rpc gateway" },
-  { id: "rpc-reference", label: "RPC Reference", keywords: "rpc methods reference getSlot getBalance getAccountInfo getBlock sendTransaction solana jsonrpc glossary" },
+// ---------------------------------------------------------------------------
+// Sidebar navigation data
+// ---------------------------------------------------------------------------
+
+const sidebarGroups = [
+  {
+    label: "Getting started",
+    items: [
+      { id: "introduction", label: "Introduction" },
+      { id: "quickstart", label: "Quickstart" },
+      { id: "framework-quickstarts", label: "Framework quickstarts" },
+    ],
+  },
+  {
+    label: "Core concepts",
+    items: [
+      { id: "authentication", label: "Authentication" },
+      { id: "funding", label: "Funding" },
+      { id: "standard-rpc", label: "Standard RPC" },
+      { id: "priority-relay", label: "Priority Relay" },
+    ],
+  },
+  {
+    label: "Analytics",
+    items: [
+      { id: "analytics-overview", label: "Analytics overview" },
+      { id: "analytics-api", label: "Analytics API" },
+      { id: "public-stats-api", label: "Public Stats API" },
+    ],
+  },
+  {
+    label: "Developer tools",
+    items: [
+      { id: "api-explorer", label: "API Explorer" },
+      { id: "playground-section", label: "Playground" },
+      { id: "sdk-reference", label: "SDK Reference" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { id: "operations-guide", label: "Operations Guide" },
+      { id: "release-guide", label: "Release Guide" },
+      { id: "cicd-integration", label: "CI/CD Integration" },
+      { id: "migration-guide", label: "Migration Guide" },
+    ],
+  },
+  {
+    label: "Reference",
+    items: [
+      { id: "rate-limits", label: "Rate Limits" },
+      { id: "simulation-mode", label: "Simulation Mode" },
+      { id: "api-versioning", label: "API Versioning" },
+      { id: "error-reference", label: "Error Reference" },
+      { id: "error-codes", label: "Error Codes" },
+      { id: "faq", label: "FAQ" },
+      { id: "rpc-reference", label: "RPC Reference" },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      { id: "webhooks", label: "Webhooks" },
+      { id: "team-collaboration", label: "Team Collaboration" },
+      { id: "public-project-pages", label: "Public Project Pages" },
+      { id: "changelog-section", label: "Changelog" },
+    ],
+  },
+  {
+    label: "Network",
+    items: [
+      { id: "network-status-section", label: "Network Status" },
+      { id: "status-api", label: "Status API" },
+      { id: "troubleshooting", label: "Troubleshooting" },
+    ],
+  },
 ] as const;
 
-function CodeBlock({ code, label }: { readonly code: string; readonly label?: string }) {
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function CodeBlock({ language, code }: { language: string; code: string }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-      {label ? (
-        <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2">
-          <span className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-            {label}
-          </span>
-          <CopyButton value={code} />
-        </div>
-      ) : (
-        <div className="flex justify-end border-b border-[var(--fyxvo-border)] px-3 py-1.5">
-          <CopyButton value={code} />
-        </div>
-      )}
-      <pre className="overflow-x-auto p-4 text-xs leading-6 text-[var(--fyxvo-text-soft)]">
+    <div className="relative overflow-hidden rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+      <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2.5">
+        <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">{language}</span>
+        <CopyButton value={code} label="Copy" />
+      </div>
+      <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-[var(--fyxvo-text-soft)]">
         <code>{code}</code>
       </pre>
     </div>
   );
 }
 
-function SectionHeading({
-  id,
-  eyebrow,
-  title,
-  description,
-}: {
-  readonly id: string;
-  readonly eyebrow?: string;
-  readonly title: string;
-  readonly description?: string;
-}) {
+function SectionHeading({ id, title }: { id: string; title: string }) {
   return (
-    <div className="mb-6">
-      {eyebrow ? (
-        <div className="mb-2 text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-brand)]">{eyebrow}</div>
-      ) : null}
-      <h2
-        id={id}
-        className="scroll-mt-24 font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]"
-      >
-        {title}
-      </h2>
-      {description ? (
-        <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">{description}</p>
-      ) : null}
-    </div>
+    <h2
+      id={id}
+      className="scroll-mt-24 text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)]"
+    >
+      {title}
+    </h2>
   );
 }
 
-const QUICKSTART_FRAMEWORKS = ["Next.js", "React", "Node.js", "Python", "Rust"] as const;
-type QuickstartFramework = (typeof QUICKSTART_FRAMEWORKS)[number];
+function SectionDivider() {
+  return <hr className="border-[var(--fyxvo-border)]" />;
+}
+
+function Prose({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="space-y-4 text-[15px] leading-7 text-[var(--fyxvo-text-soft)]">{children}</div>
+  );
+}
+
+function InlineCode({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded-md bg-[var(--fyxvo-panel)] px-1.5 py-0.5 font-mono text-xs text-[var(--fyxvo-brand)]">
+      {children}
+    </code>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page component
+// ---------------------------------------------------------------------------
 
 export default function DocsPage() {
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [activeQuickstart, setActiveQuickstart] = useState<QuickstartFramework>("Next.js");
+  const [activeSection, setActiveSection] = useState("introduction");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
+  // Active section tracking via IntersectionObserver
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  const authChallengeCode = `curl -X POST ${webEnv.apiBaseUrl}/v1/auth/challenge \\
-  -H "content-type: application/json" \\
-  -d '{"walletAddress":"YOUR_WALLET"}'`;
-
-  const authVerifyCode = `# 1. Get challenge — returns the exact message to sign
-curl -X POST ${webEnv.apiBaseUrl}/v1/auth/challenge \\
-  -H "content-type: application/json" \\
-  -d '{"walletAddress":"YOUR_WALLET"}'
-
-# Response: { "walletAddress": "...", "nonce": "...", "message": "fyxvo:YOUR_WALLET:NONCE" }
-
-# 2. Sign the message with your wallet (browser, @solana/wallet-adapter-base)
-const encoded = new TextEncoder().encode(message);
-const signatureBytes = await wallet.signMessage(encoded);
-const signature = bs58.encode(signatureBytes);
-
-# 3. Verify signature and receive JWT
-curl -X POST ${webEnv.apiBaseUrl}/v1/auth/verify \\
-  -H "content-type: application/json" \\
-  -d '{
-    "walletAddress": "YOUR_WALLET",
-    "message": "<message-from-step-1>",
-    "signature": "<base58-signature>"
-  }'
-
-# Response: { "token": "eyJ...", "user": { "id": "...", "walletAddress": "...", "role": "MEMBER" } }`;
-
-  const fundingCode = [
-    `# 1. Prepare the unsigned funding transaction`,
-    `curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/funding/prepare \\`,
-    `  -H "authorization: Bearer YOUR_JWT" \\`,
-    `  -H "content-type: application/json" \\`,
-    `  -d '{"asset":"SOL","amountLamports":100000000,"funderWalletAddress":"YOUR_WALLET"}'`,
-    ``,
-    `# Response: { "item": { "id": "FUNDING_ID", "transactionBase64": "<unsigned-tx>", "amount": "100000000" } }`,
-    ``,
-    `# 2. Decode, sign, and broadcast (using @solana/web3.js)`,
-    `import { Transaction, Connection } from "@solana/web3.js";`,
-    ``,
-    `const fundingItem = response.item;`,
-    `const tx = Transaction.from(Buffer.from(fundingItem.transactionBase64, "base64"));`,
-    `const signed = await wallet.signTransaction(tx);`,
-    `const connection = new Connection("https://api.devnet.solana.com");`,
-    `const sig = await connection.sendRawTransaction(signed.serialize());`,
-    `await connection.confirmTransaction(sig, "confirmed");`,
-    ``,
-    `# 3. Verify the confirmed transaction with the API`,
-    `curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/funding/FUNDING_ID/verify \\`,
-    `  -H "authorization: Bearer YOUR_JWT" \\`,
-    `  -H "content-type: application/json" \\`,
-    `  -d '{"signature": "<tx-signature>"}'`,
-  ].join("\n");
-
-  const standardRpcCode = `# Standard relay — requires rpc:request scope
-curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "content-type: application/json" \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'
-
-# Also accepts Authorization: Bearer
-curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "content-type: application/json" \\
-  -H "authorization: Bearer YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"confirmed"}]}'`;
-
-  const priorityRelayCode = `# Priority relay — requires rpc:request AND priority:relay scopes
-curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
-  -H "content-type: application/json" \\
-  -H "x-api-key: YOUR_PRIORITY_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["<base64-tx>",{"encoding":"base64","skipPreflight":false}]}'`;
-
-  const analyticsOverviewCode = `curl ${webEnv.apiBaseUrl}/v1/analytics/overview \\
-  -H "authorization: Bearer YOUR_JWT"
-
-# Response shape:
-# {
-#   "item": {
-#     "totals": { "projects": 3, "apiKeys": 5, "fundingRequests": 2, "requestLogs": 14200 },
-#     "latency": { "averageMs": 42, "maxMs": 312 },
-#     "requestsByService": [{ "service": "gateway", "count": 14200 }]
-#   }
-# }`;
-
-  const analyticsProjectCode = `curl ${webEnv.apiBaseUrl}/v1/analytics/projects/YOUR_PROJECT_ID?range=24h \\
-  -H "authorization: Bearer YOUR_JWT"
-
-# Range options: 1h | 6h | 24h | 7d | 30d (default: all time)
-# Response shape:
-# {
-#   "item": {
-#     "totals": { "requestLogs": 4800, "apiKeys": 2, "fundingRequests": 1 },
-#     "latency": { "averageMs": 38, "maxMs": 210, "p95Ms": 95 },
-#     "statusCodes": [{ "statusCode": 200, "count": 4750 }, { "statusCode": 429, "count": 50 }],
-#     "recentRequests": [{ "route": "/rpc", "method": "POST", "statusCode": 200, "durationMs": 38 }]
-#   }
-# }`;
-
-  const sdkInstallNpmCode = `npm install @fyxvo/sdk`;
-  const sdkInstallYarnCode = `yarn add @fyxvo/sdk`;
-  const sdkInstallPnpmCode = `pnpm add @fyxvo/sdk`;
-
-  const sdkClientCode = `import { createFyxvoClient } from "@fyxvo/sdk";
-
-const client = createFyxvoClient({
-  baseUrl: "${webEnv.gatewayBaseUrl}",
-  apiKey: process.env.FYXVO_API_KEY,
-});`;
-
-  const sdkRpcCode = `// Standard RPC request
-const health = await client.rpc({
-  id: 1,
-  method: "getHealth",
-});
-
-// With params
-const blockhash = await client.rpc({
-  id: 2,
-  method: "getLatestBlockhash",
-  params: [{ commitment: "confirmed" }],
-});
-
-console.log(blockhash.result.value.blockhash);`;
-
-  const sdkPriorityCode = `// Priority relay request (requires priority:relay scoped key)
-// Pass the /priority path via the options second argument
-const slot = await client.rpc(
-  { id: 1, method: "getSlot" },
-  { path: "/priority" }
-);
-
-if ("result" in slot) {
-  const slotNumber = slot.result as number;
-  // use slotNumber
-}`;
-
-  const sdkErrorCode = `import { FyxvoError, FyxvoApiError } from "@fyxvo/sdk";
-
-try {
-  const result = await client.rpc({ id: 1, method: "getHealth" });
-} catch (err) {
-  if (err instanceof FyxvoApiError) {
-    // HTTP-level error from the gateway (4xx / 5xx)
-    // err.status holds the HTTP status code, err.message has the description
-    const status: number | undefined = err.status;
-    const message: string = err.message;
-    void status; void message;
-  } else if (err instanceof FyxvoError) {
-    // SDK-level error (network, timeout, config)
-    const message: string = err.message;
-    void message;
-  }
-}`;
-
-  const rateLimitCode = `# The gateway returns 429 when a key exceeds its rate window.
-# Response headers include:
-#   x-ratelimit-limit:     <requests per window>
-#   x-ratelimit-remaining: <remaining in current window>
-#   x-ratelimit-reset:     <unix timestamp when the window resets>
-
-# Standard path (rpc:request scope) — 300 req / 60 s per key
-# Priority path (priority:relay scope) — 60 req / 60 s per key
-
-# Retry with backoff after a 429:
-async function withRetry(fn, maxAttempts = 3) {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (err?.statusCode === 429 && attempt < maxAttempts - 1) {
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-      } else {
-        throw err;
-      }
-    }
-  }
-}`;
-
-  const pythonRpcCode = `import requests
-
-response = requests.post(
-    "https://rpc.fyxvo.com/rpc",
-    headers={"x-api-key": "YOUR_KEY", "Content-Type": "application/json"},
-    json={"jsonrpc": "2.0", "id": 1, "method": "getHealth", "params": []}
-)
-print(response.json())`;
-
-  const tsAuthCode = `import { createFyxvoClient } from "@fyxvo/sdk";
-
-// Step 1 — request a challenge
-const api = createFyxvoClient({ baseUrl: "${webEnv.apiBaseUrl}" });
-const challenge = await api.request<{ message: string; nonce: string }>({
-  method: "POST",
-  path: "/v1/auth/challenge",
-  body: { walletAddress: "YOUR_WALLET_ADDRESS" },
-});
-
-// Step 2 — sign the message with your wallet
-const encoded = new TextEncoder().encode(challenge.message);
-const sigBytes = await wallet.signMessage(encoded);
-const signature = bs58.encode(sigBytes);
-
-// Step 3 — verify and receive a JWT
-const session = await api.request<{ token: string }>({
-  method: "POST",
-  path: "/v1/auth/verify",
-  body: {
-    walletAddress: "YOUR_WALLET_ADDRESS",
-    message: challenge.message,
-    signature,
-  },
-});
-
-// Step 4 — use the JWT as a bearer token for subsequent calls
-const authedClient = createFyxvoClient({
-  baseUrl: "${webEnv.apiBaseUrl}",
-  headers: { authorization: \`Bearer \${session.token}\` },
-});`;
-
-  const tsApiKeyCode = `// Create a gateway relay API key (requires JWT from auth flow)
-const authedClient = createFyxvoClient({
-  baseUrl: "${webEnv.apiBaseUrl}",
-  headers: { authorization: "Bearer YOUR_JWT" },
-});
-
-const created = await authedClient.request<{
-  item: { id: string; prefix: string; scopes: string[] };
-  plainTextKey: string;
-}>({
-  method: "POST",
-  path: "/v1/api-keys",
-  body: { label: "my-relay-key", scopes: ["rpc:request"] },
-});
-
-const apiKey = created.plainTextKey;`;
-
-  const tsRpcCode = `import { createFyxvoClient, type RpcResponse } from "@fyxvo/sdk";
-
-// Gateway client — use your relay API key here
-const gateway = createFyxvoClient({
-  baseUrl: "${webEnv.gatewayBaseUrl}",
-  apiKey: process.env.FYXVO_API_KEY,
-});
-
-// Standard RPC call
-const health = await gateway.rpc<string>({ method: "getHealth" });
-
-// With typed params
-interface BlockhashResult {
-  blockhash: string;
-  lastValidBlockHeight: number;
-}
-const response: RpcResponse<{ value: BlockhashResult }> = await gateway.rpc({
-  id: 1,
-  method: "getLatestBlockhash",
-  params: [{ commitment: "confirmed" }],
-});
-
-if ("result" in response) {
-  const blockhash: string = response.result.value.blockhash;
-  void blockhash;
-}`;
-
-  const healthCheckCode = `# API health
-curl ${webEnv.apiBaseUrl}/health
-# { "status": "ok", "timestamp": "..." }
-
-# Gateway health
-curl ${webEnv.gatewayBaseUrl}/health
-# { "status": "ok" }
-
-# Gateway full status (metrics, node count, pricing)
-curl ${webEnv.gatewayBaseUrl}/v1/status
-
-# Status page
-open ${webEnv.statusPageUrl}`;
-
-  const statusApiHealthCode = `curl ${webEnv.apiBaseUrl}/health
-
-# Public
-# Use when you want the fastest readiness check for the control plane.
-# Returns service, version, timestamp, and assistant availability.`;
-
-  const statusApiStatusCode = `curl ${webEnv.apiBaseUrl}/v1/status
-
-# Public
-# Use when you want richer API runtime context like environment, dependencies,
-# and assistant availability for dashboards or release checks.`;
-
-  const statusApiIncidentsCode = `curl ${webEnv.apiBaseUrl}/v1/incidents
-
-# Public
-# Use when you want the current incident list and timeline updates for each incident.`;
-
-  const statusApiNetworkCode = `curl ${webEnv.apiBaseUrl}/v1/network/stats
-curl ${webEnv.apiBaseUrl}/v1/network/capacity
-curl ${webEnv.apiBaseUrl}/v1/network/health-calendar
-
-# Public
-# Use for high-level usage, capacity posture, and recent health history.`;
-
-  const statusApiPublicProjectCode = `curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public \\
-  -H "x-api-key: YOUR_API_KEY"
-
-# Authenticated with a project API key
-# Use from backend services when you want public-safe project usage stats.`;
-
-  const statusSnapshotCode = `# Status snapshot sharing
-# Open ${webEnv.statusPageUrl}
-# Use "Copy snapshot" to capture current API health, gateway health,
-# protocol readiness, and active incident count as shareable text.`;
-
-  const visibleSections = useMemo(() => {
-    const q = debouncedQuery.trim().toLowerCase();
-    if (!q) return NAV_SECTIONS.map((s) => s.id);
-    return NAV_SECTIONS.filter(
-      (s) =>
-        s.label.toLowerCase().includes(q) ||
-        s.id.toLowerCase().includes(q) ||
-        s.keywords.toLowerCase().includes(q)
-    ).map((s) => s.id);
-  }, [debouncedQuery]);
-
-  function scrollTo(id: string) {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  return (
-    <div className="relative">
-      <div className="lg:flex lg:gap-10 xl:gap-14">
-        {/* Sidebar — lg+ only */}
-        <aside className="hidden lg:block lg:w-56 xl:w-60 shrink-0">
-          <div className="sticky top-24 space-y-3">
-            <div className="relative">
-              <input
-                type="search"
-                placeholder="Search sections…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="h-9 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 focus:ring-offset-[var(--fyxvo-bg)] transition"
-              />
-            </div>
-            <nav className="flex flex-col gap-0.5">
-              {NAV_SECTIONS.map((section) => {
-                const visible = visibleSections.includes(section.id);
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => scrollTo(section.id)}
-                    className={[
-                      "rounded-lg px-3 py-1.5 text-left text-sm transition",
-                      visible
-                        ? "text-[var(--fyxvo-text-soft)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
-                        : "text-[var(--fyxvo-text-muted)] opacity-40 cursor-default",
-                    ].join(" ")}
-                    disabled={!visible}
-                  >
-                    {section.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </aside>
-
-        {/* Main content */}
-        <main className="min-w-0 flex-1 space-y-14">
-          {/* Page header */}
-          <PageHeader
-            eyebrow="Docs"
-            title="Start from wallet auth to first request in minutes."
-            description="This guide covers the full self-serve path on Fyxvo devnet. Wallet auth, project activation, SOL funding, relay usage, analytics, and SDK reference — all in one place."
-          />
-
-          <Notice tone="neutral" title="Devnet only">
-            Fyxvo is live on Solana devnet today. SOL is the active funding path. USDC remains
-            intentionally configuration-gated until it is explicitly enabled for a deployment.
-          </Notice>
-
-          <Notice tone="neutral" title="Need a direct line while integrating?">
-            For launch-fit questions, issue reports, or managed rollout conversations, use the
-            community paths below or the contact page.
-            <div className="mt-4">
-              <SocialLinkButtons />
-            </div>
-          </Notice>
-
-          {/* ── Introduction ─────────────────────────────────────── */}
-          <section id="introduction">
-            <SectionHeading
-              id="introduction"
-              eyebrow="Section 1"
-              title="Introduction"
-              description="What Fyxvo is, who it is for, and what is live on devnet today."
-            />
-            <div className="grid gap-5 lg:grid-cols-3">
-              <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-                <CardHeader>
-                  <CardTitle>What is Fyxvo</CardTitle>
-                  <CardDescription>
-                    A developer platform for Solana teams that need a real, funded RPC relay path —
-                    not a mock dashboard.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                  Fyxvo provides wallet-authenticated project management, on-chain SOL funding, a
-                  standard relay, a separate priority relay path, per-project analytics, and a public
-                  status surface. Everything connects from wallet identity to observable traffic in a
-                  single controlled flow.
-                </CardContent>
-              </Card>
-              <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-                <CardHeader>
-                  <CardTitle>Who it is for</CardTitle>
-                  <CardDescription>
-                    Solana teams validating funded RPC, priority relay, and analytics before widening
-                    traffic.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                  Use Fyxvo if you want to confirm wallet-authenticated project control, SOL-funded
-                  gateway access, priority routing behavior, request analytics, and a managed launch
-                  path without building your own infrastructure first.
-                </CardContent>
-              </Card>
-              <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-                <CardHeader>
-                  <CardTitle>What is live today</CardTitle>
-                  <CardDescription>
-                    The full devnet path is active: wallet auth, project activation, SOL funding,
-                    standard relay, priority relay, analytics, and public status.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                  USDC remains gated and the current operator topology is managed infrastructure —
-                  not an open external operator marketplace. Both limits are stated explicitly
-                  throughout the product and in these docs.
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-
-          {/* ── Quickstart ───────────────────────────────────────── */}
-          <section id="quickstart">
-            <SectionHeading
-              id="quickstart"
-              eyebrow="Section 2"
-              title="Quickstart"
-              description="The four-step path from wallet connect to first confirmed relay request."
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                {
-                  step: "Step 1",
-                  title: "Connect a wallet",
-                  body: "Open the dashboard. The app requests a challenge from the API, asks the connected wallet to sign it, and exchanges that signature for a JWT-backed API session. Phantom is the most direct path for browser-first devnet usage.",
-                },
-                {
-                  step: "Step 2",
-                  title: "Create and activate a project",
-                  body: "Project creation prepares the on-chain activation transaction immediately. The project becomes usable as soon as the wallet signs and devnet confirms it. The API derives the PDA and prepares everything — you only need to sign.",
-                },
-                {
-                  step: "Step 3",
-                  title: "Fund with SOL",
-                  body: "Prepare a SOL funding transaction from the project page, review the lamport amount, sign it in the wallet, and wait for API verification. The API then refreshes the project's on-chain balance view so the gateway can accept traffic.",
-                },
-                {
-                  step: "Step 4",
-                  title: "Issue a key and send traffic",
-                  body: "Generate a relay key scoped to rpc:request. Copy the /rpc endpoint and send a small JSON-RPC request. That first request should appear in project analytics and on the status surface within seconds.",
-                },
-              ].map((item) => (
-                <div
-                  key={item.step}
-                  className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5"
-                >
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-                    {item.step}
-                  </div>
-                  <div className="mt-2 text-base font-semibold text-[var(--fyxvo-text)]">
-                    {item.title}
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                    {item.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Five Minute Quickstart */}
-          <section id="five-minute-quickstart" className="rounded-[1.5rem] border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] p-6 space-y-5">
-            <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-brand)] mb-1">Complete working example</div>
-              <h3 className="text-xl font-semibold text-[var(--fyxvo-text)]">Five Minute Quickstart</h3>
-              <p className="mt-2 text-sm text-[var(--fyxvo-text-muted)]">
-                From zero to a live devnet relay request using curl only. No SDK required.
-              </p>
-            </div>
-            <CodeBlock
-              label="Step 1 — Request an auth challenge"
-              code={`curl -s -X POST ${webEnv.apiBaseUrl}/v1/auth/challenge \\
-  -H "content-type: application/json" \\
-  -d '{"walletAddress":"YOUR_WALLET_ADDRESS_BASE58"}'
-
-# Save the nonce and message from the response
-# { "walletAddress": "...", "nonce": "abc123", "message": "Fyxvo Authentication\\nWallet: ...\\nNonce: abc123\\n..." }`}
-            />
-            <CodeBlock
-              label="Step 2 — Sign the message with your wallet CLI (e.g. solana-keygen)"
-              code={`# Sign the exact message string returned from the challenge endpoint.
-# Using the Solana CLI (base58 output):
-echo -n "Fyxvo Authentication\\nWallet: YOUR_WALLET\\nNonce: abc123\\n..." | \\
-  solana sign-offchain-message - --keypair ~/.config/solana/id.json
-
-# Or use @solana/wallet-adapter-base in the browser:
-# const sig = await wallet.signMessage(Buffer.from(message));
-# const sigBase58 = bs58.encode(sig);`}
-            />
-            <CodeBlock
-              label="Step 3 — Verify and get your JWT"
-              code={`curl -s -X POST ${webEnv.apiBaseUrl}/v1/auth/verify \\
-  -H "content-type: application/json" \\
-  -d '{
-    "walletAddress": "YOUR_WALLET_ADDRESS_BASE58",
-    "message": "THE_EXACT_CHALLENGE_MESSAGE",
-    "signature": "YOUR_BASE58_SIGNATURE"
-  }'
-
-# { "token": "eyJhbGci...", "user": { "walletAddress": "...", "role": "MEMBER" } }
-export JWT="eyJhbGci..."`}
-            />
-            <CodeBlock
-              label="Step 4 — Issue an API key (after creating and funding a project in the dashboard)"
-              code={`curl -s -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/api-keys \\
-  -H "authorization: Bearer $JWT" \\
-  -H "content-type: application/json" \\
-  -d '{"label":"my-key","scopes":["project:read","rpc:request"]}'
-
-# { "item": { "id": "...", "prefix": "fyxvo_live_...", ... }, "plainTextKey": "fyxvo_live_...secret" }
-export API_KEY="fyxvo_live_...secret"`}
-            />
-            <CodeBlock
-              label="Step 5 — Send your first relay request"
-              code={`curl -s -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "content-type: application/json" \\
-  -H "x-api-key: $API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'
-
-# { "jsonrpc": "2.0", "result": "ok", "id": 1 }
-
-# Priority relay (requires priority:relay scope):
-curl -s -X POST ${webEnv.gatewayBaseUrl}/priority \\
-  -H "content-type: application/json" \\
-  -H "x-api-key: $API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}'`}
-            />
-            <Notice tone="success" title="That's it">
-              Your first request is now in the relay logs. Check the Analytics page to see it appear within seconds. Fund more SOL to increase capacity — {PRICING_LAMPORTS.standard.toLocaleString()} lamports per standard request, {PRICING_LAMPORTS.computeHeavy.toLocaleString()} per compute-heavy, {PRICING_LAMPORTS.priority.toLocaleString()} per priority.
-            </Notice>
-          </section>
-
-          {/* ── Framework Quickstarts ────────────────────────────── */}
-          <section id="quickstarts">
-            <SectionHeading
-              id="quickstarts"
-              eyebrow="Quickstarts"
-              title="Framework Quickstarts"
-              description="Ready-to-run examples for the most common Solana development environments."
-            />
-            <div className="flex gap-1 border-b border-[var(--fyxvo-border)] mb-6">
-              {QUICKSTART_FRAMEWORKS.map((fw) => (
-                <button
-                  key={fw}
-                  type="button"
-                  onClick={() => setActiveQuickstart(fw)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    activeQuickstart === fw
-                      ? "border-b-2 border-[var(--fyxvo-brand)] text-[var(--fyxvo-text)]"
-                      : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-                  }`}
-                >
-                  {fw}
-                </button>
-              ))}
-            </div>
-
-            {activeQuickstart === "Next.js" && (
-              <div className="space-y-4">
-                <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Server component example using <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">@solana/web3.js</code> in a Next.js App Router route handler.
-                </p>
-                <CodeBlock
-                  label="app/api/solana/route.ts"
-                  code={`// app/api/solana/route.ts
-import { Connection } from "@solana/web3.js";
-
-const connection = new Connection(
-  \`https://rpc.fyxvo.com/rpc?api-key=\${process.env.FYXVO_API_KEY}\`
-);
-
-export async function GET() {
-  const slot = await connection.getSlot();
-  return Response.json({ slot });
-}`}
-                />
-              </div>
-            )}
-
-            {activeQuickstart === "React" && (
-              <div className="space-y-4">
-                <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Client component using the JSON-RPC protocol directly with <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">fetch</code> and Vite environment variables.
-                </p>
-                <CodeBlock
-                  label="SlotDisplay.tsx"
-                  code={`import { useEffect, useState } from "react";
-
-const RPC_URL = \`https://rpc.fyxvo.com/rpc?api-key=\${import.meta.env.VITE_FYXVO_API_KEY}\`;
-
-export function SlotDisplay() {
-  const [slot, setSlot] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch(RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getSlot", params: [] }),
-    })
-      .then((r) => r.json())
-      .then((d) => setSlot(d.result as number));
+    const allIds = sidebarGroups.flatMap((g) => g.items.map((i) => i.id));
+    const observers: IntersectionObserver[] = [];
+
+    allIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (entry?.isIntersecting) {
+            setActiveSection(id);
+          }
+        },
+        { rootMargin: "-20% 0px -70% 0px" }
+      );
+
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => {
+      observers.forEach((o) => o.disconnect());
+    };
   }, []);
 
-  return <div>Current slot: {slot ?? "loading..."}</div>;
-}`}
-                />
+  function scrollToSection(id: string) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setSidebarOpen(false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sidebar content (reused for desktop + mobile drawer)
+  // ---------------------------------------------------------------------------
+
+  function SidebarContent() {
+    return (
+      <div className="px-4 py-6">
+        <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+          Documentation
+        </p>
+        <div className="space-y-5">
+          {sidebarGroups.map((group) => (
+            <div key={group.label}>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollToSection(item.id)}
+                    className={[
+                      "w-full rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
+                      activeSection === item.id
+                        ? "bg-[var(--fyxvo-brand-subtle)] font-medium text-[var(--fyxvo-brand)]"
+                        : "text-[var(--fyxvo-text-soft)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]",
+                    ].join(" ")}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-            {activeQuickstart === "Node.js" && (
-              <div className="space-y-4">
-                <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  TypeScript Node.js script using the Fyxvo SDK to fetch the latest blockhash.
-                </p>
-                <CodeBlock
-                  label="index.ts"
-                  code={`import { FyxvoClient } from "@fyxvo/sdk";
+  // ---------------------------------------------------------------------------
+  // Framework quickstart tabs state
+  // ---------------------------------------------------------------------------
 
-const client = new FyxvoClient({ apiKey: process.env.FYXVO_API_KEY! });
+  const [fwTab, setFwTab] = useState<"nextjs" | "react" | "nodejs" | "python" | "rust">("nextjs");
+  const fwTabs: Array<{ key: typeof fwTab; label: string }> = [
+    { key: "nextjs", label: "Next.js" },
+    { key: "react", label: "React" },
+    { key: "nodejs", label: "Node.js" },
+    { key: "python", label: "Python" },
+    { key: "rust", label: "Rust" },
+  ];
 
-async function main() {
-  const response = await client.rpc({
-    id: 1,
-    method: "getLatestBlockhash",
-    params: [],
+  const fwCode: Record<typeof fwTab, { language: string; code: string }> = {
+    nextjs: {
+      language: "tsx",
+      code: `// app/page.tsx — Server Component
+export default async function Page() {
+  const res = await fetch("https://rpc.fyxvo.com/rpc", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": process.env.FYXVO_API_KEY!,
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+    cache: "no-store",
   });
-  console.log(response);
-}
+  const data = await res.json();
+  return <pre>{JSON.stringify(data, null, 2)}</pre>;
+}`,
+    },
+    react: {
+      language: "tsx",
+      code: `// components/HealthCheck.tsx
+import { useEffect, useState } from "react";
 
-main();`}
-                />
-              </div>
-            )}
+export function HealthCheck() {
+  const [status, setStatus] = useState<string>("loading\u2026");
 
-            {activeQuickstart === "Python" && (
-              <div className="space-y-4">
-                <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Python script using <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">requests</code> to call the Fyxvo RPC endpoint.
-                </p>
-                <CodeBlock
-                  label="main.py"
-                  code={`import requests
-import os
+  useEffect(() => {
+    fetch("https://rpc.fyxvo.com/rpc", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": import.meta.env.VITE_FYXVO_API_KEY,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+    })
+      .then((r) => r.json())
+      .then((d) => setStatus(d.result))
+      .catch(() => setStatus("error"));
+  }, []);
+
+  return <p>Network: {status}</p>;
+}`,
+    },
+    nodejs: {
+      language: "js",
+      code: `// health-check.mjs
+const res = await fetch("https://rpc.fyxvo.com/rpc", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "x-api-key": process.env.FYXVO_API_KEY,
+  },
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+});
+
+const { result } = await res.json();
+console.log("Health:", result); // "ok"`,
+    },
+    python: {
+      language: "python",
+      code: `# health_check.py
+import os, requests
 
 response = requests.post(
     "https://rpc.fyxvo.com/rpc",
-    headers={"x-api-key": os.getenv("FYXVO_API_KEY")},
-    json={"jsonrpc": "2.0", "id": 1, "method": "getLatestBlockhash", "params": []},
+    json={"jsonrpc": "2.0", "id": 1, "method": "getHealth"},
+    headers={
+        "content-type": "application/json",
+        "x-api-key": os.environ["FYXVO_API_KEY"],
+    },
 )
-print(response.json())`}
-                />
-              </div>
-            )}
-
-            {activeQuickstart === "Rust" && (
-              <div className="space-y-4">
-                <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Rust async example using <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">reqwest</code> and <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">serde_json</code>.
-                </p>
-                <CodeBlock
-                  label="src/main.rs"
-                  code={`use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+data = response.json()
+print("Health:", data["result"])  # ok`,
+    },
+    rust: {
+      language: "rust",
+      code: `// src/main.rs
+use reqwest::Client;
 use serde_json::json;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert("x-api-key", HeaderValue::from_str(&std::env::var("FYXVO_API_KEY")?)?);
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+async fn main() -> anyhow::Result<()> {
+    let api_key = std::env::var("FYXVO_API_KEY")?;
+    let client = Client::new();
 
-    let body = json!({"jsonrpc": "2.0", "id": 1, "method": "getLatestBlockhash", "params": []});
+    let body = json!({ "jsonrpc": "2.0", "id": 1, "method": "getHealth" });
 
-    let resp = client
+    let resp: serde_json::Value = client
         .post("https://rpc.fyxvo.com/rpc")
-        .headers(headers)
+        .header("content-type", "application/json")
+        .header("x-api-key", &api_key)
         .json(&body)
         .send()
+        .await?
+        .json()
         .await?;
 
-    println!("{}", resp.text().await?);
+    println!("Health: {}", resp["result"]);
     Ok(())
+}`,
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // API Explorer state
+  // ---------------------------------------------------------------------------
+
+  const [apiJwt, setApiJwt] = useState("");
+  const [apiEndpoint, setApiEndpoint] = useState("/v1/analytics/overview");
+  const [apiMethod, setApiMethod] = useState("GET");
+  const [apiBody, setApiBody] = useState("");
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+
+  async function sendApiRequest() {
+    setApiLoading(true);
+    try {
+      const url = new URL(apiEndpoint, webEnv.apiBaseUrl).toString();
+      const opts: RequestInit = {
+        method: apiMethod,
+        headers: {
+          authorization: `Bearer ${apiJwt}`,
+          "content-type": "application/json",
+        },
+      };
+      if (apiMethod !== "GET" && apiBody.trim()) {
+        opts.body = apiBody;
+      }
+      const res = await fetch(url, opts);
+      setApiResponse(await res.json());
+    } catch (e) {
+      setApiResponse({ error: e instanceof Error ? e.message : "Request failed" });
+    } finally {
+      setApiLoading(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // RPC methods table data
+  // ---------------------------------------------------------------------------
+
+  const rpcMethods = [
+    { method: "getHealth", endpoint: "/rpc", description: "Returns 'ok' when the node is healthy." },
+    { method: "getSlot", endpoint: "/rpc", description: "Returns the current slot the node is processing." },
+    { method: "getBlockHeight", endpoint: "/rpc", description: "Returns the current block height." },
+    { method: "getEpochInfo", endpoint: "/rpc", description: "Returns information about the current epoch." },
+    { method: "getBalance", endpoint: "/rpc", description: "Returns the SOL balance of an account in lamports." },
+    { method: "getAccountInfo", endpoint: "/rpc", description: "Returns all information associated with a given account." },
+    { method: "getMultipleAccounts", endpoint: "/rpc", description: "Returns account information for a list of public keys." },
+    { method: "getProgramAccounts", endpoint: "/rpc", description: "Returns all accounts owned by the specified program." },
+    { method: "getTokenAccountsByOwner", endpoint: "/rpc", description: "Returns SPL token accounts by owner." },
+    { method: "getTokenSupply", endpoint: "/rpc", description: "Returns total supply of a token mint." },
+    { method: "getTokenAccountBalance", endpoint: "/rpc", description: "Returns the token balance of an SPL token account." },
+    { method: "getTransaction", endpoint: "/rpc", description: "Returns transaction details for a confirmed signature." },
+    { method: "getSignaturesForAddress", endpoint: "/rpc", description: "Returns signatures for an address with optional range." },
+    { method: "getRecentBlockhash", endpoint: "/rpc", description: "Returns a recent blockhash and fee schedule (legacy)." },
+    { method: "getLatestBlockhash", endpoint: "/rpc", description: "Returns the latest blockhash and last-valid block height." },
+    { method: "getFeeForMessage", endpoint: "/rpc", description: "Returns the fee the network will charge for a given message." },
+    { method: "sendTransaction", endpoint: "/rpc", description: "Submits a signed transaction to the cluster for processing." },
+    { method: "simulateTransaction", endpoint: "/rpc", description: "Simulates a transaction without broadcasting it." },
+    { method: "getMinimumBalanceForRentExemption", endpoint: "/rpc", description: "Returns minimum balance for an account to be rent-exempt." },
+    { method: "getBlockProduction", endpoint: "/rpc", description: "Returns recent block production information from the cluster." },
+    { method: "getClusterNodes", endpoint: "/rpc", description: "Returns contact information for all cluster nodes." },
+    { method: "getVersion", endpoint: "/rpc", description: "Returns the current Solana software version." },
+    { method: "requestAirdrop", endpoint: "/rpc", description: "Requests an airdrop of lamports to an account (devnet only)." },
+    { method: "sendTransaction (priority)", endpoint: "/priority", description: "Routes via priority relay for latency-sensitive submissions." },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  return (
+    <div className="flex min-h-screen bg-[var(--fyxvo-bg)]">
+      {/* Desktop sidebar */}
+      <aside className="sticky top-[76px] hidden h-[calc(100vh-76px)] w-64 shrink-0 overflow-y-auto border-r border-[var(--fyxvo-border)] lg:flex lg:flex-col">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile sidebar toggle button */}
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] shadow-lg lg:hidden"
+        aria-label="Open docs navigation"
+      >
+        <MenuIcon className="h-5 w-5 text-[var(--fyxvo-text)]" />
+      </button>
+
+      {/* Mobile sidebar drawer */}
+      {sidebarOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <aside className="absolute left-0 top-0 h-full w-72 overflow-y-auto border-r border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-3">
+              <span className="text-sm font-semibold text-[var(--fyxvo-text)]">Documentation</span>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                aria-label="Close navigation"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <SidebarContent />
+          </aside>
+        </div>
+      ) : null}
+
+      {/* Main content */}
+      <main ref={contentRef} className="flex-1 overflow-x-hidden">
+        <div className="mx-auto max-w-3xl space-y-16 px-6 py-12 lg:px-10 xl:px-16">
+
+          {/* Introduction */}
+          <section className="space-y-6">
+            <SectionHeading id="introduction" title="Introduction" />
+            <Prose>
+              <p>
+                Fyxvo is a Solana devnet infrastructure platform built for teams and individual
+                developers who need more than a shared public RPC node. Rather than competing for
+                capacity on a best-effort endpoint, Fyxvo projects run on dedicated relay
+                infrastructure that is funded on-chain, scoped per API key, and observable in
+                real time through an analytics dashboard.
+              </p>
+              <p>
+                The platform is currently in private alpha. Access is granted on a rolling basis
+                to teams who have been invited. During this phase the product surface expands
+                rapidly, and developer feedback directly shapes the roadmap. All breaking changes
+                are announced in advance on the changelog and in the status feed.
+              </p>
+              <p>
+                Authentication uses wallet signatures rather than email and password. When you
+                connect a Solana wallet, the platform issues a signed challenge, your wallet signs
+                it, and the resulting JWT is used to gate every subsequent API call. There is no
+                password to lose and no email to verify. Your cryptographic identity is your
+                session.
+              </p>
+              <p>
+                Funding is on-chain. Each project holds a SOL balance that is decremented per
+                request. Standard RPC calls cost 1,000 lamports. Priority relay calls cost 5,000
+                lamports. This model means you see exactly what infrastructure costs in real SOL
+                rather than opaque usage tiers, and you can top up at any time without waiting for
+                a billing cycle to close.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Quickstart */}
+          <section className="space-y-6">
+            <SectionHeading id="quickstart" title="Quickstart" />
+            <Prose>
+              <p>
+                Getting your first request through Fyxvo takes about five minutes. The steps
+                below walk from a fresh account to a working RPC call. Each step builds on the
+                previous one, so complete them in order.
+              </p>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 1 — Connect your wallet.</strong>{" "}
+                Open the dashboard and click "Connect wallet". Approve the connection request in
+                your browser extension. Phantom, Backpack, and Solflare are all supported. Once
+                connected the platform issues an auth challenge automatically.
+              </p>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 2 — Create a project.</strong>{" "}
+                In the dashboard, click "New project", give it a name, and optionally set a public
+                slug. The slug is used for public project pages at{" "}
+                <InlineCode>/p/your-slug</InlineCode>.
+              </p>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 3 — Fund your project.</strong>{" "}
+                Click "Add funds" in the project overview. The platform prepares an on-chain
+                transaction that transfers SOL from your wallet to the project escrow. Sign the
+                transaction in your wallet extension and wait for confirmation. Your project
+                balance updates automatically once the transaction is confirmed.
+              </p>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 4 — Create an API key.</strong>{" "}
+                Navigate to the Keys tab of your project and click "New key". Choose the scopes
+                that apply — at minimum you need <InlineCode>rpc:read</InlineCode> for standard
+                calls or <InlineCode>rpc:relay</InlineCode> for the priority endpoint. Copy the
+                key value immediately; it will not be shown again.
+              </p>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 5 — Send your first request.</strong>{" "}
+                Use the key in the <InlineCode>x-api-key</InlineCode> header. Here is a minimal
+                health check using curl:
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST https://rpc.fyxvo.com/rpc \\
+  -H "content-type: application/json" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`}
+            />
+            <Prose>
+              <p>A successful response looks like this:</p>
+            </Prose>
+            <CodeBlock
+              language="json"
+              code={`{"jsonrpc":"2.0","id":1,"result":"ok"}`}
+            />
+          </section>
+
+          <SectionDivider />
+
+          {/* Framework quickstarts */}
+          <section className="space-y-6">
+            <SectionHeading id="framework-quickstarts" title="Framework Quickstarts" />
+            <Prose>
+              <p>
+                The examples below show how to integrate Fyxvo in common environments. All of
+                them use the same standard RPC endpoint and the <InlineCode>x-api-key</InlineCode>{" "}
+                header. Store your key in an environment variable; never commit it to source
+                control.
+              </p>
+            </Prose>
+            <div className="overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
+              <div className="flex overflow-x-auto border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
+                {fwTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setFwTab(tab.key)}
+                    className={[
+                      "shrink-0 px-4 py-3 text-sm font-medium transition-colors",
+                      fwTab === tab.key
+                        ? "border-b-2 border-[var(--fyxvo-brand)] text-[var(--fyxvo-brand)]"
+                        : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]",
+                    ].join(" ")}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <CodeBlock
+                language={fwCode[fwTab].language}
+                code={fwCode[fwTab].code}
+              />
+            </div>
+          </section>
+
+          <SectionDivider />
+
+          {/* Authentication */}
+          <section className="space-y-6">
+            <SectionHeading id="authentication" title="Authentication" />
+            <Prose>
+              <p>
+                Fyxvo uses a three-step wallet-based authentication flow. Because Solana wallets
+                can sign arbitrary messages, the platform can verify your identity without ever
+                storing a password. The result is a short-lived JWT that you attach to every API
+                request as a Bearer token.
+              </p>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 1 — Request a challenge.</strong>{" "}
+                Send a POST request to <InlineCode>/v1/auth/challenge</InlineCode> with your wallet
+                address. The server returns a nonce and a human-readable message that your wallet
+                must sign.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST ${webEnv.apiBaseUrl}/v1/auth/challenge \\
+  -H "content-type: application/json" \\
+  -d '{"walletAddress":"YOUR_WALLET_ADDRESS"}'
+
+# Response
+{
+  "nonce": "9f3a\u2026c12",
+  "message": "Sign this message to authenticate with Fyxvo.\\nNonce: 9f3a\u2026c12"
 }`}
-                />
-              </div>
-            )}
-          </section>
-
-          {/* ── Authentication ───────────────────────────────────── */}
-          <section id="authentication">
-            <SectionHeading
-              id="authentication"
-              eyebrow="Section 3"
-              title="Authentication"
-              description="Wallet-signed JWT flow: challenge, sign, verify."
             />
-            <div className="space-y-5">
-              <Notice tone="neutral" title="How the wallet session works">
-                The API issues a short-lived challenge string. The wallet signs it off-chain. The
-                signed payload is exchanged for a JWT. That JWT becomes the bearer token for all
-                authenticated API actions: project management, funding, analytics, and key
-                management.
-              </Notice>
-              <CodeBlock code={authChallengeCode} label="Step 1 — Request a challenge" />
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  Step 2 — Sign in the browser
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Use <code className="text-[var(--fyxvo-brand)]">wallet.signMessage(Buffer.from(challenge))</code> from{" "}
-                  <code className="text-[var(--fyxvo-brand)]">@solana/wallet-adapter-base</code>. Convert the
-                  resulting{" "}
-                  <code className="text-[var(--fyxvo-brand)]">Uint8Array</code> signature to base58 before
-                  sending.
-                </p>
-              </div>
-              <CodeBlock code={authVerifyCode} label="Full auth flow" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Notice tone="neutral" title="JWT expiry">
-                  Tokens expire after 24 hours. Re-authenticate by repeating the challenge + verify
-                  flow. There is no refresh token endpoint; the wallet signs a new challenge each
-                  time.
-                </Notice>
-                <Notice tone="neutral" title="Supported wallets">
-                  Phantom, Solflare, Backpack, and any Wallet Standard compatible wallet work through
-                  the Solana wallet adapter layer. Phantom is the fastest for browser-first devnet
-                  usage.
-                </Notice>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Funding ──────────────────────────────────────────── */}
-          <section id="funding">
-            <SectionHeading
-              id="funding"
-              eyebrow="Section 4"
-              title="Funding"
-              description="SOL funding flow on devnet — prepare, sign, verify."
-            />
-            <div className="space-y-5">
-              <Notice tone="success" title="SOL is live on devnet">
-                The full SOL funding path is active. Fund your devnet wallet first (via the Solana
-                faucet), then fund the project through Fyxvo. That keeps the control plane, Anchor
-                program, and gateway aligned before you scale request volume.
-              </Notice>
-              <CodeBlock code={fundingCode} label="Prepare, sign, and verify a funding transaction" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Notice tone="neutral" title="Unsigned transaction review">
-                  The API returns the unsigned transaction encoded in base64. Decode and inspect it
-                  before signing. This keeps the funding flow explicit and auditable.
-                </Notice>
-                <Notice tone="neutral" title="USDC stays gated">
-                  USDC funding exists in the protocol but is configuration-gated. It will not accept
-                  USDC transfers until the deployment explicitly enables it via runtime config.
-                </Notice>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Standard RPC ─────────────────────────────────────── */}
-          <section id="standard-rpc">
-            <SectionHeading
-              id="standard-rpc"
-              eyebrow="Section 5"
-              title="Standard RPC"
-              description="Send standard JSON-RPC traffic through the /rpc relay endpoint."
-            />
-            <div className="space-y-5">
-              <Notice tone="neutral" title="Required scope">
-                Keys used on the standard path must carry the{" "}
-                <code className="text-[var(--fyxvo-brand)]">rpc:request</code> scope. Under-scoped keys receive
-                a 403, not silent broad access.
-              </Notice>
-              <CodeBlock code={standardRpcCode} label="Standard relay request" />
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  What the gateway does
-                </div>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  <li>Validates the API key and checks its scope</li>
-                  <li>Checks the project's funded SOL balance against the request cost</li>
-                  <li>Routes to the upstream Solana RPC node pool with fallback</li>
-                  <li>Logs the request, latency, and result for analytics rollups</li>
-                  <li>Deducts the lamport cost from the project balance</li>
-                </ul>
-              </div>
-              <Notice tone="neutral" title="Endpoint">
-                Standard path: <code className="text-[var(--fyxvo-brand)]">{webEnv.gatewayBaseUrl}/rpc</code>
-              </Notice>
-            </div>
-          </section>
-
-          {/* ── Priority Relay ───────────────────────────────────── */}
-          <section id="priority-relay">
-            <SectionHeading
-              id="priority-relay"
-              eyebrow="Section 6"
-              title="Priority Relay"
-              description="Latency-sensitive traffic on the /priority endpoint with a separately scoped key."
-            />
-            <div className="space-y-5">
-              <Notice tone="neutral" title="Required scope">
-                Priority keys must carry both <code className="text-[var(--fyxvo-brand)]">rpc:request</code>{" "}
-                and <code className="text-[var(--fyxvo-brand)]">priority:relay</code> scopes. Sending a standard
-                key to <code className="text-[var(--fyxvo-brand)]">/priority</code> returns 403.
-              </Notice>
-              <CodeBlock code={priorityRelayCode} label="Priority relay request" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-3">
-                    Standard vs priority
-                  </div>
-                  <table className="w-full text-sm text-[var(--fyxvo-text-soft)]">
-                    <thead>
-                      <tr className="border-b border-[var(--fyxvo-border)]">
-                        <th className="pb-2 text-left font-medium text-[var(--fyxvo-text)]">
-                          Property
-                        </th>
-                        <th className="pb-2 text-left font-medium text-[var(--fyxvo-text)]">
-                          Standard
-                        </th>
-                        <th className="pb-2 text-left font-medium text-[var(--fyxvo-text)]">
-                          Priority
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--fyxvo-border)]">
-                      <tr>
-                        <td className="py-2">Endpoint</td>
-                        <td className="py-2">/rpc</td>
-                        <td className="py-2">/priority</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Scope</td>
-                        <td className="py-2">rpc:request</td>
-                        <td className="py-2">+ priority:relay</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Rate limit</td>
-                        <td className="py-2">300 / min</td>
-                        <td className="py-2">60 / min</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <Notice tone="neutral" title="Why they are separate">
-                  Keeping standard and priority traffic on separate paths gives teams clearer pricing,
-                  independent rate windows, and better operational discipline. A single key cannot
-                  accidentally consume the priority budget.
-                </Notice>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Analytics ────────────────────────────────────────── */}
-          <section id="analytics">
-            <SectionHeading
-              id="analytics"
-              eyebrow="Section 7"
-              title="Analytics"
-              description="Monitor request volume, latency, and errors across your Fyxvo projects."
-            />
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              Fyxvo provides a two-level analytics surface: an overview endpoint that aggregates totals across all your projects, and a per-project endpoint that surfaces method breakdowns, latency percentiles, status code distributions, and recent error events. Both endpoints require a valid JWT and respect the standard rate limit window.
-            </p>
-          </section>
-
-          {/* ── Analytics API ────────────────────────────────────── */}
-          <section id="analytics-api">
-            <SectionHeading
-              id="analytics-api"
-              eyebrow="Section 7"
-              title="Analytics API"
-              description="Fetch usage data across all projects or drill into a specific project."
-            />
-            <div className="space-y-5">
-              <CodeBlock
-                code={analyticsOverviewCode}
-                label={`GET ${webEnv.apiBaseUrl}/v1/analytics/overview`}
-              />
-              <CodeBlock
-                code={analyticsProjectCode}
-                label={`GET ${webEnv.apiBaseUrl}/v1/analytics/projects/:id`}
-              />
-              <div className="grid gap-4 sm:grid-cols-3">
-                {[
-                  {
-                    label: "Overview endpoint",
-                    body: "Aggregates totals across all projects owned by the authenticated wallet: total requests, success rate, average latency, and 24-hour rolling count.",
-                  },
-                  {
-                    label: "Project endpoint",
-                    body: "Returns per-project metrics including method breakdown, recent error log, and latency percentiles for both standard and priority paths.",
-                  },
-                  {
-                    label: "Auth required",
-                    body: "Both endpoints require a valid JWT Bearer token in the Authorization header. Use the wallet auth flow to obtain one.",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
-                  >
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                      {item.label}
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                      {item.body}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section id="public-stats">
-            <SectionHeading
-              id="public-stats"
-              eyebrow="Project API"
-              title="Public Stats API"
-              description="Read project-level public stats with a project-scoped API key from your backend services."
-            />
-            <div className="space-y-5">
-              <Notice tone="warning" title="Keep keys off the client">
-                Pass <code className="font-mono text-xs">x-api-key</code> from a backend service, serverless function, or CI job. Do not ship project keys in browser bundles.
-              </Notice>
-              <CodeBlock
-                label="curl"
-                code={`curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public \\
-  -H "x-api-key: $FYXVO_API_KEY"`}
-              />
-              <CodeBlock
-                label="JavaScript fetch (server-side)"
-                code={`const response = await fetch("${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public", {
-  headers: {
-    "x-api-key": process.env.FYXVO_API_KEY!,
-  },
-  cache: "no-store",
-});
-
-const stats = await response.json();
-console.log(stats);`}
-              />
-              <CodeBlock
-                label="Node.js"
-                code={`import process from "node:process";
-
-const response = await fetch("${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public", {
-  headers: {
-    "x-api-key": process.env.FYXVO_API_KEY ?? "",
-  },
-});
-
-console.log(await response.json());`}
-              />
-              <CodeBlock
-                label="Python"
-                code={`import os
-import requests
-
-response = requests.get(
-    "${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/stats/public",
-    headers={"x-api-key": os.environ["FYXVO_API_KEY"]},
-    timeout=10,
-)
-
-print(response.json())`}
-              />
-            </div>
-          </section>
-
-          {/* ── API Explorer ────────────────────────────────────── */}
-          <section id="api-explorer">
-            <SectionHeading
-              id="api-explorer"
-              eyebrow="Interactive"
-              title="API Explorer"
-              description="Try live API endpoints directly from the docs. Paste your JWT token to test authenticated routes."
-            />
-            <ApiExplorer />
-          </section>
-
-          {/* ── Webhooks ────────────────────────────────────── */}
-          <section id="webhooks">
-            <SectionHeading
-              id="webhooks"
-              eyebrow="Platform"
-              title="Webhooks"
-              description="Receive HTTP POST callbacks when events happen in your project."
-            />
-            <div className="space-y-5">
-              <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                Webhooks let you integrate Fyxvo events into your own systems. Every delivery includes an{" "}
-                <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">x-fyxvo-signature</code> header
-                with format <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">sha256={"<hex>"}</code>.
+            <Prose>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 2 — Sign the message.</strong>{" "}
+                Using your Solana wallet library, sign the message bytes returned in the challenge
+                response. The signature is a base58-encoded string. In a browser context you
+                call{" "}
+                <InlineCode>{"wallet.signMessage(new TextEncoder().encode(message))"}</InlineCode>.
               </p>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">
-                <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Supported events</p>
-                <div className="flex flex-wrap gap-2">
-                  {["funding.confirmed", "apikey.created", "apikey.revoked", "balance.low", "project.activated"].map((e) => (
-                    <code key={e} className="rounded border border-[var(--fyxvo-border)] px-2 py-0.5 text-xs text-[var(--fyxvo-text-soft)] font-mono">{e}</code>
-                  ))}
-                </div>
-              </div>
-              <CodeBlock
-                label="Create a webhook"
-                code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/webhooks \\
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Step 3 — Verify the signature.</strong>{" "}
+                Send the signature and wallet address to <InlineCode>/v1/auth/verify</InlineCode>.
+                The server verifies the signature against the nonce and, if valid, returns a JWT.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST ${webEnv.apiBaseUrl}/v1/auth/verify \\
+  -H "content-type: application/json" \\
+  -d '{
+    "walletAddress": "YOUR_WALLET_ADDRESS",
+    "signature": "BASE58_SIGNATURE",
+    "nonce": "9f3a\u2026c12"
+  }'
+
+# Response
+{
+  "token": "eyJhbGci\u2026",
+  "expiresAt": "2026-04-03T12:00:00.000Z"
+}`}
+            />
+            <Prose>
+              <p>
+                Store the JWT in <InlineCode>localStorage</InlineCode> or a secure cookie and
+                attach it to every request using the{" "}
+                <InlineCode>{"Authorization: Bearer <token>"}</InlineCode> header. Tokens are
+                valid for seven days. When a token expires, restart the challenge flow to obtain
+                a fresh one.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Funding */}
+          <section className="space-y-6">
+            <SectionHeading id="funding" title="Funding" />
+            <Prose>
+              <p>
+                Every Fyxvo project has an on-chain SOL balance. Each request deducts lamports
+                from that balance at the rate configured for the endpoint used. This model gives
+                you complete visibility into infrastructure cost and eliminates monthly billing
+                surprises.
+              </p>
+              <p>
+                To add funds, first call{" "}
+                <InlineCode>{"POST /v1/projects/{id}/funding/prepare"}</InlineCode> with the
+                amount in lamports. The server constructs a Solana transaction that transfers SOL
+                from your connected wallet to the project escrow account and returns it as a
+                base64-encoded serialized transaction.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`# Step 1 — Prepare funding transaction
+curl -X POST ${webEnv.apiBaseUrl}/v1/projects/proj_abc123/funding/prepare \\
   -H "authorization: Bearer YOUR_JWT" \\
   -H "content-type: application/json" \\
-  -d '{"url":"https://your-server.example.com/webhook","events":["funding.confirmed","balance.low"]}'`}
-              />
-              <CodeBlock
-                label="Test a webhook"
-                code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/webhooks/WEBHOOK_ID/test \\
-  -H "authorization: Bearer YOUR_JWT"`}
-              />
-              <CodeBlock
-                label="Signature verification (Node.js)"
-                code={`const crypto = require('crypto');
-const sig = req.headers['x-fyxvo-signature'];
-const computed = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-if (sig !== computed) return res.status(401).send('Unauthorized');`}
-              />
-              <Notice tone="neutral" title="Need to debug a signature mismatch?">
-                Open the webhook signature debugger in project settings to paste the payload, secret, and{" "}
-                <code className="font-mono text-xs">x-fyxvo-signature</code> header, verify the computed HMAC, and copy Node.js or Python validation snippets without leaving Fyxvo.
-              </Notice>
-              <Notice tone="neutral" title="Retry behavior">
-                If your endpoint is unreachable, Fyxvo retries once after 30 seconds. After two failures the webhook remains active but{" "}
-                <code className="font-mono text-xs">lastTriggeredAt</code> is not updated. URLs must be HTTPS — localhost and private IP ranges are blocked.
-              </Notice>
-            </div>
-          </section>
+  -d '{"lamports": 50000000}'
 
-          {/* ── Team Collaboration ────────────────────────────────────── */}
-          <section id="team-collaboration">
-            <SectionHeading
-              id="team-collaboration"
-              eyebrow="Platform"
-              title="Team Collaboration"
-              description="Invite team members to your project by Solana wallet address."
+# Response
+{
+  "transaction": "BASE64_SERIALIZED_TRANSACTION",
+  "escrowAddress": "5xfZ\u2026kQpL"
+}`}
             />
-            <div className="space-y-5">
-              <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                Project owners can invite other Fyxvo users by wallet address. Invitations are pending until the invitee accepts via{" "}
-                <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">PATCH /v1/projects/:id/members/:memberId/accept</code>.
+            <Prose>
+              <p>
+                <strong className="font-semibold text-[var(--fyxvo-text)]">Sign the transaction.</strong>{" "}
+                Deserialize the base64 transaction, have your wallet sign it, and re-serialize it.
+                Then call{" "}
+                <InlineCode>{"POST /v1/projects/{id}/funding/verify"}</InlineCode> with the signed
+                transaction. The server broadcasts it to Solana devnet and waits for confirmation
+                before updating the project balance.
               </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Notice tone="neutral" title="Member permissions">
-                  Members can view analytics and API keys but cannot delete the project or change ownership. Only the project owner can invite or remove members.
-                </Notice>
-                <Notice tone="neutral" title="Team management">
-                  Team management is in Settings → Team on the project page. Pending invitations are shown until accepted or removed.
-                </Notice>
-              </div>
-              <CodeBlock
-                label="Invite a member"
-                code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/members/invite \\
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`# Step 2 — Submit signed transaction
+curl -X POST ${webEnv.apiBaseUrl}/v1/projects/proj_abc123/funding/verify \\
   -H "authorization: Bearer YOUR_JWT" \\
   -H "content-type: application/json" \\
-  -d '{"walletAddress":"MEMBER_WALLET_ADDRESS"}'`}
-              />
-              <CodeBlock
-                label="List members"
-                code={`curl ${webEnv.apiBaseUrl}/v1/projects/YOUR_PROJECT_ID/members \\
-  -H "authorization: Bearer YOUR_JWT"`}
-              />
-              <div className="grid gap-4 md:grid-cols-2">
-                {[
-                  {
-                    title: "Use notes as the runbook",
-                    body: "Keep overview, owner notes, runbook steps, known issues, and links in Project settings so the whole team shares the same operational handbook.",
-                  },
-                  {
-                    title: "Share playground recipes safely",
-                    body: "Use saved recipes for debugging, benchmarks, balance checks, or webhooks, then share the project-scoped recipe link with teammates who already belong to the project.",
-                  },
-                  {
-                    title: "Operate from alerts",
-                    body: "Treat the alert center as a shared inbox: acknowledge an alert when someone is investigating it, resolve it when the condition clears, and keep the history visible for later review.",
-                  },
-                  {
-                    title: "Interpret health honestly",
-                    body: "The project health score is a readiness checklist, not a vanity score. Use the breakdown and weekly trend to see whether activation, funding, keys, traffic, webhook health, and team setup are improving.",
-                  },
-                  {
-                    title: "Manage API keys safely",
-                    body: "Label keys clearly, add expiries when a client should have a bounded lifetime, rotate compromised keys immediately, and export metadata instead of sharing raw secrets.",
-                  },
-                  {
-                    title: "Archive and restore deliberately",
-                    body: "Archive a project when traffic has stopped or ownership has changed. Restore it when the team is ready to operate it again, and let the activity timeline capture that handoff.",
-                  },
-                ].map((item) => (
-                  <div key={item.title} className="rounded-[1.25rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
-                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+  -d '{"signedTransaction": "BASE64_SIGNED_TRANSACTION"}'
 
-          {/* ── Public Project Pages ────────────────────────────────────── */}
-          <section id="public-profiles">
-            <SectionHeading
-              id="public-profiles"
-              eyebrow="Platform"
-              title="Public Project Pages"
-              description="Share your project's aggregate stats publicly — no API key required."
+# Response
+{
+  "signature": "5vEk\u2026aMpL",
+  "balanceLamports": 50000000,
+  "status": "confirmed"
+}`}
             />
-            <div className="space-y-5">
-              <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                Enable a public URL for your project from Settings → Project settings → Public profile. The public page at{" "}
-                <code className="rounded bg-[var(--fyxvo-panel-soft)] px-1 py-0.5 font-mono text-xs">/p/[your-slug]</code>{" "}
-                shows total requests and average latency. No API keys or balances are shown.
+            <Prose>
+              <p>
+                The dashboard shows a live balance widget on every project page. When the balance
+                drops below the configured low-balance threshold, a webhook event is fired and an
+                in-app notification is displayed. You can configure the threshold on the project
+                settings page.
               </p>
-              <Notice tone="neutral" title="README badge">
-                Add a live status badge to your GitHub README. The badge shows latency and updates every 5 minutes via CDN cache.
-              </Notice>
-              <CodeBlock
-                label="README badge markdown"
-                code={`[![Fyxvo Status](https://api.fyxvo.com/badge/project/YOUR_SLUG)](https://www.fyxvo.com/p/YOUR_SLUG)`}
-              />
-            </div>
+            </Prose>
           </section>
 
-          {/* ── Playground ────────────────────────────────────── */}
-          <section id="playground" className="scroll-mt-20">
-            <h2 className="mb-4 text-xl font-semibold text-[var(--fyxvo-text)]">Playground</h2>
-            <p className="mb-4 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-              The <a href="/playground" className="text-[var(--fyxvo-brand)] underline">API Playground</a> lets you send live JSON-RPC requests to the Fyxvo gateway and inspect responses without writing any code.
-            </p>
-            <div className="space-y-3">
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--fyxvo-text)]">Compare Mode</h3>
-                <p className="text-xs leading-5 text-[var(--fyxvo-text-muted)]">Toggle Compare in the request builder to run the same request on both the standard and priority paths simultaneously. The priority response badge turns green when it is faster.</p>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--fyxvo-text)]">Schema Panel</h3>
-                <p className="text-xs leading-5 text-[var(--fyxvo-text-muted)]">Click Schema next to any method to see the expected response shape — field names, types, and descriptions — before you send the request.</p>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--fyxvo-text)]">Shareable URLs</h3>
-                <p className="text-xs leading-5 text-[var(--fyxvo-text-muted)]">Click Share to encode the current method and parameters into the URL. Send the link to a colleague and they will land on the same request configuration.</p>
-              </div>
-            </div>
-          </section>
+          <SectionDivider />
 
-          <section id="operations-guide">
-            <SectionHeading
-              id="operations-guide"
-              eyebrow="Runbook"
-              title="Operations Guide"
-              description="Use these habits and product surfaces to operate a real integration day to day."
-            />
-            <div className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                {[
-                  {
-                    title: "Monitor gateway health",
-                    body: `Watch ${webEnv.siteUrl}/status for API and gateway condition, then compare that signal with your project-level request log explorer when an integration starts failing.`,
-                  },
-                  {
-                    title: "Read status page signals",
-                    body: "Treat incidents and component changes as broad infrastructure signals. Treat project analytics, request logs, and alert center entries as your integration-specific signal.",
-                  },
-                  {
-                    title: "Investigate webhook failures",
-                    body: "Start in Settings or the alert center, inspect the delivery attempt, compare the next retry time, and replay with the playground webhook tester before changing server code.",
-                  },
-                  {
-                    title: "Use trace IDs",
-                    body: "Copy the X-Fyxvo-Trace-Id header from a request response, then open Trace Lookup in the playground or the request log explorer to inspect upstream node, region, latency, and status.",
-                  },
-                  {
-                    title: "Interpret latency, success rate, and cache hit rate",
-                    body: "Latency trends tell you when standard routing is enough, success rate tells you whether the integration is healthy, and cache hits show when repeated reads are being served efficiently.",
-                  },
-                  {
-                    title: "Debug balance-related issues",
-                    body: "If traffic stops unexpectedly, check spendable SOL credits first, then funding history, then request logs for 402-style or gateway funding errors before assuming the RPC itself is down.",
-                  },
-                  {
-                    title: "Use simulation mode safely",
-                    body: "Simulation mode is ideal for payload validation, teammate onboarding, and reproducing read-only examples without burning funded credits. Switch it off before validating real throughput or funding posture.",
-                  },
-                  {
-                    title: "Use request logs and the alert center together",
-                    body: "Use the alert center to spot what changed, then jump into request logs filtered by method, key, status, or mode to isolate the exact project traffic behind the alert.",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
-                  >
-                    <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
-                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
-                  </div>
-                ))}
-              </div>
-              <Notice tone="neutral" title="Good operator loop">
-                Start with status, confirm the project and time range, inspect request logs, follow a trace when needed, verify funding posture, then replay or simulate the request in the playground before making code changes.
-              </Notice>
-            </div>
-          </section>
-
-          <section id="release-guide">
-            <SectionHeading
-              id="release-guide"
-              eyebrow="Release"
-              title="Release Guide"
-              description="A practical path from first wallet connection to a stable devnet integration that the team can actually operate."
-            />
-            <div className="grid gap-4 md:grid-cols-2">
-              {[
-                {
-                  title: "Run a paid devnet beta first",
-                  body: "The next honest commercial step is a managed paid beta on devnet: pre-funded project credits, budgets, hard stops, alerts, and direct operator support before any mainnet claim.",
-                },
-                {
-                  title: "Go from zero to first request",
-                  body: "Connect a wallet, create a project, activate it, fund it with a small devnet SOL amount, create one API key, and send one standard RPC request through the hosted gateway.",
-                },
-                {
-                  title: "Fund and test safely on devnet",
-                  body: "Use small amounts, treat devnet funding as workflow validation, and confirm that analytics, request logs, and alerts respond before trying larger evaluation traffic.",
-                },
-                {
-                  title: "Use simulation before real request flow",
-                  body: "Run the request shape through simulation mode first when onboarding a teammate or verifying payload structure, then switch to live funded flow when you need real routing and accounting.",
-                },
-                {
-                  title: "Monitor once traffic starts",
-                  body: "Keep the status page, alert center, request logs, and project health score open together so you can separate platform incidents from integration-specific issues quickly.",
-                },
-                {
-                  title: "Use alerts, request logs, and health score together",
-                  body: "Alerts tell you what changed, request logs show which traffic caused it, and the health score summarizes whether the project is still operationally ready for the team.",
-                },
-                {
-                  title: "Prepare for mainnet honestly",
-                  body: "Treat the current devnet phase as operational rehearsal: tighten runbooks, scopes, alerts, and collaboration habits now so the product and your integration are better prepared for future mainnet work.",
-                },
-                {
-                  title: "Use a conservative beta reserve",
-                  body: "A calm limited mainnet beta should be planned with reserve, not hope. A practical founder starting point is about 100 SOL total across traffic liquidity, ops buffer, and treasury/reconciliation safety margin.",
-                },
-              ].map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
-                >
-                  <div className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.title}</div>
-                  <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
-                </div>
-              ))}
-            </div>
-            <Notice tone="neutral" title="Release habit">
-              Before any larger rollout, confirm live status, funded balance, request logs, alert thresholds, webhook handling, and one real request in the authenticated product — not just local code or mock traffic.
-            </Notice>
-            <Notice tone="warning" title="Mainnet gate">
-              Do not treat deployment alone as launch readiness. Mainnet beta should wait for governed authority control, reviewed treasury operations, migration discipline, verified incident handling, and a support model that is repeatable without manual founder intervention.
-            </Notice>
-          </section>
-
-          {/* ── SDK Reference ────────────────────────────────────── */}
-          <section id="sdk-reference">
-            <SectionHeading
-              id="sdk-reference"
-              eyebrow="Section 8"
-              title="SDK Reference"
-              description="@fyxvo/sdk — TypeScript SDK for the Fyxvo gateway and control-plane API."
-            />
-            <div className="space-y-5">
-              <Notice tone="neutral" title="SDK install">
-                Install {"@fyxvo/sdk"} with npm, yarn, or pnpm. The package exposes a typed client for the gateway and API. Use the curl / fetch examples in the Standard RPC and Priority Relay sections if you prefer to integrate without the SDK.
-              </Notice>
-              <div className="space-y-2">
-                <CodeBlock code={sdkInstallNpmCode} label="npm" />
-                <CodeBlock code={sdkInstallYarnCode} label="yarn" />
-                <CodeBlock code={sdkInstallPnpmCode} label="pnpm" />
-              </div>
-              <CodeBlock code={sdkClientCode} label="Create a client" />
-              <CodeBlock code={sdkRpcCode} label="client.rpc() — standard relay" />
-              <CodeBlock code={sdkPriorityCode} label="client.rpc() with /priority path — priority relay" />
-              <CodeBlock code={sdkErrorCode} label="Error handling" />
-              <CodeBlock code={tsAuthCode} label="TypeScript — full wallet auth flow" />
-              <CodeBlock code={tsApiKeyCode} label="TypeScript — create an API key" />
-              <CodeBlock code={tsRpcCode} label="TypeScript — typed gateway RPC call" />
-              <CodeBlock code={pythonRpcCode} label="Python (requests) — gateway RPC call" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Notice tone="neutral" title="FyxvoError">
-                  Base class for all SDK errors. Covers network failures, timeouts, and
-                  configuration issues. Always catch this as a fallback.
-                </Notice>
-                <Notice tone="neutral" title="FyxvoApiError">
-                  Extends FyxvoError with an HTTP statusCode. Thrown when the gateway or API returns
-                  a 4xx or 5xx response. Check statusCode === 429 for rate limit handling.
-                </Notice>
-              </div>
-            </div>
-          </section>
-
-          {/* ── Rate Limits ──────────────────────────────────────── */}
-          <section id="rate-limits">
-            <SectionHeading
-              id="rate-limits"
-              eyebrow="Section 9"
-              title="Rate Limits"
-              description="Per-key limits for standard and priority paths, and how to handle 429 responses."
-            />
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
-                    Standard path
-                  </div>
-                  <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Limit:</span> 300
-                      requests per 60-second window
-                    </p>
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Scope:</span>{" "}
-                      rpc:request
-                    </p>
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Enforcement:</span>{" "}
-                      Redis-backed, per API key
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
-                    Priority path
-                  </div>
-                  <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Limit:</span> 60
-                      requests per 60-second window
-                    </p>
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Scope:</span>{" "}
-                      priority:relay
-                    </p>
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Enforcement:</span>{" "}
-                      Separate window from standard
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <CodeBlock code={rateLimitCode} label="429 handling with exponential backoff" />
-              <Notice tone="neutral" title="Rate limit headers">
-                Every response includes <code className="text-[var(--fyxvo-brand)]">x-ratelimit-limit</code>,{" "}
-                <code className="text-[var(--fyxvo-brand)]">x-ratelimit-remaining</code>, and{" "}
-                <code className="text-[var(--fyxvo-brand)]">x-ratelimit-reset</code> headers. Use these to
-                implement adaptive backoff without waiting for a 429.
-              </Notice>
-            </div>
-          </section>
-
-          {/* ── Simulation Mode ──────────────────────────────────── */}
-          <section id="simulation-mode">
-            <SectionHeading
-              id="simulation-mode"
-              eyebrow="Gateway"
-              title="Simulation Mode"
-              description="Test against the gateway without using your project balance or touching Solana devnet."
-            />
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
-                    What simulation mode does
-                  </div>
-                  <ul className="space-y-1.5 text-sm text-[var(--fyxvo-text-soft)]">
-                    <li>Requests are free — no lamports are deducted.</li>
-                    <li>Traffic is not forwarded to Solana devnet.</li>
-                    <li>The gateway returns canned, deterministic responses.</li>
-                    <li>Useful for SDK integration tests and CI pipelines.</li>
-                  </ul>
-                </div>
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
-                    Supported methods
-                  </div>
-                  <ul className="space-y-1.5 text-sm font-mono text-[var(--fyxvo-text-soft)]">
-                    <li>getHealth</li>
-                    <li>getSlot</li>
-                    <li>getBalance</li>
-                    <li>getLatestBlockhash</li>
-                  </ul>
-                  <p className="mt-3 text-xs text-[var(--fyxvo-text-muted)]">
-                    Other methods may pass through or return a stub error in simulation mode.
-                  </p>
-                </div>
-              </div>
-              <CodeBlock
-                label="Enable simulation mode — append ?simulate=true"
-                code={`# Standard path with simulation enabled
-curl -X POST "${webEnv.gatewayBaseUrl}/rpc?simulate=true" \\
+          {/* Standard RPC */}
+          <section className="space-y-6">
+            <SectionHeading id="standard-rpc" title="Standard RPC" />
+            <Prose>
+              <p>
+                The standard RPC endpoint is{" "}
+                <InlineCode>https://rpc.fyxvo.com/rpc</InlineCode>. It accepts standard Solana
+                JSON-RPC 2.0 requests over HTTPS POST and supports the full method surface of a
+                Solana validator node. Every successful request deducts 1,000 lamports from the
+                calling project's balance.
+              </p>
+              <p>
+                Authentication is via the <InlineCode>x-api-key</InlineCode> header using an API
+                key with the <InlineCode>rpc:read</InlineCode> scope. The endpoint is fully
+                compatible with libraries that accept a custom RPC URL, including{" "}
+                <InlineCode>@solana/web3.js</InlineCode>, <InlineCode>solana-py</InlineCode>, and
+                the Rust SDK. Because header-based key injection is non-standard for some library
+                configurations, refer to the SDK Reference section for a helper that handles this
+                transparently.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST https://rpc.fyxvo.com/rpc \\
   -H "content-type: application/json" \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
+  -H "x-api-key: fxk_your_key_here" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getBalance",
+    "params": ["YOUR_WALLET_ADDRESS"]
+  }'
 
-# Response (canned — not from devnet):
-# {"jsonrpc":"2.0","id":1,"result":"ok"}`}
-              />
-              <div className="rounded-[1.5rem] border border-amber-500/30 bg-amber-500/10 p-5">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-warning)] mb-2">
-                  Production integrations
-                </div>
-                <p className="text-sm text-[var(--fyxvo-text-soft)]">
-                  Simulation mode is intended for development and testing only. Production
-                  integrations must omit the <code className="font-mono text-xs">?simulate=true</code>{" "}
-                  parameter to ensure requests are routed to Solana devnet and fees are applied
-                  correctly against your project balance.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* ── API Versioning ───────────────────────────────────── */}
-          <section id="api-versioning">
-            <SectionHeading
-              id="api-versioning"
-              eyebrow="Reference"
-              title="API Versioning"
-              description="How Fyxvo versions its REST API and what counts as a breaking change."
-            />
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
-                    Current version
-                  </div>
-                  <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Version:</span>{" "}
-                      <code className="font-mono text-xs">v1</code>
-                    </p>
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Base path:</span>{" "}
-                      <code className="font-mono text-xs">/v1/</code>
-                    </p>
-                    <p>
-                      <span className="font-medium text-[var(--fyxvo-text)]">Version header:</span>{" "}
-                      <code className="font-mono text-xs">X-Fyxvo-API-Version: v1</code>
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
-                    Version detection
-                  </div>
-                  <p className="text-sm text-[var(--fyxvo-text-soft)]">
-                    Every API response includes the{" "}
-                    <code className="font-mono text-xs">X-Fyxvo-API-Version: v1</code> header.
-                    Check this header in your client to detect version mismatches before they cause
-                    silent behavior changes.
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-3">
-                    Breaking changes
-                  </div>
-                  <ul className="space-y-1.5 text-sm text-[var(--fyxvo-text-soft)]">
-                    <li>Changes to existing response field shapes or types</li>
-                    <li>Removal of response fields</li>
-                    <li>Changes to the authentication mechanism</li>
-                    <li>Changes to required request fields</li>
-                    <li>Removal of existing endpoints</li>
-                  </ul>
-                </div>
-                <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-3">
-                    Non-breaking changes
-                  </div>
-                  <ul className="space-y-1.5 text-sm text-[var(--fyxvo-text-soft)]">
-                    <li>Adding new optional response fields</li>
-                    <li>Adding new endpoints</li>
-                    <li>Adding new optional query parameters</li>
-                    <li>Adding new optional request body fields</li>
-                    <li>Expanding enum values in new fields</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-3">
-                  Deprecations
-                </div>
-                <p className="text-sm text-[var(--fyxvo-text-soft)]">
-                  Deprecations are announced via a{" "}
-                  <code className="font-mono text-xs">Deprecation</code> header in affected
-                  API responses and in the{" "}
-                  <a href="/changelog" className="text-[var(--fyxvo-brand)] underline">changelog</a>.
-                  Deprecated endpoints remain available for a minimum of 90 days after the
-                  announcement. Watch the{" "}
-                  <code className="font-mono text-xs">Deprecation</code> header in your HTTP
-                  client to catch these early.
-                </p>
-              </div>
-              <CodeBlock
-                label="Detecting the API version in your client"
-                code={`// After any fetch call, check the version header:
-const response = await fetch("${webEnv.apiBaseUrl}/v1/...", { /* ... */ });
-const apiVersion = response.headers.get("X-Fyxvo-API-Version");
-if (apiVersion && apiVersion !== "v1") {
-  // Version mismatch — review the changelog for migration steps
-}
-
-// curl: observe the header in verbose output
-curl -I ${webEnv.apiBaseUrl}/health
-# X-Fyxvo-API-Version: v1`}
-              />
-            </div>
-          </section>
-
-          {/* ── Troubleshooting ──────────────────────────────────── */}
-          <section id="troubleshooting">
-            <SectionHeading
-              id="troubleshooting"
-              eyebrow="Section 10"
-              title="Troubleshooting"
-              description="A detailed diagnostic guide for the most common failure categories."
-            />
-            <div className="space-y-6">
-
-              {/* ---- Authentication Errors ---- */}
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
-                  <span className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-rose-500">401 / 403</span>
-                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Authentication Errors</h3>
-                </div>
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The gateway or API rejected your credentials. This covers both missing-token (401) and insufficient-scope (403) failures.</p>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>JWT has expired (tokens expire after 24 hours)</li>
-                      <li>API key was revoked or does not exist</li>
-                      <li>Key is missing required scope (<code className="font-mono text-xs">rpc:request</code> for standard, <code className="font-mono text-xs">priority:relay</code> for priority)</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Diagnosis</p>
-                    <p className="text-sm text-[var(--fyxvo-text-soft)]">Check the <code className="font-mono text-xs">error.code</code> field in the response body. Code <code className="font-mono text-xs">TOKEN_EXPIRED</code> means re-authenticate. Code <code className="font-mono text-xs">INSUFFICIENT_SCOPE</code> means generate a new key with the right scopes.</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Re-authenticate via <code className="font-mono text-xs">POST /v1/auth/challenge</code> + <code className="font-mono text-xs">POST /v1/auth/verify</code></li>
-                      <li>Generate a new API key from the API Keys page with the required scopes</li>
-                      <li>Confirm the <code className="font-mono text-xs">X-Api-Key</code> or <code className="font-mono text-xs">Authorization: Bearer</code> header is present and correctly formatted</li>
-                    </ul>
-                  </div>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: re-authenticate</summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
-                      <code>{`# Step 1 — get a challenge
-curl -X POST ${webEnv.apiBaseUrl}/v1/auth/challenge \\
-  -H "content-type: application/json" \\
-  -d '{"walletAddress":"YOUR_WALLET"}'
-
-# Step 2 — sign the returned message with your wallet and verify
-curl -X POST ${webEnv.apiBaseUrl}/v1/auth/verify \\
-  -H "content-type: application/json" \\
-  -d '{"walletAddress":"YOUR_WALLET","message":"<from-step-1>","signature":"<base58-sig>"}'`}</code>
-                    </pre>
-                  </details>
-                </div>
-              </div>
-
-              {/* ---- Connection Errors ---- */}
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
-                  <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-500">network</span>
-                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Connection Errors</h3>
-                </div>
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The request never reaches the gateway or returns a non-JSON response.</p>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Wrong endpoint URL (common: using API base instead of gateway base)</li>
-                      <li>No internet access or DNS resolution failure</li>
-                      <li>Gateway is temporarily unavailable (planned maintenance or incident)</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Verify the RPC endpoint: <code className="font-mono text-xs">{webEnv.gatewayBaseUrl}/rpc</code></li>
-                      <li>Check <a href={webEnv.statusPageUrl} className="text-[var(--fyxvo-brand)] hover:underline" target="_blank" rel="noopener noreferrer">status.fyxvo.com</a> for active incidents</li>
-                    </ul>
-                  </div>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: health check</summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
-                      <code>{`curl https://rpc.fyxvo.com/health
-# Expected: {"status":"ok"}
-
-curl ${webEnv.apiBaseUrl}/health
-# Expected: {"status":"ok"}`}</code>
-                    </pre>
-                  </details>
-                </div>
-              </div>
-
-              {/* ---- Rate Limit Errors ---- */}
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
-                  <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-amber-500">429</span>
-                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Rate Limit Errors</h3>
-                </div>
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The gateway returned a 429 Too Many Requests. Your project has exceeded its per-minute request quota.</p>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Burst of requests exceeded the per-minute limit for your tier</li>
-                      <li>Multiple clients sharing the same API key concurrently</li>
-                      <li>Missing backoff logic causing retry storms</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Diagnosis</p>
-                    <p className="text-sm text-[var(--fyxvo-text-soft)]">Check the <code className="font-mono text-xs">X-RateLimit-Remaining</code> and <code className="font-mono text-xs">Retry-After</code> headers on the 429 response.</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Implement exponential backoff using the <code className="font-mono text-xs">Retry-After</code> header value</li>
-                      <li>Consider upgrading to the Priority tier for higher throughput limits</li>
-                      <li>Deduplicate requests and use batch methods where available</li>
-                    </ul>
-                  </div>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: check rate limit headers</summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
-                      <code>{`curl -i -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'
-
-# Look for: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After`}</code>
-                    </pre>
-                  </details>
-                </div>
-              </div>
-
-              {/* ---- Balance Errors ---- */}
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
-                  <span className="rounded-md border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-orange-500">402</span>
-                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Balance Errors</h3>
-                </div>
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-sm text-[var(--fyxvo-text-soft)]">A 402 Payment Required means the project does not have enough SOL credits to cover the relay request.</p>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Project treasury balance has been exhausted</li>
-                      <li>Funding transaction was sent but not yet verified by the API</li>
-                      <li>Using a key from a different project with an empty treasury</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Fix</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Fund the project at <a href="/funding" className="text-[var(--fyxvo-brand)] hover:underline">fyxvo.com/funding</a></li>
-                      <li>Verify a pending funding transaction using <code className="font-mono text-xs">POST /v1/projects/:id/funding/:fid/verify</code></li>
-                    </ul>
-                  </div>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: check balance via API</summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
-                      <code>{`curl ${webEnv.apiBaseUrl}/v1/me/balance \\
-  -H "authorization: Bearer YOUR_JWT"
-
-# Returns: { "availableSolCredits": "...", "totalSolFunded": "..." }`}</code>
-                    </pre>
-                  </details>
-                </div>
-              </div>
-
-              {/* ---- Unexpected RPC Errors ---- */}
-              <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] px-5 py-4">
-                  <span className="rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-2 py-0.5 font-mono text-xs font-semibold text-[var(--fyxvo-text-muted)]">RPC</span>
-                  <h3 className="text-sm font-semibold text-[var(--fyxvo-text)]">Unexpected RPC Errors</h3>
-                </div>
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-sm text-[var(--fyxvo-text-soft)]">The gateway reached Solana devnet but the RPC call itself failed. Check the <code className="font-mono text-xs">fyxvo_hint</code> field in the error response for a human-readable diagnosis.</p>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Causes</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li>Solana devnet node under load or temporarily unavailable</li>
-                      <li>Blockhash has expired before the transaction was submitted (use <code className="font-mono text-xs">getLatestBlockhash</code> again)</li>
-                      <li>Transaction simulation failed due to an account constraint or insufficient lamports</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Common codes</p>
-                    <ul className="list-inside list-disc space-y-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      <li><code className="font-mono text-xs">-32002</code> — Transaction simulation failed: check transaction logs in the response</li>
-                      <li><code className="font-mono text-xs">-32003</code> — Blockhash expired: fetch a fresh blockhash and re-sign</li>
-                      <li><code className="font-mono text-xs">-32016</code> — Blockhash not found: same resolution as -32003</li>
-                    </ul>
-                  </div>
-                  <details className="text-xs">
-                    <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">Example: inspect fyxvo_hint</summary>
-                    <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
-                      <code>{`# A Fyxvo error response looks like:
+# Response
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "error": {
-    "code": -32002,
-    "message": "Transaction simulation failed",
-    "fyxvo_hint": "The transaction failed simulation. Check that the fee payer has enough SOL and all accounts are valid."
+  "result": {
+    "context": { "slot": 348201984 },
+    "value": 1500000000
   }
-}`}</code>
-                    </pre>
-                  </details>
-                </div>
-              </div>
-
-            </div>
+}`}
+            />
           </section>
 
-          {/* ── Error Reference ──────────────────────────────────── */}
-          <section id="error-reference">
-            <SectionHeading
-              id="error-reference"
-              eyebrow="Reference"
-              title="Error Reference"
-              description="A quick reference for every error code returned by the Fyxvo API and gateway."
-            />
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              All Fyxvo API errors follow the shape <code className="font-mono text-xs">{"{ error: string, message: string }"}</code>. HTTP status codes map directly to problem categories: 400 for validation, 401 for auth, 402 for insufficient balance, 403 for scope or role issues, 429 for rate limits, and 503 for protocol unavailability. See the Error Codes table below for the full list with resolution guidance.
-            </p>
-          </section>
+          <SectionDivider />
 
-          {/* ── CI/CD Integration ────────────────────────────────── */}
-          <section id="ci-cd">
-            <SectionHeading
-              id="ci-cd"
-              eyebrow="Reference"
-              title="CI/CD Integration"
-              description="How to use Fyxvo API keys safely in automated pipelines."
-            />
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              Store your API key in an environment secret (e.g. <code className="font-mono text-xs">FYXVO_API_KEY</code>) and pass it as the <code className="font-mono text-xs">X-Api-Key</code> header. In GitHub Actions, use <code className="font-mono text-xs">{"${{ secrets.FYXVO_API_KEY }}"}</code>. Never commit keys directly. Use separate keys per environment so you can revoke CI access without affecting production.
-            </p>
-          </section>
-
-          {/* ── Migration Guide ───────────────────────────────────── */}
-          <section id="migration-guide">
-            <SectionHeading
-              id="migration-guide"
-              eyebrow="Reference"
-              title="Migration Guide"
-              description="Switch to Fyxvo from Helius, QuickNode, or any other Solana RPC provider."
-            />
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              Fyxvo is a drop-in replacement for any standard Solana JSON-RPC provider. Replace your existing endpoint URL with the Fyxvo gateway URL and add an <code className="font-mono text-xs">X-Api-Key</code> header containing your relay key. No SDK changes are required — any library that speaks JSON-RPC over HTTP works without modification.
-            </p>
-          </section>
-
-          {/* ── Network Status ───────────────────────────────────── */}
-          <section id="network-status">
-            <SectionHeading
-              id="network-status"
-              eyebrow="Section 11"
-              title="Network Status"
-              description="How to check the live condition of the API, gateway, and protocol."
-            />
-            <div className="space-y-5">
-              <CodeBlock code={healthCheckCode} label="Health check commands" />
-              <div className="grid gap-4 sm:grid-cols-3">
-                {[
-                  {
-                    label: "status.fyxvo.com",
-                    url: webEnv.statusPageUrl,
-                    body: "Public status page. Combines API health, gateway health, and protocol readiness into a single honest surface. Share this with teammates during evaluation.",
-                  },
-                  {
-                    label: "API health",
-                    url: `${webEnv.apiBaseUrl}/health`,
-                    body: 'Returns { "status": "ok" } when the control plane, database, and Redis are operational. Include this in your monitoring setup.',
-                  },
-                  {
-                    label: "Gateway status",
-                    url: `${webEnv.gatewayBaseUrl}/v1/status`,
-                    body: "Returns the full gateway state: node count, upstream availability, pricing config, scope enforcement status, and live relay metrics.",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5"
-                  >
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                      {item.label}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <code className="break-all text-xs text-[var(--fyxvo-brand)]">{item.url}</code>
-                      <CopyButton value={item.url} className="shrink-0" />
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                      {item.body}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <Notice tone="neutral" title="Interpreting a degraded status">
-                If the status page shows degraded, check individual health endpoints to isolate
-                whether the issue is the API, gateway, or Solana devnet itself. If devnet is healthy
-                but the gateway is degraded, contact support before scaling traffic.
-              </Notice>
-            </div>
-          </section>
-
-          <section id="status-api">
-            <SectionHeading
-              id="status-api"
-              eyebrow="Reference"
-              title="Status API"
-              description="Public status and network endpoints you can wire into internal dashboards, smoke tests, release checks, or lightweight uptime monitoring."
-            />
-            <div className="space-y-5">
-              <div className="grid gap-4 xl:grid-cols-2">
-                {[
-                  {
-                    title: "GET /health",
-                    code: statusApiHealthCode,
-                    body: "Public. Best for quick release smoke tests and simple uptime checks. Returns overall status, service name, version, timestamp, and assistant availability.",
-                  },
-                  {
-                    title: "GET /v1/status",
-                    code: statusApiStatusCode,
-                    body: "Public. Best for richer diagnostics. Use this for admin readouts, deployment checks, and environment-level status summaries.",
-                  },
-                  {
-                    title: "GET /v1/incidents",
-                    code: statusApiIncidentsCode,
-                    body: "Public. Returns active and historical incidents with timeline updates, affected services, and resolution timestamps. Use this to link platform incidents to project-level alerts.",
-                  },
-                  {
-                    title: "GET /v1/network/stats, /capacity, /health-calendar",
-                    code: statusApiNetworkCode,
-                    body: "Public. Use these for high-level usage trends, capacity posture, and recent service-health history without requiring an authenticated session.",
-                  },
-                  {
-                    title: "Project public stats endpoints",
-                    code: statusApiPublicProjectCode,
-                    body: "API-key authenticated. Use from backend services when you want public-safe project usage stats without exposing a dashboard session.",
-                  },
-                  {
-                    title: "Status snapshot sharing",
-                    code: statusSnapshotCode,
-                    body: "Human-readable handoff, not a separate API endpoint. Use the status page snapshot copy action when you need to share the current platform state quickly in chat, docs, or support threads.",
-                  },
-                ].map((item) => (
-                  <Card key={item.title} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-                    <CardHeader>
-                      <CardTitle>{item.title}</CardTitle>
-                      <CardDescription>{item.body}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <CodeBlock code={item.code} />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <Notice tone="neutral" title="Common operational uses">
-                Use <code className="font-mono text-xs">/health</code> in deploy smoke tests, <code className="font-mono text-xs">/v1/status</code> in richer admin dashboards, <code className="font-mono text-xs">/v1/incidents</code> to explain alert spikes, and the network endpoints when you want public operational context without exposing private project data.
-              </Notice>
-            </div>
-          </section>
-
-          {/* ── Changelog ────────────────────────────────────────── */}
-          <section id="changelog">
-            <SectionHeading
-              id="changelog"
-              eyebrow="Section 12"
-              title="Changelog"
-              description="What shipped in each version of the Fyxvo devnet platform."
-            />
-            <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <CardTitle>Version 0.1.0</CardTitle>
-                  <Badge tone="brand">current</Badge>
-                </div>
-                <CardDescription>Initial devnet launch release</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {[
-                    {
-                      title: "Wallet authentication",
-                      body: "Challenge–sign–verify JWT flow. Supports Phantom, Solflare, Backpack, and Wallet Standard adapters.",
-                    },
-                    {
-                      title: "Project activation",
-                      body: "On-chain project account creation via Anchor PDA derivation. Wallet signs the activation transaction; API verifies confirmation.",
-                    },
-                    {
-                      title: "SOL funding",
-                      body: "API-prepared unsigned transactions for SOL deposits into the Anchor-managed project vault. Includes verify endpoint for balance refresh.",
-                    },
-                    {
-                      title: "Standard relay",
-                      body: "JSON-RPC relay at /rpc with API key validation, funded balance enforcement, multi-node routing, and fallback.",
-                    },
-                    {
-                      title: "Priority relay",
-                      body: "Separate /priority path with priority:relay scope requirement, independent rate window, and distinct pricing from standard.",
-                    },
-                    {
-                      title: "Analytics",
-                      body: "Overview endpoint for cross-project totals and per-project endpoint for method breakdown, latency, and error log.",
-                    },
-                    {
-                      title: "Per-key analytics",
-                      body: "Request counts and success rates broken down by individual API key so teams can trace which key is responsible for traffic.",
-                    },
-                    {
-                      title: "Method breakdown",
-                      body: "Analytics surface includes per-method request counts and average latency to identify expensive or high-volume RPC methods.",
-                    },
-                    {
-                      title: "Error log",
-                      body: "Recent error events surfaced in the analytics API with timestamps, error codes, and affected project identifiers.",
-                    },
-                    {
-                      title: "Notifications",
-                      body: "In-product notification surface for balance warnings, rate limit events, and project status changes.",
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.title}
-                      className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
-                    >
-                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-                        {item.title}
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                        {item.body}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Full changelog link */}
-          <div className="text-center">
-            <a
-              href="/changelog"
-              className="text-sm text-[var(--fyxvo-brand)] hover:underline"
-            >
-              View the full changelog →
-            </a>
-          </div>
-
-          {/* ── Migration Guide ──────────────────────────────────────── */}
-          <section id="migration">
-            <SectionHeading
-              id="migration"
-              eyebrow="Migration"
-              title="Migrating from Helius or QuickNode"
-              description="Switch to Fyxvo in two lines of code. No SDK changes required."
-            />
-            <div className="space-y-4">
-              <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                Fyxvo is a drop-in Solana RPC provider. Replace the endpoint URL and add your API key header. Everything else stays the same.
+          {/* Priority Relay */}
+          <section className="space-y-6">
+            <SectionHeading id="priority-relay" title="Priority Relay" />
+            <Prose>
+              <p>
+                The priority relay endpoint is{" "}
+                <InlineCode>https://rpc.fyxvo.com/priority</InlineCode>. It is optimized for
+                latency-sensitive operations, particularly transaction submission. Each call
+                deducts 5,000 lamports rather than the standard 1,000.
               </p>
-              <CodeBlock
-                label="Before (Helius / QuickNode / any provider)"
-                code={`const connection = new Connection("https://mainnet.helius-rpc.com/?api-key=YOUR_KEY");
-// or
-const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/");`}
-              />
-              <CodeBlock
-                label="After (Fyxvo)"
-                code={`const connection = new Connection("${webEnv.gatewayBaseUrl}/rpc", {
-  httpHeaders: { "X-Api-Key": "fyxvo_live_YOUR_KEY" }
-});`}
-              />
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">
-                <p className="text-sm font-medium text-[var(--fyxvo-text)]">What stays the same</p>
-                <ul className="text-sm leading-6 text-[var(--fyxvo-text-soft)] space-y-1 list-disc list-inside">
-                  <li>All Solana JSON-RPC methods work identically</li>
-                  <li>@solana/web3.js, solana-py, and all standard clients</li>
-                  <li>Transaction signing and submission flows</li>
-                  <li>WebSocket subscriptions are not part of the hosted alpha surface yet</li>
-                </ul>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2">
-                <p className="text-sm font-medium text-[var(--fyxvo-text)]">What is different</p>
-                <ul className="text-sm leading-6 text-[var(--fyxvo-text-soft)] space-y-1 list-disc list-inside">
-                  <li>Authentication uses a per-project API key in the <code className="font-mono text-xs">X-Api-Key</code> header (not a URL query param)</li>
-                  <li>Billing is on-chain: SOL credits are funded directly to your project treasury</li>
-                  <li>Currently devnet only — mainnet is on the roadmap</li>
-                </ul>
-              </div>
-            </div>
+              <p>
+                The priority relay maintains a dedicated routing window that keeps connections
+                warm to the network's leader schedule. When submitting a{" "}
+                <InlineCode>sendTransaction</InlineCode> call through this endpoint, the relay
+                attempts to deliver the transaction to the current slot leader with minimal
+                additional hops. This is especially valuable for time-sensitive operations like
+                arbitrage, liquidations, and competitive NFT mints on devnet testing environments.
+              </p>
+              <p>
+                Authentication for the priority relay requires an API key with the{" "}
+                <InlineCode>rpc:relay</InlineCode> scope in addition to{" "}
+                <InlineCode>rpc:read</InlineCode>. The request format is identical to the standard
+                RPC endpoint; only the URL changes.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST https://rpc.fyxvo.com/priority \\
+  -H "content-type: application/json" \\
+  -H "x-api-key: fxk_your_relay_key" \\
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "sendTransaction",
+    "params": ["BASE64_SIGNED_TX", { "encoding": "base64" }]
+  }'`}
+            />
           </section>
 
-          {/* ── Rate Limits Reference ──────────────────────────────── */}
-          <section id="rate-limits-reference">
-            <SectionHeading
-              id="rate-limits-reference"
-              eyebrow="Reference"
-              title="Rate limits reference"
-              description="Per-key rate limits on devnet. Limits will increase as the network scales."
-            />
-            <div className="overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Path</th>
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Scope required</th>
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Limit</th>
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Window</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--fyxvo-border)]">
-                  {[
-                    { path: "/rpc (standard)", scope: "rpc:request", limit: "300 req", window: "60 s" },
-                    { path: "/priority (priority)", scope: "priority:relay", limit: "60 req", window: "60 s" },
-                    { path: "API (auth, projects)", scope: "n/a (JWT)", limit: "120 req", window: "60 s" },
-                    { path: "API (analytics)", scope: "n/a (JWT)", limit: "120 req", window: "60 s" },
-                  ].map((row) => (
-                    <tr key={row.path} className="bg-[var(--fyxvo-bg)] hover:bg-[var(--fyxvo-panel-soft)] transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text)]">{row.path}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text-muted)]">{row.scope}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--fyxvo-text)]">{row.limit}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--fyxvo-text-muted)]">{row.window}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-3 text-xs text-[var(--fyxvo-text-muted)]">
-              Rate limit headers: <code className="font-mono">x-ratelimit-limit</code>, <code className="font-mono">x-ratelimit-remaining</code>, <code className="font-mono">x-ratelimit-reset</code>. On 429, wait for the reset timestamp before retrying.
-            </p>
+          <SectionDivider />
+
+          {/* Analytics overview */}
+          <section className="space-y-6">
+            <SectionHeading id="analytics-overview" title="Analytics" />
+            <Prose>
+              <p>
+                The analytics system records every request that passes through the relay layer and
+                makes the aggregated data available in real time through the dashboard and the
+                analytics API. You can observe total request counts, latency distribution, error
+                rates by method, and balance consumption trends across any time window from the
+                last hour to the last 30 days.
+              </p>
+              <p>
+                In the dashboard, navigate to a project and click the Analytics tab. The overview
+                panel shows total requests, average response time in milliseconds, the error rate
+                as a percentage, and total lamports spent. Hover over any chart point to see the
+                exact values for that interval.
+              </p>
+              <p>
+                The latency breakdown panel splits response times into four buckets: under 100ms,
+                100–250ms, 250–500ms, and over 500ms. This distribution helps you identify whether
+                slowness is consistent (a configuration issue) or sporadic (network variance). The
+                error rate panel breaks errors down by HTTP status code so you can distinguish
+                balance errors (402) from authentication issues (401) and rate limits (429).
+              </p>
+              <p>
+                Analytics data is updated in real time as requests arrive. The dashboard polls the
+                analytics API on a short interval and merges new data points into the live charts
+                without requiring a page refresh. For programmatic access to the same data, see
+                the Analytics API section below.
+              </p>
+            </Prose>
           </section>
 
-          {/* ── Error Codes ──────────────────────────────────────────── */}
-          <section id="error-codes">
-            <SectionHeading
-              id="error-codes"
-              eyebrow="Reference"
-              title="Error codes reference"
-              description="Common error codes returned by the API and gateway."
+          <SectionDivider />
+
+          {/* Analytics API */}
+          <section className="space-y-6">
+            <SectionHeading id="analytics-api" title="Analytics API" />
+            <Prose>
+              <p>
+                Two endpoints expose analytics data over the REST API. Both require a Bearer JWT
+                in the <InlineCode>Authorization</InlineCode> header. The cross-project overview
+                aggregates across all projects owned by the authenticated wallet. The per-project
+                endpoint scopes results to a single project.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`# Cross-project overview
+GET ${webEnv.apiBaseUrl}/v1/analytics/overview
+Authorization: Bearer YOUR_JWT
+
+# Per-project analytics
+GET ${webEnv.apiBaseUrl}/v1/projects/proj_abc123/analytics?window=24h
+Authorization: Bearer YOUR_JWT`}
             />
-            <div className="overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">HTTP</th>
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Code</th>
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Meaning</th>
-                    <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Resolution</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--fyxvo-border)]">
-                  {[
-                    { http: "400", code: "validation_error", meaning: "Request body failed schema validation", fix: "Check the details field for which fields are invalid" },
-                    { http: "400", code: "invalid_message", meaning: "Auth challenge message does not match", fix: "Request a new challenge and sign the exact returned message" },
-                    { http: "401", code: "unauthorized", meaning: "No JWT token provided", fix: "Include Authorization: Bearer <token> header" },
-                    { http: "401", code: "invalid_token", meaning: "JWT is malformed or expired", fix: "Re-authenticate via /v1/auth/challenge + /v1/auth/verify" },
-                    { http: "401", code: "invalid_signature", meaning: "Wallet signature verification failed", fix: "Sign with the correct wallet and the exact challenge message" },
-                    { http: "401", code: "session_expired", meaning: "Session version has been rotated", fix: "Re-authenticate to get a fresh JWT" },
-                    { http: "402", code: "insufficient_balance", meaning: "Project has no spendable SOL credits", fix: "Fund the project treasury and wait for confirmation" },
-                    { http: "403", code: "forbidden", meaning: "Action requires elevated privileges", fix: "Check your account role in Settings" },
-                    { http: "403", code: "scope_missing", meaning: "API key lacks the required scope", fix: "Revoke the key and create a new one with the correct scopes" },
-                    { http: "404", code: "not_found", meaning: "Project, key, or resource not found", fix: "Verify the ID is correct and belongs to your account" },
-                    { http: "409", code: "project_already_activated", meaning: "Activation transaction already confirmed", fix: "The project is already active — no action needed" },
-                    { http: "429", code: "rate_limited", meaning: "Rate limit exceeded for this window", fix: "Back off and retry after x-ratelimit-reset timestamp" },
-                    { http: "503", code: "protocol_not_ready", meaning: "Fyxvo program not ready on chain", fix: "Check /status for protocol readiness details" },
-                  ].map((row) => (
-                    <tr key={row.code} className="bg-[var(--fyxvo-bg)] hover:bg-[var(--fyxvo-panel-soft)] transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text)]">{row.http}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-brand)]">{row.code}</td>
-                      <td className="px-4 py-3 text-xs text-[var(--fyxvo-text-soft)]">{row.meaning}</td>
-                      <td className="px-4 py-3 text-xs text-[var(--fyxvo-text-muted)]">{row.fix}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Prose>
+              <p>
+                The <InlineCode>window</InlineCode> query parameter accepts{" "}
+                <InlineCode>1h</InlineCode>, <InlineCode>6h</InlineCode>,{" "}
+                <InlineCode>24h</InlineCode>, <InlineCode>7d</InlineCode>, and{" "}
+                <InlineCode>30d</InlineCode>. Defaults to <InlineCode>24h</InlineCode> if omitted.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="json"
+              code={`// Example response from /v1/projects/:id/analytics
+{
+  "window": "24h",
+  "totalRequests": 14821,
+  "successRequests": 14710,
+  "errorRequests": 111,
+  "errorRate": 0.0075,
+  "avgLatencyMs": 87,
+  "p95LatencyMs": 210,
+  "lamportsConsumed": 14821000,
+  "series": [
+    { "ts": "2026-03-26T12:00:00Z", "requests": 604, "errors": 4, "avgLatencyMs": 82 },
+    { "ts": "2026-03-26T13:00:00Z", "requests": 617, "errors": 5, "avgLatencyMs": 91 }
+  ]
+}`}
+            />
           </section>
 
-          {/* ── FAQ ──────────────────────────────────────────────────── */}
-          <section id="faq">
-            <SectionHeading
-              id="faq"
-              eyebrow="FAQ"
-              title="Frequently asked questions"
-              description="Real questions from developers integrating with Fyxvo."
+          <SectionDivider />
+
+          {/* Public Stats API */}
+          <section className="space-y-6">
+            <SectionHeading id="public-stats-api" title="Public Stats API" />
+            <Prose>
+              <p>
+                The public stats API exposes read-only aggregate data for projects that have
+                enabled public visibility. These endpoints require no authentication and are
+                suitable for embedding in status pages, README badges, or third-party dashboards.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`# List all public projects
+GET ${webEnv.apiBaseUrl}/v1/public/projects
+
+# Get stats for a specific public project by slug
+GET ${webEnv.apiBaseUrl}/v1/public/projects/my-project-slug`}
             />
-            <div className="space-y-4">
-              {[
-                {
-                  q: "Is Fyxvo production-ready for mainnet?",
-                  a: "Not yet. Fyxvo is currently a private devnet alpha. Mainnet support is on the roadmap. Devnet-graduated projects will have a clear migration path when mainnet launches.",
-                },
-                {
-                  q: "What happens if my SOL balance runs out?",
-                  a: "Gateway requests will return a 402 Insufficient Balance error until you fund the project treasury. Your project data, API keys, and analytics are preserved — only relay access is paused.",
-                },
-                {
-                  q: "Can I use Fyxvo without a wallet?",
-                  a: "No. Wallet ownership is the authentication anchor. You need a Solana wallet (Phantom, Backpack, etc.) to create a project, fund the treasury, and receive a session JWT.",
-                },
-                {
-                  q: "How do I get more devnet SOL for testing?",
-                  a: "Use the Solana devnet faucet: `solana airdrop 2 YOUR_WALLET --url devnet`. You can also use https://faucet.solana.com. Note: devnet SOL has no real value.",
-                },
-                {
-                  q: "What RPC methods are compute-heavy and cost more?",
-                  a: "The following methods cost 3,000 lamports instead of 1,000: getProgramAccounts, getLargestAccounts, getSignaturesForAddress, getSignaturesForAddress2, getTokenLargestAccounts. These are expensive upstream queries that require heavier node compute.",
-                },
-                {
-                  q: "Can I have multiple projects?",
-                  a: "Yes. Each project is an independent on-chain account with its own treasury, API keys, and analytics. Create additional projects from the Dashboard.",
-                },
-                {
-                  q: "How do volume discounts work?",
-                  a: "Discounts apply to your billing rate: ≥1M requests/month → 20% off standard rate; ≥10M requests/month → 40% off. During devnet alpha, contact the team to apply volume pricing manually.",
-                },
-                {
-                  q: "Why does the gateway return a 401 even with a valid API key?",
-                  a: "The most common causes: (1) the key was revoked, (2) the key lacks the required scope (rpc:request for standard, priority:relay for priority), or (3) the X-Api-Key header is missing or misspelled.",
-                },
-                {
-                  q: "Can I use Fyxvo with languages other than JavaScript?",
-                  a: "Yes. Any HTTP client works. Use the X-Api-Key header and POST JSON-RPC to the gateway endpoint. Python, Rust, Go, and curl all work identically.",
-                },
-                {
-                  q: "How do I withdraw unused SOL from my project treasury?",
-                  a: "Treasury withdrawal is not yet available via the dashboard UI. During the devnet alpha, contact the team to initiate a withdrawal. Mainnet will have a self-serve withdrawal flow.",
-                },
-              ].map((item) => (
-                <div key={item.q} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-                  <p className="text-sm font-semibold text-[var(--fyxvo-text)]">{item.q}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.a}</p>
+            <CodeBlock
+              language="json"
+              code={`// Response from /v1/public/projects/:slug
+{
+  "slug": "my-project-slug",
+  "displayName": "My Project",
+  "totalRequests": 98432,
+  "uptimePercent": 99.97,
+  "avgLatencyMs": 84,
+  "lastUpdated": "2026-03-27T08:42:00Z",
+  "badges": {
+    "requests": "https://fyxvo.com/badge/my-project-slug/requests",
+    "uptime": "https://fyxvo.com/badge/my-project-slug/uptime"
+  }
+}`}
+            />
+            <Prose>
+              <p>
+                Only projects where the owner has explicitly enabled public visibility appear in
+                these responses. Private projects are never included in the public listing, and
+                their slugs return a 404 from these endpoints. Owners can toggle public
+                visibility from the project settings page at any time.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* API Explorer */}
+          <section className="space-y-6">
+            <SectionHeading id="api-explorer" title="API Explorer" />
+            <Prose>
+              <p>
+                The API Explorer below lets you send authenticated requests to the Fyxvo REST API
+                directly from this page. Paste your JWT, choose an endpoint from the dropdown,
+                set the HTTP method, provide an optional request body, and click Send. The raw
+                JSON response is displayed below the form. This is useful for understanding
+                response shapes and testing queries before writing integration code.
+              </p>
+            </Prose>
+
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">
+                    JWT token
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="eyJhbGci\u2026"
+                    value={apiJwt}
+                    onChange={(e) => setApiJwt(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-muted)] outline-none focus:border-[var(--fyxvo-brand)]"
+                  />
                 </div>
-              ))}
-            </div>
-          </section>
-
-          {/* ── RPC Reference ─────────────────────────────────────── */}
-          <section id="rpc-reference">
-            <SectionHeading
-              id="rpc-reference"
-              eyebrow="Reference"
-              title="RPC Reference"
-              description="A glossary of key Solana JSON-RPC methods routed through the Fyxvo gateway."
-            />
-            <div className="space-y-6">
-              {(
-                [
-                  {
-                    category: "Account & Balance",
-                    methods: [
-                      {
-                        name: "getBalance",
-                        description: "Returns the lamport balance of the account at the given public key.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[pubkey]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getBalance","params":["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"]}'`,
-                      },
-                      {
-                        name: "getAccountInfo",
-                        description: "Returns all information associated with the account at the given public key.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[pubkey]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",{"encoding":"base58"}]}'`,
-                      },
-                      {
-                        name: "getMultipleAccounts",
-                        description: "Get info for multiple accounts at once.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[pubkeys[]]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getMultipleAccounts","params":[["PUBKEY1","PUBKEY2"],{"encoding":"base58"}]}'`,
-                      },
-                      {
-                        name: "getTokenAccountBalance",
-                        description: "Get token account balance for an SPL Token account.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[pubkey]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenAccountBalance","params":["TOKEN_ACCOUNT_PUBKEY"]}'`,
-                      },
-                      {
-                        name: "getTokenAccountsByOwner",
-                        description: "Get all token accounts owned by an address, filtered by mint or program ID.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[ownerAddress, { mint | programId }]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenAccountsByOwner","params":["OWNER_PUBKEY",{"programId":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"},{"encoding":"jsonParsed"}]}'`,
-                      },
-                      {
-                        name: "getTokenLargestAccounts",
-                        description: "Get the 20 largest token accounts for a given mint.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[mintAddress]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenLargestAccounts","params":["MINT_ADDRESS"]}'`,
-                      },
-                      {
-                        name: "getTokenSupply",
-                        description: "Get the total supply of an SPL Token mint.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[mintAddress]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getTokenSupply","params":["MINT_ADDRESS"]}'`,
-                      },
-                      {
-                        name: "getProgramAccounts",
-                        description: "Get all accounts owned by a program. Compute-heavy — use filters to narrow results.",
-                        tier: "Standard",
-                        heavy: true,
-                        params: "[programId]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getProgramAccounts","params":["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"]}'`,
-                      },
-                    ],
-                  },
-                  {
-                    category: "Block & Slot",
-                    methods: [
-                      {
-                        name: "getSlot",
-                        description: "Returns the slot that has reached the given or default commitment level.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[]}'`,
-                      },
-                      {
-                        name: "getBlock",
-                        description: "Returns identity and transaction information about a confirmed block in the ledger. Compute-heavy.",
-                        tier: "Standard",
-                        heavy: true,
-                        params: "[slot]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getBlock","params":[SLOT_NUMBER,{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
-                      },
-                      {
-                        name: "getLatestBlockhash",
-                        description: "Returns the latest blockhash and the last block height at which it is valid.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getLatestBlockhash","params":[{"commitment":"confirmed"}]}'`,
-                      },
-                      {
-                        name: "getBlockHeight",
-                        description: "Returns the current block height of the node.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getBlockHeight","params":[]}'`,
-                      },
-                      {
-                        name: "getBlockTime",
-                        description: "Get estimated production time of a block, as Unix timestamp.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[slot]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getBlockTime","params":[SLOT_NUMBER]}'`,
-                      },
-                      {
-                        name: "getBlocks",
-                        description: "Get confirmed blocks in a slot range.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[startSlot, endSlot?]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getBlocks","params":[START_SLOT,END_SLOT]}'`,
-                      },
-                      {
-                        name: "getFirstAvailableBlock",
-                        description: "Get the slot of the lowest confirmed block that has not been purged from the ledger.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getFirstAvailableBlock","params":[]}'`,
-                      },
-                    ],
-                  },
-                  {
-                    category: "Transaction",
-                    methods: [
-                      {
-                        name: "sendTransaction",
-                        description: "Submits a signed transaction to the cluster for processing.",
-                        tier: "Priority",
-                        heavy: false,
-                        params: "[encodedTransaction]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
-  -H "x-api-key: YOUR_PRIORITY_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["<base64-signed-tx>",{"encoding":"base64","skipPreflight":false}]}'`,
-                      },
-                      {
-                        name: "simulateTransaction",
-                        description: "Simulate sending a transaction without actually submitting it to the network.",
-                        tier: "Priority",
-                        heavy: false,
-                        params: "[transaction]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
-  -H "x-api-key: YOUR_PRIORITY_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"simulateTransaction","params":["<base64-tx>",{"encoding":"base64","sigVerify":false}]}'`,
-                      },
-                      {
-                        name: "getTransaction",
-                        description: "Returns transaction details for a confirmed transaction.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[signature]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getTransaction","params":["SIGNATURE",{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
-                      },
-                      {
-                        name: "getTransactions",
-                        description: "Get details for multiple transactions by signature array.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[signatures[]]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getTransactions","params":[["SIG1","SIG2"],{"encoding":"json","maxSupportedTransactionVersion":0}]}'`,
-                      },
-                      {
-                        name: "getSignaturesForAddress",
-                        description: "Get confirmed signatures for transactions involving an address.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[address]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSignaturesForAddress","params":["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc",{"limit":10}]}'`,
-                      },
-                      {
-                        name: "getSignatureStatuses",
-                        description: "Returns the statuses of a list of transaction signatures.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[signatures[]]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSignatureStatuses","params":[["SIG1","SIG2"],{"searchTransactionHistory":false}]}'`,
-                      },
-                    ],
-                  },
-                  {
-                    category: "Network",
-                    methods: [
-                      {
-                        name: "getHealth",
-                        description: "Returns the current health of the node \u2014 \u201cok\u201d if healthy.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'`,
-                      },
-                      {
-                        name: "getVersion",
-                        description: "Returns the current Solana version running on the node.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getVersion","params":[]}'`,
-                      },
-                      {
-                        name: "getEpochInfo",
-                        description: "Returns information about the current epoch including slot index and epoch number.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getEpochInfo","params":[]}'`,
-                      },
-                      {
-                        name: "getEpochSchedule",
-                        description: "Get epoch schedule information from the cluster\u2019s genesis config.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getEpochSchedule","params":[]}'`,
-                      },
-                      {
-                        name: "getGenesisHash",
-                        description: "Returns the genesis hash of the ledger.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getGenesisHash","params":[]}'`,
-                      },
-                      {
-                        name: "getClusterNodes",
-                        description: "Get information about all cluster nodes participating in the network.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getClusterNodes","params":[]}'`,
-                      },
-                      {
-                        name: "getLeaderSchedule",
-                        description: "Get the leader schedule for the current or a specific epoch.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getLeaderSchedule","params":[]}'`,
-                      },
-                      {
-                        name: "getMinimumBalanceForRentExemption",
-                        description: "Get minimum balance required to make account rent exempt for a given data size.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[dataSize]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getMinimumBalanceForRentExemption","params":[128]}'`,
-                      },
-                      {
-                        name: "getRecentPerformanceSamples",
-                        description: "Get recent performance samples showing transactions and slots per second.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[limit?]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getRecentPerformanceSamples","params":[5]}'`,
-                      },
-                      {
-                        name: "getStakeActivation",
-                        description: "Get epoch activation information for a stake account.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "[pubkey]",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getStakeActivation","params":["STAKE_ACCOUNT_PUBKEY"]}'`,
-                      },
-                      {
-                        name: "getVoteAccounts",
-                        description: "Get account info and stake for all voting accounts in the current bank.",
-                        tier: "Standard",
-                        heavy: false,
-                        params: "none",
-                        example: `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "x-api-key: YOUR_API_KEY" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getVoteAccounts","params":[]}'`,
-                      },
-                    ],
-                  },
-                ] as Array<{ category: string; methods: Array<{ name: string; description: string; tier: string; heavy: boolean; params: string; example: string }> }>
-              ).map(({ category, methods }) => (
-                <div key={category} className="space-y-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">{category}</h3>
-                  <div className="divide-y divide-[var(--fyxvo-border)] rounded-xl border border-[var(--fyxvo-border)] overflow-hidden">
-                    {methods.map((m) => (
-                      <div key={m.name} className="bg-[var(--fyxvo-panel-soft)] p-4">
-                        <div className="flex flex-wrap items-center gap-3 mb-1">
-                          <code className="font-mono text-sm font-semibold text-[var(--fyxvo-text)]">{m.name}</code>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${m.tier === "Priority" ? "bg-amber-500/15 text-amber-500" : "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"}`}>
-                            {m.tier}
-                          </span>
-                          {m.heavy && (
-                            <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-500">
-                              ⚡ Heavy
-                            </span>
-                          )}
-                          {m.params !== "none" && (
-                            <span className="font-mono text-[10px] text-[var(--fyxvo-text-muted)]">{m.params}</span>
-                          )}
-                        </div>
-                        <p className="text-sm leading-5 text-[var(--fyxvo-text-soft)] mb-2">{m.description}</p>
-                        <details className="text-xs">
-                          <summary className="cursor-pointer select-none text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors">
-                            Example
-                          </summary>
-                          <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3 text-xs leading-5 text-[var(--fyxvo-text-soft)] whitespace-pre-wrap">
-                            <code>{m.example}</code>
-                          </pre>
-                        </details>
-                      </div>
-                    ))}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">
+                      Endpoint
+                    </label>
+                    <select
+                      value={apiEndpoint}
+                      onChange={(e) => setApiEndpoint(e.target.value)}
+                      className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)] outline-none focus:border-[var(--fyxvo-brand)]"
+                    >
+                      <option value="/v1/analytics/overview">/v1/analytics/overview</option>
+                      <option value="/v1/projects">/v1/projects</option>
+                      <option value="/v1/status">/v1/status</option>
+                      <option value="/health">/health</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">
+                      Method
+                    </label>
+                    <select
+                      value={apiMethod}
+                      onChange={(e) => setApiMethod(e.target.value)}
+                      className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)] outline-none focus:border-[var(--fyxvo-brand)]"
+                    >
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                      <option value="PATCH">PATCH</option>
+                      <option value="DELETE">DELETE</option>
+                    </select>
                   </div>
                 </div>
-              ))}
+                {apiMethod !== "GET" ? (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">
+                      Body (JSON)
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder={`{\n  "key": "value"\n}`}
+                      value={apiBody}
+                      onChange={(e) => setApiBody(e.target.value)}
+                      className="w-full resize-none rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-muted)] outline-none focus:border-[var(--fyxvo-brand)]"
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <Button
+                onClick={() => void sendApiRequest()}
+                disabled={apiLoading || !apiJwt.trim()}
+                size="sm"
+              >
+                {apiLoading ? "Sending\u2026" : "Send request"}
+              </Button>
+              {apiResponse !== null ? (
+                <div className="relative overflow-hidden rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]">
+                  <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2">
+                    <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">Response</span>
+                    <CopyButton value={JSON.stringify(apiResponse, null, 2)} label="Copy" />
+                  </div>
+                  <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-[var(--fyxvo-text-soft)]">
+                    {JSON.stringify(apiResponse, null, 2)}
+                  </pre>
+                </div>
+              ) : null}
             </div>
           </section>
 
-          {/* Footer notice */}
-          <Notice tone="neutral" title="Still have questions?">
-            Docs cover the fastest self-serve path. For launch-fit questions, issue reports, or
-            managed rollout conversations, use the community paths or the contact page.
-            <div className="mt-4">
-              <SocialLinkButtons />
+          <SectionDivider />
+
+          {/* Playground */}
+          <section className="space-y-6">
+            <SectionHeading id="playground-section" title="Playground" />
+            <Prose>
+              <p>
+                The Playground is a dedicated live JSON-RPC builder where you can construct and
+                send arbitrary Solana RPC method calls against your Fyxvo project. Unlike the API
+                Explorer above, which targets the REST management API, the Playground routes
+                requests through the actual relay layer using the RPC endpoint, so each call
+                deducts balance just as a production request would.
+              </p>
+              <p>
+                In the Playground you can choose from every supported Solana method, fill in the
+                parameters using a structured form UI, inspect the raw request JSON before sending,
+                and see the full response with timing information and the latency class (standard
+                or priority). It is particularly useful for validating account addresses, checking
+                transaction simulation output, and confirming that your API key scopes are
+                configured correctly before integrating them into application code.
+              </p>
+              <p>
+                Access the Playground at{" "}
+                <Link
+                  href="/playground"
+                  className="font-medium text-[var(--fyxvo-brand)] hover:underline"
+                >
+                  /playground
+                </Link>
+                . You must have a connected wallet and at least one funded project with an active
+                API key to use it.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* SDK Reference */}
+          <section className="space-y-6">
+            <SectionHeading id="sdk-reference" title="SDK Reference" />
+            <Prose>
+              <p>
+                The <InlineCode>@fyxvo/sdk</InlineCode> package provides a typed TypeScript client
+                for both the RPC relay and the REST management API. It handles header injection,
+                retries on transient errors, and serialization of request and response types.
+              </p>
+            </Prose>
+            <CodeBlock language="bash" code="npm install @fyxvo/sdk" />
+            <Prose>
+              <p>
+                Construct a <InlineCode>FyxvoClient</InlineCode> with your base URL and API key.
+                The client exposes <InlineCode>rpc()</InlineCode> for standard Solana JSON-RPC
+                calls, <InlineCode>relay()</InlineCode> for priority relay, and{" "}
+                <InlineCode>request()</InlineCode> for the management REST API using your JWT.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="typescript"
+              code={`import { FyxvoClient } from "@fyxvo/sdk";
+
+const client = new FyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
+  apiKey: "fxk_your_key_here"
+});
+
+// Standard RPC call
+const health = await client.rpc("getHealth", []);
+console.log(health.result); // "ok"
+
+// Get account balance
+const balance = await client.rpc("getBalance", ["YOUR_WALLET_ADDRESS"]);
+console.log(balance.result.value); // lamports
+
+// Priority relay transaction submission
+const sig = await client.relay("sendTransaction", [base64Tx, { encoding: "base64" }]);
+
+// Management API call (requires JWT)
+const clientWithJwt = new FyxvoClient({
+  baseUrl: "${webEnv.apiBaseUrl}",
+  jwt: "eyJhbGci\u2026"
+});
+const projects = await clientWithJwt.request("GET", "/v1/projects");`}
+            />
+            <Prose>
+              <p>
+                The <InlineCode>FyxvoClient</InlineCode> constructor accepts an optional{" "}
+                <InlineCode>retries</InlineCode> number (defaults to 2),{" "}
+                <InlineCode>timeout</InlineCode> in milliseconds (defaults to 10,000), and a
+                custom <InlineCode>fetch</InlineCode> implementation for environments where the
+                global fetch is not available. All methods return typed promises and throw typed{" "}
+                <InlineCode>FyxvoError</InlineCode> instances on failure, which carry the HTTP
+                status code, the error message, and the machine-readable error code.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Operations Guide */}
+          <section className="space-y-6">
+            <SectionHeading id="operations-guide" title="Operations Guide" />
+            <Prose>
+              <p>
+                Running a Fyxvo project in a continuous integration or staging environment
+                requires attention to three operational concerns: monitoring the request flow,
+                maintaining an adequate balance, and responding to alerts before the project
+                halts.
+              </p>
+              <p>
+                Monitoring is done through the analytics dashboard. For automated monitoring, poll
+                the per-project analytics API on a schedule and compare the error rate and latency
+                against your acceptable thresholds. If either metric crosses your threshold,
+                trigger your internal alerting (PagerDuty, Slack webhook, email) using your own
+                pipeline.
+              </p>
+              <p>
+                Balance management is the most common operational issue. The platform fires a
+                webhook and an in-app notification when the balance drops below the configured
+                low-balance threshold. The default threshold is 5,000,000 lamports (0.005 SOL).
+                You can raise or lower this on the project settings page. For CI environments
+                running overnight test suites, set the threshold high enough that you have time
+                to respond before the project goes dry. A depleted project returns HTTP 402 on
+                every request until funded.
+              </p>
+              <p>
+                The full request lifecycle for a standard RPC call is: API key validation, scope
+                check, balance debit reservation, upstream RPC dispatch, response returned to
+                caller, balance debit confirmed. If the upstream errors out, the balance debit is
+                rolled back and no lamports are consumed. If the connection times out, the
+                reservation is held briefly and then released. You will not be charged for
+                requests that do not reach the upstream successfully.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Release Guide */}
+          <section className="space-y-6">
+            <SectionHeading id="release-guide" title="Release Guide" />
+            <Prose>
+              <p>
+                Fyxvo follows a staged release process. Changes are deployed to a canary
+                environment first, where they serve a small percentage of traffic for 24–48 hours
+                before full rollout. This allows regressions to be caught and rolled back before
+                they affect all users.
+              </p>
+              <p>
+                Breaking API changes are never introduced without prior notice. The current API
+                surface is versioned under <InlineCode>/v1/</InlineCode>. When a breaking change
+                is necessary, it will be introduced under <InlineCode>/v2/</InlineCode> and the
+                v1 surface will be maintained for a minimum of 60 days with deprecation notices
+                included in response headers.
+              </p>
+              <p>
+                All releases are documented in the{" "}
+                <Link href="/changelog" className="font-medium text-[var(--fyxvo-brand)] hover:underline">
+                  Changelog
+                </Link>
+                . Each entry includes a date, a list of additions, changes, and fixes, and a
+                severity indicator: patch for backwards-compatible fixes, minor for new features,
+                and major for breaking changes. Subscribe to the Fyxvo Discord or Telegram channel
+                to receive notifications when new releases are published.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* CI/CD Integration */}
+          <section className="space-y-6">
+            <SectionHeading id="cicd-integration" title="CI/CD Integration" />
+            <Prose>
+              <p>
+                Fyxvo integrates cleanly into automated pipelines. The only requirement is that
+                your runner has access to the <InlineCode>FYXVO_API_KEY</InlineCode> environment
+                variable. Store it as a repository secret in your CI provider rather than in any
+                committed file.
+              </p>
+              <p>
+                The SDK reads <InlineCode>FYXVO_API_KEY</InlineCode> from the environment
+                automatically when no <InlineCode>apiKey</InlineCode> is passed to the
+                constructor. This makes it easy to use the same test code locally (where the key
+                is in your shell environment) and in CI (where it is injected as a secret) without
+                any code changes.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="yaml"
+              code={`# .github/workflows/test.yml
+name: Integration tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        env:
+          FYXVO_API_KEY: \${{ secrets.FYXVO_API_KEY }}
+        run: npm test`}
+            />
+            <Prose>
+              <p>
+                If your test suite makes a large number of requests, consider using simulation
+                mode (see Simulation Mode) in CI to avoid consuming balance on every test run.
+                Simulation mode returns realistic responses without charging lamports, making it
+                ideal for testing the shape of responses rather than the live state of the network.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Migration Guide */}
+          <section className="space-y-6">
+            <SectionHeading id="migration-guide" title="Migration Guide" />
+            <Prose>
+              <p>
+                Migrating from a shared public devnet RPC to Fyxvo requires two changes: updating
+                the endpoint URL and adding the <InlineCode>x-api-key</InlineCode> header. No
+                other application code needs to change. Fyxvo is a drop-in replacement that
+                speaks standard Solana JSON-RPC.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="diff"
+              code={`// Before — public devnet RPC
+- const connection = new Connection("https://api.devnet.solana.com");
+
+// After — Fyxvo
++ const connection = new Connection("https://rpc.fyxvo.com/rpc", {
++   httpHeaders: { "x-api-key": process.env.FYXVO_API_KEY }
++ });`}
+            />
+            <Prose>
+              <p>
+                Before switching traffic, ensure your project is funded. An unfunded project
+                returns HTTP 402 on every request, which will manifest as a connection error in
+                most Solana libraries. Fund the project via the dashboard or the funding API,
+                then swap the endpoint URL in your configuration.
+              </p>
+              <p>
+                After migrating, verify your setup by checking the analytics dashboard for the
+                first few minutes of traffic. You should see request counts climbing and the error
+                rate near zero. If you see a spike in 401 errors, check that the API key is set
+                correctly and has the <InlineCode>rpc:read</InlineCode> scope. If you see 402
+                errors, the balance has run out and the project needs funding.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Rate Limits */}
+          <section className="space-y-6">
+            <SectionHeading id="rate-limits" title="Rate Limits" />
+            <Prose>
+              <p>
+                Rate limits are enforced per API key. The default limit for standard RPC keys is
+                100 requests per second with a burst allowance of 200 requests per second for up
+                to two seconds. Priority relay keys have a default limit of 50 requests per
+                second with a burst of 100.
+              </p>
+              <p>
+                Limits are configurable at the project level for keys within that project.
+                Navigate to the project settings, select a key, and adjust the rate limit slider.
+                Increases above the default maximums are available on request; contact the Fyxvo
+                team via Discord or the contact form with your use case and the request volume you
+                need.
+              </p>
+              <p>
+                When a key exceeds its rate limit, the relay returns HTTP 429 with a{" "}
+                <InlineCode>Retry-After</InlineCode> header indicating the number of seconds until
+                the next request will be accepted. Balance is not consumed for rate-limited
+                requests. The SDK handles 429 responses automatically with an exponential backoff
+                strategy when <InlineCode>retries</InlineCode> is greater than zero.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Simulation Mode */}
+          <section className="space-y-6">
+            <SectionHeading id="simulation-mode" title="Simulation Mode" />
+            <Prose>
+              <p>
+                Append <InlineCode>?simulate=true</InlineCode> to any request to enter simulation
+                mode. In simulation mode the request is processed through the relay layer and a
+                real response is returned from the upstream node, but the lamport balance is not
+                decremented. This is useful for testing your integration without cost.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST "https://rpc.fyxvo.com/rpc?simulate=true" \\
+  -H "content-type: application/json" \\
+  -H "x-api-key: fxk_your_key_here" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'
+
+# The response is identical to a real request but no lamports are consumed.
+# A Fyxvo-Simulate: true header is added to the response for confirmation.`}
+            />
+            <Prose>
+              <p>
+                Simulation mode is particularly valuable in CI pipelines where you want to verify
+                that requests are correctly formed and that the API key is valid without burning
+                through the project balance on every test run. It is also useful during local
+                development when you are iterating on request parameters and want to see the
+                response shape before committing to a live call.
+              </p>
+              <p>
+                Note that simulation mode does not bypass authentication or scope checks. The
+                request must still carry a valid API key with the appropriate scope. An invalid
+                key in simulation mode returns the same 401 error as it would without the
+                simulate flag.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* API Versioning */}
+          <section className="space-y-6">
+            <SectionHeading id="api-versioning" title="API Versioning" />
+            <Prose>
+              <p>
+                All Fyxvo REST API endpoints use a <InlineCode>/v1/</InlineCode> prefix. The RPC
+                relay endpoints at <InlineCode>/rpc</InlineCode> and{" "}
+                <InlineCode>/priority</InlineCode> are not versioned because they follow the
+                upstream Solana JSON-RPC specification.
+              </p>
+              <p>
+                Backward-compatible additions — new fields in responses, new optional query
+                parameters, new endpoints — are deployed to the current version without a version
+                bump. If your client ignores unknown fields in JSON responses, as all well-written
+                clients should, these additions will not break your integration.
+              </p>
+              <p>
+                Breaking changes — removed fields, changed field types, changed authentication
+                requirements, changed error shapes — require a new major version. Breaking changes
+                are introduced at <InlineCode>/v2/</InlineCode> while the old version remains
+                active. The old version is supported for at least 60 days after the new version
+                launches, with <InlineCode>Deprecation</InlineCode> and{" "}
+                <InlineCode>Sunset</InlineCode> headers added to all responses from the deprecated
+                version.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Error Reference */}
+          <section className="space-y-6">
+            <SectionHeading id="error-reference" title="Error Reference" />
+            <Prose>
+              <p>
+                Fyxvo uses standard HTTP status codes with JSON error bodies. Every error response
+                has a consistent shape regardless of which endpoint produced it, making it
+                straightforward to handle errors generically at the client level.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">401 Unauthenticated.</strong>
+                The request did not include a valid credential. For the RPC relay, this means the{" "}
+                <InlineCode>x-api-key</InlineCode> header is missing or the key does not exist.
+                For the REST API, the Bearer token is missing, malformed, or expired.
+                Re-authenticate to obtain a fresh token.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">402 Payment required.</strong>
+                The project's SOL balance is insufficient to cover the cost of the request. Fund
+                the project via the dashboard or the funding API to resume service.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">403 Forbidden.</strong>
+                The credential is valid but lacks the required scope for the requested operation.
+                For example, trying to use a key with only <InlineCode>rpc:read</InlineCode> on
+                the priority relay endpoint will return 403. Update the key's scopes in the
+                dashboard.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">404 Not found.</strong>
+                The requested resource does not exist. Check the path, project ID, or key ID in
+                your request.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">429 Too many requests.</strong>
+                The API key has exceeded its per-second rate limit. Check the{" "}
+                <InlineCode>Retry-After</InlineCode> header for the number of seconds to wait. No
+                balance is consumed for rate-limited requests.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">500 Internal error.</strong>
+                An unexpected error occurred on the Fyxvo infrastructure. These are rare. Check
+                the status page and contact support if the error persists.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Error Codes */}
+          <section className="space-y-6">
+            <SectionHeading id="error-codes" title="Error Codes" />
+            <Prose>
+              <p>
+                Every error response from the REST API includes a machine-readable{" "}
+                <InlineCode>code</InlineCode> field alongside the human-readable{" "}
+                <InlineCode>error</InlineCode> message. Use the code to drive programmatic error
+                handling rather than parsing message strings, which may change between releases.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="json"
+              code={`{
+  "error": "Insufficient project balance to complete this request.",
+  "code": "INSUFFICIENT_BALANCE"
+}`}
+            />
+            <Prose>
+              <p>
+                Common error codes you will encounter are{" "}
+                <InlineCode>MISSING_API_KEY</InlineCode> when the{" "}
+                <InlineCode>x-api-key</InlineCode> header is absent,{" "}
+                <InlineCode>INVALID_API_KEY</InlineCode> when the key does not match any active
+                key, <InlineCode>SCOPE_DENIED</InlineCode> when the key lacks the required scope,{" "}
+                <InlineCode>INSUFFICIENT_BALANCE</InlineCode> when the project balance is too low,{" "}
+                <InlineCode>RATE_LIMITED</InlineCode> when requests are arriving too fast,{" "}
+                <InlineCode>TOKEN_EXPIRED</InlineCode> when a JWT has passed its expiry,{" "}
+                <InlineCode>PROJECT_NOT_FOUND</InlineCode> when a project ID does not exist or the
+                caller does not have access to it, and{" "}
+                <InlineCode>UPSTREAM_ERROR</InlineCode> when the Solana node returned an
+                unexpected error that Fyxvo could not classify.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* FAQ */}
+          <section className="space-y-6">
+            <SectionHeading id="faq" title="FAQ" />
+            <Prose>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Is Fyxvo available for mainnet?
+                </strong>
+                Fyxvo currently operates exclusively on Solana devnet. Mainnet support is on the
+                roadmap but there is no confirmed date. During the private alpha phase the focus
+                is on hardening the devnet infrastructure and collecting developer feedback.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  How do I get access?
+                </strong>
+                Access is by invitation during the private alpha. Join the Fyxvo Discord or
+                follow{" "}
+                <Link href="https://x.com/fyxvo" className="text-[var(--fyxvo-brand)] hover:underline">
+                  @fyxvo on X
+                </Link>{" "}
+                to hear when open registration becomes available.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  What happens when my project runs out of balance?
+                </strong>
+                When the balance reaches zero, every subsequent request returns HTTP 402. Requests
+                are not queued or retried — they fail immediately. Top up the project balance via
+                the dashboard or the funding API to resume service. The analytics API remains
+                accessible at zero balance so you can investigate how the balance was consumed.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Can I use Fyxvo with @solana/web3.js?
+                </strong>
+                Yes. Pass your Fyxvo RPC URL and set the <InlineCode>httpHeaders</InlineCode>{" "}
+                option to include your API key. The <InlineCode>Connection</InlineCode> class
+                accepts this option in <InlineCode>@solana/web3.js</InlineCode> v1 as the second
+                argument to the constructor. See the Migration Guide for a one-line example.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  How is on-chain funding different from a credit card payment?
+                </strong>
+                On-chain funding means no payment processor, no card details, no chargebacks, and
+                no monthly invoices. You transfer SOL directly from your wallet. The transfer is
+                visible on-chain, auditable at any time, and does not require trusting Fyxvo with
+                financial credentials. The cost per request is fixed in lamports and does not
+                change based on time of day or demand.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  How many projects can I create?
+                </strong>
+                During the private alpha there is a soft limit of 10 projects per wallet. If you
+                need more, reach out via Discord and the team can raise your limit manually.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Is there a free tier?
+                </strong>
+                There is no free tier during the private alpha. All requests consume lamports from
+                the project balance. Devnet SOL is available for free via the Solana airdrop
+                faucet, so the effective cost is the time it takes to request an airdrop rather
+                than real money.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Where is data stored?
+                </strong>
+                Analytics data and project metadata are stored off-chain in a managed database.
+                The balance escrow lives on-chain in a program-derived account controlled by the
+                Fyxvo program. Request logs are retained for 30 days and then pruned.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* RPC Reference */}
+          <section className="space-y-6">
+            <SectionHeading id="rpc-reference" title="RPC Reference" />
+            <Prose>
+              <p>
+                The table below lists all Solana JSON-RPC methods supported by the Fyxvo relay,
+                the endpoint they route through, and a brief description of what each method
+                returns. Methods marked <InlineCode>/priority</InlineCode> are available on the
+                priority relay as well as the standard endpoint.
+              </p>
+            </Prose>
+            <div className="overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
+                      <th className="px-4 py-3 text-left font-medium text-[var(--fyxvo-text-muted)]">
+                        Method
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-[var(--fyxvo-text-muted)]">
+                        Endpoint
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-[var(--fyxvo-text-muted)]">
+                        Description
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--fyxvo-border)]">
+                    {rpcMethods.map((m) => (
+                      <tr
+                        key={m.method}
+                        className="bg-[var(--fyxvo-panel)] transition-colors hover:bg-[var(--fyxvo-panel-soft)]"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-brand)]">
+                          {m.method}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-[var(--fyxvo-text-muted)]">
+                          {m.endpoint}
+                        </td>
+                        <td className="px-4 py-3 text-[13px] text-[var(--fyxvo-text-soft)]">
+                          {m.description}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </Notice>
-        </main>
-      </div>
+          </section>
+
+          <SectionDivider />
+
+          {/* Webhooks */}
+          <section className="space-y-6">
+            <SectionHeading id="webhooks" title="Webhooks" />
+            <Prose>
+              <p>
+                Fyxvo can deliver real-time event notifications to an HTTP endpoint you control.
+                Create a webhook by sending a POST request to <InlineCode>/v1/webhooks</InlineCode>{" "}
+                with a target URL and the list of event types you want to receive. Fyxvo will
+                deliver a signed POST request to your endpoint for each matching event.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST ${webEnv.apiBaseUrl}/v1/webhooks \\
+  -H "authorization: Bearer YOUR_JWT" \\
+  -H "content-type: application/json" \\
+  -d '{
+    "url": "https://your-server.example.com/webhook",
+    "events": ["request.completed", "balance.low", "key.created", "key.revoked"],
+    "projectId": "proj_abc123"
+  }'`}
+            />
+            <Prose>
+              <p>
+                Each delivery includes a <InlineCode>Fyxvo-Signature</InlineCode> header
+                containing an HMAC-SHA256 signature of the request body, signed with the webhook
+                secret shown when you create the webhook. Always verify this signature before
+                processing the payload.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="json"
+              code={`// Example webhook payload for balance.low event
+{
+  "id": "evt_01j9kxmZq4VfRtUwPbCnLsYe",
+  "event": "balance.low",
+  "timestamp": "2026-03-27T10:15:00.000Z",
+  "projectId": "proj_abc123",
+  "data": {
+    "balanceLamports": 4200000,
+    "thresholdLamports": 5000000,
+    "warningPercent": 84
+  }
+}`}
+            />
+            <Prose>
+              <p>
+                Fyxvo retries failed webhook deliveries with exponential backoff, up to five
+                attempts over approximately one hour. A delivery is considered failed if your
+                endpoint returns a non-2xx status code or does not respond within ten seconds.
+                You can view delivery history and manually re-trigger failed deliveries from the
+                webhook settings page in the dashboard.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Team Collaboration */}
+          <section className="space-y-6">
+            <SectionHeading id="team-collaboration" title="Team Collaboration" />
+            <Prose>
+              <p>
+                Multiple wallets can collaborate on a single project. Each member has a role that
+                determines what actions they can perform. Roles are OWNER, ADMIN, MEMBER, and
+                VIEWER. The OWNER is the wallet that created the project and is the only role that
+                can delete the project or transfer ownership.
+              </p>
+              <p>
+                ADMIN members can invite other members, revoke membership, create and revoke API
+                keys, add funding, and modify project settings. MEMBER access covers creating API
+                keys and viewing analytics. VIEWER access is read-only: analytics and request
+                logs are visible but no changes can be made.
+              </p>
+              <p>
+                Invite a member by their Solana wallet address using the REST API or the team
+                settings tab in the dashboard.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`curl -X POST ${webEnv.apiBaseUrl}/v1/projects/proj_abc123/members \\
+  -H "authorization: Bearer YOUR_JWT" \\
+  -H "content-type: application/json" \\
+  -d '{
+    "walletAddress": "INVITE_WALLET_ADDRESS",
+    "role": "MEMBER"
+  }'`}
+            />
+            <Prose>
+              <p>
+                The invited wallet will see the project in their dashboard on their next login.
+                There is no email confirmation step because identity is tied to the wallet address,
+                not an email account. To remove a member, call{" "}
+                <InlineCode>{"DELETE /v1/projects/{id}/members/{walletAddress}"}</InlineCode>.
+                Members can also remove themselves at any time.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Public Project Pages */}
+          <section className="space-y-6">
+            <SectionHeading id="public-project-pages" title="Public Project Pages" />
+            <Prose>
+              <p>
+                When public visibility is enabled for a project, it gets a shareable page at{" "}
+                <InlineCode>/p/your-slug</InlineCode>. This page shows aggregate stats — total
+                requests, uptime percentage, and average latency — without revealing the project's
+                API keys or balance details. It is designed to be embedded in project READMEs,
+                documentation sites, or grant proposals to demonstrate real infrastructure usage.
+              </p>
+              <p>
+                Enable public visibility from the project settings page. You can set or change the
+                slug at any time; the old slug will redirect to the new one for 24 hours after
+                the change. The slug must be globally unique across all Fyxvo projects.
+              </p>
+              <p>
+                Each public project page generates badge images that you can embed in a README.
+                Copy the badge markdown from the project page:
+              </p>
+            </Prose>
+            <CodeBlock
+              language="markdown"
+              code={`[![Fyxvo requests](https://fyxvo.com/badge/my-project/requests)](https://fyxvo.com/p/my-project)
+[![Fyxvo uptime](https://fyxvo.com/badge/my-project/uptime)](https://fyxvo.com/p/my-project)`}
+            />
+            <Prose>
+              <p>
+                Badge images are generated dynamically on every request and cached for 60 seconds.
+                They follow the shields.io format and are compatible with any Markdown renderer.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Changelog */}
+          <section className="space-y-6">
+            <SectionHeading id="changelog-section" title="Changelog" />
+            <Prose>
+              <p>
+                The Fyxvo changelog is published at{" "}
+                <Link href="/changelog" className="font-medium text-[var(--fyxvo-brand)] hover:underline">
+                  /changelog
+                </Link>{" "}
+                and updated with every release. Each entry includes a date, a severity level
+                (patch, minor, or major), and a detailed description of what changed and why.
+              </p>
+              <p>
+                The changelog is the authoritative source of truth for what has changed in the
+                platform. Release notes are written for developers, not marketing: they describe
+                the actual API surface changes, breaking changes with migration paths, and known
+                issues that are scheduled to be resolved in a future release. Subscribe to the
+                Fyxvo Discord or Telegram channel to receive notifications when new entries are
+                published.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Network Status */}
+          <section className="space-y-6">
+            <SectionHeading id="network-status-section" title="Network Status" />
+            <Prose>
+              <p>
+                The Fyxvo status page at{" "}
+                <Link href="/status" className="font-medium text-[var(--fyxvo-brand)] hover:underline">
+                  /status
+                </Link>{" "}
+                shows live health indicators for all components of the platform: the RPC relay,
+                the priority relay, the REST API, the analytics pipeline, and the authentication
+                service. Each component displays its current state (operational, degraded, or
+                outage) and the latency of the last health check.
+              </p>
+              <p>
+                The status page also shows the last 90 days of uptime for each component as a
+                timeline of bars. Hovering over a bar shows the date, the percentage of the day
+                the component was operational, and links to any incident reports that were filed
+                for that day.
+              </p>
+              <p>
+                To receive status notifications without polling the page, subscribe via the
+                Discord status channel or the Telegram bot. Both channels receive automated
+                notifications within 60 seconds of a status change and again when the incident
+                is resolved.
+              </p>
+            </Prose>
+          </section>
+
+          <SectionDivider />
+
+          {/* Status API */}
+          <section className="space-y-6">
+            <SectionHeading id="status-api" title="Status API" />
+            <Prose>
+              <p>
+                The status API exposes machine-readable health data for all platform components.
+                All endpoints in this group require no authentication and are rate-limited only
+                by IP. They are designed for integration into external monitoring tools.
+              </p>
+            </Prose>
+            <CodeBlock
+              language="bash"
+              code={`# Simple health check — returns 200 if the API is up
+GET ${webEnv.apiBaseUrl}/health
+
+# Full component status
+GET ${webEnv.apiBaseUrl}/v1/status
+
+# Active and resolved incidents
+GET ${webEnv.apiBaseUrl}/v1/incidents`}
+            />
+            <CodeBlock
+              language="json"
+              code={`// /v1/status response shape
+{
+  "page": { "updatedAt": "2026-03-27T08:42:00Z" },
+  "components": [
+    { "name": "RPC Relay", "status": "operational", "latencyMs": 45 },
+    { "name": "Priority Relay", "status": "operational", "latencyMs": 38 },
+    { "name": "REST API", "status": "operational", "latencyMs": 22 },
+    { "name": "Analytics", "status": "operational", "latencyMs": 67 },
+    { "name": "Auth Service", "status": "operational", "latencyMs": 18 }
+  ],
+  "overallStatus": "operational"
+}
+
+// /v1/incidents response shape
+{
+  "incidents": [
+    {
+      "id": "inc_01j9k",
+      "title": "Elevated relay latency",
+      "status": "resolved",
+      "createdAt": "2026-03-20T14:00:00Z",
+      "resolvedAt": "2026-03-20T15:42:00Z",
+      "components": ["RPC Relay"]
+    }
+  ]
+}`}
+            />
+          </section>
+
+          <SectionDivider />
+
+          {/* Troubleshooting */}
+          <section className="space-y-6">
+            <SectionHeading id="troubleshooting" title="Troubleshooting" />
+            <Prose>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Wallet connection fails.
+                </strong>
+                Check that your browser wallet extension (Phantom, Backpack, or Solflare) is
+                installed, unlocked, and connected to Solana devnet. Some extensions block
+                connection requests from localhost; try adding an exception or testing on a
+                deployed environment. If the extension appears stuck, reload the extension from
+                your browser's extension manager.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Auth challenge fails with a network error.
+                </strong>
+                The challenge endpoint at <InlineCode>/v1/auth/challenge</InlineCode> requires a
+                network request to the Fyxvo API. Check that the{" "}
+                <InlineCode>NEXT_PUBLIC_API_BASE_URL</InlineCode> environment variable is set
+                correctly. Verify that the API server is reachable by navigating to{" "}
+                <InlineCode>/health</InlineCode> in your browser.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Requests return 401.
+                </strong>
+                A 401 from the RPC relay means the <InlineCode>x-api-key</InlineCode> header is
+                missing or the key is invalid. Verify you are sending the header and that the key
+                value has not been accidentally truncated. A 401 from the REST API means your JWT
+                has expired or is malformed — re-authenticate to get a fresh token.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Requests return 402.
+                </strong>
+                The project balance is empty. Navigate to the project dashboard and add funds via
+                the "Add funds" button, or use the{" "}
+                <InlineCode>{"POST /v1/projects/{id}/funding/prepare"}</InlineCode> endpoint.
+                Check the analytics page to see how quickly balance was consumed and adjust your
+                low-balance alert threshold accordingly.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Requests return 403.
+                </strong>
+                Your API key lacks the required scope. Open the key settings in the dashboard and
+                check which scopes are enabled. <InlineCode>rpc:read</InlineCode> is required for
+                the standard RPC endpoint and <InlineCode>rpc:relay</InlineCode> is additionally
+                required for the priority relay.
+              </p>
+              <p>
+                <strong className="block font-semibold text-[var(--fyxvo-text)]">
+                  Analytics show no data.
+                </strong>
+                Analytics data appears after the first request passes through the relay. If you
+                have sent requests but the dashboard shows nothing, check that the requests are
+                reaching the right project (verify the API key belongs to the project you are
+                looking at) and that sufficient time has passed for the analytics pipeline to
+                process the events — typically under five seconds.
+              </p>
+            </Prose>
+          </section>
+
+          <div className="pb-16" />
+        </div>
+      </main>
     </div>
   );
 }

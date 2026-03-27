@@ -12,6 +12,7 @@ import { usePortal } from "./portal-provider";
 import { shortenAddress } from "../lib/format";
 
 const primaryLinks = [
+  { href: "/", label: "Home", description: "Solana devnet" },
   { href: "/dashboard", label: "Dashboard", description: "Workspace" },
   { href: "/explore", label: "Explore", description: "Public projects" },
   { href: "/docs", label: "Docs", description: "Guides and API" },
@@ -25,7 +26,8 @@ const secondaryLinks = [
 ] as const;
 
 function isActive(pathname: string, href: string) {
-  return pathname === href || (href !== "/" && pathname.startsWith(href));
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(href);
 }
 
 function openCommandPalette() {

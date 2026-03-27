@@ -1,33 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Notice,
-} from "@fyxvo/ui";
+import { Badge, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { getStatusSnapshot } from "../../lib/server-status";
-import { getServiceHealthHistory, getIncidents } from "../../lib/api";
+import { getServiceHealthHistory, getIncidents, getNetworkStats } from "../../lib/api";
 import { webEnv } from "../../lib/env";
-import { formatDuration, shortenAddress } from "../../lib/format";
 import { liveDevnetState } from "../../lib/live-state";
+import { formatDuration, shortenAddress } from "../../lib/format";
 import { StatusRefreshIndicator } from "../../components/status-refresh-indicator";
-import { StatusMetricValue } from "../../components/status-metric-value";
-import { ResponseTimeTicker } from "../../components/response-time-ticker";
 import { StatusSubscribeForm } from "../../components/status-subscribe-form";
 import { StatusRegions, StatusHealthCalendar } from "../../components/status-regions";
-import { StatusAdminIncidents } from "../../components/status-admin-incidents";
 import { CopyButton } from "../../components/copy-button";
+import type { StatusIncident } from "../../lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: {
-    absolute: "Status — Fyxvo"
-  },
+  title: { absolute: "Status — Fyxvo" },
   description:
     "See what is running, what needs attention, and the current state of the Fyxvo devnet control plane, gateway, and on-chain protocol.",
   alternates: {
@@ -40,15 +28,15 @@ export const metadata: Metadata = {
     url: `${webEnv.siteUrl}/status`,
     siteName: "Fyxvo",
     type: "website",
-    images: [{ url: webEnv.socialImageUrl }]
+    images: [{ url: webEnv.socialImageUrl }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Status — Fyxvo",
     description:
       "Live service readiness for the Fyxvo devnet control plane, gateway, and on-chain protocol accounts.",
-    images: [webEnv.socialImageUrl]
-  }
+    images: [webEnv.socialImageUrl],
+  },
 };
 
 function percentage(value?: number) {
@@ -81,7 +69,7 @@ interface NetworkCapacityResponse {
 async function fetchNetworkCapacity(): Promise<NetworkCapacityResponse | null> {
   try {
     const res = await fetch(new URL("/v1/network/capacity", webEnv.apiBaseUrl).toString(), {
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     return (await res.json()) as NetworkCapacityResponse;
@@ -91,14 +79,17 @@ async function fetchNetworkCapacity(): Promise<NetworkCapacityResponse | null> {
 }
 
 export default async function StatusPage() {
-  const [status, serviceHealth, incidents, networkCapacity] = await Promise.all([
+  const [status, serviceHealth, incidents, networkCapacity, networkStats] = await Promise.all([
     getStatusSnapshot(),
     getServiceHealthHistory().catch(() => null),
-    getIncidents().catch(() => []),
+    getIncidents().catch(() => [] as StatusIncident[]),
     fetchNetworkCapacity().catch(() => null),
+    getNetworkStats().catch(() => null),
   ]);
+
   const readiness = status.apiStatus.protocolReadiness;
   const gatewayMetrics = status.gatewayStatus.metrics;
+
   const healthy =
     status.apiHealth.status === "ok" &&
     status.gatewayHealth.status === "ok" &&
@@ -107,145 +98,124 @@ export default async function StatusPage() {
   const apiUptime = computeUptime(serviceHealth?.api ?? []);
   const gatewayUptime = computeUptime(serviceHealth?.gateway ?? []);
 
-  const notes = [
-    {
-      title: "SOL path is live on devnet",
-      body: "Wallet-authenticated project activation, SOL funding, funded gateway access, request logging, worker rollups, and analytics are operating against the live devnet program.",
-      tone: "success" as const,
-    },
-    {
-      title: "USDC remains configuration-gated",
-      body: status.apiStatus.acceptedAssets?.usdcEnabled
-        ? "USDC has been turned on for this deployment."
-        : "The on-chain asset path is there, but USDC stays turned off in the current config until you decide to enable it.",
-      tone: status.apiStatus.acceptedAssets?.usdcEnabled
-        ? ("warning" as const)
-        : ("neutral" as const),
-    },
-    {
-      title: "Managed infrastructure is active",
-      body: "Fyxvo runs on managed operator infrastructure for the current launch. This is exactly what it sounds like, not an open marketplace with external operators.",
-      tone: "neutral" as const,
-    },
-    {
-      title: "Gateway keys are scope-enforced",
-      body: "Standard relay needs the rpc:request scope. Priority relay needs both rpc:request and priority:relay. If a key does not have the right scopes, it gets rejected rather than quietly granted broader access.",
-      tone: "neutral" as const,
-    },
-    {
-      title: "Authority control is still single-signer",
-      body:
-        status.apiStatus.authorityPlan?.mode === "single-signer"
-          ? "The live devnet stack still uses single-signer protocol control. The repo now exposes separate protocol, pause, and upgrade authority configuration to prepare the governed migration path."
-          : "The configured authority plan is no longer single-signer, but mainnet claims should still wait for on-chain governance changes.",
-      tone:
-        status.apiStatus.authorityPlan?.mode === "single-signer"
-          ? ("warning" as const)
-          : ("neutral" as const),
-    },
-  ];
-  const snapshotSummary = [
-    `Fyxvo status snapshot`,
-    `Timestamp: ${status.apiHealth.timestamp}`,
-    `API: ${status.apiHealth.status}`,
-    `Gateway: ${status.gatewayHealth.status}`,
-    `Protocol ready: ${readiness?.ready ? "yes" : "no"}`,
-    `Active incidents: ${incidents.filter((incident) => incident.resolvedAt == null).length}`,
-  ].join("\n");
-
   return (
     <div className="space-y-10 lg:space-y-12">
-      {/* Hero status banner */}
-      <div className="flex flex-col items-center text-center py-8 gap-4">
+
+      {/* Section 1 — Status headline */}
+      <div className="flex flex-col items-center gap-4 py-10 text-center">
         <div className="flex items-center gap-3">
           <span
-            className={`h-4 w-4 rounded-full ${healthy ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"} shadow-lg`}
+            className={`h-4 w-4 rounded-full shadow-lg ${
+              healthy ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"
+            }`}
           />
-          <h1 className="text-3xl font-bold text-[var(--fyxvo-text)]">
-            {healthy ? "All Systems Operational" : "Attention Needed"}
+          <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl">
+            {healthy ? "All systems operational" : "Degraded performance"}
           </h1>
         </div>
-        <p className="text-sm text-[var(--fyxvo-text-muted)] max-w-lg">
-          Current state of the Fyxvo control plane, relay gateway, and Solana devnet program.
+        <p className="text-sm text-[var(--fyxvo-text-muted)]">
+          Last updated {new Date(status.apiHealth.timestamp).toLocaleString()}
         </p>
-        <CopyButton value={snapshotSummary} label="Copy snapshot" />
         <StatusRefreshIndicator />
-        <ResponseTimeTicker apiBase={webEnv.apiBaseUrl} />
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Notice tone={healthy ? "success" : "warning"} title="How to read this page">
-          When everything is healthy, the API, gateway, and protocol are all responding normally. Degraded means at least one service is still running but needs attention. A disruption means something is down or an incident is actively being worked on.
-        </Notice>
-        <Notice tone="neutral" title="Managed infrastructure in the current devnet phase">
-          During the private alpha, Fyxvo runs on managed infrastructure. The status you see here reflects the actual live stack, not a mainnet SLA or a theoretical marketplace setup.
-        </Notice>
-      </section>
-
-      {/* Three service cards */}
+      {/* Section 2 — Three component cards */}
       <section className="grid gap-4 md:grid-cols-3">
-        {/* Card 1 — Control Plane (API) */}
+
+        {/* Control Plane */}
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Control Plane (API)</CardTitle>
+            <CardTitle className="text-sm font-medium">Control Plane</CardTitle>
             <Badge tone={status.apiHealth.status === "ok" ? "success" : "warning"}>
-              {status.apiHealth.status}
+              {status.apiHealth.status === "ok" ? "Operational" : "Degraded"}
             </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-2xl font-bold text-[var(--fyxvo-text)]">
-              <StatusMetricValue storageKey="api-cluster" value={status.apiStatus.solanaCluster ?? "Unavailable"} />
+            <p className="text-xs text-[var(--fyxvo-text-muted)] font-mono break-all">
+              {webEnv.apiBaseUrl}
+            </p>
+            <div className="space-y-1.5 text-xs text-[var(--fyxvo-text-muted)]">
+              {status.apiStatus.version ? (
+                <p>
+                  Version{" "}
+                  <span className="text-[var(--fyxvo-text-soft)]">{status.apiStatus.version}</span>
+                </p>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    status.apiStatus.dependencies?.databaseConfigured
+                      ? "bg-[var(--fyxvo-success)]"
+                      : "bg-[var(--fyxvo-warning)]"
+                  }`}
+                />
+                <span>
+                  Database{" "}
+                  <span className="text-[var(--fyxvo-text-soft)]">
+                    {status.apiStatus.dependencies?.databaseConfigured ? "configured" : "not configured"}
+                  </span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    status.apiStatus.dependencies?.redisConfigured
+                      ? "bg-[var(--fyxvo-success)]"
+                      : "bg-[var(--fyxvo-warning)]"
+                  }`}
+                />
+                <span>
+                  Redis{" "}
+                  <span className="text-[var(--fyxvo-text-soft)]">
+                    {status.apiStatus.dependencies?.redisConfigured ? "configured" : "not configured"}
+                  </span>
+                </span>
+              </div>
             </div>
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">Solana cluster</p>
-            <div className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">
-              <p>
-                Database:{" "}
-                <span className="text-[var(--fyxvo-text-soft)]">
-                  {status.apiStatus.dependencies?.databaseConfigured ? "configured" : "not configured"}
-                </span>
-              </p>
-              <p>
-                Redis:{" "}
-                <span className="text-[var(--fyxvo-text-soft)]">
-                  {status.apiStatus.dependencies?.redisConfigured ? "configured" : "not configured"}
-                </span>
-              </p>
-              <p>
-                Assistant:{" "}
-                <span className="text-[var(--fyxvo-text-soft)]">
-                  {status.apiStatus.assistantAvailable ? "available" : "unavailable"}
-                </span>
-              </p>
-            </div>
+            <p className="text-xs text-[var(--fyxvo-text-muted)]">
+              {apiUptime.uptime}% uptime over {apiUptime.actualDays} days
+            </p>
             <Link
               href={new URL("/health", webEnv.apiBaseUrl).toString()}
               target="_blank"
-              className="text-xs text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
+              rel="noopener noreferrer"
+              className="text-xs text-[var(--fyxvo-brand)] hover:underline"
             >
-              API health endpoint →
+              Health endpoint
             </Link>
-            <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-              {apiUptime.uptime}% uptime over the last {apiUptime.actualDays} days
-            </p>
           </CardContent>
         </Card>
 
-        {/* Card 2 — Relay Gateway */}
+        {/* Relay Gateway */}
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Relay Gateway</CardTitle>
             <Badge tone={status.gatewayHealth.status === "ok" ? "success" : "warning"}>
-              {status.gatewayHealth.status}
+              {status.gatewayHealth.status === "ok" ? "Operational" : "Degraded"}
             </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-2xl font-bold text-[var(--fyxvo-text)]">
-              <StatusMetricValue storageKey="gateway-success-rate" value={percentage(gatewayMetrics?.standard?.successRate)} />
-            </div>
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">Standard success rate</p>
-            <div className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">
+            <p className="text-xs text-[var(--fyxvo-text-muted)] font-mono break-all">
+              {webEnv.gatewayBaseUrl}
+            </p>
+            <div className="space-y-1.5 text-xs text-[var(--fyxvo-text-muted)]">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    status.gatewayStatus.upstreamReachable
+                      ? "bg-[var(--fyxvo-success)]"
+                      : "bg-[var(--fyxvo-warning)]"
+                  }`}
+                />
+                <span>
+                  Upstream{" "}
+                  <span className="text-[var(--fyxvo-text-soft)]">
+                    {status.gatewayStatus.upstreamReachable ? "reachable" : "unreachable"}
+                  </span>
+                </span>
+              </div>
               <p>
-                Standard latency:{" "}
+                Avg latency{" "}
                 <span className="text-[var(--fyxvo-text-soft)]">
                   {typeof gatewayMetrics?.standard?.averageLatencyMs === "number"
                     ? formatDuration(gatewayMetrics.standard.averageLatencyMs)
@@ -253,351 +223,226 @@ export default async function StatusPage() {
                 </span>
               </p>
               <p>
-                Priority latency:{" "}
+                Success rate{" "}
                 <span className="text-[var(--fyxvo-text-soft)]">
-                  {typeof gatewayMetrics?.priority?.averageLatencyMs === "number"
-                    ? formatDuration(gatewayMetrics.priority.averageLatencyMs)
-                    : "Unavailable"}
-                </span>
-              </p>
-              <p>
-                Upstream nodes:{" "}
-                <span className="text-[var(--fyxvo-text-soft)]">
-                  {status.gatewayStatus.nodeCount ?? 0}
+                  {percentage(gatewayMetrics?.standard?.successRate)}
                 </span>
               </p>
             </div>
-            <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-              {gatewayUptime.uptime}% uptime over the last {gatewayUptime.actualDays} days
+            <p className="text-xs text-[var(--fyxvo-text-muted)]">
+              {gatewayUptime.uptime}% uptime over {gatewayUptime.actualDays} days
             </p>
+            <Link
+              href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[var(--fyxvo-brand)] hover:underline"
+            >
+              Gateway status endpoint
+            </Link>
           </CardContent>
         </Card>
 
-        {/* Card 3 — Protocol (On-chain) */}
+        {/* Protocol */}
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Protocol (On-chain)</CardTitle>
+            <CardTitle className="text-sm font-medium">Protocol</CardTitle>
             <Badge tone={readiness?.ready ? "success" : "warning"}>
-              {readiness?.ready ? "ready" : "attention"}
+              {readiness?.ready ? "Ready" : "Attention needed"}
             </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-2xl font-bold text-[var(--fyxvo-text)]">
-              <StatusMetricValue storageKey="protocol-program" value={shortenAddress(liveDevnetState.programId)} />
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm text-[var(--fyxvo-text)]">
+                {shortenAddress(liveDevnetState.programId)}
+              </span>
+              <CopyButton value={liveDevnetState.programId} />
             </div>
             <p className="text-xs text-[var(--fyxvo-text-muted)]">Program ID</p>
-            <div className="space-y-1 text-xs text-[var(--fyxvo-text-muted)]">
+            <div className="space-y-1.5 text-xs text-[var(--fyxvo-text-muted)]">
               <p>
-                Cluster:{" "}
+                Cluster{" "}
                 <span className="text-[var(--fyxvo-text-soft)]">
-                  {status.apiStatus.solanaCluster}
+                  {status.apiStatus.solanaCluster ?? "devnet"}
                 </span>
               </p>
               <p>
-                SOL:{" "}
-                <span className="text-[var(--fyxvo-text-soft)]">live</span>
+                SOL <span className="text-[var(--fyxvo-text-soft)]">live</span>
               </p>
               <p>
-                USDC:{" "}
+                USDC{" "}
                 <span className="text-[var(--fyxvo-text-soft)]">
                   {status.apiStatus.acceptedAssets?.usdcEnabled ? "enabled" : "gated"}
                 </span>
               </p>
-              <p>
-                Authority:{" "}
-                <span className="text-[var(--fyxvo-text-soft)]">
-                  {status.apiStatus.authorityPlan?.mode ?? "unavailable"}
-                </span>
-              </p>
             </div>
+            <p className="text-xs text-[var(--fyxvo-text-soft)]">
+              {readiness?.ready ? "Ready" : "Attention needed"}
+            </p>
           </CardContent>
         </Card>
       </section>
 
-      {/* Uptime timeline */}
-      {serviceHealth && Object.keys(serviceHealth).length > 0 ? (
-        <section>
-          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-            <CardHeader>
-              <CardTitle>Uptime timeline</CardTitle>
-              <CardDescription>Last 48 health checks per service, newest right. Green = healthy, amber = degraded, red = unreachable.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(["api", "gateway", "worker"] as const).map((svc) => {
-                const snapshots = serviceHealth[svc] ?? [];
-                if (snapshots.length === 0) return null;
-                const orderedOldestFirst = [...snapshots].reverse();
-                const uptimePct = snapshots.length > 0
-                  ? Math.round((snapshots.filter((s) => s.status === "healthy").length / snapshots.length) * 100)
+      {/* Section 3 — Uptime timeline (48 slots) */}
+      <section>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Uptime timeline</CardTitle>
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">
+              Last 48 checks per service, newest on the right. Green is healthy, amber is
+              degraded, gray is unknown.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {(["api", "gateway", "worker"] as const).map((svc) => {
+              const snapshots = serviceHealth?.[svc] ?? [];
+              const ordered = [...snapshots].slice(-48).reverse();
+              const displayCount = 48;
+              const fillerCount = Math.max(0, displayCount - ordered.length);
+              const uptimePct =
+                snapshots.length > 0
+                  ? Math.round(
+                      (snapshots.filter((s) => s.status === "healthy").length /
+                        snapshots.length) *
+                        100,
+                    )
                   : 100;
 
-                return (
-                  <div key={svc} className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-[var(--fyxvo-text)] capitalize">{svc}</span>
-                      <span className="text-xs text-[var(--fyxvo-text-muted)]">{uptimePct}% uptime</span>
-                    </div>
-                    <div className="flex gap-0.5">
-                      {orderedOldestFirst.map((snapshot) => (
-                        <div
-                          key={snapshot.id}
-                          title={`${new Date(snapshot.checkedAt).toLocaleString()} — ${snapshot.status}${snapshot.responseTimeMs != null ? ` (${snapshot.responseTimeMs}ms)` : ""}`}
-                          className={`h-6 flex-1 rounded-sm ${
-                            snapshot.status === "healthy"
-                              ? "bg-[var(--fyxvo-success)]"
-                              : snapshot.status === "degraded"
-                                ? "bg-[var(--fyxvo-warning)]"
-                                : "bg-[var(--fyxvo-danger)]"
-                          }`}
-                        />
-                      ))}
-                    </div>
+              return (
+                <div key={svc} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium capitalize text-[var(--fyxvo-text)]">
+                      {svc}
+                    </span>
+                    <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                      {uptimePct}% uptime
+                    </span>
                   </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: fillerCount }).map((_, i) => (
+                      <div
+                        key={`filler-${i}`}
+                        className="h-6 flex-1 rounded-sm bg-[var(--fyxvo-border)]"
+                      />
+                    ))}
+                    {ordered.map((snapshot) => (
+                      <div
+                        key={snapshot.id}
+                        title={`${new Date(snapshot.checkedAt).toLocaleString()} — ${snapshot.status}`}
+                        className={`h-6 flex-1 rounded-sm ${
+                          snapshot.status === "healthy"
+                            ? "bg-[var(--fyxvo-success)]"
+                            : snapshot.status === "degraded"
+                              ? "bg-[var(--fyxvo-warning)]"
+                              : "bg-[var(--fyxvo-border-strong)]"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </section>
 
-      {/* Detailed service information */}
-      <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      {/* Section 4 — Hosted services (live numbers) */}
+      <section>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Hosted services</CardTitle>
-            <CardDescription>
-              These numbers come straight from the live API and gateway endpoints. Nothing here is hardcoded.
-            </CardDescription>
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">
+              Live counters from the network stats endpoint. These numbers update on each page
+              load.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                    API
-                  </div>
-                  <div className="mt-2 text-sm text-[var(--fyxvo-text)]">
-                    Cluster {status.apiStatus.solanaCluster}
-                  </div>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                  Total requests
                 </div>
-                <Badge tone={status.apiHealth.status === "ok" ? "success" : "warning"}>
-                  {status.apiHealth.status}
-                </Badge>
-              </div>
-              <div className="mt-3 text-sm text-[var(--fyxvo-text-muted)]">
-                Database configured:{" "}
-                {String(status.apiStatus.dependencies?.databaseConfigured ?? false)}. Redis
-                configured: {String(status.apiStatus.dependencies?.redisConfigured ?? false)}.
-              </div>
-              <div className="mt-3 text-xs uppercase tracking-[0.16em]">
-                <Link
-                  href={new URL("/health", webEnv.apiBaseUrl).toString()}
-                  className="text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
-                >
-                  API health endpoint
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                    Gateway
-                  </div>
-                  <div className="mt-2 text-sm text-[var(--fyxvo-text)]">
-                    {status.gatewayStatus.nodeCount ?? 0} upstream nodes
-                  </div>
-                </div>
-                <Badge tone={status.gatewayHealth.status === "ok" ? "success" : "warning"}>
-                  {status.gatewayHealth.status}
-                </Badge>
-              </div>
-              <div className="mt-3 text-sm text-[var(--fyxvo-text-muted)]">
-                Success rate {percentage(gatewayMetrics?.standard?.successRate)}. Priority latency{" "}
-                {typeof gatewayMetrics?.priority?.averageLatencyMs === "number"
-                  ? formatDuration(gatewayMetrics.priority.averageLatencyMs)
-                  : "Unavailable"}
-                .
-              </div>
-              <div className="mt-3 text-sm text-[var(--fyxvo-text-muted)]">
-                Scope enforcement{" "}
-                {status.gatewayStatus.scopeEnforcement?.enabled ? "enabled" : "unavailable"}.
-                Standard requires{" "}
-                {status.gatewayStatus.scopeEnforcement?.standardRequiredScopes?.join(", ") ??
-                  "Unavailable"}
-                .
-              </div>
-              <div className="mt-3 text-xs uppercase tracking-[0.16em]">
-                <Link
-                  href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
-                  className="text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
-                >
-                  Gateway status endpoint
-                </Link>
-              </div>
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  Public links
-                </div>
-                <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text)]">
-                  <p className="break-all">{webEnv.apiBaseUrl}</p>
-                  <p className="break-all">{webEnv.gatewayBaseUrl}</p>
-                  <p className="break-all">{webEnv.statusPageUrl}</p>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {networkStats?.totalRequests != null
+                    ? networkStats.totalRequests.toLocaleString()
+                    : "Unavailable"}
                 </div>
               </div>
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  Accepted assets
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                  Total projects
                 </div>
-                <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text)]">
-                  <p>SOL is live</p>
-                  <p>
-                    USDC is {status.apiStatus.acceptedAssets?.usdcEnabled ? "enabled" : "gated"}
-                  </p>
-                  <p className="break-all">
-                    {status.apiStatus.acceptedAssets?.usdcMintAddress ?? "No USDC mint configured"}
-                  </p>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {networkStats?.totalProjects != null
+                    ? networkStats.totalProjects.toLocaleString()
+                    : "Unavailable"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                  Total API keys
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                  {networkStats?.totalApiKeys != null
+                    ? networkStats.totalApiKeys.toLocaleString()
+                    : "Unavailable"}
                 </div>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href={new URL("/health", webEnv.apiBaseUrl).toString()}
-                target="_blank"
-                className="text-sm text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
-              >
-                Open API health
-              </Link>
-              <Link
-                href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
-                target="_blank"
-                className="text-sm text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
-              >
-                Open RPC status
-              </Link>
-              <Link
-                href={new URL("/v1/metrics", webEnv.gatewayBaseUrl).toString()}
-                target="_blank"
-                className="text-sm text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
-              >
-                Open RPC metrics
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Protocol and launch state</CardTitle>
-            <CardDescription>
-              An honest look at what is live, what is managed, and what is intentionally still turned off.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  Core protocol accounts
-                </div>
-                <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text)]">
-                  <p className="break-all">Config {liveDevnetState.protocolConfig}</p>
-                  <p className="break-all">Treasury {liveDevnetState.treasury}</p>
-                  <p className="break-all">Registry {liveDevnetState.operatorRegistry}</p>
-                  <p className="break-all">USDC vault {liveDevnetState.treasuryUsdcVault}</p>
-                </div>
-              </div>
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  Managed infrastructure
-                </div>
-                <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text)]">
-                  <p className="break-all">Wallet {liveDevnetState.managedOperatorWallet}</p>
-                  <p className="break-all">Operator {liveDevnetState.managedOperatorAccount}</p>
-                  <p className="break-all">Rewards {liveDevnetState.managedRewardAccount}</p>
-                </div>
-              </div>
-              <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
-                  Authority posture
-                </div>
-                <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text)]">
-                  <p>Mode {status.apiStatus.authorityPlan?.mode ?? "Unavailable"}</p>
-                  <p className="break-all">
-                    Protocol {status.apiStatus.authorityPlan?.protocolAuthority ?? "Unavailable"}
-                  </p>
-                  <p className="break-all">
-                    Pause {status.apiStatus.authorityPlan?.pauseAuthority ?? "Unavailable"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {notes.map((item) => (
-              <Notice key={item.title} tone={item.tone} title={item.title}>
-                {item.body}
-              </Notice>
-            ))}
-
-            {readiness && !readiness.ready ? (
-              <div className="rounded-[1.5rem] border border-amber-500/20 bg-[var(--fyxvo-warning)]/5 p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-warning)]">
-                  Readiness reasons
-                </div>
-                <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
-                  {readiness.reasons.map((reason) => (
-                    <p key={reason}>{reason}</p>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
       </section>
 
-      {/* Incident history */}
+      {/* Section 5 — Incident history */}
       <section>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Incident history</CardTitle>
-            <CardDescription>Incidents detected automatically by the monitoring system.</CardDescription>
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">
+              Incidents detected automatically by the monitoring system.
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {incidents.length === 0 ? (
-                <p className="text-sm text-[var(--fyxvo-text-muted)]">No incidents recorded.</p>
-              ) : (
-                incidents.map((incident) => (
+            {incidents.length === 0 ? (
+              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6 text-center">
+                <p className="text-sm text-[var(--fyxvo-text-muted)]">No recent incidents.</p>
+                <p className="mt-1 text-xs text-[var(--fyxvo-text-soft)]">
+                  The monitoring system has not recorded any service disruptions. All checks are
+                  passing normally.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {incidents.slice(0, 10).map((incident) => (
                   <div
                     key={incident.id}
-                    className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
+                    className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-medium text-[var(--fyxvo-text)] capitalize">{incident.serviceName}</div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="font-medium capitalize text-[var(--fyxvo-text)]">
+                        {incident.serviceName}
+                      </div>
                       <Badge tone={incident.resolvedAt ? "success" : "warning"}>
-                        {incident.resolvedAt ? "resolved" : "open"}
+                        {incident.resolvedAt ? "Resolved" : "Ongoing"}
                       </Badge>
                     </div>
-                    <div className="mt-1 flex gap-2 text-xs text-[var(--fyxvo-text-muted)]">
-                      <span className="capitalize">{incident.severity}</span>
-                      <span>·</span>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--fyxvo-text-muted)]">
+                      <Badge tone="neutral">{incident.severity}</Badge>
                       <span>{new Date(incident.startedAt).toLocaleString()}</span>
-                      {incident.resolvedAt && (
+                      {incident.resolvedAt ? (
                         <>
-                          <span>–</span>
+                          <span>to</span>
                           <span>{new Date(incident.resolvedAt).toLocaleString()}</span>
                         </>
-                      )}
+                      ) : null}
                     </div>
-                    <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">{incident.description}</p>
+                    <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
+                      {incident.description}
+                    </p>
                     {incident.updates && incident.updates.length > 0 ? (
                       <div className="mt-4 space-y-3 border-t border-[var(--fyxvo-border)] pt-4">
                         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                          Incident timeline
+                          Timeline
                         </div>
                         <div className="space-y-3">
                           {incident.updates.map((update, index) => (
@@ -610,17 +455,31 @@ export default async function StatusPage() {
                               </div>
                               <div className="flex-1 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-3">
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--fyxvo-text-muted)]">
-                                  <Badge tone={update.status === "resolved" ? "success" : update.status === "escalated" ? "warning" : "neutral"}>
+                                  <Badge
+                                    tone={
+                                      update.status === "resolved"
+                                        ? "success"
+                                        : update.status === "escalated"
+                                          ? "warning"
+                                          : "neutral"
+                                    }
+                                  >
                                     {update.status}
                                   </Badge>
-                                  {update.severity ? <span className="capitalize">{update.severity}</span> : null}
+                                  {update.severity ? (
+                                    <span className="capitalize">{update.severity}</span>
+                                  ) : null}
                                   <span>{new Date(update.createdAt).toLocaleString()}</span>
                                 </div>
-                                <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">{update.message}</p>
+                                <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
+                                  {update.message}
+                                </p>
                                 {update.affectedServices.length > 0 ? (
-                                  <div className="mt-2 flex flex-wrap gap-2">
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
                                     {update.affectedServices.map((service) => (
-                                      <Badge key={service} tone="neutral">{service}</Badge>
+                                      <Badge key={service} tone="neutral">
+                                        {service}
+                                      </Badge>
                                     ))}
                                   </div>
                                 ) : null}
@@ -631,74 +490,132 @@ export default async function StatusPage() {
                       </div>
                     ) : null}
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
-        <div className="mt-4">
-          <StatusAdminIncidents initialIncidents={incidents} />
-        </div>
       </section>
 
-      {/* Network Capacity */}
+      {/* Section 6 — Network capacity */}
       <section>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Network Capacity</CardTitle>
-            <CardDescription>
-              How much of the current infrastructure capacity is being used.
-            </CardDescription>
+            <CardTitle>Network capacity</CardTitle>
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">
+              How much of the current infrastructure capacity is in use.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {(() => {
-              const CAPACITY_MAX = 10_000;
-              const current = networkCapacity?.requestsPerMinute ?? 0;
-              const capacity = networkCapacity?.capacityPerMinute ?? CAPACITY_MAX;
-              const utilizationPct = Math.min(100, Math.round((current / capacity) * 100));
-              return (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--fyxvo-text-muted)]">Requests/min (current)</span>
-                    <span className="font-mono font-medium text-[var(--fyxvo-text)]">
-                      {networkCapacity ? current.toLocaleString() : "Unavailable"}
-                    </span>
+          <CardContent>
+            {networkCapacity ? (
+              (() => {
+                const CAPACITY_MAX = 10_000;
+                const current = networkCapacity.requestsPerMinute ?? 0;
+                const capacity = networkCapacity.capacityPerMinute ?? CAPACITY_MAX;
+                const utilizationPct = Math.min(
+                  100,
+                  Math.round((current / capacity) * 100),
+                );
+                return (
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                        <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                          Requests per minute
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                          {current.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                        <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                          Capacity limit
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                          {capacity.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                        <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                          Utilization
+                        </div>
+                        <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                          {utilizationPct}%
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--fyxvo-panel-soft)]">
+                      <div
+                        style={{ width: `${utilizationPct}%` }}
+                        className="h-2 rounded bg-[var(--fyxvo-brand)] transition-[width]"
+                      />
+                    </div>
+                    <p className="text-xs text-[var(--fyxvo-text-muted)]">
+                      This capacity reflects the current managed infrastructure and will grow as
+                      the operator network expands.
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--fyxvo-text-muted)]">Capacity</span>
-                    <span className="font-mono font-medium text-[var(--fyxvo-text)]">{capacity.toLocaleString()} req/min</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--fyxvo-text-muted)]">Utilization</span>
-                    <span className="font-mono font-medium text-[var(--fyxvo-text)]">{utilizationPct}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--fyxvo-panel-soft)]">
-                    <div
-                      style={{ width: `${utilizationPct}%` }}
-                      className="h-2 rounded bg-[var(--fyxvo-brand)] transition-[width]"
-                    />
-                  </div>
-                  <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                    This capacity estimate reflects the current managed infrastructure. It will grow as the operator network expands.
-                  </p>
-                </div>
-              );
-            })()}
+                );
+              })()
+            ) : (
+              <Notice tone="neutral" title="Capacity data unavailable">
+                The network capacity endpoint is not returning data right now. The rest of the
+                status page reflects live data from the control plane and gateway.
+              </Notice>
+            )}
           </CardContent>
         </Card>
       </section>
 
-      {/* Gateway Regions */}
+      {/* Section 7 — Gateway regions */}
       <section>
         <StatusRegions />
       </section>
 
-      {/* 30-Day Network Health Calendar */}
+      {/* Section 7b — 30-day health calendar */}
       <section>
         <StatusHealthCalendar />
       </section>
 
-      {/* Subscribe to status updates */}
+      {/* Section 8 — Protocol addresses */}
+      <section>
+        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
+          <CardHeader>
+            <CardTitle>Protocol addresses</CardTitle>
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">
+              On-chain accounts for the live Fyxvo devnet program. These are the actual deployed
+              addresses, not placeholders.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                { label: "Config", value: liveDevnetState.protocolConfig },
+                { label: "Treasury", value: liveDevnetState.treasury },
+                { label: "Registry", value: liveDevnetState.operatorRegistry },
+                { label: "USDC Vault", value: liveDevnetState.treasuryUsdcVault },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
+                >
+                  <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                    {label}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="font-mono text-sm text-[var(--fyxvo-text)] break-all">
+                      {shortenAddress(value)}
+                    </span>
+                    <CopyButton value={value} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Section 9 — Status subscriber */}
       <StatusSubscribeForm />
     </div>
   );

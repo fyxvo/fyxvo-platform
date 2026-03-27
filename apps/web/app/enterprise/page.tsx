@@ -1,251 +1,352 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-  Notice,
-} from "@fyxvo/ui";
-import { submitEnterpriseInterest } from "../../lib/api";
-
-const VOLUME_OPTIONS = [
-  "Under 100k/day",
-  "100k – 1M/day",
-  "1M – 10M/day",
-  "More than 10M/day",
-];
+import Link from "next/link";
+import { Button, Notice } from "@fyxvo/ui";
+import { Input } from "@fyxvo/ui";
+import { submitInterest } from "../../lib/api";
 
 const FEATURES = [
   {
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
     title: "Priority SLA",
-    body: "You get dedicated relay capacity with real uptime guarantees and latency targets under 50ms at p95. No asterisks.",
+    description:
+      "Formal uptime commitments backed by defined incident response windows. Enterprise customers receive documented SLA terms with a 99.9 percent uptime target and escalation paths that bypass the standard support queue.",
   },
   {
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
     title: "Dedicated nodes",
-    body: "Your own infrastructure, completely separate from shared queues. No noisy neighbors slowing things down.",
+    description:
+      "Your traffic runs through dedicated routing infrastructure that is completely separate from the shared node pool. No noisy-neighbor effects, no contention with other projects, and consistent latency profiles that reflect your workload rather than the aggregate.",
   },
   {
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-      </svg>
-    ),
     title: "Custom rate limits",
-    body: "We set volume and burst limits around how you actually use the platform, not some generic tier that doesn't fit.",
+    description:
+      "Per-key and per-project rate limits configured around how your application actually behaves, not constrained to a generic plan ceiling. Burst windows, sustained throughput caps, and method-level overrides are all available as part of the enterprise configuration.",
   },
   {
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-    title: "Team & RBAC",
-    body: "Bring your whole team on board with role-based access, audit logs, and API keys scoped to each project.",
+    title: "Team and RBAC",
+    description:
+      "Full role-based access control across your organization with owner, admin, member, and viewer roles. Every privileged action generates an immutable audit log entry, giving your security team the visibility they need for compliance and incident review.",
   },
   {
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
     title: "Advanced analytics",
-    body: "Go deeper with request analytics, flexible retention windows, exportable raw logs, and dashboards that actually help.",
+    description:
+      "Extended log retention, exportable raw request data, custom dashboard views, and deeper method-level breakdowns than the standard analytics surface. Enterprise teams can pull data into their own tooling through structured exports.",
   },
   {
-    icon: (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    ),
     title: "Dedicated support",
-    body: "A private Slack channel or email line with guaranteed response times and a real person you can reach by name.",
+    description:
+      "A private support channel with a guaranteed response SLA and a named contact who understands your deployment. Support is direct, not forum-based, and covers infrastructure questions, architecture review, and incident coordination.",
   },
+];
+
+const VOLUME_OPTIONS = [
+  { value: "Under 100K", label: "Under 100K per month" },
+  { value: "100K-1M", label: "100K to 1M per month" },
+  { value: "1M-10M", label: "1M to 10M per month" },
+  { value: "Over 10M", label: "Over 10M per month" },
 ];
 
 export default function EnterprisePage() {
   const [companyName, setCompanyName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [estimatedMonthlyReqs, setEstimatedMonthlyReqs] = useState("");
+  const [monthlyRequests, setMonthlyRequests] = useState("");
   const [useCase, setUseCase] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!companyName || !contactEmail || !estimatedMonthlyReqs || !useCase) return;
+    if (!companyName || !contactEmail || !monthlyRequests || !useCase) return;
     setSubmitting(true);
     setError(null);
     try {
-      await submitEnterpriseInterest({ companyName, contactEmail, estimatedMonthlyReqs, useCase });
+      await submitInterest({
+        name: companyName,
+        email: contactEmail,
+        role: "Enterprise",
+        team: companyName,
+        useCase,
+        expectedRequestVolume: monthlyRequests,
+        interestAreas: ["Standard RPC", "Priority relay"],
+        operatorInterest: false,
+        source: "enterprise-page",
+      });
       setSubmitted(true);
     } catch {
-      setError("Submission failed. Please try again or email us directly.");
+      setError(
+        "Submission failed. Please try again or reach out by email directly."
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
+  const isFormValid =
+    companyName.trim().length > 0 &&
+    contactEmail.trim().length > 0 &&
+    monthlyRequests.length > 0 &&
+    useCase.trim().length > 0;
+
   return (
-    <div className="min-h-screen bg-[var(--fyxvo-bg)]">
+    <div>
       {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--fyxvo-brand-muted)] bg-[var(--fyxvo-brand-soft)] px-4 py-1.5 text-xs font-medium text-[var(--fyxvo-brand)] mb-6">
-          Enterprise
-        </div>
-        <h1 className="font-display text-4xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl lg:text-6xl">
-          Ready for serious traffic
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--fyxvo-text-muted)]">
-          If you have outgrown shared plans and need infrastructure that keeps up with production workloads,
-          this is where we come in. Dedicated capacity, real SLAs, and a team that picks up the phone.
-        </p>
-        <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <a href="#contact" className="inline-flex items-center justify-center rounded-xl bg-[var(--fyxvo-brand)] px-6 py-3 text-sm font-semibold text-white shadow hover:bg-[var(--fyxvo-brand-hover)] transition-colors">
-            Talk to us
-          </a>
-          <a href="/pricing" className="inline-flex items-center justify-center rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-6 py-3 text-sm font-semibold text-[var(--fyxvo-text)] hover:bg-[var(--fyxvo-panel)] transition-colors">
-            See pricing
-          </a>
-        </div>
-      </section>
-
-      {/* Feature grid */}
-      <section className="mx-auto max-w-5xl px-6 py-12">
-        <h2 className="text-center font-display text-2xl font-semibold text-[var(--fyxvo-text)] mb-10">
-          What you get on an enterprise plan
-        </h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <Card key={f.title} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-              <CardHeader>
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-brand)]">
-                  {f.icon}
-                </div>
-                <CardTitle className="text-base">{f.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-[var(--fyxvo-text-muted)]">{f.body}</p>
-              </CardContent>
-            </Card>
-          ))}
+      <section className="border-b border-[var(--fyxvo-border)] py-24 lg:py-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <div className="mb-8 inline-flex items-center gap-2 rounded-lg border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--fyxvo-brand)]">
+              Enterprise
+            </div>
+            <h1 className="font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
+              Ready for{" "}
+              <span className="fyxvo-text-gradient">serious traffic</span>
+            </h1>
+            <p className="mt-6 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
+              Enterprise plans give high-volume teams dedicated Solana devnet infrastructure that is entirely separate from the shared relay pool. You get formal SLA backing, custom rate limit configuration, role-based team management, and a direct support line rather than a help forum.
+            </p>
+            <div className="mt-10 flex flex-wrap gap-3">
+              <Button asChild size="lg">
+                <a href="#contact">Get in touch</a>
+              </Button>
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/pricing">Review pricing</Link>
+              </Button>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Social proof */}
-      <section className="mx-auto max-w-5xl px-6 py-12">
-        <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 sm:p-12">
-          <div className="grid gap-8 sm:grid-cols-3 text-center">
-            {[
-              { stat: ">10M", label: "Requests handled daily" },
-              { stat: "<50ms", label: "p95 relay latency" },
-              { stat: "99.9%", label: "Uptime backed by SLA" },
-            ].map(({ stat, label }) => (
-              <div key={stat}>
-                <p className="font-display text-3xl font-bold text-[var(--fyxvo-brand)]">{stat}</p>
-                <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{label}</p>
+      {/* Feature cards */}
+      <section className="border-t border-[var(--fyxvo-border)] py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+            What you get
+          </p>
+          <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+            Built for teams operating at scale
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
+            Six capabilities that go beyond what the standard shared infrastructure offers. Each one is designed for teams where reliability, visibility, and control are non-negotiable.
+          </p>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((feature) => (
+              <div
+                key={feature.title}
+                className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6"
+              >
+                <h3 className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
+                  {feature.title}
+                </h3>
+                <p className="mt-3 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Contact form */}
-      <section id="contact" className="mx-auto max-w-2xl px-6 py-16">
-        <h2 className="font-display text-2xl font-semibold text-[var(--fyxvo-text)] mb-2">
-          Let&apos;s talk
-        </h2>
-        <p className="text-sm text-[var(--fyxvo-text-muted)] mb-8">
-          Tell us a bit about what you need and how you plan to use it. We usually get back to you within a business day.
-        </p>
-        {submitted ? (
-          <Notice tone="success" title="We got your request">
-            Thanks for reaching out. Keep an eye on {contactEmail} and we will be in touch soon.
-          </Notice>
-        ) : (
-          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">Company name</label>
-                <Input
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Acme Corp"
-                  required
-                  className="h-10 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">Contact email</label>
-                <Input
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  type="email"
-                  placeholder="you@company.com"
-                  required
-                  className="h-10 text-sm"
-                />
-              </div>
+      {/* Stats */}
+      <section className="border-t border-[var(--fyxvo-border)] py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 sm:p-12">
+            <div className="grid gap-10 sm:grid-cols-3 text-center">
+              {[
+                {
+                  stat: "10M+",
+                  description: "Requests handled daily through the managed relay infrastructure.",
+                },
+                {
+                  stat: "<50ms",
+                  description: "p95 relay latency under normal operating conditions across devnet.",
+                },
+                {
+                  stat: "99.9%",
+                  description: "Uptime target backed by formal SLA for enterprise deployments.",
+                },
+              ].map(({ stat, description }) => (
+                <div key={stat}>
+                  <p className="font-display text-5xl font-semibold text-[var(--fyxvo-brand)]">
+                    {stat}
+                  </p>
+                  <p className="mt-3 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+                    {description}
+                  </p>
+                </div>
+              ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contact form */}
+      <section
+        id="contact"
+        className="border-t border-[var(--fyxvo-border)] py-24"
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-16 lg:grid-cols-2 lg:gap-20">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">Estimated monthly requests</label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {VOLUME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => setEstimatedMonthlyReqs(opt)}
-                    className={`rounded-lg border px-2 py-1.5 text-xs font-medium text-center transition-colors ${
-                      estimatedMonthlyReqs === opt
-                        ? "border-[var(--fyxvo-brand-muted)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]"
-                        : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-                    }`}
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Contact
+              </p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+                Talk to us about your use case
+              </h2>
+              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+                Tell us about your company, your expected traffic, and what you are building. We usually respond within one business day and the conversation will be with someone who understands the Fyxvo infrastructure stack, not a sales script.
+              </p>
+              <div className="mt-8 space-y-4">
+                {[
+                  {
+                    heading: "Dedicated infrastructure",
+                    body: "Enterprise customers get routing infrastructure that is entirely isolated from the shared relay pool.",
+                  },
+                  {
+                    heading: "Flexible volume pricing",
+                    body: "High-volume teams can negotiate per-request rates that go beyond the standard automatic discount tiers.",
+                  },
+                  {
+                    heading: "Direct support channel",
+                    body: "A private support line with a real person and a guaranteed response window, not a community forum.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.heading}
+                    className="flex gap-4"
                   >
-                    {opt}
-                  </button>
+                    <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)]">
+                      <svg
+                        className="h-3 w-3 text-[var(--fyxvo-brand)]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2.5}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-display text-base font-semibold text-[var(--fyxvo-text)]">
+                        {item.heading}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+                        {item.body}
+                      </p>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
+
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--fyxvo-text-muted)]">Use case</label>
-              <textarea
-                value={useCase}
-                onChange={(e) => setUseCase(e.target.value)}
-                placeholder="What are you building? What problems are you running into? The more context the better."
-                rows={4}
-                required
-                maxLength={2000}
-                className="w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-accent)] resize-none"
-              />
+              {submitted ? (
+                <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8">
+                  <Notice tone="success" title="Request received">
+                    Thank you for reaching out. We will review your submission and follow up at {contactEmail} within one business day.
+                  </Notice>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => void handleSubmit(e)}
+                  className="space-y-5 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6 sm:p-8"
+                >
+                  <p className="font-display text-xl font-semibold text-[var(--fyxvo-text)]">
+                    Enterprise inquiry
+                  </p>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]">
+                        Company name
+                      </label>
+                      <Input
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        placeholder="Acme Corp"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]">
+                        Contact email
+                      </label>
+                      <Input
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        type="email"
+                        placeholder="you@company.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]">
+                      Estimated monthly requests
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {VOLUME_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setMonthlyRequests(opt.value)}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${
+                            monthlyRequests === opt.value
+                              ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
+                              : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] text-[var(--fyxvo-text-muted)] hover:border-[var(--fyxvo-border-strong)] hover:text-[var(--fyxvo-text)]"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[var(--fyxvo-text)]">
+                      Use case
+                    </label>
+                    <textarea
+                      value={useCase}
+                      onChange={(e) => setUseCase(e.target.value)}
+                      placeholder="What are you building and what infrastructure requirements are you running into? The more context you share, the better we can help."
+                      rows={5}
+                      required
+                      maxLength={3000}
+                      className="w-full resize-none rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2.5 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--fyxvo-brand)]"
+                    />
+                    <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+                      {useCase.length} / 3000 characters
+                    </p>
+                  </div>
+
+                  {error != null ? (
+                    <Notice tone="warning" title="Submission failed">
+                      {error}
+                    </Notice>
+                  ) : null}
+
+                  <Button
+                    type="submit"
+                    disabled={submitting || !isFormValid}
+                    className="w-full"
+                  >
+                    {submitting ? "Sending request..." : "Send enterprise request"}
+                  </Button>
+
+                  <p className="text-center text-xs text-[var(--fyxvo-text-muted)]">
+                    We respond within one business day. Your information is not shared with third parties.
+                  </p>
+                </form>
+              )}
             </div>
-            {error && (
-              <Notice tone="warning" title="Something went wrong">
-                {error}
-              </Notice>
-            )}
-            <Button
-              type="submit"
-              disabled={submitting || !companyName || !contactEmail || !estimatedMonthlyReqs || !useCase}
-              className="w-full"
-            >
-              {submitting ? "Sending..." : "Send request"}
-            </Button>
-          </form>
-        )}
+          </div>
+        </div>
       </section>
     </div>
   );

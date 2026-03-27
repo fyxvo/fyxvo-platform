@@ -1,180 +1,252 @@
 import type { Metadata } from "next";
-import { Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
-import { PageHeader } from "../../components/page-header";
+import Link from "next/link";
+import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
-  title: "Terms of Service",
-  description: "Terms governing use of the Fyxvo devnet private alpha infrastructure platform.",
+  title: "Terms of Service — Fyxvo",
+  description:
+    "Terms governing use of the Fyxvo devnet private alpha infrastructure platform.",
+  alternates: {
+    canonical: `${webEnv.siteUrl}/terms`,
+  },
+  openGraph: {
+    title: "Terms of Service — Fyxvo",
+    description:
+      "Terms governing use of the Fyxvo devnet private alpha infrastructure platform.",
+    url: `${webEnv.siteUrl}/terms`,
+    siteName: "Fyxvo",
+    type: "website",
+    images: [{ url: webEnv.socialImageUrl }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service — Fyxvo",
+    description:
+      "Terms governing use of the Fyxvo devnet private alpha infrastructure platform.",
+    images: [webEnv.socialImageUrl],
+  },
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function PolicySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+    <section className="border-t border-[var(--fyxvo-border)] pt-10">
+      <h2 className="font-display text-xl font-semibold text-[var(--fyxvo-text)] sm:text-2xl">
+        {title}
+      </h2>
+      <div className="mt-5 space-y-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
         {children}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
 export default function TermsPage() {
-  const effectiveDate = "March 19, 2026";
-
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8 space-y-8">
-      <PageHeader
-        eyebrow="Legal"
-        title="Terms of Service"
-        description={`Effective date: ${effectiveDate}. These terms govern your use of the Fyxvo devnet private alpha platform.`}
-      />
+    <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-12">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+          Legal
+        </p>
+        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl">
+          Terms of Service
+        </h1>
+        <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+          Last updated: March 2026. These terms govern your use of the Fyxvo
+          devnet private alpha platform. By using any part of the platform,
+          including the web interface at fyxvo.com, the API at api.fyxvo.com,
+          or the relay gateway at rpc.fyxvo.com, you agree to these terms.
+        </p>
 
-      <Notice tone="warning" title="Private alpha — please read this carefully">
-        Fyxvo is a private alpha running on Solana devnet. There is no service level agreement, no
-        uptime guarantee, and no warranty of any kind. This is a place to evaluate whether Fyxvo
-        works for you, not a place to run production workloads.
-      </Notice>
+        <div className="mt-6 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+          <p className="text-sm font-semibold text-[var(--fyxvo-text)]">
+            Private alpha — please read carefully
+          </p>
+          <p className="mt-2 text-sm leading-7 text-[var(--fyxvo-text-muted)]">
+            Fyxvo is a private alpha running exclusively on Solana devnet. There
+            is no service level agreement, no uptime guarantee, and no warranty
+            of any kind. This is an environment for evaluation and development,
+            not for production workloads of any kind.
+          </p>
+        </div>
+      </div>
 
-      <div className="space-y-6">
-        <Section title="1. What this service is">
+      <div className="space-y-10">
+        <PolicySection title="Platform status">
           <p>
-            Fyxvo is developer infrastructure built on Solana devnet. It gives you wallet-authenticated
-            project controls, SOL-funded JSON-RPC relay, priority relay, analytics, and managed
-            operator infrastructure. The web interface is at www.fyxvo.com, the control plane API at
-            api.fyxvo.com, and the relay gateway at rpc.fyxvo.com.
+            Fyxvo is developer infrastructure for Solana devnet. It provides
+            wallet-authenticated project controls, on-chain funded JSON-RPC
+            relay, priority relay, request analytics, and managed operator
+            infrastructure. The platform is currently in a private alpha stage.
+            Features, pricing structures, data formats, and access policies can
+            change at any time without prior notice.
           </p>
           <p>
-            The whole platform is in private alpha. That means features, pricing, data structures,
-            and access policies can all shift at any time without advance notice.
+            The platform operates exclusively on Solana devnet. There is no
+            mainnet deployment at this time. Devnet is a test environment
+            maintained by the Solana Foundation, and it can experience resets,
+            instability, or extended downtime for reasons entirely outside
+            Fyxvo's control. The service is provided as-is, with no implied
+            warranties of merchantability, fitness for a particular purpose, or
+            uninterrupted availability.
           </p>
-        </Section>
+        </PolicySection>
 
-        <Section title="2. Who can use it">
+        <PolicySection title="Acceptable use">
           <p>
-            Fyxvo is currently open to teams that received an invitation to the private alpha or
-            signed up through the public interest form. By using the platform, you are confirming
-            that:
+            Fyxvo is intended for legitimate Solana development, integration
+            testing, and infrastructure evaluation. You agree to use the platform
+            only for those purposes. You may not use the platform to send
+            malicious, abusive, or artificially inflated request traffic. You may
+            not attempt to circumvent rate limiting, scope enforcement, or
+            balance checks by any technical means. You may not reverse-engineer
+            or attempt to extract non-public infrastructure details, routing
+            logic, or internal API behavior.
           </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>You are at least 18 years old, or have the legal capacity to enter into contracts in your jurisdiction.</li>
-            <li>You are here to develop, evaluate, or test software.</li>
-            <li>You will not use the platform for anything illegal, fraudulent, or harmful.</li>
-            <li>You understand this is devnet infrastructure and not a mainnet production service.</li>
-          </ul>
-        </Section>
+          <p>
+            API keys are project-scoped credentials intended for your own use.
+            You may not redistribute, resell, or sublicense access to the relay
+            gateway through API keys assigned to your projects. Each key should
+            be held and used by the team that owns the project. If you become
+            aware that a key has been exposed or misused, you are responsible for
+            revoking it promptly.
+          </p>
+          <p>
+            Violations of these acceptable use terms may result in immediate
+            suspension or termination of access without notice. We reserve the
+            right to make that determination at our discretion.
+          </p>
+        </PolicySection>
 
-        <Section title="3. Devnet alpha status and no-SLA disclaimer">
+        <PolicySection title="On-chain funding terms">
           <p>
-            Fyxvo runs on Solana devnet. Devnet is a test environment maintained by the Solana
-            Foundation, and it can be unstable, get reset, or go offline for reasons entirely outside
-            our control.
+            All funding on the Fyxvo platform uses Solana devnet SOL. Devnet SOL
+            has no monetary value. It is obtainable from public faucets at no
+            cost and exists solely as a test token for development purposes.
+            Fyxvo does not sell devnet SOL, does not charge money for devnet
+            access, and makes no representation that devnet SOL has or will have
+            any monetary value.
           </p>
           <p>
-            We do not make promises about uptime, latency, data persistence, or uninterrupted
-            service during the private alpha. There is no SLA, no uptime commitment, and no
-            obligation for us to notify you before something goes down.
+            When you fund a project treasury, you sign and submit a Solana
+            transaction from your wallet. That transaction is irreversible once
+            confirmed on-chain. The API verifies the confirmed transaction
+            signature and credits your project's spendable balance accordingly.
+            Consumed credits are deducted as relay requests are processed. There
+            are no refunds for consumed devnet credits because there is nothing
+            of monetary value to refund.
           </p>
           <p>
-            We may pause, restructure, or discontinue services at any time. By using the platform,
-            you are accepting that reality.
+            A separate terms document governing real funding, fees, and refund
+            policies will be published before any mainnet deployment. These terms
+            apply exclusively to devnet usage.
           </p>
-        </Section>
+        </PolicySection>
 
-        <Section title="4. Acceptable use">
-          <p>When you use Fyxvo, you agree that you will not:</p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>Send spam, abusive requests, or traffic designed to degrade the experience for other users.</li>
-            <li>Attempt to circumvent rate limiting, scope enforcement, or funding balance checks.</li>
-            <li>Reverse-engineer, scrape, or extract non-public platform data or infrastructure details.</li>
-            <li>Route requests through the relay gateway to unauthorized or malicious nodes.</li>
-            <li>Misrepresent your identity, your team, or your intended use case in any submission form.</li>
-            <li>Use the platform in any jurisdiction where doing so would violate the law.</li>
-          </ul>
+        <PolicySection title="API key usage">
           <p>
-            If you break these rules, we reserve the right to suspend or terminate your access
-            without warning.
+            API keys are project-scoped credentials that grant relay access
+            within the bounds of the scopes assigned at creation time. Each key
+            can be scoped to standard RPC relay, priority relay, or both. You
+            are responsible for keeping your API keys confidential and for
+            assigning the narrowest scopes that satisfy your use case.
           </p>
-        </Section>
+          <p>
+            Keys may be revoked by you at any time from the project dashboard.
+            Fyxvo may also revoke keys at its discretion if it detects abuse,
+            policy violations, or suspicious activity. A revoked key is rejected
+            immediately at the gateway. Keys are not for sharing with third
+            parties, reselling, or embedding in publicly accessible code
+            repositories. If a key is exposed, revoke it and generate a new one.
+          </p>
+        </PolicySection>
 
-        <Section title="5. API key responsibility">
+        <PolicySection title="Service availability">
           <p>
-            Your API keys are yours to protect. Keep them secret, assign the narrowest scopes that
-            make sense, and revoke any key you no longer need or that may have been exposed.
+            During the private alpha, Fyxvo operates on a best-effort basis.
+            There is no formal uptime commitment and no service level agreement.
+            We work to keep the gateway and API available, and we monitor health
+            continuously, but we cannot guarantee uninterrupted operation on
+            devnet infrastructure.
           </p>
           <p>
-            We are not responsible for unauthorized usage that results from a key being improperly
-            secured on your end. Every key has explicit scopes and is tied to a funded project. If a
-            key is under-scoped or has been revoked, the gateway will reject it automatically.
+            Platform status, incidents, and maintenance notices are published at{" "}
+            <Link
+              href="/status"
+              className="text-[var(--fyxvo-brand)] hover:underline"
+            >
+              fyxvo.com/status
+            </Link>
+            . We post updates there when incidents are open and when they are
+            resolved. There is no formal SLA-backed notification process during
+            the alpha.
           </p>
-        </Section>
+        </PolicySection>
 
-        <Section title="6. Crypto funding and devnet SOL">
+        <PolicySection title="Limitation of liability">
           <p>
-            All funding transactions on Fyxvo use Solana devnet SOL, which has no real-world
-            monetary value. You can get devnet SOL from public faucets for free. Fyxvo does not sell
-            devnet SOL and does not charge for devnet access.
+            To the fullest extent permitted by applicable law, Fyxvo and its
+            contributors disclaim all warranties, express or implied, including
+            warranties of merchantability, fitness for a particular purpose, and
+            non-infringement. The platform is provided as-is and as-available
+            without any representation that it will meet your requirements or
+            operate without interruption.
           </p>
           <p>
-            When you spend SOL credits through relay usage, those credits are consumed according to
-            the pricing model published at www.fyxvo.com/pricing. There are no refunds for consumed
-            devnet credits, because there is nothing of monetary value to refund.
+            In no event will Fyxvo or its contributors be liable for any
+            indirect, incidental, special, consequential, or punitive damages
+            arising from your use of or inability to use the platform. This
+            includes but is not limited to loss of devnet credits, loss of data,
+            service interruptions, or errors caused by Solana devnet instability.
+            Because devnet tokens have no monetary value, claims for financial
+            compensation arising from devnet activity have no basis. You use this
+            platform at your own risk.
           </p>
-          <p>
-            When we move to mainnet, we will publish a separate terms document covering real funding,
-            fees, and refund policies. These terms apply exclusively to devnet.
-          </p>
-        </Section>
+        </PolicySection>
 
-        <Section title="7. Intellectual property">
+        <PolicySection title="Governing terms">
           <p>
-            The code, documentation, design, and infrastructure behind Fyxvo belong to us. During
-            the private alpha, you have a limited, non-exclusive license to use the platform for
-            evaluation and development purposes.
+            These terms may be updated at any time. The date at the top of this
+            page reflects the most recent revision. When significant changes are
+            made, we will announce them through our community channels and the
+            status page. Continued use of the platform after a revision is
+            published constitutes acceptance of the updated terms.
           </p>
           <p>
-            Everything you build on top of Fyxvo is yours. Your project data, your wallet identity,
-            and the workloads you send through the relay all belong to you. We make no claim over
-            any traffic or data you transmit through the gateway.
+            If any provision of these terms is found to be unenforceable by a
+            court of competent jurisdiction, the remaining provisions will
+            continue in full force. These terms represent the complete agreement
+            between you and Fyxvo with respect to use of the private alpha
+            platform.
           </p>
-        </Section>
+        </PolicySection>
 
-        <Section title="8. Limitation of liability">
+        <PolicySection title="Contact for legal questions">
           <p>
-            To the fullest extent the law allows, Fyxvo and its contributors are not liable for:
+            If you have questions about these terms or wish to raise a legal
+            matter, you can reach us at{" "}
+            <a
+              href="mailto:legal@fyxvo.com"
+              className="text-[var(--fyxvo-brand)] hover:underline"
+            >
+              legal@fyxvo.com
+            </a>
+            . For general support and product questions, use the{" "}
+            <Link
+              href="/contact"
+              className="text-[var(--fyxvo-brand)] hover:underline"
+            >
+              contact page
+            </Link>
+            .
           </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>Lost devnet SOL or funded credits caused by platform outages or software bugs.</li>
-            <li>Data loss resulting from platform resets or infrastructure changes.</li>
-            <li>Indirect, consequential, or incidental damages arising from your use of the platform.</li>
-            <li>Downtime, latency spikes, or errors on the Solana devnet network itself.</li>
-          </ul>
-          <p>
-            You are using this platform at your own risk. It is a private alpha, and we ask that you
-            treat it accordingly.
-          </p>
-        </Section>
-
-        <Section title="9. How terms may change">
-          <p>
-            We may update these terms at any time. The effective date at the top of this page always
-            reflects the latest revision. If you continue using the platform after we publish
-            changes, that counts as your acceptance of the updated terms.
-          </p>
-          <p>
-            When something significant changes, we will announce it through our community channels
-            (X, Discord, Telegram) and the status page.
-          </p>
-        </Section>
-
-        <Section title="10. Governing law">
-          <p>
-            These terms are governed by applicable law. If a court finds any portion of this
-            agreement unenforceable, the remainder stands. This document represents the complete
-            agreement between you and Fyxvo regarding use of the private alpha platform.
-          </p>
-        </Section>
+        </PolicySection>
       </div>
     </div>
   );

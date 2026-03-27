@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
-import { PageHeader } from "../../components/page-header";
 import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
   title: "Security — Fyxvo",
   description:
-    "How Fyxvo handles vulnerability reporting, secrets, API keys, and the current scope of security review during the devnet private alpha.",
+    "Fyxvo's security posture during the devnet private alpha: what is in place, how secrets are handled, what has not been audited, and how to report vulnerabilities.",
   alternates: {
     canonical: `${webEnv.siteUrl}/security`,
   },
   openGraph: {
     title: "Security — Fyxvo",
     description:
-      "How Fyxvo handles vulnerability reporting, secrets, API keys, and the current scope of security review during the devnet private alpha.",
+      "Fyxvo's security posture during the devnet private alpha: what is in place, how secrets are handled, what has not been audited, and how to report vulnerabilities.",
     url: `${webEnv.siteUrl}/security`,
     siteName: "Fyxvo",
     type: "website",
@@ -24,84 +22,166 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Security — Fyxvo",
     description:
-      "How Fyxvo handles vulnerability reporting, secrets, API keys, and the current scope of security review during the devnet private alpha.",
+      "Fyxvo's security posture during the devnet private alpha: what is in place, how secrets are handled, what has not been audited, and how to report vulnerabilities.",
     images: [webEnv.socialImageUrl],
   },
 };
 
+function PolicySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="border-t border-[var(--fyxvo-border)] pt-10">
+      <h2 className="font-display text-xl font-semibold text-[var(--fyxvo-text)] sm:text-2xl">
+        {title}
+      </h2>
+      <div className="mt-5 space-y-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export default function SecurityPage() {
   return (
-    <div className="space-y-10 lg:space-y-12">
-      <PageHeader
-        eyebrow="Security"
-        title="Where Fyxvo stands on security right now"
-        description="We are running a devnet private alpha, so we want to be straightforward about what protections are already in place, what still needs work, and how you can let us know if you find something wrong."
-      />
+    <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-12">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+          Security
+        </p>
+        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl">
+          Security posture
+        </h1>
+        <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
+          Fyxvo is a devnet private alpha. This page describes what security
+          controls are in place today, how sensitive material is handled, where
+          the boundaries of current review sit, and how to reach the team if you
+          find something worth reporting.
+        </p>
+      </div>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Found a vulnerability?</CardTitle>
-            <CardDescription>If it could affect user funds, credentials, or service integrity, please reach out privately first.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>Send security disclosures to <a className="text-[var(--fyxvo-brand)]" href="mailto:security@fyxvo.com">security@fyxvo.com</a>.</p>
-            <p>The more detail you can share, the better. Reproduction steps, a description of the impact, and any proof-of-concept material all help us validate and respond quickly.</p>
-            <p>We ask that you hold off on publishing exploit details until we have had a reasonable window to investigate and address the issue.</p>
-            <p>
-              You can also find our disclosure policy in the repository:{" "}
-              <Link className="text-[var(--fyxvo-brand)]" href="https://github.com/fyxvo/fyxvo-platform/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">
-                SECURITY.md
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+      <div className="space-y-10">
+        <PolicySection title="What is in place">
+          <p>
+            Authentication on Fyxvo is wallet-based. When you sign in, the
+            server issues a signed challenge, your wallet extension signs it, and
+            the signature is verified server-side before a JWT session token is
+            issued. There are no passwords. The JWT has a fixed expiry and is
+            validated on every authenticated request. No admin credentials are
+            exposed in the frontend.
+          </p>
+          <p>
+            Gateway access is controlled through project-scoped API keys.
+            Each key carries explicit scopes, either standard relay, priority
+            relay, or both. The gateway enforces scope on every request before
+            routing it. Keys can be revoked instantly from the dashboard, and
+            revocation takes effect at the gateway immediately. Server-side
+            request validation runs before any relay routing occurs.
+          </p>
+          <p>
+            Content Security Policy headers are set on all pages, rate limiting
+            is enforced on all API and gateway endpoints, and request logs are
+            captured so the team can investigate anomalies. The relay gateway
+            validates that webhook URLs and outbound targets do not resolve to
+            internal or private network addresses, which reduces SSRF exposure.
+          </p>
+        </PolicySection>
 
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>What we have in place today</CardTitle>
-            <CardDescription>These are the security controls that are live in the product right now.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>Authentication works through signed wallet challenges. There are no passwords involved.</p>
-            <p>Gateway access is gated behind project-scoped API keys. Each key has explicit scopes, and you can revoke them cleanly whenever you need to.</p>
-            <p>All secrets live in managed runtime configuration. Nothing sensitive gets committed to the repo.</p>
-            <p>Webhook URLs go through validation that blocks private and internal address targets, which helps reduce SSRF exposure.</p>
-            <p>On the operational side, we have CSP reporting, request logging, incident tracking, and support workflows running so we can actually see what is happening.</p>
-          </CardContent>
-        </Card>
-      </section>
+        <PolicySection title="How secrets are handled">
+          <p>
+            API keys are hashed before storage. The full key value is shown to
+            you exactly once at creation. After that moment, neither you nor
+            Fyxvo can recover it, and only the hash is retained server-side.
+            JWTs are signed server-side using a key held in managed runtime
+            configuration. No signing secrets are committed to source control or
+            exposed to the browser.
+          </p>
+          <p>
+            Wallet private keys never leave your device. Fyxvo's authentication
+            flow requests a signature from your wallet extension for a
+            server-issued challenge, and that signature is what gets sent to the
+            API. The private key itself is never transmitted, never requested,
+            and never stored. Solana transactions such as project funding are
+            also signed entirely within your wallet extension before being
+            submitted to the network.
+          </p>
+          <p>
+            Environment variables containing sensitive material are managed in
+            server-side runtime configuration. The only environment variables
+            exposed to the browser are those explicitly prefixed with
+            NEXT_PUBLIC_, which contain non-sensitive values such as the site
+            URL, API base URL, and Solana cluster identifier. No credentials,
+            signing keys, or database connection strings are exposed client-side.
+          </p>
+        </PolicySection>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>How we handle secrets and keys</CardTitle>
-            <CardDescription>A clear picture of what Fyxvo touches and what it does not.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>We will never ask you for your wallet private keys, and we do not store them.</p>
-            <p>When you create an API key, you see it once. After that, we only store a hash on our end. You can rotate or revoke keys directly from the product whenever you want.</p>
-            <p>Each webhook endpoint gets its own generated secret, which is used for HMAC verification so you can confirm that requests are genuinely coming from Fyxvo.</p>
-            <p>The AI assistant runs through backend runtime secrets. None of that credential material is ever exposed to your browser.</p>
-          </CardContent>
-        </Card>
+        <PolicySection title="What has not been audited">
+          <p>
+            The Fyxvo Solana program has not undergone a formal third-party
+            security audit. The program ID is{" "}
+            <span className="font-mono text-sm text-[var(--fyxvo-text)]">
+              Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc
+            </span>
+            . It runs under a staged governance model with explicit authority
+            roles for protocol configuration, treasury, and upgrade decisions,
+            but that governance structure itself has not been independently
+            reviewed.
+          </p>
+          <p>
+            The full API and gateway stack has not received a formal external
+            penetration test or code audit. The platform is in private alpha, and
+            the scope of review reflects that stage. There is currently no bug
+            bounty program. The infrastructure runs on a single managed operator
+            topology, which means it has not been tested at scale or under
+            adversarial load conditions. These are known gaps, not oversights,
+            and they will be addressed before any mainnet deployment.
+          </p>
+        </PolicySection>
 
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>What has not been audited yet</CardTitle>
-            <CardDescription>We think it is important to be honest about where the boundaries are.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>We have not completed a formal external security audit of the full platform stack. That is the truth of where things stand today.</p>
-            <p>The devnet launch exists so we can do controlled evaluation, run real integration tests, and harden operations before making any claims about mainnet readiness.</p>
-            <p>Broader external review, stronger governance, and a proper mainnet security posture are all things we are working toward, but they are not done yet.</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Notice tone="warning" title="Current stage">
-        Fyxvo is live on Solana devnet for real developer evaluation, but this is still a private alpha. Please test carefully, keep your wallet hygiene tight, and do not treat the current environment as though it has been through a mainnet-grade audit. We are not there yet, and we would rather be upfront about that.
-      </Notice>
+        <PolicySection title="Current stage">
+          <p>
+            This is a private devnet alpha. The security posture described here
+            is appropriate for that stage: real controls are in place, but the
+            platform has not gone through the audit and hardening process that
+            mainnet infrastructure requires. Devnet tokens have no monetary
+            value, which limits the financial risk surface during this period.
+          </p>
+          <p>
+            Before any mainnet deployment, a full audit of the Solana program and
+            the API layer will be required. Governance structures will be
+            hardened, the operator topology will be stress-tested, and the
+            security posture will be re-evaluated in full. We will publish the
+            results of that process publicly.
+          </p>
+          <p>
+            If you find a potential vulnerability or security issue, please reach
+            out to{" "}
+            <a
+              href="mailto:security@fyxvo.com"
+              className="text-[var(--fyxvo-brand)] hover:underline"
+            >
+              security@fyxvo.com
+            </a>{" "}
+            before publishing any details. We ask for a reasonable window to
+            investigate and respond. Our responsible disclosure policy is
+            documented in{" "}
+            <Link
+              href="https://github.com/fyxvo/fyxvo-platform/blob/main/SECURITY.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--fyxvo-brand)] hover:underline"
+            >
+              SECURITY.md on GitHub
+            </Link>
+            .
+          </p>
+        </PolicySection>
+      </div>
     </div>
   );
 }
