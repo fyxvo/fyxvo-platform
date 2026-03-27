@@ -97,9 +97,9 @@ function computeHealthScore(p: ProjectHealthInput): number {
 }
 
 function healthColor(score: number): string {
-  if (score >= 80) return "text-green-600 dark:text-green-400 border-green-500/20 bg-green-500/5";
-  if (score >= 50) return "text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5";
-  return "text-red-600 dark:text-red-400 border-red-500/20 bg-red-500/5";
+  if (score >= 80) return "text-[var(--fyxvo-success)] border-green-500/20 bg-green-500/5";
+  if (score >= 50) return "text-[var(--fyxvo-warning)] border-amber-500/20 bg-amber-500/5";
+  return "text-[var(--fyxvo-danger)] border-red-500/20 bg-red-500/5";
 }
 
 function rolloutToneForBlocked(isBlocked: boolean) {
@@ -1372,10 +1372,10 @@ export default function DashboardPage() {
       {announcement && !announcementDismissed && (
         <div className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 ${
           announcement.severity === "critical"
-            ? "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+            ? "border-rose-500/30 bg-rose-500/10 text-[var(--fyxvo-danger)]"
             : announcement.severity === "warning"
-            ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            : "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-text)]"
+            ? "border-amber-500/30 bg-amber-500/10 text-[var(--fyxvo-warning)]"
+            : "border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
         }`}>
           <p className="text-sm">{announcement.message}</p>
           <button
@@ -1389,7 +1389,7 @@ export default function DashboardPage() {
       )}
 
       {whatsNew && (
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-brand-500/30 bg-brand-500/10 px-4 py-3">
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)] px-4 py-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-brand-500">What&apos;s new in {whatsNew.version}</p>
             <p className="mt-0.5 text-sm font-medium text-[var(--fyxvo-text)]">{whatsNew.title}</p>
@@ -1429,14 +1429,14 @@ export default function DashboardPage() {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                   </span>
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <span className="text-xs font-medium text-[var(--fyxvo-success)]">
                     Activated
                   </span>
                 </>
               ) : (
                 <>
                   <span className="h-2 w-2 rounded-full bg-amber-400" />
-                  <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                  <span className="text-xs font-medium text-[var(--fyxvo-warning)]">
                     Not activated
                   </span>
                 </>
@@ -1713,7 +1713,7 @@ export default function DashboardPage() {
               <button
                 key={t.id}
                 onClick={() => setProjectTemplate(t.id)}
-                className={`w-full rounded-xl border p-4 text-left transition-colors ${projectTemplate === t.id ? "border-brand-500/50 bg-brand-500/10" : "border-[var(--fyxvo-border)] hover:border-brand-500/30"}`}
+                className={`w-full rounded-xl border p-4 text-left transition-colors ${projectTemplate === t.id ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)]" : "border-[var(--fyxvo-border)] hover:border-[var(--fyxvo-brand)]/30"}`}
               >
                 <p className="font-medium text-[var(--fyxvo-text)]">{t.name}</p>
                 <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{t.desc}</p>
@@ -1777,7 +1777,7 @@ export default function DashboardPage() {
                   key={item}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
                     Step {index + 1}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item}</p>
@@ -1809,7 +1809,7 @@ export default function DashboardPage() {
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
                       Step {index + 1}
                     </div>
                     <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">

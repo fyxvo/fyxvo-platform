@@ -44,12 +44,13 @@ export function SiteFooter() {
           <div className="space-y-4">
             <BrandLogo />
             <p className="max-w-sm text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-              Funded Solana RPC, wallet-authenticated project control, and honest devnet status in
-              one surface. SOL is live. USDC is gated. Operator infrastructure is managed.
+              On-chain funded Solana RPC with wallet-based project control, live analytics,
+              and transparent devnet status. Built for teams that need real infrastructure,
+              not simulated environments.
             </p>
             <div className="inline-flex items-center gap-2 rounded-md border border-[var(--fyxvo-border)] px-3 py-1.5 text-xs text-[var(--fyxvo-text-muted)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-              Solana devnet · Private alpha
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--fyxvo-brand)]" />
+              Solana devnet, private alpha
             </div>
             <div className="pt-1">
               <SocialLinks />
@@ -116,7 +117,7 @@ export function SiteFooter() {
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--fyxvo-border)] pt-6">
           <p className="text-xs text-[var(--fyxvo-text-muted)]">
-            Fyxvo · Private alpha · Solana devnet · {new Date().getFullYear()}
+            Fyxvo {new Date().getFullYear()}, private alpha on Solana devnet
           </p>
           <p className="font-mono text-xs text-[var(--fyxvo-text-muted)]">
             FQ5pyjBQvfadKPPxd66YXksgn8veYnjEw2R1g6aQnFaa

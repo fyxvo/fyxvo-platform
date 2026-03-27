@@ -355,15 +355,15 @@ function renderInlineText(text: string): ReactNode[] {
 
 function codeColor(token: string, language: string): string {
   const normalized = language.toLowerCase();
-  if (/^["'`].*["'`]$/.test(token)) return "text-emerald-600 dark:text-emerald-300";
-  if (/^(true|false|null|undefined)$/.test(token)) return "text-amber-600 dark:text-amber-300";
-  if (/^\d/.test(token)) return "text-sky-600 dark:text-sky-300";
+  if (/^["'`].*["'`]$/.test(token)) return "text-[var(--fyxvo-success)]";
+  if (/^(true|false|null|undefined)$/.test(token)) return "text-[var(--fyxvo-warning)]";
+  if (/^\d/.test(token)) return "text-sky-500";
   if (/^(const|let|await|async|return|import|from|new|if|else|try|catch|export|function|class|type)$/.test(token)) {
-    return "text-fuchsia-600 dark:text-fuchsia-300";
+    return "text-fuchsia-500";
   }
-  if (normalized === "bash" && /^-{1,2}[a-z0-9-]+/i.test(token)) return "text-fuchsia-600 dark:text-fuchsia-300";
-  if ((normalized === "bash" || normalized === "sh") && /^https?:\/\//.test(token)) return "text-sky-600 dark:text-sky-300";
-  if (token === "curl") return "text-fuchsia-600 dark:text-fuchsia-300";
+  if (normalized === "bash" && /^-{1,2}[a-z0-9-]+/i.test(token)) return "text-fuchsia-500";
+  if ((normalized === "bash" || normalized === "sh") && /^https?:\/\//.test(token)) return "text-sky-500";
+  if (token === "curl") return "text-fuchsia-500";
   return "text-[var(--fyxvo-text)]";
 }
 
@@ -399,7 +399,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
             type="button"
             onClick={() => setWrap((current) => !current)}
             className={cn(
-              "rounded-md border border-[var(--fyxvo-border)] px-2.5 py-1 text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:border-brand-500/25 hover:text-[var(--fyxvo-text)]",
+              "rounded-md border border-[var(--fyxvo-border)] px-2.5 py-1 text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:border-[var(--fyxvo-brand)]/25 hover:text-[var(--fyxvo-text)]",
               FOCUS_RING_CLASS
             )}
           >
@@ -413,7 +413,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
               window.setTimeout(() => setCopied(false), 2000);
             }}
             className={cn(
-              "rounded-md border border-[var(--fyxvo-border)] px-2.5 py-1 text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:border-brand-500/25 hover:text-[var(--fyxvo-text)]",
+              "rounded-md border border-[var(--fyxvo-border)] px-2.5 py-1 text-[var(--fyxvo-text-muted)] transition-colors duration-150 hover:border-[var(--fyxvo-brand)]/25 hover:text-[var(--fyxvo-text)]",
               FOCUS_RING_CLASS
             )}
           >
@@ -546,7 +546,7 @@ function MarkdownContent({ content }: { content: string }) {
       blocks.push(
         <blockquote
           key={`quote-${blocks.length}`}
-          className="rounded-r-2xl border-l-2 border-brand-500/50 bg-brand-500/5 px-4 py-3 text-sm leading-7 text-[var(--fyxvo-text-muted)]"
+          className="rounded-r-2xl border-l-2 border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] px-4 py-3 text-sm leading-7 text-[var(--fyxvo-text-muted)]"
         >
           {quoted.map((item, itemIndex) => (
             <p key={`quote-line-${itemIndex}`}>{renderInlineText(item)}</p>
@@ -641,7 +641,7 @@ function AssistantActionPill({
     cn(
       "inline-flex items-center rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-1.5",
       "text-xs font-medium text-[var(--fyxvo-text-muted)]",
-      "transition-colors duration-150 hover:border-brand-500/25 hover:text-[var(--fyxvo-text)]",
+      "transition-colors duration-150 hover:border-[var(--fyxvo-brand)]/25 hover:text-[var(--fyxvo-text)]",
       FOCUS_RING_CLASS
     );
 
@@ -675,12 +675,12 @@ function ToolCard({
     <Link
       href={href}
       className={cn(
-        "group rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3.5 transition-colors duration-150 hover:border-brand-500/25 hover:bg-brand-500/5",
+        "group rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3.5 transition-colors duration-150 hover:border-[var(--fyxvo-brand)]/25 hover:bg-[var(--fyxvo-brand-subtle)]",
         FOCUS_RING_CLASS
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-brand-500/15 bg-brand-500/8 text-[var(--fyxvo-brand)]">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--fyxvo-brand)]/15 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]">
           {icon}
         </div>
         <div className="min-w-0">
@@ -1469,7 +1469,7 @@ export function AssistantWorkspace() {
               onChange={(event) => setFeedbackDraft((current) => (current ? { ...current, note: event.target.value } : current))}
               rows={3}
               placeholder="Optional note"
-              className="mt-3 w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] transition-colors duration-150 focus:border-brand-500/40"
+              className="mt-3 w-full rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] outline-none placeholder:text-[var(--fyxvo-text-muted)] transition-colors duration-150 focus:border-[var(--fyxvo-brand)]/40"
             />
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setFeedbackDraft(null)}>
@@ -1598,7 +1598,7 @@ export function AssistantWorkspace() {
         <Link
           key={key}
           href={item.href}
-          className="flex items-center justify-between rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-sm text-[var(--fyxvo-text-muted)] transition hover:border-brand-500/30 hover:text-[var(--fyxvo-text)]"
+          className="flex items-center justify-between rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-sm text-[var(--fyxvo-text-muted)] transition hover:border-[var(--fyxvo-brand)]/30 hover:text-[var(--fyxvo-text)]"
         >
           <span>{item.label}</span>
           <BookIcon className="h-4 w-4" />
@@ -1639,7 +1639,7 @@ export function AssistantWorkspace() {
         className={cn(
           "rounded-xl border px-3.5 py-3 transition-colors duration-150",
           isActive
-            ? "border-brand-500/25 bg-brand-500/8"
+            ? "border-[var(--fyxvo-brand)]/25 bg-[var(--fyxvo-brand-subtle)]"
             : compact
               ? "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
               : "border-transparent hover:border-[var(--fyxvo-border)] hover:bg-[var(--fyxvo-panel-soft)]"
@@ -1654,7 +1654,7 @@ export function AssistantWorkspace() {
               aria-label="Rename conversation"
               className={cn(
                 "h-10 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 text-sm text-[var(--fyxvo-text)] outline-none transition-colors placeholder:text-[var(--fyxvo-text-muted)]",
-                "focus:border-brand-500/40",
+                "focus:border-[var(--fyxvo-brand)]/40",
                 FOCUS_RING_CLASS
               )}
             />
@@ -1706,7 +1706,7 @@ export function AssistantWorkspace() {
                   "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-colors",
                   FOCUS_RING_CLASS,
                   conversation.pinned
-                    ? "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-brand)]"
+                    ? "border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"
                     : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] disabled:opacity-50"
                 )}
               >
@@ -1861,7 +1861,7 @@ export function AssistantWorkspace() {
             className={cn(
               "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition",
               debugMode
-                ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-brand)]"
+                ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"
                 : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
             )}
           >
@@ -1927,7 +1927,7 @@ export function AssistantWorkspace() {
                       }}
                       className={cn(
                         "w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-3 text-left text-sm text-[var(--fyxvo-text-muted)] transition",
-                        "hover:border-brand-500/30 hover:bg-brand-500/5 hover:text-[var(--fyxvo-text)]",
+                        "hover:border-[var(--fyxvo-brand)]/30 hover:bg-[var(--fyxvo-brand-subtle)] hover:text-[var(--fyxvo-text)]",
                         FOCUS_RING_CLASS
                       )}
                     >
@@ -2017,7 +2017,7 @@ export function AssistantWorkspace() {
         ) : messages.length === 0 ? (
           <div className="mx-auto max-w-3xl space-y-6">
             <div className="rounded-[1.75rem] border border-[var(--fyxvo-border)] bg-[linear-gradient(180deg,var(--fyxvo-panel-soft),var(--fyxvo-panel))] px-6 py-10 text-center shadow-[0_4px_20px_rgba(15,23,42,0.05)]">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/8 text-[var(--fyxvo-brand)]">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]">
                 <SparklesIcon className="h-5 w-5" />
               </div>
               <h2 className="mt-5 text-xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-2xl">
@@ -2161,7 +2161,7 @@ export function AssistantWorkspace() {
             ) : null}
 
             {returnBanner ? (
-              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
+              <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-[var(--fyxvo-success)]">
                 Returned from Playground with your prepared request ready.
               </div>
             ) : null}
@@ -2282,7 +2282,7 @@ export function AssistantWorkspace() {
                         "flex min-h-[52px] items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition",
                         FOCUS_RING_CLASS,
                         selected
-                          ? "border-brand-500/30 bg-brand-500/10 text-[var(--fyxvo-brand)]"
+                          ? "border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"
                           : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                       )}
                     >
@@ -2343,7 +2343,7 @@ export function AssistantWorkspace() {
                 aria-label="Search assistant conversations"
                 className={cn(
                   "h-10 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 text-sm text-[var(--fyxvo-text)] outline-none transition-colors placeholder:text-[var(--fyxvo-text-muted)]",
-                  "focus:border-brand-500/40",
+                  "focus:border-[var(--fyxvo-brand)]/40",
                   FOCUS_RING_CLASS
                 )}
               />

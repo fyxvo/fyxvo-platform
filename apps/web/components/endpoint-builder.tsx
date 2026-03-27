@@ -68,7 +68,7 @@ print(resp)`;
               type="button"
               onClick={() => setMode(m)}
               className={`px-4 py-1.5 text-xs font-medium transition ${mode === m
-                ? "bg-brand-500 text-white"
+                ? "bg-[var(--fyxvo-brand)] text-white"
                 : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
               }`}
             >

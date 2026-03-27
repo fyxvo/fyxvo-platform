@@ -71,7 +71,7 @@ export function FeedbackWidget() {
                     onClick={() => setRating(r)}
                     className={`flex-1 rounded-lg border py-2 text-lg transition-colors ${
                       rating === r
-                        ? "border-brand-500/50 bg-brand-500/10"
+                        ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)]"
                         : "border-[var(--fyxvo-border)] hover:border-[var(--fyxvo-border-strong)]"
                     }`}
                     aria-label={r === "up" ? "Thumbs up" : "Thumbs down"}
@@ -94,7 +94,7 @@ export function FeedbackWidget() {
                 type="button"
                 onClick={() => void handleSubmit()}
                 disabled={!rating || submitting}
-                className="w-full rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:bg-brand-600 transition-colors"
+                className="w-full rounded-lg bg-[var(--fyxvo-brand)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40 hover:bg-[var(--fyxvo-brand-strong)] transition-colors"
               >
                 {submitting ? "Sending…" : "Send feedback"}
               </button>

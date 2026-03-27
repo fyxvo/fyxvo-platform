@@ -307,19 +307,19 @@ const releases: Release[] = [
 const toneMap: Record<ChangeEntry["type"], { label: string; color: string }> = {
   added: {
     label: "Added",
-    color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20",
+    color: "bg-emerald-500/10 text-[var(--fyxvo-success)] border border-emerald-500/20",
   },
   changed: {
     label: "Changed",
-    color: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20",
+    color: "bg-amber-500/10 text-[var(--fyxvo-warning)] border border-amber-500/20",
   },
   fixed: {
     label: "Fixed",
-    color: "bg-brand-500/10 text-[var(--fyxvo-brand)] border border-brand-500/20",
+    color: "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)] border border-[var(--fyxvo-brand)]/20",
   },
   removed: {
     label: "Removed",
-    color: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20",
+    color: "bg-rose-500/10 text-[var(--fyxvo-danger)] border border-rose-500/20",
   },
 };
 

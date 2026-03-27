@@ -10,20 +10,20 @@ function typeIcon(type: Notification["type"]) {
   switch (type) {
     case "funding_confirmed":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-emerald-700 dark:text-emerald-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-[var(--fyxvo-success)]" aria-hidden="true">
           <path d="M10 3v14M14 6.5c0-1.5-1.8-2.5-4-2.5S6 5 6 6.5 7.8 9.5 10 9.5s4 1 4 2.5S12.2 14 10 14s-4-1-4-2.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "api_key_created":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-[var(--fyxvo-brand)] dark:text-brand-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-[var(--fyxvo-brand)] " aria-hidden="true">
           <circle cx="7" cy="13" r="3" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M9.5 11.5L18 3M16 3h2v2M14 5l2 2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
     case "api_key_revoked":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-rose-700 dark:text-rose-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-[var(--fyxvo-danger)]" aria-hidden="true">
           <circle cx="7" cy="13" r="3" />
           <path d="M9.5 11.5L18 3" strokeLinecap="round" />
           <path d="M15 5l2 2M17 5l-2 2" strokeLinecap="round" strokeLinejoin="round" />
@@ -31,7 +31,7 @@ function typeIcon(type: Notification["type"]) {
       );
     case "error_spike":
       return (
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-amber-700 dark:text-amber-400" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-4 w-4 text-[var(--fyxvo-warning)]" aria-hidden="true">
           <path d="M10 4l8 13H2z" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M10 9v3M10 14.5h.01" strokeLinecap="round" />
         </svg>
@@ -293,7 +293,7 @@ export function NotificationBell({ token }: { readonly token: string }) {
           <path d="M8 16a2 2 0 004 0" strokeLinecap="round" />
         </svg>
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--fyxvo-brand)] px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -369,7 +369,7 @@ export function NotificationBell({ token }: { readonly token: string }) {
                   return (
                     <div
                       key={item.id}
-                      className={`flex gap-3 px-4 py-3 transition cursor-pointer ${isRead ? "opacity-60" : "bg-brand-500/5"} hover:bg-[var(--fyxvo-panel-soft)]`}
+                      className={`flex gap-3 px-4 py-3 transition cursor-pointer ${isRead ? "opacity-60" : "bg-[var(--fyxvo-brand-subtle)]"} hover:bg-[var(--fyxvo-panel-soft)]`}
                       onClick={() => handleItemClick(item)}
                       role="button"
                       tabIndex={0}
@@ -380,7 +380,7 @@ export function NotificationBell({ token }: { readonly token: string }) {
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-xs font-semibold text-[var(--fyxvo-text)]">{item.title}</p>
                           {!isRead && (
-                            <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-brand-400" />
+                            <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--fyxvo-brand)]" />
                           )}
                         </div>
                         <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)] leading-5">{item.message}</p>

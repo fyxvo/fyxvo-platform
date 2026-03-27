@@ -244,7 +244,7 @@ export default function ApiKeysPage() {
               <span className="text-sm text-[var(--fyxvo-text-soft)]">{selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""} selected</span>
               <button
                 type="button"
-                className="rounded px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition-colors"
+                className="rounded px-2 py-1 text-xs text-[var(--fyxvo-danger)] hover:bg-[var(--fyxvo-danger-bg)] transition-colors"
                 onClick={() => setBulkRevokeOpen(true)}
               >
                 Bulk revoke ({selectedKeyIds.size})
@@ -352,7 +352,7 @@ export default function ApiKeysPage() {
                               <div className="text-xs text-[var(--fyxvo-text-muted)]">Expires {formatRelativeDate(apiKey.expiresAt)}</div>
                             ) : null}
                             {!apiKey.lastUsedAt || new Date(apiKey.lastUsedAt).getTime() < Date.now() - 14 * 24 * 60 * 60 * 1000 ? (
-                              <div className="text-xs text-amber-600 dark:text-amber-400">Dormant 14d+</div>
+                              <div className="text-xs text-[var(--fyxvo-warning)]">Dormant 14d+</div>
                             ) : null}
                           </div>
                         </td>
@@ -370,7 +370,7 @@ export default function ApiKeysPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="rounded px-2 py-1 text-xs text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition-colors"
+                                  className="rounded px-2 py-1 text-xs text-[var(--fyxvo-danger)] hover:bg-[var(--fyxvo-danger-bg)] transition-colors"
                                   onClick={() => {
                                     setRevokeKey(apiKey);
                                   }}

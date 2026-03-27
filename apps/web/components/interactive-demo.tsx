@@ -144,7 +144,7 @@ function StepFund() {
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
           <span className="text-xs text-[var(--fyxvo-text-muted)]">0.05 SOL deposited · ~50,000 requests</span>
         </div>
-        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-medium text-[var(--fyxvo-success)]">
           funded
         </span>
       </div>
@@ -181,7 +181,7 @@ function StepApiKey() {
             <span className="text-emerald-400">$</span>
             <span className="text-slate-300">fyxvo keys create --project my-dapp</span>
           </div>
-          <div className="mt-2 rounded-md border border-slate-700/60 bg-slate-900/60 px-3 py-2.5 flex items-center justify-between gap-3">
+          <div className="mt-2 rounded-md border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2.5 flex items-center justify-between gap-3">
             <span className="font-mono text-sm text-emerald-300 tracking-wide">
               fyxvo_live_AbCd<span className="text-slate-500">...</span>XyZ
             </span>
@@ -401,7 +401,7 @@ export function InteractiveDemo() {
             onClick={() => setActiveStep(step.id)}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition ${
               activeStep === step.id
-                ? "bg-brand-500 text-white"
+                ? "bg-[var(--fyxvo-brand)] text-white"
                 : "border border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
             }`}
           >
@@ -459,7 +459,7 @@ export function InteractiveDemo() {
         </div>
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-600"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--fyxvo-brand-strong)]"
         >
           Create your free account →
         </Link>

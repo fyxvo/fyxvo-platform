@@ -290,7 +290,7 @@ export function PlaygroundRecipesPanel({
                 key={recipe.id}
                 className={`rounded-[1.25rem] border p-4 ${
                   selectedRecipeId === recipe.id
-                    ? "border-brand-500/40 bg-brand-500/10"
+                    ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand-subtle)]"
                     : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]"
                 }`}
               >

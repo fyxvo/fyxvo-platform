@@ -164,7 +164,7 @@ export function RealtimeFeed({ projectId, token }: RealtimeFeedProps) {
                 onClick={() => setStatusFilter(filter)}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
                   statusFilter === filter
-                    ? "bg-brand-500/20 text-[var(--fyxvo-brand)]"
+                    ? "bg-[var(--fyxvo-brand)]/20 text-[var(--fyxvo-brand)]"
                     : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                 }`}
               >

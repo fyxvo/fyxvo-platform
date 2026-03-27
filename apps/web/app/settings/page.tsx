@@ -874,7 +874,7 @@ export default function SettingsPage() {
                   onClick={() => setArchiveReason((prev) => (prev === reason ? null : reason))}
                   className={`rounded-xl border px-3 py-2 text-left text-xs font-medium transition-colors ${
                     archiveReason === reason
-                      ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                       : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                   }`}
                 >
@@ -962,11 +962,11 @@ export default function SettingsPage() {
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
                         reputationLevel === "Operator"
-                          ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          ? "bg-amber-500/15 text-[var(--fyxvo-warning)]"
                           : reputationLevel === "Architect"
-                            ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                            ? "bg-purple-500/15 text-purple-600"
                             : reputationLevel === "Builder"
-                              ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                              ? "bg-blue-500/15 text-blue-600"
                               : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                       }`}
                     >
@@ -992,11 +992,11 @@ export default function SettingsPage() {
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold ${
                   reputationLevel === "Operator"
-                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    ? "bg-amber-500/15 text-[var(--fyxvo-warning)]"
                     : reputationLevel === "Architect"
-                      ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                      ? "bg-purple-500/15 text-purple-600"
                       : reputationLevel === "Builder"
-                        ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                        ? "bg-blue-500/15 text-blue-600"
                         : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                 }`}
               >
@@ -1049,7 +1049,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
               {emailSaved ? (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Email saved.</p>
+                <p className="text-xs text-[var(--fyxvo-success)]">Email saved.</p>
               ) : null}
               <p className="text-xs text-[var(--fyxvo-text-muted)]">
                 Fyxvo uses this address for verification, weekly digests, and operational notices after you confirm it.
@@ -1397,7 +1397,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
               {displayNameSaved ? (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Display name saved.</p>
+                <p className="text-xs text-[var(--fyxvo-success)]">Display name saved.</p>
               ) : null}
             </div>
           </SettingRow>
@@ -1410,7 +1410,7 @@ export default function SettingsPage() {
                   onClick={() => setProjectEnvironment(env)}
                   className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                     projectEnvironment === env
-                      ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                       : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                   }`}
                 >
@@ -1470,7 +1470,7 @@ export default function SettingsPage() {
               onClick={() => setProjectStarred(!projectStarred)}
               className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                 projectStarred
-                  ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                  ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                   : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
               }`}
             >
@@ -1539,7 +1539,7 @@ export default function SettingsPage() {
                   aria-checked={projectIsPublic}
                   onClick={() => setProjectIsPublic(!projectIsPublic)}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                    projectIsPublic ? "bg-brand-500" : "bg-[var(--fyxvo-border-strong)]"
+                    projectIsPublic ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border-strong)]"
                   }`}
                 >
                   <span
@@ -1588,7 +1588,7 @@ export default function SettingsPage() {
                 aria-checked={projectLeaderboardVisible}
                 onClick={() => setProjectLeaderboardVisible(!projectLeaderboardVisible)}
                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                  projectLeaderboardVisible ? "bg-brand-500" : "bg-[var(--fyxvo-border-strong)]"
+                  projectLeaderboardVisible ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border-strong)]"
                 }`}
               >
                 <span
@@ -1760,7 +1760,7 @@ export default function SettingsPage() {
                     onClick={() => setNewWebhookEvents((prev) => prev.includes(ev) ? prev.filter((x) => x !== ev) : [...prev, ev])}
                     className={`rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${
                       newWebhookEvents.includes(ev)
-                        ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                        ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                         : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                     }`}
                   >
@@ -1804,9 +1804,9 @@ export default function SettingsPage() {
                             <span
                               className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 ev.status === "delivered"
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  ? "bg-emerald-500/10 text-[var(--fyxvo-success)]"
                                   : ev.status === "failed"
-                                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                                  ? "bg-rose-500/10 text-[var(--fyxvo-danger)]"
                                   : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                               }`}
                             >
@@ -2056,7 +2056,7 @@ expected = hmac.new(
                 {transferOpen ? (
                   <div className="space-y-3">
                     {transferSuccess ? (
-                      <p className="text-sm text-emerald-600 dark:text-emerald-400">Ownership transferred successfully.</p>
+                      <p className="text-sm text-[var(--fyxvo-success)]">Ownership transferred successfully.</p>
                     ) : acceptedMembers.length === 0 ? (
                       <p className="text-sm text-[var(--fyxvo-text-muted)]">No accepted team members to transfer to.</p>
                     ) : (
@@ -2176,7 +2176,7 @@ expected = hmac.new(
                     disabled={notifPrefsSaving === key}
                     onClick={() => void toggleNotifPref(key)}
                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--fyxvo-accent)] ${
-                      notifPrefs[key] ? "bg-brand-500" : "bg-[var(--fyxvo-border-strong)]"
+                      notifPrefs[key] ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border-strong)]"
                     } ${notifPrefsSaving === key ? "opacity-50" : ""}`}
                   >
                     <span
@@ -2297,7 +2297,7 @@ expected = hmac.new(
                   onClick={() => saveDensity(d)}
                   className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                     density === d
-                      ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                       : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                   }`}
                 >

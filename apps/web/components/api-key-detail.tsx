@@ -23,7 +23,7 @@ function MiniBarChart({ buckets }: { readonly buckets: ApiKeyAnalytics["dailyBuc
       {[...buckets].reverse().map((b) => (
         <div key={b.date} className="group relative flex-1">
           <div
-            className="w-full rounded-t-sm bg-brand-500/40 transition group-hover:bg-brand-500/70"
+            className="w-full rounded-t-sm bg-[var(--fyxvo-brand)]/40 transition group-hover:bg-[var(--fyxvo-brand)]/70"
             style={{ height: `${Math.max((b.count / maxCount) * 100, 8)}%` }}
             title={`${b.date}: ${b.count} requests (${b.errors} errors)`}
           />
@@ -122,7 +122,7 @@ export function ApiKeyDetail({
                 key={r.value}
                 type="button"
                 onClick={() => setRange(r.value)}
-                className={`rounded px-2.5 py-1 text-xs font-medium transition ${range === r.value ? "bg-brand-500 text-white" : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"}`}
+                className={`rounded px-2.5 py-1 text-xs font-medium transition ${range === r.value ? "bg-[var(--fyxvo-brand)] text-white" : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"}`}
               >
                 {r.label}
               </button>
@@ -147,7 +147,7 @@ export function ApiKeyDetail({
               </div>
               <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3">
                 <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Error rate</p>
-                <p className={`mt-1 text-xl font-semibold ${analytics.errorRate > 0.05 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                <p className={`mt-1 text-xl font-semibold ${analytics.errorRate > 0.05 ? "text-[var(--fyxvo-danger)]" : "text-[var(--fyxvo-success)]"}`}>
                   {(analytics.errorRate * 100).toFixed(1)}%
                 </p>
               </div>

@@ -70,7 +70,7 @@ export function StatusRegions() {
               <span
                 className={`text-xs font-medium ${
                   isActive
-                    ? "text-emerald-600 dark:text-emerald-400"
+                    ? "text-[var(--fyxvo-success)]"
                     : isPlanned
                       ? "text-[var(--fyxvo-text-muted)]"
                       : "text-[var(--fyxvo-text-muted)]"

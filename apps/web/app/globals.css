@@ -1,16 +1,8 @@
 /*
  * Fyxvo Global Stylesheet
- * ─────────────────────────────────────────────────────────────────────────────
- * Design token documentation is in packages/ui/src/styles.css.
- * This file wires Next.js font variables into the token system and provides
- * app-level base resets and utility classes that extend the token system.
  *
- * Structure:
- *   @import        — pull in design tokens from the UI package
- *   @tailwind      — Tailwind directives
- *   @layer base    — HTML/body resets, typography baseline, selection color
- *   @layer utilities — fyxvo-* utility classes for consistent surface styling
- * ─────────────────────────────────────────────────────────────────────────────
+ * Wires Next.js font variables into the token system and provides
+ * app-level base resets and utility classes.
  */
 
 @import "@fyxvo/ui/styles.css";
@@ -20,13 +12,11 @@
 @tailwind utilities;
 
 @layer base {
-  /* Wire Next.js font variables into the design token system */
   :root {
     --font-display: var(--font-space-grotesk);
     --font-sans: var(--font-ibm-plex-sans);
   }
 
-  /* Every border defaults to the design system border color */
   * {
     border-color: var(--fyxvo-border);
   }
@@ -40,22 +30,22 @@
   body {
     min-height: 100vh;
     overflow-x: hidden;
-    line-height: 1.5;
+    line-height: 1.6;
     background:
       radial-gradient(
-        circle at 10% 0%,
-        color-mix(in srgb, var(--fyxvo-brand) 18%, transparent),
-        transparent 26%
+        ellipse 60% 40% at 10% 0%,
+        color-mix(in srgb, var(--fyxvo-brand) 14%, transparent),
+        transparent
       ),
       radial-gradient(
-        circle at 84% 14%,
-        color-mix(in srgb, var(--fyxvo-brand-soft) 16%, transparent),
-        transparent 25%
+        ellipse 50% 35% at 85% 12%,
+        color-mix(in srgb, var(--fyxvo-brand-soft) 12%, transparent),
+        transparent
       ),
       radial-gradient(
-        circle at 50% 100%,
-        color-mix(in srgb, var(--fyxvo-brand) 10%, transparent),
-        transparent 28%
+        ellipse 70% 30% at 50% 100%,
+        color-mix(in srgb, var(--fyxvo-brand) 8%, transparent),
+        transparent
       ),
       var(--fyxvo-bg);
     color: var(--fyxvo-text);
@@ -64,7 +54,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Heading scale: use display font with tight leading and balance */
   h1,
   h2,
   h3,
@@ -78,7 +67,6 @@
     text-wrap: pretty;
   }
 
-  /* Grid overlay — subtle fixed reference grid using the text-muted color */
   body::before {
     content: "";
     position: fixed;
@@ -93,11 +81,11 @@
       ),
       linear-gradient(
         90deg,
-        color-mix(in srgb, var(--fyxvo-text-muted) 8%, transparent) 1px,
+        color-mix(in srgb, var(--fyxvo-text-muted) 6%, transparent) 1px,
         transparent 1px
       ),
       linear-gradient(
-        color-mix(in srgb, var(--fyxvo-text-muted) 8%, transparent) 1px,
+        color-mix(in srgb, var(--fyxvo-text-muted) 6%, transparent) 1px,
         transparent 1px
       );
     background-size:
@@ -107,12 +95,10 @@
     mask-image: radial-gradient(circle at center, black, transparent 82%);
   }
 
-  /* Link transitions use the fast token (150ms) */
   a {
     transition: color var(--fyxvo-transition-fast);
   }
 
-  /* Code elements use the monospace stack */
   code,
   pre,
   kbd,
@@ -120,13 +106,11 @@
     font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   }
 
-  /* Selection uses a restrained brand tint */
   ::selection {
-    background: color-mix(in srgb, var(--fyxvo-brand) 28%, transparent);
+    background: color-mix(in srgb, var(--fyxvo-brand) 32%, transparent);
     color: white;
   }
 
-  /* Scrollbar styling for webkit browsers */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -147,7 +131,6 @@
 }
 
 @layer utilities {
-  /* Panel surface — gradient + ambient shadow for floating cards */
   .fyxvo-surface {
     background:
       linear-gradient(
@@ -161,38 +144,33 @@
       var(--fyxvo-shadow);
   }
 
-  /* Text gradient — brand-tinted heading treatment */
   .fyxvo-text-gradient {
     background: linear-gradient(
-      120deg,
-      var(--fyxvo-text) 0%,
-      var(--fyxvo-brand-soft) 52%,
-      var(--fyxvo-brand) 100%
+      135deg,
+      var(--fyxvo-brand-soft) 0%,
+      var(--fyxvo-brand) 50%,
+      var(--fyxvo-brand-strong) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
-  /* Card outline — inset border + directional glow */
   .fyxvo-outline {
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, var(--fyxvo-border) 90%, transparent),
       0 24px 64px color-mix(in srgb, var(--fyxvo-brand) 12%, rgba(2, 6, 23, 0.2));
   }
 
-  /* Soft panel — used for secondary surfaces within cards */
   .fyxvo-panel-subtle {
     background: var(--fyxvo-panel-soft);
     border-color: var(--fyxvo-border);
   }
 
-  /* Hairline border utility */
   .fyxvo-hairline {
     border-color: var(--fyxvo-border);
   }
 
-  /* Text color shortcuts */
   .fyxvo-muted {
     color: var(--fyxvo-text-muted);
   }
@@ -201,19 +179,16 @@
     color: var(--fyxvo-text-soft);
   }
 
-  /* Brand ring — used for focused / active brand-colored elements */
   .fyxvo-brand-ring {
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--fyxvo-brand) 18%, transparent),
       0 18px 50px color-mix(in srgb, var(--fyxvo-brand) 18%, transparent);
   }
 
-  /* Scroll margin for in-page anchor links (accounts for sticky header) */
   .fyxvo-scroll-section {
     scroll-margin-top: 6rem;
   }
 
-  /* Interactive hover — 150ms transition on bg/border/color */
   .fyxvo-interactive {
     transition:
       background-color var(--fyxvo-transition-fast),
@@ -222,7 +197,6 @@
       box-shadow var(--fyxvo-transition-fast);
   }
 
-  /* Focus ring — immediate appearance (no transition delay) */
   .fyxvo-focus-ring {
     outline: none;
   }

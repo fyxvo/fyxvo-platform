@@ -28,24 +28,25 @@ export default function PrivacyPage() {
       <PageHeader
         eyebrow="Legal"
         title="Privacy Policy"
-        description={`Effective date: ${effectiveDate}. This policy describes how Fyxvo handles personal information collected through the devnet private alpha platform.`}
+        description={`Effective date: ${effectiveDate}. Here is how we look after your personal information while you use the Fyxvo devnet private alpha.`}
       />
 
       <Notice tone="neutral" title="Private alpha context">
-        Fyxvo is currently operating as a private alpha on Solana devnet. This policy reflects current
-        data practices. It will be updated as the platform evolves toward mainnet.
+        Fyxvo is currently in private alpha on Solana devnet. This policy describes what we actually
+        do with your data today. As the platform grows and moves closer to mainnet, we will revisit
+        and update it accordingly.
       </Notice>
 
       <div className="space-y-6">
         <Section title="1. Who we are">
           <p>
-            Fyxvo operates a Solana devnet infrastructure platform providing wallet-authenticated
-            project control, funded JSON-RPC relay, and managed operator infrastructure. The platform
-            is accessed at www.fyxvo.com with API services at api.fyxvo.com and gateway services at
-            rpc.fyxvo.com.
+            Fyxvo is a Solana devnet infrastructure platform. We provide wallet-authenticated project
+            controls, funded JSON-RPC relay, and managed operator infrastructure. The main platform
+            lives at www.fyxvo.com, the API at api.fyxvo.com, and the gateway at rpc.fyxvo.com.
           </p>
           <p>
-            For questions about this policy, contact us through the channels listed at{" "}
+            Got a question about how we handle your data? You can reach us through the contact
+            channels listed at{" "}
             <span className="font-mono text-[var(--fyxvo-text)]">www.fyxvo.com/contact</span>.
           </p>
         </Section>
@@ -53,154 +54,158 @@ export default function PrivacyPage() {
         <Section title="2. What data we collect">
           <p className="font-medium text-[var(--fyxvo-text)]">Wallet addresses</p>
           <p>
-            When you connect a Solana wallet, we record your public wallet address. This address is
-            used to identify your account and sign your API session. We never request, store, or have
-            access to your private key or seed phrase under any circumstances.
+            When you connect a Solana wallet, we store your public wallet address. That is how we
+            know who you are and how we authenticate your API sessions. We never ask for your private
+            key or seed phrase, we never store them, and we have zero access to them.
           </p>
           <p className="font-medium text-[var(--fyxvo-text)]">Session data</p>
           <p>
-            A JWT (JSON Web Token) is issued after wallet authentication. This token is stored in your
-            browser session and transmitted with API requests. It expires and is not persisted on our
-            servers after expiry.
+            Once you sign in with your wallet, we create a JWT (JSON Web Token) for your session.
+            Your browser holds onto that token and sends it with each API request. When the token
+            expires, we do not keep a copy on our servers.
           </p>
           <p className="font-medium text-[var(--fyxvo-text)]">Request logs</p>
           <p>
-            Every JSON-RPC request routed through the gateway is logged with the project identifier,
-            route, method, HTTP status code, and response latency. Logs are associated with the
-            project that issued the API key, not with personal identity beyond the project owner's
-            wallet address.
+            Every JSON-RPC request that flows through the gateway gets logged with a project
+            identifier, route, method, HTTP status code, and response latency. These logs are
+            associated with the project that owns the API key, not with you personally beyond the
+            wallet address of the project owner.
           </p>
           <p className="font-medium text-[var(--fyxvo-text)]">Project data</p>
           <p>
-            Project names, slugs, descriptions, on-chain program-derived addresses (PDAs), and funding
-            history are stored in our database. This data is tied to your wallet address.
+            We store your project names, slugs, descriptions, on-chain program-derived addresses
+            (PDAs), and funding history. All of it is tied to your wallet address.
           </p>
           <p className="font-medium text-[var(--fyxvo-text)]">API keys</p>
           <p>
-            API key metadata (label, scopes, prefix, status, creation and last-used timestamps) is
-            stored. Full key values are shown once at creation and are not stored in recoverable form
-            after that point.
+            We hold onto metadata about your API keys: labels, scopes, prefixes, status, and
+            timestamps for when they were created and last used. The full key value is shown to you
+            exactly once at creation. After that moment, we cannot recover it and neither can you.
           </p>
           <p className="font-medium text-[var(--fyxvo-text)]">Interest and feedback submissions</p>
           <p>
-            If you submit an interest or feedback form, we collect the name, email, team name, use
-            case description, expected request volume, and any message you provide. This data is used
-            for founder follow-up and product improvement.
+            If you fill out an interest or feedback form, we collect the name, email, team name, use
+            case, expected request volume, and whatever message you write. We use that to follow up
+            with you personally and to improve the product.
           </p>
           <p className="font-medium text-[var(--fyxvo-text)]">Analytics events</p>
           <p>
-            Lightweight first-party events (landing CTA clicks, wallet connect intent, project
-            creation starts, funding flow starts, API key creation) are recorded without third-party
-            tracking scripts. No cross-site tracking is used.
+            We record lightweight, first-party events such as landing page CTA clicks, wallet
+            connect attempts, project creation starts, funding flow starts, and API key creation.
+            There are no third-party tracking scripts on the site. We do not follow you around the
+            internet.
           </p>
         </Section>
 
         <Section title="3. How wallet addresses are handled">
           <p>
-            Your wallet address is a public identifier on the Solana blockchain. We use it to
-            associate your account with projects, API keys, and funding records within Fyxvo. We do
-            not sell, share, or combine wallet addresses with third-party identity graphs or
-            advertising networks.
+            Your wallet address is already publicly visible on the Solana blockchain. Inside Fyxvo,
+            we use it to tie your account to your projects, API keys, and funding records. We will
+            never sell it, share it with advertisers, or cross-reference it with third-party identity
+            services.
           </p>
           <p>
-            Wallet addresses may appear in admin-visible logs and audit surfaces for fraud prevention
-            and governance review. They are not displayed to other users of the platform.
+            Wallet addresses may appear in internal admin logs and audit tools so we can investigate
+            potential fraud or governance issues. Other users on the platform cannot see your wallet
+            address.
           </p>
         </Section>
 
         <Section title="4. Request log storage">
           <p>
-            Request logs are stored to support analytics, billing reconciliation, rate limit
-            enforcement, and operator health reporting. Logs include the request timestamp, route,
-            method, HTTP status, latency, service identifier, and project identifier.
+            We keep request logs so we can power your analytics dashboards, reconcile billing,
+            enforce rate limits, and monitor operator health. Each log entry captures a timestamp,
+            route, method, HTTP status, latency, service identifier, and project identifier.
           </p>
           <p>
-            Request logs do not contain the body of relayed RPC requests. Only routing metadata is
-            retained. Devnet request logs are retained for 90 days unless a shorter retention is
-            operationally necessary.
+            We never store the actual body of your RPC requests. Only routing metadata is retained.
+            On devnet, request logs are kept for 90 days unless operational circumstances require a
+            shorter window.
           </p>
         </Section>
 
         <Section title="5. Analytics tracking">
           <p>
-            Fyxvo uses first-party analytics only. We record product usage events (listed in Section
-            2) using our own API endpoints. We do not use Google Analytics, Mixpanel, Segment, or
-            similar third-party analytics services on the current alpha platform.
+            All of our analytics are first-party. The product usage events described in Section 2 go
+            through our own API endpoints. We do not use Google Analytics, Mixpanel, Segment, or any
+            other third-party analytics tool in this alpha.
           </p>
           <p>
-            Browser-side analytics are minimal and do not track users across sessions or across other
-            websites. No fingerprinting techniques are used.
+            On the browser side, our tracking footprint is minimal. We do not follow you across
+            sessions or across other websites, and we do not use fingerprinting techniques.
           </p>
         </Section>
 
         <Section title="6. Interest and feedback submission storage">
           <p>
-            Interest and feedback submissions are stored in our control plane database and are
-            accessible to Fyxvo team members for review and follow-up. Submissions are not shared
-            with third parties. Email addresses provided in submissions are used only for direct
-            founder follow-up and are not added to marketing lists without explicit consent.
+            When you submit an interest or feedback form, that data lives in our control plane
+            database where the Fyxvo team can review and follow up on it. We do not share it outside
+            the team. If you give us your email address, we will only use it for direct, personal
+            follow-up. We will not add you to any marketing list unless you explicitly tell us you
+            want that.
           </p>
         </Section>
 
         <Section title="7. Third-party services">
-          <p>The following third-party services are used in the operation of the platform:</p>
+          <p>A few third-party services help us run the platform.</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              <span className="font-medium text-[var(--fyxvo-text)]">Vercel</span> — frontend
-              hosting and edge delivery. Vercel may log request metadata including IP addresses and
-              request paths.
+              <span className="font-medium text-[var(--fyxvo-text)]">Vercel</span> hosts our
+              frontend and handles edge delivery. Vercel may log request metadata such as IP
+              addresses and request paths on their infrastructure.
             </li>
             <li>
-              <span className="font-medium text-[var(--fyxvo-text)]">Railway</span> — API and
-              gateway backend hosting. Railway may log container-level request metadata.
+              <span className="font-medium text-[var(--fyxvo-text)]">Railway</span> hosts the API
+              and gateway backends. Railway may log container-level request metadata for their own
+              operational needs.
             </li>
             <li>
-              <span className="font-medium text-[var(--fyxvo-text)]">Solana devnet</span> — all
-              on-chain transactions are publicly visible on the Solana blockchain. On-chain data
-              (project PDAs, funding transactions) is immutable and public by the nature of the
-              protocol.
+              <span className="font-medium text-[var(--fyxvo-text)]">Solana devnet</span> is a
+              public blockchain, which means all on-chain transactions are visible to anyone. Data
+              like project PDAs and funding transactions is immutable and public by nature.
             </li>
           </ul>
           <p>
-            We do not use advertising networks, social media pixels, or third-party identity
-            services.
+            We do not use advertising networks, social media tracking pixels, or third-party
+            identity resolution services.
           </p>
         </Section>
 
         <Section title="8. Data retention">
           <p>
-            Account data (wallet address, projects, API keys) is retained as long as the account is
-            active. Request logs are retained for 90 days on devnet. Interest and feedback
-            submissions are retained indefinitely for product review purposes.
+            Your account data (wallet address, projects, API keys) sticks around as long as your
+            account is active. Request logs on devnet are kept for 90 days. Interest and feedback
+            submissions are kept indefinitely so we can refer back to them when making product
+            decisions.
           </p>
           <p>
-            When the platform moves to mainnet, a formal data retention schedule will be published.
-            For deletion requests during the private alpha, contact us directly.
+            When we move to mainnet, we will publish a formal data retention schedule. If you want
+            something deleted during the private alpha, just reach out and we will take care of it.
           </p>
         </Section>
 
         <Section title="9. Your rights">
           <p>
-            You have the right to request access to data associated with your wallet address, to
-            request deletion of your account data, and to withdraw from the private alpha at any
-            time.
+            You can ask us for a copy of all the data tied to your wallet address. You can ask us
+            to delete your account data. You can leave the private alpha whenever you want.
           </p>
           <p>
-            To exercise these rights, contact us through the support channels at
-            www.fyxvo.com/contact. During the private alpha, requests are handled manually with a
-            response target of five business days.
+            For any of these requests, contact us through the support channels at
+            www.fyxvo.com/contact. During the private alpha we handle these manually, and we aim
+            to respond within five business days.
           </p>
           <p>
-            Note that on-chain data (transactions, PDAs) cannot be deleted as it is part of the
-            public Solana blockchain ledger.
+            One thing worth knowing: on-chain data such as transactions and PDAs lives on the public
+            Solana blockchain ledger and cannot be removed. That is simply how blockchains work.
           </p>
         </Section>
 
         <Section title="10. Changes to this policy">
           <p>
-            We may update this policy as the platform evolves. Material changes will be communicated
-            through the status page or community channels (X, Discord, Telegram). The effective date
-            at the top of this page will be updated with each revision.
+            As the platform evolves, we may update this policy. If we make a meaningful change, we
+            will let you know through the status page or our community channels (X, Discord,
+            Telegram). The effective date at the top of this page will always reflect the latest
+            revision.
           </p>
         </Section>
       </div>

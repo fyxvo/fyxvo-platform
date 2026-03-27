@@ -53,7 +53,7 @@ export function CookieNotice() {
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg-elevated)] px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <p className="text-sm text-[var(--fyxvo-text-muted)]">
           Fyxvo uses cookies and local storage for session management and preferences.{" "}
-          <Link href="/cookies" className="text-[var(--fyxvo-brand)] dark:text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 underline-offset-2 hover:underline">
+          <Link href="/cookies" className="text-[var(--fyxvo-brand)] text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)] underline-offset-2 hover:underline">
             Cookie policy
           </Link>
         </p>

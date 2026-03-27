@@ -121,13 +121,13 @@ export function PricingEstimator({ solPriceUsd }: Props) {
             </div>
           ) : null}
           {result.discountPct > 0 ? (
-            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center justify-between text-[var(--fyxvo-success)]">
               <span className="text-xs">Volume discount applied</span>
               <span className="text-xs font-medium">−{result.discountPct}%</span>
             </div>
           ) : null}
           {freeRemaining > 0 ? (
-            <div className="text-xs text-emerald-600 dark:text-emerald-400">
+            <div className="text-xs text-[var(--fyxvo-success)]">
               {freeRemaining.toLocaleString()} of your {FREE_TIER_REQUESTS.toLocaleString()} free requests remain for new projects.
             </div>
           ) : null}
@@ -303,7 +303,7 @@ export function AdvancedPricingEstimator({ solPriceUsd }: AdvancedProps) {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--fyxvo-text-muted)]">Recommended 30-day fund</span>
-            <span className="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{recommended30DayFund.toFixed(6)} SOL</span>
+            <span className="font-mono text-sm font-semibold text-[var(--fyxvo-success)]">{recommended30DayFund.toFixed(6)} SOL</span>
           </div>
           {solPriceUsd != null && totalMonthlySol > 0 ? (
             <div className="flex items-center justify-between">

@@ -81,7 +81,7 @@ function SectionHeading({
   return (
     <div className="mb-6">
       {eyebrow ? (
-        <div className="mb-2 text-xs uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300">{eyebrow}</div>
+        <div className="mb-2 text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-brand)]">{eyebrow}</div>
       ) : null}
       <h2
         id={id}
@@ -588,7 +588,7 @@ curl ${webEnv.apiBaseUrl}/v1/network/health-calendar
                   key={item.step}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
                     {item.step}
                   </div>
                   <div className="mt-2 text-base font-semibold text-[var(--fyxvo-text)]">
@@ -603,9 +603,9 @@ curl ${webEnv.apiBaseUrl}/v1/network/health-calendar
           </section>
 
           {/* Five Minute Quickstart */}
-          <section id="five-minute-quickstart" className="rounded-[1.5rem] border border-brand-500/20 bg-brand-500/5 p-6 space-y-5">
+          <section id="five-minute-quickstart" className="rounded-[1.5rem] border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] p-6 space-y-5">
             <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-brand-600 dark:text-brand-300 mb-1">Complete working example</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-brand)] mb-1">Complete working example</div>
               <h3 className="text-xl font-semibold text-[var(--fyxvo-text)]">Five Minute Quickstart</h3>
               <p className="mt-2 text-sm text-[var(--fyxvo-text-muted)]">
                 From zero to a live devnet relay request using curl only. No SDK required.
@@ -690,7 +690,7 @@ curl -s -X POST ${webEnv.gatewayBaseUrl}/priority \\
                   onClick={() => setActiveQuickstart(fw)}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
                     activeQuickstart === fw
-                      ? "border-b-2 border-brand-500 text-[var(--fyxvo-text)]"
+                      ? "border-b-2 border-[var(--fyxvo-brand)] text-[var(--fyxvo-text)]"
                       : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                   }`}
                 >
@@ -851,10 +851,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                   Step 2 — Sign in the browser
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Use <code className="text-brand-600 dark:text-brand-300">wallet.signMessage(Buffer.from(challenge))</code> from{" "}
-                  <code className="text-brand-600 dark:text-brand-300">@solana/wallet-adapter-base</code>. Convert the
+                  Use <code className="text-[var(--fyxvo-brand)]">wallet.signMessage(Buffer.from(challenge))</code> from{" "}
+                  <code className="text-[var(--fyxvo-brand)]">@solana/wallet-adapter-base</code>. Convert the
                   resulting{" "}
-                  <code className="text-brand-600 dark:text-brand-300">Uint8Array</code> signature to base58 before
+                  <code className="text-[var(--fyxvo-brand)]">Uint8Array</code> signature to base58 before
                   sending.
                 </p>
               </div>
@@ -913,7 +913,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             <div className="space-y-5">
               <Notice tone="neutral" title="Required scope">
                 Keys used on the standard path must carry the{" "}
-                <code className="text-brand-600 dark:text-brand-300">rpc:request</code> scope. Under-scoped keys receive
+                <code className="text-[var(--fyxvo-brand)]">rpc:request</code> scope. Under-scoped keys receive
                 a 403, not silent broad access.
               </Notice>
               <CodeBlock code={standardRpcCode} label="Standard relay request" />
@@ -930,7 +930,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 </ul>
               </div>
               <Notice tone="neutral" title="Endpoint">
-                Standard path: <code className="text-brand-600 dark:text-brand-300">{webEnv.gatewayBaseUrl}/rpc</code>
+                Standard path: <code className="text-[var(--fyxvo-brand)]">{webEnv.gatewayBaseUrl}/rpc</code>
               </Notice>
             </div>
           </section>
@@ -945,9 +945,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             />
             <div className="space-y-5">
               <Notice tone="neutral" title="Required scope">
-                Priority keys must carry both <code className="text-brand-600 dark:text-brand-300">rpc:request</code>{" "}
-                and <code className="text-brand-600 dark:text-brand-300">priority:relay</code> scopes. Sending a standard
-                key to <code className="text-brand-600 dark:text-brand-300">/priority</code> returns 403.
+                Priority keys must carry both <code className="text-[var(--fyxvo-brand)]">rpc:request</code>{" "}
+                and <code className="text-[var(--fyxvo-brand)]">priority:relay</code> scopes. Sending a standard
+                key to <code className="text-[var(--fyxvo-brand)]">/priority</code> returns 403.
               </Notice>
               <CodeBlock code={priorityRelayCode} label="Priority relay request" />
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1458,7 +1458,7 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
                     Standard path
                   </div>
                   <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
@@ -1477,7 +1477,7 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
                   </div>
                 </div>
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
                     Priority path
                   </div>
                   <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
@@ -1498,9 +1498,9 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
               </div>
               <CodeBlock code={rateLimitCode} label="429 handling with exponential backoff" />
               <Notice tone="neutral" title="Rate limit headers">
-                Every response includes <code className="text-brand-600 dark:text-brand-300">x-ratelimit-limit</code>,{" "}
-                <code className="text-brand-600 dark:text-brand-300">x-ratelimit-remaining</code>, and{" "}
-                <code className="text-brand-600 dark:text-brand-300">x-ratelimit-reset</code> headers. Use these to
+                Every response includes <code className="text-[var(--fyxvo-brand)]">x-ratelimit-limit</code>,{" "}
+                <code className="text-[var(--fyxvo-brand)]">x-ratelimit-remaining</code>, and{" "}
+                <code className="text-[var(--fyxvo-brand)]">x-ratelimit-reset</code> headers. Use these to
                 implement adaptive backoff without waiting for a 429.
               </Notice>
             </div>
@@ -1517,7 +1517,7 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
                     What simulation mode does
                   </div>
                   <ul className="space-y-1.5 text-sm text-[var(--fyxvo-text-soft)]">
@@ -1528,7 +1528,7 @@ if (sig !== computed) return res.status(401).send('Unauthorized');`}
                   </ul>
                 </div>
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
                     Supported methods
                   </div>
                   <ul className="space-y-1.5 text-sm font-mono text-[var(--fyxvo-text-soft)]">
@@ -1554,7 +1554,7 @@ curl -X POST "${webEnv.gatewayBaseUrl}/rpc?simulate=true" \\
 # {"jsonrpc":"2.0","id":1,"result":"ok"}`}
               />
               <div className="rounded-[1.5rem] border border-amber-500/30 bg-amber-500/10 p-5">
-                <div className="text-xs uppercase tracking-[0.16em] text-amber-600 dark:text-amber-400 mb-2">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-warning)] mb-2">
                   Production integrations
                 </div>
                 <p className="text-sm text-[var(--fyxvo-text-soft)]">
@@ -1578,7 +1578,7 @@ curl -X POST "${webEnv.gatewayBaseUrl}/rpc?simulate=true" \\
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
                     Current version
                   </div>
                   <div className="space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
@@ -1597,7 +1597,7 @@ curl -X POST "${webEnv.gatewayBaseUrl}/rpc?simulate=true" \\
                   </div>
                 </div>
                 <div className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300 mb-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-3">
                     Version detection
                   </div>
                   <p className="text-sm text-[var(--fyxvo-text-soft)]">
@@ -1952,7 +1952,7 @@ curl ${webEnv.apiBaseUrl}/health
                       {item.label}
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <code className="break-all text-xs text-brand-600 dark:text-brand-300">{item.url}</code>
+                      <code className="break-all text-xs text-[var(--fyxvo-brand)]">{item.url}</code>
                       <CopyButton value={item.url} className="shrink-0" />
                     </div>
                     <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
@@ -2091,7 +2091,7 @@ curl ${webEnv.apiBaseUrl}/health
                       key={item.title}
                       className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                     >
-                      <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
                         {item.title}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
@@ -2663,7 +2663,7 @@ const connection = new Connection("https://solana-mainnet.quiknode.pro/YOUR_KEY/
                       <div key={m.name} className="bg-[var(--fyxvo-panel-soft)] p-4">
                         <div className="flex flex-wrap items-center gap-3 mb-1">
                           <code className="font-mono text-sm font-semibold text-[var(--fyxvo-text)]">{m.name}</code>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${m.tier === "Priority" ? "bg-amber-500/15 text-amber-500" : "bg-brand-500/10 text-[var(--fyxvo-brand)]"}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${m.tier === "Priority" ? "bg-amber-500/15 text-amber-500" : "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"}`}>
                             {m.tier}
                           </span>
                           {m.heavy && (

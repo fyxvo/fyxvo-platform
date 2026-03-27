@@ -34,22 +34,22 @@ export default function SecurityPage() {
     <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Security"
-        title="Security posture for the current Fyxvo stage"
-        description="Fyxvo is in a devnet private alpha, so this page is intentionally specific about what is in place today, what still needs review, and how to report issues responsibly."
+        title="Where Fyxvo stands on security right now"
+        description="We are running a devnet private alpha, so we want to be straightforward about what protections are already in place, what still needs work, and how you can let us know if you find something wrong."
       />
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Report a vulnerability</CardTitle>
-            <CardDescription>Use a private channel for anything that could affect user funds, credentials, or service integrity.</CardDescription>
+            <CardTitle>Found a vulnerability?</CardTitle>
+            <CardDescription>If it could affect user funds, credentials, or service integrity, please reach out privately first.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>Email security disclosures to <a className="text-[var(--fyxvo-brand)]" href="mailto:security@fyxvo.com">security@fyxvo.com</a>.</p>
-            <p>Include reproduction steps, impact, and any proof-of-concept details that help validate the issue quickly.</p>
-            <p>Do not publish exploit details before Fyxvo has had a reasonable chance to investigate and respond.</p>
+            <p>Send security disclosures to <a className="text-[var(--fyxvo-brand)]" href="mailto:security@fyxvo.com">security@fyxvo.com</a>.</p>
+            <p>The more detail you can share, the better. Reproduction steps, a description of the impact, and any proof-of-concept material all help us validate and respond quickly.</p>
+            <p>We ask that you hold off on publishing exploit details until we have had a reasonable window to investigate and address the issue.</p>
             <p>
-              Repository policy:{" "}
+              You can also find our disclosure policy in the repository:{" "}
               <Link className="text-[var(--fyxvo-brand)]" href="https://github.com/fyxvo/fyxvo-platform/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">
                 SECURITY.md
               </Link>
@@ -59,15 +59,15 @@ export default function SecurityPage() {
 
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Current security scope</CardTitle>
-            <CardDescription>High-level controls that exist today in the live product.</CardDescription>
+            <CardTitle>What we have in place today</CardTitle>
+            <CardDescription>These are the security controls that are live in the product right now.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>Wallet authentication uses signed challenges rather than password login.</p>
-            <p>Gateway access requires project-scoped API keys with explicit scopes and clean revocation paths.</p>
-            <p>Secrets are stored in managed runtime configuration, not committed to the repository.</p>
-            <p>Webhook URLs are validated against private and internal address targets to reduce SSRF risk.</p>
-            <p>CSP reporting, request logging, incident tracking, and support workflows are live for operational visibility.</p>
+            <p>Authentication works through signed wallet challenges. There are no passwords involved.</p>
+            <p>Gateway access is gated behind project-scoped API keys. Each key has explicit scopes, and you can revoke them cleanly whenever you need to.</p>
+            <p>All secrets live in managed runtime configuration. Nothing sensitive gets committed to the repo.</p>
+            <p>Webhook URLs go through validation that blocks private and internal address targets, which helps reduce SSRF exposure.</p>
+            <p>On the operational side, we have CSP reporting, request logging, incident tracking, and support workflows running so we can actually see what is happening.</p>
           </CardContent>
         </Card>
       </section>
@@ -75,32 +75,32 @@ export default function SecurityPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Secrets and keys</CardTitle>
-            <CardDescription>What Fyxvo does and does not handle.</CardDescription>
+            <CardTitle>How we handle secrets and keys</CardTitle>
+            <CardDescription>A clear picture of what Fyxvo touches and what it does not.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>Fyxvo never asks for or stores wallet private keys.</p>
-            <p>API keys are shown once at creation time, stored as hashes server-side, and can be rotated or revoked from the product.</p>
-            <p>Webhook secrets are generated per endpoint and used for HMAC verification.</p>
-            <p>Anthropic access for the assistant is handled by backend runtime secrets, not exposed to browsers.</p>
+            <p>We will never ask you for your wallet private keys, and we do not store them.</p>
+            <p>When you create an API key, you see it once. After that, we only store a hash on our end. You can rotate or revoke keys directly from the product whenever you want.</p>
+            <p>Each webhook endpoint gets its own generated secret, which is used for HMAC verification so you can confirm that requests are genuinely coming from Fyxvo.</p>
+            <p>The AI assistant runs through backend runtime secrets. None of that credential material is ever exposed to your browser.</p>
           </CardContent>
         </Card>
 
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>What is not audited yet</CardTitle>
-            <CardDescription>Honest scope boundaries for a devnet private alpha.</CardDescription>
+            <CardTitle>What has not been audited yet</CardTitle>
+            <CardDescription>We think it is important to be honest about where the boundaries are.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            <p>Fyxvo does not claim a completed external security audit for the full platform stack today.</p>
-            <p>The devnet launch is intended for controlled evaluation, integration testing, and operational hardening before any future mainnet posture is claimed.</p>
-            <p>Mainnet readiness, broader external review, and stronger governance posture are still future work.</p>
+            <p>We have not completed a formal external security audit of the full platform stack. That is the truth of where things stand today.</p>
+            <p>The devnet launch exists so we can do controlled evaluation, run real integration tests, and harden operations before making any claims about mainnet readiness.</p>
+            <p>Broader external review, stronger governance, and a proper mainnet security posture are all things we are working toward, but they are not done yet.</p>
           </CardContent>
         </Card>
       </section>
 
       <Notice tone="warning" title="Current stage">
-        Fyxvo is live for real developer evaluation on Solana devnet, but this is still a private alpha. Test code carefully, keep wallet hygiene strict, and do not treat the current stack as a mainnet-grade audited environment yet.
+        Fyxvo is live on Solana devnet for real developer evaluation, but this is still a private alpha. Please test carefully, keep your wallet hygiene tight, and do not treat the current environment as though it has been through a mainnet-grade audit. We are not there yet, and we would rather be upfront about that.
       </Notice>
     </div>
   );

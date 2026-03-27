@@ -30,7 +30,7 @@ export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-8">
           <BrandLogo priority />
@@ -42,7 +42,7 @@ export function SiteHeader() {
                 className={cn(
                   "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive(pathname, link.href)
-                    ? "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)]"
+                    ? "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"
                     : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
                 )}
               >
@@ -95,7 +95,7 @@ export function SiteHeader() {
                 className={cn(
                   "block rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive(pathname, link.href)
-                    ? "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text)]"
+                    ? "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-brand)]"
                     : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                 )}
               >
