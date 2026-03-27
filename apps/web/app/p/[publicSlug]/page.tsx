@@ -97,7 +97,7 @@ export default async function PublicProjectPage({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
           </span>
-          <span className="text-xs font-medium text-green-600 dark:text-green-400">
+          <span className="text-xs font-medium text-[var(--fyxvo-success)]">
             Live on Solana Devnet
           </span>
         </div>
@@ -105,18 +105,18 @@ export default async function PublicProjectPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-[var(--fyxvo-brand)]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)] px-3 py-1 text-xs font-medium text-[var(--fyxvo-brand)]">
                 Public project
               </div>
               {project.ownerReputationLevel ? (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                     project.ownerReputationLevel === "Operator"
-                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                      ? "bg-amber-500/15 text-[var(--fyxvo-warning)]"
                       : project.ownerReputationLevel === "Architect"
-                        ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                        ? "bg-purple-500/15 text-purple-600"
                         : project.ownerReputationLevel === "Builder"
-                          ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+                          ? "bg-blue-500/15 text-blue-600"
                           : "bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                   }`}
                 >
@@ -202,7 +202,7 @@ export default async function PublicProjectPage({
           </p>
           <Link
             href="/dashboard"
-            className="inline-flex items-center justify-center rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl bg-[var(--fyxvo-brand)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--fyxvo-brand-strong)] transition-colors"
           >
             Get started free
           </Link>

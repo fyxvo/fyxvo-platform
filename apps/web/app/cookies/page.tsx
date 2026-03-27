@@ -48,39 +48,39 @@ export default function CookiesPage() {
       <PageHeader
         eyebrow="Legal"
         title="Cookie Policy"
-        description={`Effective date: ${effectiveDate}. This policy explains what cookies and local storage Fyxvo uses and how you can manage them.`}
+        description={`Effective date: ${effectiveDate}. This policy explains what cookies and local storage Fyxvo uses, and how you can manage them.`}
       />
 
       <Notice tone="neutral" title="Minimal tracking">
         Fyxvo does not use advertising cookies, third-party tracking pixels, or cross-site
-        analytics. Storage is limited to session management, preferences, and first-party product
-        analytics.
+        analytics. We only store what is needed for session management, your preferences, and
+        first-party product analytics.
       </Notice>
 
       <div className="space-y-6">
         <Section title="1. What we use and why">
           <p>
-            Fyxvo uses browser local storage and session storage rather than traditional HTTP cookies
-            for most client-side persistence. The following items are stored:
+            Fyxvo relies on browser local storage and session storage rather than traditional HTTP
+            cookies for most client-side persistence. Here is what gets stored in your browser.
           </p>
 
           <div className="space-y-3 mt-4">
             <StorageRow
               name="fyxvo-token"
               type="Local storage"
-              purpose="Stores the JWT auth token after wallet authentication. Used to keep your API session active between page loads without requiring wallet re-authentication."
+              purpose="Holds your JWT auth token after you sign in with your wallet. This keeps your API session alive between page loads so you do not have to re-authenticate every time."
               duration="Until session expires or you disconnect your wallet"
             />
             <StorageRow
               name="fyxvo-theme"
               type="Local storage"
-              purpose="Stores your preferred theme (dark or light mode) so the correct theme loads on your next visit."
+              purpose="Remembers whether you prefer dark or light mode so the right theme loads when you come back."
               duration="Persistent until cleared"
             />
             <StorageRow
               name="fyxvo-cookies-accepted"
               type="Local storage"
-              purpose="Records that you have dismissed the cookie notice so it does not appear on every page load."
+              purpose="Records that you have dismissed the cookie notice so it does not keep popping up on every page."
               duration="Persistent until cleared"
             />
           </div>
@@ -88,58 +88,58 @@ export default function CookiesPage() {
 
         <Section title="2. Infrastructure and hosting cookies">
           <p>
-            Vercel, which hosts the Fyxvo frontend, may set performance and security cookies as
-            part of its edge delivery infrastructure. These are set by Vercel and are not under
-            Fyxvo's direct control. Vercel's privacy policy describes what it collects:
+            Vercel, which hosts the Fyxvo frontend, may set its own performance and security cookies
+            as part of edge delivery. Those cookies come from Vercel and are not under our direct
+            control. You can read about what Vercel collects in their privacy policy at
             vercel.com/legal/privacy-policy.
           </p>
           <p>
-            Railway, which hosts the API and gateway backends, does not set browser-side cookies.
-            It may log server-side request metadata for operational purposes.
+            Railway, which hosts the API and gateway backends, does not set any browser-side cookies.
+            It may log server-side request metadata for its own operational purposes.
           </p>
         </Section>
 
         <Section title="3. What we do not use">
-          <p>Fyxvo does not use:</p>
+          <p>Fyxvo does not use any of the following.</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Advertising or remarketing cookies</li>
-            <li>Third-party analytics cookies (Google Analytics, Mixpanel, etc.)</li>
-            <li>Social media tracking pixels (Meta, X, LinkedIn, etc.)</li>
+            <li>Third-party analytics cookies (Google Analytics, Mixpanel, and similar services)</li>
+            <li>Social media tracking pixels (Meta, X, LinkedIn, and others)</li>
             <li>Cross-site tracking or user fingerprinting</li>
-            <li>Persistent device identifiers beyond browser storage</li>
+            <li>Persistent device identifiers beyond what is in browser storage</li>
           </ul>
         </Section>
 
         <Section title="4. How to manage storage">
           <p>
-            You can clear all Fyxvo local storage at any time through your browser settings or
-            developer tools. Clearing storage will:
+            You can clear all Fyxvo local storage whenever you want through your browser settings
+            or developer tools. If you do, here is what happens.
           </p>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Log you out of your current wallet session (fyxvo-token)</li>
-            <li>Reset your theme preference to the platform default</li>
-            <li>Reset the cookie notice dismissal</li>
+            <li>You will be logged out of your current wallet session (fyxvo-token)</li>
+            <li>Your theme preference will reset to the platform default</li>
+            <li>The cookie notice will reappear</li>
           </ul>
           <p>
-            To clear local storage in Chrome: open DevTools (F12) → Application → Storage → Local
-            Storage → select the Fyxvo origin → clear entries.
+            In Chrome, you can do this by opening DevTools (F12), going to Application, then
+            Storage, then Local Storage, selecting the Fyxvo origin, and clearing the entries.
           </p>
           <p>
-            In Firefox: open DevTools (F12) → Storage → Local Storage → select the Fyxvo origin →
-            right-click and delete items.
+            In Firefox, open DevTools (F12), go to Storage, then Local Storage, select the Fyxvo
+            origin, and right-click to delete items.
           </p>
           <p>
-            Clearing storage does not delete your account data, projects, or API keys from the
-            Fyxvo servers. That data persists on our backend until you request deletion (see the
-            Privacy Policy for deletion requests).
+            Clearing local storage does not touch your account data, projects, or API keys on the
+            Fyxvo servers. That data lives on our backend until you ask us to delete it (see the
+            Privacy Policy for details on deletion requests).
           </p>
         </Section>
 
         <Section title="5. Changes to this policy">
           <p>
-            This policy will be updated if new storage mechanisms are introduced. The effective date
-            at the top of this page reflects the most recent revision. Changes will be communicated
-            through the Fyxvo community channels.
+            If we introduce new storage mechanisms, we will update this policy. The effective date
+            at the top of the page always reflects the most recent revision. We will communicate
+            changes through the Fyxvo community channels.
           </p>
         </Section>
       </div>

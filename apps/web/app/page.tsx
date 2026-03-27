@@ -37,19 +37,20 @@ export default async function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-16 lg:grid-cols-2 lg:gap-20 lg:items-center">
             <div>
-              <div className="mb-8 inline-flex items-center gap-2 rounded-lg border border-brand-500/20 bg-brand-500/8 px-3 py-1.5 text-sm font-medium text-brand-600 dark:text-brand-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-                Solana devnet · Private alpha
+              <div className="mb-8 inline-flex items-center gap-2 rounded-lg border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--fyxvo-brand)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--fyxvo-brand)]" />
+                Solana devnet, private alpha
               </div>
 
               <h1 className="font-display text-5xl font-semibold leading-[1.06] tracking-tight text-[var(--fyxvo-text)] sm:text-6xl xl:text-7xl">
-                Funded RPC access{" "}
-                <span className="fyxvo-text-gradient">for Solana teams.</span>
+                Real RPC access{" "}
+                <span className="fyxvo-text-gradient">for Solana builders.</span>
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-8 text-[var(--fyxvo-text-muted)]">
-                Activate a project on chain, fund it with SOL, issue an API key, and route real
-                devnet traffic through a managed relay. One flow. No mock endpoints.
+                Create a project on chain, fund it with SOL, grab an API key, and start
+                routing actual devnet traffic through a managed relay. Everything is live,
+                nothing is simulated.
               </p>
 
               <div className="mt-10 flex flex-wrap gap-3">
@@ -68,7 +69,7 @@ export default async function HomePage() {
                   size="lg"
                   variant="secondary"
                 >
-                  Read docs
+                  Read the docs
                 </TrackedLinkButton>
                 <TrackedLinkButton
                   href="/contact"
@@ -81,7 +82,7 @@ export default async function HomePage() {
                 </TrackedLinkButton>
               </div>
               <p className="mt-4 text-sm text-[var(--fyxvo-text-muted)]">
-                First response in under 5 minutes.
+                Most teams get their first response in under five minutes.
               </p>
             </div>
 
@@ -100,28 +101,28 @@ export default async function HomePage() {
               Live network
             </span>
             <div className="flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${apiOk ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${apiOk ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"}`} />
               <span className="text-sm text-[var(--fyxvo-text-soft)]">
                 API{" "}
-                <span className={apiOk ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                <span className={apiOk ? "text-[var(--fyxvo-success)]" : "text-[var(--fyxvo-warning)]"}>
                   {apiOk ? "operational" : "degraded"}
                 </span>
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${gatewayOk ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${gatewayOk ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"}`} />
               <span className="text-sm text-[var(--fyxvo-text-soft)]">
                 Gateway{" "}
-                <span className={gatewayOk ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                <span className={gatewayOk ? "text-[var(--fyxvo-success)]" : "text-[var(--fyxvo-warning)]"}>
                   {gatewayOk ? "operational" : "degraded"}
                 </span>
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${protocolReady ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${protocolReady ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"}`} />
               <span className="text-sm text-[var(--fyxvo-text-soft)]">
                 Protocol{" "}
-                <span className={protocolReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
+                <span className={protocolReady ? "text-[var(--fyxvo-success)]" : "text-[var(--fyxvo-warning)]"}>
                   {protocolReady ? "ready" : "attention"}
                 </span>
               </span>
@@ -151,7 +152,7 @@ export default async function HomePage() {
             ) : null}
             <Link
               href="/status"
-              className="ml-auto text-xs font-medium text-[var(--fyxvo-brand)] transition-colors hover:text-brand-400 dark:hover:text-brand-300"
+              className="ml-auto text-xs font-medium text-[var(--fyxvo-brand)] transition-colors hover:text-[var(--fyxvo-brand-soft)]"
             >
               Full status
             </Link>
@@ -167,10 +168,10 @@ export default async function HomePage() {
               Capabilities
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              What Fyxvo gives you
+              Everything you need in one place
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Four capabilities in one product, connected to a single on-chain funding source.
+              Four core capabilities tied to a single on-chain funding source. No separate billing systems, no hidden layers.
             </p>
           </div>
 
@@ -180,25 +181,25 @@ export default async function HomePage() {
                 label: "Standard RPC",
                 badge: "Live",
                 badgeTone: "success" as const,
-                body: "JSON-RPC relay over funded project credentials with multi-node routing, rate limiting, and request logging.",
+                body: "Route JSON-RPC requests through a managed relay with multi-node failover, per-key rate limits, and full request logging out of the box.",
               },
               {
                 label: "Priority relay",
                 badge: "Live",
                 badgeTone: "success" as const,
-                body: "Separate routing mode, separate rate window, and distinct pricing. Opt in per key when latency shape matters.",
+                body: "A dedicated routing path with its own rate window and pricing, designed for latency-sensitive operations like DeFi transactions.",
               },
               {
                 label: "Analytics",
                 badge: "Live",
                 badgeTone: "success" as const,
-                body: "Request volume, latency, error rates, and balance consumption tied to your project. Updated from real request logs.",
+                body: "Request volume, latency breakdown, error rates, and balance usage. All pulled from actual request logs, updated in real time.",
               },
               {
                 label: "USDC funding",
                 badge: "Gated",
                 badgeTone: "neutral" as const,
-                body: "The on-chain asset path exists. Public product keeps it disabled until explicitly enabled in runtime config.",
+                body: "The on-chain USDC path exists in the protocol. It stays disabled in the current deployment until explicitly turned on.",
               },
             ].map((item) => (
               <div
@@ -228,25 +229,25 @@ export default async function HomePage() {
               Built for real workflows
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              From setup to verification without guessing
+              Go from setup to verified traffic without guesswork
             </h2>
             <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Calm, technical surfaces that help teams move from setup to verification without guessing what happens next.
+              Clear, technical surfaces that show you exactly what is happening at every step. No black boxes, no assumptions about what went wrong.
             </p>
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {[
               {
-                title: "Project-based API keys",
-                body: "Issue keys per project with explicit scopes so relay traffic, analytics access, and operational ownership stay separated.",
+                title: "Project-scoped API keys",
+                body: "Each key is tied to a single project with explicit scopes, so relay traffic, analytics, and operational ownership stay cleanly separated across your organization.",
               },
               {
                 title: "Live analytics and request tracing",
-                body: "Follow first-request success with request logs, trace lookup, latency views, and project-level health instead of opaque black-box behavior.",
+                body: "Watch your first request land in the logs, then drill into latency histograms, error breakdowns, and balance consumption per project. No delayed reporting.",
               },
               {
-                title: "Managed infrastructure with status visibility",
-                body: "Use the managed gateway with public status visibility, incident history, and on-platform operational context when something changes.",
+                title: "Managed infrastructure with full visibility",
+                body: "The gateway runs on managed nodes with public status pages, incident history, and operational context built into the platform, so you always know what is happening.",
               },
             ].map((item) => (
               <div
@@ -269,44 +270,44 @@ export default async function HomePage() {
               Use cases
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-              Who is building on Fyxvo
+              Who builds on Fyxvo
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Teams running real devnet traffic with a need for funded, observable, and controllable RPC access.
+              Teams that need funded, observable, and controllable RPC access on Solana devnet.
             </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 title: "DeFi protocols",
-                body: "Validate swap, lending, and liquidation flows against devnet before mainnet deployment. Priority relay keeps latency-sensitive transactions on the fast path.",
+                body: "Test swap, lending, and liquidation flows against devnet before going to mainnet. Priority relay keeps time-sensitive transactions on the fast path.",
               },
               {
                 title: "Gaming studios",
-                body: "Test high-frequency asset minting, trade matching, and on-chain state transitions at realistic load without burning mainnet SOL.",
+                body: "Run high-frequency minting, trade matching, and on-chain state transitions at realistic load without burning mainnet SOL on every test cycle.",
               },
               {
                 title: "Tooling developers",
-                body: "Build wallets, explorers, and dashboards against a reliable, authenticated devnet RPC with structured request logs and error breakdowns.",
+                body: "Build wallets, explorers, and monitoring dashboards against authenticated devnet RPC with structured request logs and clear error breakdowns.",
               },
               {
                 title: "Agent frameworks",
-                body: "Run autonomous Solana agents with a funded API key that enforces scopes. Track every RPC call the agent makes in the analytics view.",
+                body: "Give autonomous Solana agents a funded API key with enforced scopes, and track every RPC call they make through the analytics view.",
               },
               {
                 title: "Mobile dApps",
-                body: "Point your mobile client at a managed relay with rate limiting built in. No shared rate cap, no surprise throttles mid-demo.",
+                body: "Point your mobile client at a managed relay with built-in rate limiting. No shared rate caps, no surprise throttling mid-demo.",
               },
               {
-                title: "QA and staging",
-                body: "Separate staging and production projects with distinct funded balances and API keys. Different environment labels, same control surface.",
+                title: "QA and staging environments",
+                body: "Keep staging and production on separate projects with distinct balances and keys. Same control surface, different environment labels.",
               },
             ].map((item, index) => (
               <div
                 key={item.title}
                 className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6 transition-colors duration-150 hover:border-[var(--fyxvo-border-strong)]"
               >
-                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg border border-brand-500/20 bg-brand-500/10">
+                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand-subtle)]">
                   <span className="font-display text-sm font-semibold text-[var(--fyxvo-brand)]">
                     {String(index + 1).padStart(2, "0")}
                   </span>
@@ -330,7 +331,7 @@ export default async function HomePage() {
               See how it works
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              Walk through the five steps from project creation to live analytics.
+              Walk through the five steps from project creation to live analytics, right here on the page.
             </p>
           </div>
           <InteractiveDemo />
@@ -343,25 +344,25 @@ export default async function HomePage() {
           <div className="grid gap-16 lg:grid-cols-2">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-                Live path
+                The live path
               </p>
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
                 How it works
               </h2>
               <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                Six steps from nothing to real relay traffic. Every step is real. Nothing is mocked.
+                Six steps from nothing to real relay traffic. Every step touches real infrastructure. Nothing is mocked or simulated.
               </p>
               <ol className="mt-10 space-y-4">
                 {[
-                  "Connect a Solana wallet and prove ownership with a signed challenge.",
-                  "Create a project. Sign the on-chain activation transaction in your wallet.",
-                  "Prepare a SOL funding transaction and confirm it on Solana devnet.",
-                  "Issue an API key with scoped access to the relay endpoints.",
-                  "Send a JSON-RPC request to the gateway with your API key.",
-                  "Watch request logs, latency, and balance update in analytics.",
+                  "Connect your Solana wallet and prove ownership with a signed challenge.",
+                  "Create a project and confirm the on-chain activation transaction.",
+                  "Prepare a SOL funding transaction and sign it on Solana devnet.",
+                  "Issue an API key scoped to the relay endpoints you need.",
+                  "Send your first JSON-RPC request through the gateway.",
+                  "Watch request logs, latency data, and balance updates appear in analytics.",
                 ].map((step, i) => (
                   <li key={step} className="flex gap-4">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-500/25 bg-brand-500/8 font-display text-xs font-semibold text-[var(--fyxvo-brand)]">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--fyxvo-brand)]/25 bg-[var(--fyxvo-brand-subtle)] font-display text-xs font-semibold text-[var(--fyxvo-brand)]">
                       {i + 1}
                     </div>
                     <p className="pt-0.5 text-sm leading-7 text-[var(--fyxvo-text-soft)]">{step}</p>
@@ -373,7 +374,7 @@ export default async function HomePage() {
             <div className="space-y-4">
               <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
                 <p className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                  Trust surface
+                  Current state
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {[
@@ -395,11 +396,11 @@ export default async function HomePage() {
               </div>
               <Notice tone="success" title="SOL path is live">
                 Wallet auth, project activation, SOL funding, standard RPC, priority relay, request
-                logging, and analytics are all operating against the deployed devnet program.
+                logging, and analytics are all running against the deployed devnet program today.
               </Notice>
-              <Notice tone="neutral" title="Operator topology is managed">
+              <Notice tone="neutral" title="Managed operator topology">
                 Routing runs through Fyxvo-managed infrastructure during the private alpha. This
-                keeps latency predictable while early traffic patterns settle.
+                keeps latency consistent while early traffic patterns settle in.
               </Notice>
             </div>
           </div>
@@ -415,15 +416,15 @@ export default async function HomePage() {
                 Quickstart
               </p>
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                First request in minutes
+                Your first request in minutes
               </h2>
               <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                The gateway accepts standard JSON-RPC requests with an API key in the header.
+                The gateway accepts standard JSON-RPC calls. Add your API key in the header and you are ready.
               </p>
 
               <div className="mt-8 overflow-hidden rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
                 <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2.5">
-                  <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">Standard RPC · curl</span>
+                  <span className="font-mono text-xs text-[var(--fyxvo-text-muted)]">Standard RPC, curl</span>
                   <CopyButton value={curlExample} label="Copy" />
                 </div>
                 <pre className="overflow-x-auto p-4 font-mono text-xs leading-6 text-[var(--fyxvo-text-soft)]">
@@ -483,8 +484,9 @@ export default async function HomePage() {
                 Managed operator infrastructure
               </h2>
               <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                Fyxvo launches with a single managed operator so routing quality stays predictable
-                while the product matures. This is not an open marketplace claim.
+                Fyxvo starts with a single managed operator so routing quality stays predictable
+                while the product matures. This is honest about what it is, not a marketplace claim
+                dressed up as decentralization.
               </p>
               <div className="mt-8 space-y-3">
                 {[
@@ -532,7 +534,7 @@ export default async function HomePage() {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-2.5 py-1.5 text-xs text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]"
                   >
-                    View on Explorer &#8599;
+                    View on Explorer
                   </Link>
                 </div>
               </div>
@@ -561,11 +563,12 @@ export default async function HomePage() {
                 Community
               </p>
               <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-                Join the launch channels
+                Join the conversation
               </h2>
               <p className="mt-4 max-w-lg text-base leading-7 text-[var(--fyxvo-text-muted)]">
-                X for launch updates. Discord for product questions. Telegram for quick coordination
-                during devnet rollout. Direct founder support is available through the contact form.
+                Follow launch updates on X. Ask product questions in Discord. Coordinate on Telegram
+                during devnet rollout. The founder is reachable through the contact form if you
+                need a direct conversation.
               </p>
               <div className="mt-8">
                 <SocialLinkButtons />
@@ -577,9 +580,8 @@ export default async function HomePage() {
                   Who this is for
                 </p>
                 <p className="mt-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-                  Teams validating funded Solana RPC, priority relay behavior, on-chain project
-                  activation, and analytics visibility before expanding beyond the current managed
-                  topology.
+                  Teams that want to validate funded Solana RPC, priority relay behavior, on-chain project
+                  activation, and analytics visibility before scaling beyond the current managed topology.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">

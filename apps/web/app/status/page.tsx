@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     absolute: "Status — Fyxvo"
   },
   description:
-    "Live service readiness for the Fyxvo devnet control plane, gateway, and on-chain protocol accounts.",
+    "See what is running, what needs attention, and the current state of the Fyxvo devnet control plane, gateway, and on-chain protocol.",
   alternates: {
     canonical: `${webEnv.siteUrl}/status`,
   },
@@ -116,20 +116,20 @@ export default async function StatusPage() {
     {
       title: "USDC remains configuration-gated",
       body: status.apiStatus.acceptedAssets?.usdcEnabled
-        ? "USDC has been explicitly enabled for this deployment."
-        : "The on-chain asset path exists, but the public product keeps USDC disabled until you intentionally switch it on in runtime config.",
+        ? "USDC has been turned on for this deployment."
+        : "The on-chain asset path is there, but USDC stays turned off in the current config until you decide to enable it.",
       tone: status.apiStatus.acceptedAssets?.usdcEnabled
         ? ("warning" as const)
         : ("neutral" as const),
     },
     {
       title: "Managed infrastructure is active",
-      body: "The current launch topology uses Fyxvo-managed operator infrastructure. It is described as managed infrastructure, not as an open external operator marketplace.",
+      body: "Fyxvo runs on managed operator infrastructure for the current launch. This is exactly what it sounds like, not an open marketplace with external operators.",
       tone: "neutral" as const,
     },
     {
       title: "Gateway keys are scope-enforced",
-      body: "Standard relay requires rpc:request. Priority relay requires both rpc:request and priority:relay. Under-scoped keys are rejected instead of silently receiving broad access.",
+      body: "Standard relay needs the rpc:request scope. Priority relay needs both rpc:request and priority:relay. If a key does not have the right scopes, it gets rejected rather than quietly granted broader access.",
       tone: "neutral" as const,
     },
     {
@@ -159,14 +159,14 @@ export default async function StatusPage() {
       <div className="flex flex-col items-center text-center py-8 gap-4">
         <div className="flex items-center gap-3">
           <span
-            className={`h-4 w-4 rounded-full ${healthy ? "bg-emerald-500" : "bg-amber-500"} shadow-lg`}
+            className={`h-4 w-4 rounded-full ${healthy ? "bg-[var(--fyxvo-success)]" : "bg-[var(--fyxvo-warning)]"} shadow-lg`}
           />
           <h1 className="text-3xl font-bold text-[var(--fyxvo-text)]">
             {healthy ? "All Systems Operational" : "Attention Needed"}
           </h1>
         </div>
         <p className="text-sm text-[var(--fyxvo-text-muted)] max-w-lg">
-          Live condition across the Fyxvo control plane, relay gateway, and Solana devnet program.
+          Current state of the Fyxvo control plane, relay gateway, and Solana devnet program.
         </p>
         <CopyButton value={snapshotSummary} label="Copy snapshot" />
         <StatusRefreshIndicator />
@@ -175,10 +175,10 @@ export default async function StatusPage() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Notice tone={healthy ? "success" : "warning"} title="How to read this page">
-          Healthy means the API, gateway, and protocol checks are all responding normally. Degraded means at least one core surface is still serving but needs attention. Service disruption means a core surface is unavailable or an incident is actively open.
+          When everything is healthy, the API, gateway, and protocol are all responding normally. Degraded means at least one service is still running but needs attention. A disruption means something is down or an incident is actively being worked on.
         </Notice>
         <Notice tone="neutral" title="Managed infrastructure in the current devnet phase">
-          Fyxvo currently operates managed infrastructure for the devnet private alpha. That means status reflects the live managed stack today, not a public mainnet SLA or an open operator marketplace claim.
+          During the private alpha, Fyxvo runs on managed infrastructure. The status you see here reflects the actual live stack, not a mainnet SLA or a theoretical marketplace setup.
         </Notice>
       </section>
 
@@ -220,7 +220,7 @@ export default async function StatusPage() {
             <Link
               href={new URL("/health", webEnv.apiBaseUrl).toString()}
               target="_blank"
-              className="text-xs text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
+              className="text-xs text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
             >
               API health endpoint →
             </Link>
@@ -344,10 +344,10 @@ export default async function StatusPage() {
                           title={`${new Date(snapshot.checkedAt).toLocaleString()} — ${snapshot.status}${snapshot.responseTimeMs != null ? ` (${snapshot.responseTimeMs}ms)` : ""}`}
                           className={`h-6 flex-1 rounded-sm ${
                             snapshot.status === "healthy"
-                              ? "bg-emerald-500"
+                              ? "bg-[var(--fyxvo-success)]"
                               : snapshot.status === "degraded"
-                                ? "bg-amber-400"
-                                : "bg-red-500"
+                                ? "bg-[var(--fyxvo-warning)]"
+                                : "bg-[var(--fyxvo-danger)]"
                           }`}
                         />
                       ))}
@@ -366,8 +366,7 @@ export default async function StatusPage() {
           <CardHeader>
             <CardTitle>Hosted services</CardTitle>
             <CardDescription>
-              These values come from the live API and gateway status endpoints. They are not static
-              copy.
+              These numbers come straight from the live API and gateway endpoints. Nothing here is hardcoded.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -393,7 +392,7 @@ export default async function StatusPage() {
               <div className="mt-3 text-xs uppercase tracking-[0.16em]">
                 <Link
                   href={new URL("/health", webEnv.apiBaseUrl).toString()}
-                  className="text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
+                  className="text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
                 >
                   API health endpoint
                 </Link>
@@ -432,7 +431,7 @@ export default async function StatusPage() {
               <div className="mt-3 text-xs uppercase tracking-[0.16em]">
                 <Link
                   href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
-                  className="text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
+                  className="text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
                 >
                   Gateway status endpoint
                 </Link>
@@ -470,21 +469,21 @@ export default async function StatusPage() {
               <Link
                 href={new URL("/health", webEnv.apiBaseUrl).toString()}
                 target="_blank"
-                className="text-sm text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
+                className="text-sm text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
               >
                 Open API health
               </Link>
               <Link
                 href={new URL("/v1/status", webEnv.gatewayBaseUrl).toString()}
                 target="_blank"
-                className="text-sm text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
+                className="text-sm text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
               >
                 Open RPC status
               </Link>
               <Link
                 href={new URL("/v1/metrics", webEnv.gatewayBaseUrl).toString()}
                 target="_blank"
-                className="text-sm text-[var(--fyxvo-brand)] hover:text-brand-600 dark:text-brand-300 dark:hover:text-brand-200"
+                className="text-sm text-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-brand-soft)]"
               >
                 Open RPC metrics
               </Link>
@@ -496,8 +495,7 @@ export default async function StatusPage() {
           <CardHeader>
             <CardTitle>Protocol and launch state</CardTitle>
             <CardDescription>
-              The wording stays explicit about what is live, what is managed, and what is
-              intentionally still gated.
+              An honest look at what is live, what is managed, and what is intentionally still turned off.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -546,8 +544,8 @@ export default async function StatusPage() {
             ))}
 
             {readiness && !readiness.ready ? (
-              <div className="rounded-[1.5rem] border border-amber-500/20 bg-amber-500/5 p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-amber-700 dark:text-amber-400">
+              <div className="rounded-[1.5rem] border border-amber-500/20 bg-[var(--fyxvo-warning)]/5 p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-warning)]">
                   Readiness reasons
                 </div>
                 <div className="mt-2 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
@@ -566,7 +564,7 @@ export default async function StatusPage() {
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Incident history</CardTitle>
-            <CardDescription>Service incidents automatically detected by the monitoring worker.</CardDescription>
+            <CardDescription>Incidents detected automatically by the monitoring system.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -649,7 +647,7 @@ export default async function StatusPage() {
           <CardHeader>
             <CardTitle>Network Capacity</CardTitle>
             <CardDescription>
-              Current request throughput versus managed infrastructure capacity.
+              How much of the current infrastructure capacity is being used.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -681,7 +679,7 @@ export default async function StatusPage() {
                     />
                   </div>
                   <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                    Capacity estimate is based on current managed infrastructure. Increases with operator network growth.
+                    This capacity estimate reflects the current managed infrastructure. It will grow as the operator network expands.
                   </p>
                 </div>
               );

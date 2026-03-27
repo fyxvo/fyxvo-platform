@@ -443,7 +443,7 @@ export default function ProjectPage({
                 href={`/p/${project.publicSlug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 text-xs text-[var(--fyxvo-brand)] hover:bg-brand-500/20 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md border border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand-subtle)] px-2 py-0.5 text-xs text-[var(--fyxvo-brand)] hover:bg-[var(--fyxvo-brand)]/20 transition-colors"
               >
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
@@ -600,7 +600,7 @@ export default function ProjectPage({
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${
               activeTab === tab
-                ? "border-b-2 border-brand-500 text-[var(--fyxvo-text)]"
+                ? "border-b-2 border-[var(--fyxvo-brand)] text-[var(--fyxvo-text)]"
                 : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
             }`}
           >
@@ -624,7 +624,7 @@ export default function ProjectPage({
                   onClick={() => setActivityFilter(filter)}
                   className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                     activityFilter === filter
-                      ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                       : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"
                   }`}
                 >
@@ -644,7 +644,7 @@ export default function ProjectPage({
                     const description = describeActivity(entry);
                     return (
                     <div key={entry.id} className="relative">
-                      <div className="absolute -left-4 top-1 h-2 w-2 rounded-full bg-brand-500" />
+                      <div className="absolute -left-4 top-1 h-2 w-2 rounded-full bg-[var(--fyxvo-brand)]" />
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium text-[var(--fyxvo-text)]">{description.title}</span>
@@ -811,10 +811,10 @@ export default function ProjectPage({
               score = Math.min(100, score);
               const scoreColor =
                 score >= 70
-                  ? "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                  ? "text-[var(--fyxvo-success)] border-emerald-500/20 bg-emerald-500/5"
                   : score >= 40
-                    ? "text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/5"
-                    : "text-red-600 dark:text-red-400 border-red-500/20 bg-red-500/5";
+                    ? "text-[var(--fyxvo-warning)] border-amber-500/20 bg-amber-500/5"
+                    : "text-[var(--fyxvo-danger)] border-red-500/20 bg-red-500/5";
               return (
                 <div className="flex items-center gap-3">
                   <span
@@ -998,7 +998,7 @@ export default function ProjectPage({
                 <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Recommended docs and alerts</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {starterKit.docs.map((doc) => (
-                    <Link key={doc.href} href={doc.href} className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1 text-xs text-[var(--fyxvo-text)] hover:border-brand-500/40 hover:bg-brand-500/10">
+                    <Link key={doc.href} href={doc.href} className="rounded-full border border-[var(--fyxvo-border)] px-3 py-1 text-xs text-[var(--fyxvo-text)] hover:border-[var(--fyxvo-brand)]/40 hover:bg-[var(--fyxvo-brand-subtle)]">
                       {doc.label}
                     </Link>
                   ))}

@@ -50,9 +50,9 @@ export default async function JoinPage({
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
         <div className="mx-auto w-full max-w-lg space-y-8">
           {/* Referral banner */}
-          <div className="rounded-2xl border border-brand-500/25 bg-brand-500/8 px-5 py-4">
+          <div className="rounded-2xl border border-[var(--fyxvo-brand)]/25 bg-[var(--fyxvo-brand-subtle)] px-5 py-4">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-xs">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--fyxvo-brand)]/15 text-xs">
                 👋
               </span>
               <div>

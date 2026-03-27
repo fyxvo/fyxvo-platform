@@ -167,8 +167,8 @@ export default function AlertsPage() {
   if (portal.walletPhase !== "authenticated") {
     return (
       <AuthGate
-        title="Connect a wallet to view alerts."
-        body="The alert center groups project-specific operational signals, incidents, and webhook issues for the authenticated workspace."
+        title="You'll need to sign in first"
+        body="Connect your wallet to see what's going on across your projects. Once you're in, this page pulls together balance warnings, webhook issues, error spikes, and anything else worth your attention."
       />
     );
   }
@@ -178,7 +178,7 @@ export default function AlertsPage() {
       <PageHeader
         eyebrow="Operations"
         title="Alert center"
-        description="A clearer operational view across low balance, error rate, webhook, incident, and assistant signals for your workspace."
+        description="Everything that needs your attention, all in one place. Balance warnings, error spikes, webhook failures, incidents, and other signals from your projects show up here so nothing slips through the cracks."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" onClick={copyShareUrl}>
@@ -194,7 +194,7 @@ export default function AlertsPage() {
       <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter by alert type or project to focus on the signals that matter right now.</CardDescription>
+          <CardDescription>Use these to zero in on a specific alert type or project. Handy when you want to focus on one thing at a time.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {portal.token ? (
@@ -217,7 +217,7 @@ export default function AlertsPage() {
                 onClick={() => updateUrl(type, projectFilter)}
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                   typeFilter === type
-                    ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                    ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand)]/10 text-[var(--fyxvo-text)]"
                     : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                 }`}
               >
@@ -256,8 +256,8 @@ export default function AlertsPage() {
           ))}
         </div>
       ) : visibleItems.length === 0 ? (
-        <Notice tone="success" title="No active alerts in this view">
-          The current filters do not surface any alerts right now. Adjust the filters or wait for new operational signals to land.
+        <Notice tone="success" title="All clear">
+          There is nothing matching these filters right now. That could mean everything is humming along nicely, or you might want to loosen the filters above to see more.
         </Notice>
       ) : (
         <section className="grid gap-4">
@@ -278,7 +278,7 @@ export default function AlertsPage() {
                       <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.description}</p>
                       {item.relatedIncident ? (
                         <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
-                          May be related to the ongoing {item.relatedIncident.serviceName} incident.
+                          This could be related to the ongoing {item.relatedIncident.serviceName} incident.
                         </p>
                       ) : null}
                     </div>

@@ -751,7 +751,7 @@ export default function SupportPage() {
                   onClick={() => setStatusFilter(status)}
                   className={`rounded-full border px-3 py-1 text-xs transition ${
                     statusFilter === status
-                      ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                      ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                       : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"
                   }`}
                 >

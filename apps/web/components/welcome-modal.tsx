@@ -55,7 +55,7 @@ export function WelcomeModal({ onDismiss }: { onDismiss: () => void }) {
             {STEPS.map((_, i) => (
               <div
                 key={i}
-                className={`h-1.5 w-6 rounded-full transition-colors ${i <= step ? "bg-brand-500" : "bg-[var(--fyxvo-border)]"}`}
+                className={`h-1.5 w-6 rounded-full transition-colors ${i <= step ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border)]"}`}
               />
             ))}
           </div>

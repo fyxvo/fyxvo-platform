@@ -4,11 +4,11 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Explore Public Projects — Fyxvo",
   description:
-    "Discover public Fyxvo projects, technical showcase profiles, recent traffic, latency posture, and developer visibility settings.",
+    "Take a look at what other developers have built on Fyxvo. Filter by template, tags, traffic, and more to find projects that interest you.",
   alternates: { canonical: "https://www.fyxvo.com/explore" },
   openGraph: {
     title: "Explore Public Projects — Fyxvo",
-    description: "Technical project discovery across public Fyxvo integrations.",
+    description: "Take a look at what other developers have built on Fyxvo.",
     url: "https://www.fyxvo.com/explore",
     siteName: "Fyxvo",
     type: "website",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Explore Public Projects — Fyxvo",
-    description: "Technical project discovery across public Fyxvo integrations.",
+    description: "Take a look at what other developers have built on Fyxvo.",
   },
 };
 
@@ -95,15 +95,15 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-4">
             <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl">
-              Public developer projects
+              What people are building right now
             </h1>
             <p className="max-w-3xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-              A technical showcase of public Fyxvo projects that opted into visibility. Filter by template, tag, leaderboard posture, and traffic so discovery feels operationally useful rather than social.
+              Every project you see here was made public by its creator. Have a look around, narrow things down by template or tag, or just browse to see what catches your eye.
             </p>
           </div>
           <Link
             href="/leaderboard"
-            className="inline-flex items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm font-medium text-[var(--fyxvo-text)] transition hover:border-brand-500/40 hover:text-[var(--fyxvo-brand)]"
+            className="inline-flex items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm font-medium text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand-border)] hover:text-[var(--fyxvo-brand)]"
           >
             Open leaderboard
           </Link>
@@ -115,34 +115,34 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
           <div>
             <div className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Filters</div>
             <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-              Shareable URL filters let you hand teammates a pre-scoped discovery view.
+              All of these filters update the URL, so if you find a view you like, just copy the link and share it with your team.
             </p>
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/explore"
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.toString() === "" ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.toString() === "" ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
               >
                 All projects
               </Link>
               <Link
                 href={toggleParam(filters, "leaderboardVisible", "true")}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("leaderboardVisible") === "true" ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("leaderboardVisible") === "true" ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
               >
-                Leaderboard visible
+                On the leaderboard
               </Link>
               <Link
                 href={toggleParam(filters, "recentTraffic", "true")}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("recentTraffic") === "true" ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("recentTraffic") === "true" ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
               >
-                Recent traffic
+                Active recently
               </Link>
               <Link
                 href={toggleParam(filters, "recentlyCreated", "true")}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("recentlyCreated") === "true" ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("recentlyCreated") === "true" ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
               >
-                Recently created
+                New projects
               </Link>
             </div>
 
@@ -154,7 +154,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                     <Link
                       key={templateType}
                       href={toggleParam(filters, "templateType", templateType)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("templateType") === templateType ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("templateType") === templateType ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
                     >
                       {templateType}
                     </Link>
@@ -171,7 +171,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                     <Link
                       key={tag}
                       href={toggleParam(filters, "tag", tag)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("tag") === tag ? "border-brand-500/40 bg-brand-500/10 text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${filters.get("tag") === tag ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]" : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)]"}`}
                     >
                       #{tag}
                     </Link>
@@ -185,7 +185,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
 
       {items.length === 0 ? (
         <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 text-center text-sm text-[var(--fyxvo-text-muted)]">
-          No public projects match the current filters yet.
+          No projects matched those filters. Try loosening things up a bit, or check back later when more projects have been shared.
         </div>
       ) : (
         <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -199,14 +199,14 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                   </p>
                 </div>
                 {project.leaderboardVisible ? (
-                  <span className="rounded-full border border-brand-500/30 bg-brand-500/10 px-2 py-1 text-[11px] font-medium text-[var(--fyxvo-brand)]">
+                  <span className="rounded-full border border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] px-2 py-1 text-[11px] font-medium text-[var(--fyxvo-brand)]">
                     leaderboard
                   </span>
                 ) : null}
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-3">
-                  <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">7d requests</div>
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Requests (7 days)</div>
                   <div className="mt-1 text-base font-semibold text-[var(--fyxvo-text)]">{project.requestVolume7d.toLocaleString()}</div>
                 </div>
                 <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-3">
@@ -217,7 +217,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
               <div className="mt-4 space-y-2 text-sm text-[var(--fyxvo-text-soft)]">
                 <div>Health: {project.healthSummary}</div>
                 <div>Success rate: {(project.successRate7d * 100).toFixed(1)}%</div>
-                <div>Created: {new Date(project.createdAt).toLocaleDateString()}</div>
+                <div>Created on {new Date(project.createdAt).toLocaleDateString()}</div>
               </div>
               {project.tags.length > 0 ? (
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -238,10 +238,10 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
                     href={`/p/${project.publicSlug}`}
                     className="text-sm font-medium text-[var(--fyxvo-brand)] hover:underline"
                   >
-                    Open public project page
+                    View project
                   </Link>
                 ) : (
-                  <span className="text-sm text-[var(--fyxvo-text-muted)]">Public page unavailable</span>
+                  <span className="text-sm text-[var(--fyxvo-text-muted)]">No public page yet</span>
                 )}
               </div>
             </article>

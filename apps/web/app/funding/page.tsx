@@ -441,7 +441,7 @@ await connection.requestAirdrop(pubkey, 2 * LAMPORTS_PER_SOL);`}</pre>
                   key={item.step}
                   className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-wider text-brand-600 dark:text-brand-300">
+                  <div className="text-xs uppercase tracking-wider text-[var(--fyxvo-brand)]">
                     {item.step}
                   </div>
                   <div className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">

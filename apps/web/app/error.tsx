@@ -9,7 +9,7 @@ function getSafeMessage(error: Error & { digest?: string }) {
   if (process.env.NODE_ENV !== "production" && error.message) {
     return error.message;
   }
-  return "The page could not finish loading. Refresh to try again. If this keeps happening, check the status page or reach out.";
+  return "Something prevented this page from loading. You can try refreshing, and if it keeps happening, the status page will show whether there is a wider issue.";
 }
 
 export default function Error({
@@ -22,8 +22,14 @@ export default function Error({
   const fallbackId = useId().replace(/:/g, "").toUpperCase().slice(0, 8);
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="mb-4 text-4xl font-bold text-rose-700 dark:text-rose-400">Error</div>
-      <h1 className="text-xl font-semibold text-[var(--fyxvo-text)]">Something went wrong</h1>
+      <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full border border-[var(--fyxvo-danger)]/20 bg-[var(--fyxvo-danger-bg)]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--fyxvo-danger)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+          <path d="M12 4l9 16H3z" />
+          <path d="M12 10v4" />
+          <path d="M12 18h.01" />
+        </svg>
+      </div>
+      <h1 className="mt-4 text-xl font-semibold text-[var(--fyxvo-text)]">Something went wrong</h1>
       <p className="mt-3 max-w-md text-sm leading-6 text-[var(--fyxvo-text-soft)]">
         {getSafeMessage(error)}
       </p>
@@ -41,7 +47,7 @@ export default function Error({
       <p className="mt-6 text-xs text-[var(--fyxvo-text-muted)]">
         Still seeing this?{" "}
         <Link href="/contact" className="underline hover:text-[var(--fyxvo-text)]">
-          Contact support
+          Get in touch
         </Link>
       </p>
     </div>

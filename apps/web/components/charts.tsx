@@ -104,7 +104,7 @@ export function LineChartCard({
                 {points.map((point) => (
                   <div
                     key={point.label}
-                    className="flex-1 rounded-t-[1.2rem] bg-brand-500/20"
+                    className="flex-1 rounded-t-[1.2rem] bg-[var(--fyxvo-brand)]/20"
                     style={{ height: `${Math.max((point.value / maxValue) * 100, 12)}%` }}
                   />
                 ))}
@@ -181,7 +181,7 @@ export function BarChartCard({
                 {points.map((point, index) => (
                   <div
                     key={point.label}
-                    className={index % 2 === 0 ? "flex-1 rounded-t-[1.2rem] bg-brand-500/20" : "flex-1 rounded-t-[1.2rem] bg-brand-300/25"}
+                    className={index % 2 === 0 ? "flex-1 rounded-t-[1.2rem] bg-[var(--fyxvo-brand)]/20" : "flex-1 rounded-t-[1.2rem] bg-[var(--fyxvo-brand-soft)]/25"}
                     style={{ height: `${Math.max((point.value / maxValue) * 100, 12)}%` }}
                   />
                 ))}

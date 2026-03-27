@@ -27,7 +27,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Priority SLA",
-    body: "Dedicated relay capacity with guaranteed uptime commitments and sub-50ms p95 latency targets.",
+    body: "You get dedicated relay capacity with real uptime guarantees and latency targets under 50ms at p95. No asterisks.",
   },
   {
     icon: (
@@ -36,7 +36,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Dedicated nodes",
-    body: "Private infrastructure reserved for your workload — no shared queue contention or noisy neighbor effects.",
+    body: "Your own infrastructure, completely separate from shared queues. No noisy neighbors slowing things down.",
   },
   {
     icon: (
@@ -45,7 +45,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Custom rate limits",
-    body: "Negotiate request volume and burst capacity based on your actual traffic patterns, not one-size-fits-all tiers.",
+    body: "We set volume and burst limits around how you actually use the platform, not some generic tier that doesn't fit.",
   },
   {
     icon: (
@@ -54,7 +54,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Team & RBAC",
-    body: "Multi-user projects with role-based access control, audit logs, and team-scoped API keys.",
+    body: "Bring your whole team on board with role-based access, audit logs, and API keys scoped to each project.",
   },
   {
     icon: (
@@ -63,7 +63,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Advanced analytics",
-    body: "Deeper request analytics, custom retention windows, exportable raw logs, and aggregated dashboards.",
+    body: "Go deeper with request analytics, flexible retention windows, exportable raw logs, and dashboards that actually help.",
   },
   {
     icon: (
@@ -72,7 +72,7 @@ const FEATURES = [
       </svg>
     ),
     title: "Dedicated support",
-    body: "Private Slack channel or email support with response time guarantees and a named account contact.",
+    body: "A private Slack channel or email line with guaranteed response times and a real person you can reach by name.",
   },
 ];
 
@@ -104,18 +104,18 @@ export default function EnterprisePage() {
     <div className="min-h-screen bg-[var(--fyxvo-bg)]">
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-4 py-1.5 text-xs font-medium text-[var(--fyxvo-brand)] mb-6">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[var(--fyxvo-brand-muted)] bg-[var(--fyxvo-brand-soft)] px-4 py-1.5 text-xs font-medium text-[var(--fyxvo-brand)] mb-6">
           Enterprise
         </div>
         <h1 className="font-display text-4xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl lg:text-6xl">
-          Infrastructure built for scale
+          Ready for serious traffic
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--fyxvo-text-muted)]">
-          For teams moving beyond devnet exploration into high-volume production traffic.
-          Dedicated capacity, custom SLAs, and direct engineering support.
+          If you have outgrown shared plans and need infrastructure that keeps up with production workloads,
+          this is where we come in. Dedicated capacity, real SLAs, and a team that picks up the phone.
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <a href="#contact" className="inline-flex items-center justify-center rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow hover:bg-brand-600 transition-colors">
+          <a href="#contact" className="inline-flex items-center justify-center rounded-xl bg-[var(--fyxvo-brand)] px-6 py-3 text-sm font-semibold text-white shadow hover:bg-[var(--fyxvo-brand-hover)] transition-colors">
             Talk to us
           </a>
           <a href="/pricing" className="inline-flex items-center justify-center rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-6 py-3 text-sm font-semibold text-[var(--fyxvo-text)] hover:bg-[var(--fyxvo-panel)] transition-colors">
@@ -127,13 +127,13 @@ export default function EnterprisePage() {
       {/* Feature grid */}
       <section className="mx-auto max-w-5xl px-6 py-12">
         <h2 className="text-center font-display text-2xl font-semibold text-[var(--fyxvo-text)] mb-10">
-          What enterprise includes
+          What you get on an enterprise plan
         </h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <Card key={f.title} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
               <CardHeader>
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500/10 text-[var(--fyxvo-brand)]">
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-brand)]">
                   {f.icon}
                 </div>
                 <CardTitle className="text-base">{f.title}</CardTitle>
@@ -151,9 +151,9 @@ export default function EnterprisePage() {
         <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 sm:p-12">
           <div className="grid gap-8 sm:grid-cols-3 text-center">
             {[
-              { stat: ">10M", label: "Daily requests supported" },
-              { stat: "<50ms", label: "p95 relay latency target" },
-              { stat: "99.9%", label: "Uptime SLA available" },
+              { stat: ">10M", label: "Requests handled daily" },
+              { stat: "<50ms", label: "p95 relay latency" },
+              { stat: "99.9%", label: "Uptime backed by SLA" },
             ].map(({ stat, label }) => (
               <div key={stat}>
                 <p className="font-display text-3xl font-bold text-[var(--fyxvo-brand)]">{stat}</p>
@@ -167,14 +167,14 @@ export default function EnterprisePage() {
       {/* Contact form */}
       <section id="contact" className="mx-auto max-w-2xl px-6 py-16">
         <h2 className="font-display text-2xl font-semibold text-[var(--fyxvo-text)] mb-2">
-          Get in touch
+          Let&apos;s talk
         </h2>
         <p className="text-sm text-[var(--fyxvo-text-muted)] mb-8">
-          Tell us about your scale and use case. We&apos;ll follow up within one business day.
+          Tell us a bit about what you need and how you plan to use it. We usually get back to you within a business day.
         </p>
         {submitted ? (
-          <Notice tone="success" title="Request received">
-            We&apos;ll be in touch within one business day. Check your inbox at {contactEmail}.
+          <Notice tone="success" title="We got your request">
+            Thanks for reaching out. Keep an eye on {contactEmail} and we will be in touch soon.
           </Notice>
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
@@ -211,7 +211,7 @@ export default function EnterprisePage() {
                     onClick={() => setEstimatedMonthlyReqs(opt)}
                     className={`rounded-lg border px-2 py-1.5 text-xs font-medium text-center transition-colors ${
                       estimatedMonthlyReqs === opt
-                        ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                        ? "border-[var(--fyxvo-brand-muted)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]"
                         : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                     }`}
                   >
@@ -225,7 +225,7 @@ export default function EnterprisePage() {
               <textarea
                 value={useCase}
                 onChange={(e) => setUseCase(e.target.value)}
-                placeholder="Describe your infrastructure needs, current pain points, and what you're building…"
+                placeholder="What are you building? What problems are you running into? The more context the better."
                 rows={4}
                 required
                 maxLength={2000}
@@ -233,7 +233,7 @@ export default function EnterprisePage() {
               />
             </div>
             {error && (
-              <Notice tone="warning" title="Submission failed">
+              <Notice tone="warning" title="Something went wrong">
                 {error}
               </Notice>
             )}
@@ -242,7 +242,7 @@ export default function EnterprisePage() {
               disabled={submitting || !companyName || !contactEmail || !estimatedMonthlyReqs || !useCase}
               className="w-full"
             >
-              {submitting ? "Sending…" : "Send request"}
+              {submitting ? "Sending..." : "Send request"}
             </Button>
           </form>
         )}

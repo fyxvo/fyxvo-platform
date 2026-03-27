@@ -43,9 +43,9 @@ async function fetchLeaderboard(days: number | null): Promise<LeaderboardRespons
 }
 
 function rankBadgeClass(rank: number): string {
-  if (rank === 1) return "text-yellow-400 font-bold";
-  if (rank === 2) return "text-slate-300 font-bold";
-  if (rank === 3) return "text-orange-400 font-bold";
+  if (rank === 1) return "text-[var(--fyxvo-rank-gold)] font-bold";
+  if (rank === 2) return "text-[var(--fyxvo-rank-silver)] font-bold";
+  if (rank === 3) return "text-[var(--fyxvo-rank-bronze)] font-bold";
   return "text-[var(--fyxvo-text-muted)]";
 }
 
@@ -78,7 +78,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
         <PageHeader
           eyebrow="Community"
           title="Developer Leaderboard"
-          description={`Top projects by request volume — ${periodLabel(period)}. Opt in from project settings.`}
+          description={`These are the most active projects over the last ${periodLabel(period).toLowerCase()}, ranked by how many requests they have handled. If you want your project on here, just flip the switch in your project settings.`}
         />
         {/* Period selector */}
         <div className="flex shrink-0 gap-1 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-1 self-start">
@@ -88,7 +88,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
               href={`?period=${opt.key}`}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                 period === opt.key
-                  ? "bg-brand-500 text-white"
+                  ? "bg-[var(--fyxvo-brand)] text-white"
                   : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
               }`}
             >
@@ -101,17 +101,17 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       {data === null ? (
         <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-6 py-8 text-center">
           <p className="text-sm text-[var(--fyxvo-text-muted)]">
-            Leaderboard is temporarily unavailable.
+            We are having trouble loading the leaderboard right now. Give it a minute and try again.
           </p>
         </div>
       ) : data.entries.length === 0 ? (
         <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-6 py-10 text-center">
           <p className="text-sm text-[var(--fyxvo-text-muted)]">
-            No projects have opted into the leaderboard yet. Be the first — enable it in your{" "}
+            No one has joined the leaderboard yet, so you have a chance to be first. Head to your{" "}
             <Link href="/settings" className="text-[var(--fyxvo-brand)] underline">
               project settings
-            </Link>
-            .
+            </Link>{" "}
+            and turn it on.
           </p>
         </div>
       ) : (
@@ -169,7 +169,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                         View
                       </Link>
                     ) : (
-                      <span className="text-xs text-[var(--fyxvo-text-muted)]">—</span>
+                      <span className="text-xs text-[var(--fyxvo-text-muted)]">n/a</span>
                     )}
                   </td>
                 </tr>
@@ -184,39 +184,39 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
             <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-2">
-              Combined total requests
+              Total requests combined
             </div>
             <div className="text-xl font-semibold text-[var(--fyxvo-text)]">
               {stats.totalRequests.toLocaleString()}
             </div>
-            <div className="text-xs text-[var(--fyxvo-text-muted)] mt-1">across all ranked projects</div>
+            <div className="text-xs text-[var(--fyxvo-text-muted)] mt-1">from every project on the board</div>
           </div>
           <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
             <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-2">
-              Highest single project
+              Busiest single project
             </div>
             <div className="text-xl font-semibold text-[var(--fyxvo-text)]">
               {stats.highestSingle.toLocaleString()}
             </div>
-            <div className="text-xs text-[var(--fyxvo-text-muted)] mt-1">requests by #1 project</div>
+            <div className="text-xs text-[var(--fyxvo-text-muted)] mt-1">requests handled by the top project</div>
           </div>
           <div className="rounded-[1.5rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
             <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-2">
-              Fastest avg latency
+              Fastest average latency
             </div>
             <div className="text-xl font-semibold text-[var(--fyxvo-text)]">
               {stats.fastestAvgLatency.toFixed(1)} ms
             </div>
-            <div className="text-xs text-[var(--fyxvo-text-muted)] mt-1">best performing project</div>
+            <div className="text-xs text-[var(--fyxvo-text-muted)] mt-1">the quickest response time on the board</div>
           </div>
         </div>
       )}
 
       <p className="text-xs text-[var(--fyxvo-text-muted)]">
-        Leaderboard updates every 5 minutes.
+        These rankings update every 5 minutes or so.
         {period !== "30d" && (
           <span className="ml-1 opacity-70">
-            Period selector is cosmetic until the backend supports the <code className="font-mono">days</code> parameter.
+            The period selector is cosmetic for now and will work fully once the backend supports the <code className="font-mono">days</code> parameter.
           </span>
         )}
       </p>

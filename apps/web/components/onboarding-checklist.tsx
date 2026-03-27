@@ -60,7 +60,7 @@ function StepRow({ step }: { readonly step: ChecklistStep }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm font-medium ${step.done ? "text-emerald-700 dark:text-emerald-400" : "text-[var(--fyxvo-text)]"}`}>
+        <p className={`text-sm font-medium ${step.done ? "text-[var(--fyxvo-success)]" : "text-[var(--fyxvo-text)]"}`}>
           {step.label}
         </p>
         <p className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)]">{step.description}</p>

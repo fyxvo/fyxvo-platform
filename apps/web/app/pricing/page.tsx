@@ -11,13 +11,13 @@ export const metadata: Metadata = {
   title: {
     absolute: "Pricing — Fyxvo"
   },
-  description: "Devnet launch pricing for Fyxvo: SOL-funded standard RPC and priority relay, lamport-per-request rates, volume discounts, and on-chain funding mechanics for early teams.",
+  description: "Simple, transparent pricing for Solana devnet teams. Pay per request in SOL, get volume discounts automatically, and fund your project on chain.",
   alternates: {
     canonical: `${webEnv.siteUrl}/pricing`
   },
   openGraph: {
     title: "Pricing — Fyxvo",
-    description: "Devnet launch pricing for Fyxvo: SOL-funded standard RPC and priority relay, lamport-per-request rates, volume discounts, and on-chain funding mechanics for early teams.",
+    description: "Simple, transparent pricing for Solana devnet teams. Pay per request in SOL, get volume discounts automatically, and fund your project on chain.",
     url: `${webEnv.siteUrl}/pricing`,
     siteName: "Fyxvo",
     type: "website",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Pricing — Fyxvo",
-    description: "Devnet launch pricing for Fyxvo: SOL-funded standard RPC and priority relay, lamport-per-request rates, volume discounts, and on-chain funding mechanics for early teams.",
+    description: "Simple, transparent pricing for Solana devnet teams. Pay per request in SOL, get volume discounts automatically, and fund your project on chain.",
     images: [webEnv.socialImageUrl]
   }
 };
@@ -62,24 +62,24 @@ export default async function PricingPage() {
       tag: "standard",
       lamports: PRICING_LAMPORTS.standard,
       usdc: PRICING_USDC.standard,
-      description: "All standard JSON-RPC reads: getBalance, getAccountInfo, getBlock, getTransaction, etc.",
-      what: "API-key validation, funded balance enforcement, Redis-backed rate limiting, multi-node routing with fallback, request logging, and analytics rollups."
+      description: "Covers all the everyday JSON-RPC reads you rely on, like getBalance, getAccountInfo, getBlock, and getTransaction.",
+      what: "Each request goes through API-key validation, balance checks, Redis-backed rate limiting, multi-node routing with automatic fallback, full request logging, and rolled-up analytics."
     },
     {
       name: "Compute-heavy",
       tag: "compute-heavy",
       lamports: PRICING_LAMPORTS.computeHeavy,
       usdc: PRICING_USDC.computeHeavy,
-      description: "High-CPU methods: getProgramAccounts, getTokenAccountsByOwner, getSignaturesForAddress, getMultipleAccounts, and related.",
-      what: "Same routing as standard, but priced separately to reflect upstream compute cost for resource-intensive queries."
+      description: "For the heavier methods that need more upstream compute, such as getProgramAccounts, getTokenAccountsByOwner, and getSignaturesForAddress.",
+      what: "Uses the same routing infrastructure as standard requests, but priced to reflect the higher compute cost these queries place on the node pool."
     },
     {
       name: "Priority relay",
       tag: "priority",
       lamports: PRICING_LAMPORTS.priority,
       usdc: PRICING_USDC.priority,
-      description: "The /priority endpoint: faster routing mode, separate rate window, distinct per-request pricing from the standard path.",
-      what: "Separate routing mode. Priority mode is explicit — it is not a hidden fast lane of the standard path."
+      description: "A dedicated endpoint with its own routing path, separate rate window, and distinct pricing. Built for when speed matters most.",
+      what: "This is an entirely separate routing mode. Priority is always explicit and never a hidden fast lane layered on top of the standard path."
     }
   ] as const;
 
@@ -87,8 +87,8 @@ export default async function PricingPage() {
     <div className="space-y-10 lg:space-y-12">
       <PageHeader
         eyebrow="Pricing"
-        title="Devnet launch pricing for early teams running real Solana traffic."
-        description="Three tiers. Lamport-per-request pricing. On-chain funding. Volume discounts at 1M and 10M requests per month."
+        title="Straightforward pricing for teams shipping real Solana traffic on devnet."
+        description="Three tiers, each priced per request in lamports. Fund your project on chain and get automatic volume discounts at 1M and 10M requests per month."
         actions={
           <>
             <TrackedLinkButton
@@ -165,7 +165,7 @@ export default async function PricingPage() {
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Free tier</CardTitle>
-            <CardDescription>Every new project starts with complimentary requests on devnet.</CardDescription>
+            <CardDescription>Every new project gets a batch of complimentary requests so you can try things out on devnet before funding.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-[1.6rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-5">
@@ -175,7 +175,7 @@ export default async function PricingPage() {
               <p className="mt-2 text-sm text-[var(--fyxvo-text-muted)]">standard requests per new project, no funding required</p>
             </div>
             <p className="text-sm text-[var(--fyxvo-text-soft)] leading-6">
-              Activate your project, issue an API key, and route up to {FREE_TIER_REQUESTS.toLocaleString()} standard devnet requests without depositing SOL. Compute-heavy and priority requests are not included in the free tier.
+              Just activate your project, create an API key, and start routing up to {FREE_TIER_REQUESTS.toLocaleString()} standard devnet requests without putting any SOL down. Compute-heavy and priority requests are not part of the free tier.
             </p>
           </CardContent>
         </Card>
@@ -183,17 +183,17 @@ export default async function PricingPage() {
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Volume discounts</CardTitle>
-            <CardDescription>Automatic discounts applied at threshold crossing. No negotiation required.</CardDescription>
+            <CardDescription>These kick in automatically when you cross the threshold. Nothing to negotiate or request.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {[
               {
-                label: `≥${(VOLUME_DISCOUNT.tier1.monthlyRequests / 1_000_000).toFixed(0)}M req/month`,
+                label: `${(VOLUME_DISCOUNT.tier1.monthlyRequests / 1_000_000).toFixed(0)}M+ requests per month`,
                 discount: `${VOLUME_DISCOUNT.tier1.discountBps / 100}% off`,
                 detail: "20% reduction across all tiers"
               },
               {
-                label: `≥${(VOLUME_DISCOUNT.tier2.monthlyRequests / 1_000_000).toFixed(0)}M req/month`,
+                label: `${(VOLUME_DISCOUNT.tier2.monthlyRequests / 1_000_000).toFixed(0)}M+ requests per month`,
                 discount: `${VOLUME_DISCOUNT.tier2.discountBps / 100}% off`,
                 detail: "40% reduction across all tiers"
               }
@@ -203,11 +203,11 @@ export default async function PricingPage() {
                   <div className="text-sm font-medium text-[var(--fyxvo-text)]">{item.label}</div>
                   <div className="text-xs text-[var(--fyxvo-text-muted)]">{item.detail}</div>
                 </div>
-                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{item.discount}</div>
+                <div className="text-sm font-semibold text-[var(--fyxvo-accent-success)]">{item.discount}</div>
               </div>
             ))}
             <p className="text-sm text-[var(--fyxvo-text-soft)] leading-6">
-              Discounts apply to the per-request lamport cost at the time of the request. No billing cycle delays.
+              Discounts are applied to the per-request lamport cost right when the request happens. There are no billing cycles or delayed adjustments.
             </p>
           </CardContent>
         </Card>
@@ -218,12 +218,12 @@ export default async function PricingPage() {
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>Revenue split</CardTitle>
-            <CardDescription>Every request fee is split on-chain between node operators, the protocol treasury, and infrastructure funding.</CardDescription>
+            <CardDescription>Every request fee is divided on chain between the people running nodes, the protocol treasury, and infrastructure funding.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3">
               {[
-                { label: "Node operators", bps: REVENUE_SPLIT_BPS.nodeOperators, color: "bg-brand-500" },
+                { label: "Node operators", bps: REVENUE_SPLIT_BPS.nodeOperators, color: "bg-[var(--fyxvo-brand)]" },
                 { label: "Protocol treasury", bps: REVENUE_SPLIT_BPS.protocolTreasury, color: "bg-emerald-500" },
                 { label: "Infrastructure fund", bps: REVENUE_SPLIT_BPS.infraFund, color: "bg-sky-500" }
               ].map((item) => (
@@ -246,7 +246,7 @@ export default async function PricingPage() {
           <CardHeader>
             <CardTitle>How funding works</CardTitle>
             <CardDescription>
-              Fyxvo is funded on chain, not through an off-platform invoice abstraction.
+              Fyxvo is funded directly on chain. There is no off-platform invoice layer sitting in between.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -254,22 +254,22 @@ export default async function PricingPage() {
               {[
                 {
                   title: "1. Activate project",
-                  body: "Create the project and confirm the activation transaction so the on-chain project account exists.",
+                  body: "Create your project and confirm the activation transaction. This sets up your on-chain project account.",
                 },
                 {
                   title: "2. Fund with SOL",
-                  body: "Prepare and sign a SOL funding transaction. The API verifies the signature and refreshes spendable balance.",
+                  body: "Prepare and sign a SOL funding transaction. Once the signature is verified, your spendable balance updates immediately.",
                 },
                 {
-                  title: "3. Spend through the gateway",
-                  body: "Requests are priced by tier and method, then deducted against the on-chain-backed project balance.",
+                  title: "3. Start making requests",
+                  body: "Each request is priced by its tier and method, then deducted from the on-chain-backed balance tied to your project.",
                 },
               ].map((item) => (
                 <div
                   key={item.title}
                   className="rounded-[1.5rem] border border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] p-4"
                 >
-                  <div className="text-xs uppercase tracking-[0.16em] text-brand-600 dark:text-brand-300">
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
                     {item.title}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
@@ -278,11 +278,11 @@ export default async function PricingPage() {
                 </div>
               ))}
             </div>
-            <Notice tone="success" title="SOL is the live funding path">
-              SOL funding is live on devnet today.
+            <Notice tone="success" title="SOL funding is live">
+              You can fund your project with SOL on devnet right now.
             </Notice>
-            <Notice tone="neutral" title="USDC stays gated">
-              USDC remains configuration-gated until the deployment explicitly enables it.
+            <Notice tone="neutral" title="USDC is not yet available">
+              USDC funding is gated behind a configuration flag and will remain disabled until an upcoming deployment turns it on.
             </Notice>
           </CardContent>
         </Card>
@@ -301,24 +301,24 @@ export default async function PricingPage() {
             <thead>
               <tr className="border-b border-[var(--fyxvo-border)]">
                 <th className="py-3 pr-6 text-left font-medium text-[var(--fyxvo-text-muted)] w-48">Feature</th>
-                <th className="py-3 px-4 text-center font-semibold text-[var(--fyxvo-text)] bg-brand-500/5 rounded-t-xl">Fyxvo</th>
+                <th className="py-3 px-4 text-center font-semibold text-[var(--fyxvo-text)] bg-[var(--fyxvo-brand)]/5 rounded-t-xl">Fyxvo</th>
                 <th className="py-3 px-4 text-center font-medium text-[var(--fyxvo-text-muted)]">Public RPC</th>
                 <th className="py-3 px-4 text-center font-medium text-[var(--fyxvo-text-muted)]">Generic RPCs</th>
               </tr>
             </thead>
             <tbody>
               {[
-                { feature: "On-chain funding", fyxvo: "✓ SOL-native", pub: "–", generic: "Credit card" },
-                { feature: "API key scoping", fyxvo: "✓ Revokable", pub: "–", generic: "Varies" },
-                { feature: "Per-request analytics", fyxvo: "✓ Live logs", pub: "–", generic: "Paid tier only" },
-                { feature: "Priority relay path", fyxvo: "✓ Separate endpoint", pub: "–", generic: "Not offered" },
-                { feature: "Rate limiting", fyxvo: "✓ Per-key + project", pub: "Hard caps", generic: "Plan-based" },
-                { feature: "Devnet focus", fyxvo: "✓ Purpose-built", pub: "Shared", generic: "Mainnet-first" },
-                { feature: "Transparent pricing", fyxvo: "✓ Lamport-per-req", pub: "Free / throttled", generic: "Opaque tiers" },
+                { feature: "On-chain funding", fyxvo: "Yes, SOL-native", pub: "No", generic: "Credit card" },
+                { feature: "API key scoping", fyxvo: "Yes, revokable", pub: "No", generic: "Varies" },
+                { feature: "Per-request analytics", fyxvo: "Yes, live logs", pub: "No", generic: "Paid tier only" },
+                { feature: "Priority relay path", fyxvo: "Yes, separate endpoint", pub: "No", generic: "Not offered" },
+                { feature: "Rate limiting", fyxvo: "Yes, per-key and project", pub: "Hard caps", generic: "Plan-based" },
+                { feature: "Devnet focus", fyxvo: "Yes, purpose-built", pub: "Shared", generic: "Mainnet-first" },
+                { feature: "Transparent pricing", fyxvo: "Yes, lamport-per-request", pub: "Free but throttled", generic: "Opaque tiers" },
               ].map((row) => (
                 <tr key={row.feature} className="border-b border-[var(--fyxvo-border)]">
                   <td className="py-3 pr-6 text-[var(--fyxvo-text-muted)]">{row.feature}</td>
-                  <td className="py-3 px-4 text-center bg-brand-500/5 text-[var(--fyxvo-text)] font-medium">{row.fyxvo}</td>
+                  <td className="py-3 px-4 text-center bg-[var(--fyxvo-brand)]/5 text-[var(--fyxvo-text)] font-medium">{row.fyxvo}</td>
                   <td className="py-3 px-4 text-center text-[var(--fyxvo-text-muted)]">{row.pub}</td>
                   <td className="py-3 px-4 text-center text-[var(--fyxvo-text-muted)]">{row.generic}</td>
                 </tr>
@@ -327,7 +327,7 @@ export default async function PricingPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-[var(--fyxvo-text-muted)]">
-          Devnet alpha. Comparison is based on available public information and is provided for context only.
+          This is a devnet alpha comparison based on publicly available information. It is meant to give you context, not serve as a definitive benchmark.
         </p>
       </section>
 
@@ -337,27 +337,27 @@ export default async function PricingPage() {
         {[
           {
             q: "Is this devnet only?",
-            a: "Yes. Fyxvo runs on Solana devnet during the private alpha. All projects, API keys, and funded balances are devnet. Mainnet is a future consideration once the protocol has been validated at scale."
+            a: "For now, yes. Fyxvo runs entirely on Solana devnet during this private alpha phase. That means all your projects, API keys, and funded balances live on devnet. We will consider mainnet once the protocol has been thoroughly validated at scale."
           },
           {
             q: "What happens when my SOL balance runs out?",
-            a: "Requests are rejected with a 402 status until the project is re-funded. Your API key remains valid — it just won't route traffic until the balance is topped up. The dashboard shows a low-balance warning when you approach threshold."
+            a: "Your requests will start getting rejected with a 402 status until you top up the project balance. The good news is that your API key stays valid the whole time, so as soon as you add more SOL, traffic starts flowing again. You will also see a low-balance warning on the dashboard before you actually hit zero."
           },
           {
             q: "Can I use one API key across multiple projects?",
-            a: "No. API keys are scoped to a single project. Each project has its own funded balance and rate window. You can issue multiple keys per project for different services or environments."
+            a: "That is not how it works. Each API key belongs to one project, and each project maintains its own funded balance and rate window. If you need keys for different services or environments, you can create multiple keys within the same project."
           },
           {
             q: "What is the difference between standard and priority relay?",
-            a: "Standard relay handles all JSON-RPC reads through the managed node pool. Priority relay is a separate endpoint with a distinct rate window designed for DeFi transactions and latency-sensitive operations. It costs more per request and is billed separately."
+            a: "Standard relay handles your everyday JSON-RPC reads through the managed node pool. Priority relay is a completely separate endpoint with its own rate window, built specifically for DeFi transactions and anything where latency really matters. It costs more per request and is billed on its own."
           },
           {
             q: "Are there any hidden fees?",
-            a: "No. Pricing is lamport-per-request, published in the config package, and applied at the time of the request. Volume discounts are applied automatically at threshold crossings. There are no platform fees, subscription fees, or overage charges beyond the per-request cost."
+            a: "None at all. Every request costs a known number of lamports, published in the config package, and charged at the moment the request goes through. Volume discounts apply automatically when you cross the thresholds. There are no platform fees, no subscriptions, and no surprise overage charges."
           },
           {
             q: "How do volume discounts work?",
-            a: "Discounts are applied automatically when a project crosses the 1M or 10M monthly request threshold. The discount applies to all requests in the current billing window above the threshold — you don't need to negotiate or request it."
+            a: "They are fully automatic. Once your project crosses the 1M or 10M monthly request threshold, the discount kicks in for all requests above that line in the current billing window. You do not need to ask for it or sign up for a different plan."
           },
         ].map((item) => (
           <div key={item.q} className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
@@ -369,8 +369,8 @@ export default async function PricingPage() {
 
       <InterestCaptureForm
         source="pricing-page"
-        title="Plan rollout, volume, or founder review"
-        description="Use this form when the team wants higher-volume devnet planning, priority relay review, analytics visibility, or a managed rollout conversation."
+        title="Want to talk about volume, priority relay, or a managed rollout?"
+        description="Use this form if you are planning higher-volume devnet usage, want to explore priority relay, need analytics visibility, or just want to talk through your rollout with the team."
       />
 
       <section className="grid gap-6 lg:grid-cols-3">
@@ -378,32 +378,33 @@ export default async function PricingPage() {
           <CardHeader>
             <CardTitle>Who this is for</CardTitle>
             <CardDescription>
-              Early teams that want a real devnet relay path, not a mock dashboard.
+              Teams that want to test with a real devnet relay, not a placeholder dashboard.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            This is a good fit for teams validating wallet-authenticated project control, funded
-            JSON-RPC, priority relay behavior, analytics visibility, and managed launch operations
-            before broader rollout.
+            If you are validating wallet-authenticated project control, funded JSON-RPC,
+            priority relay behavior, analytics, or managed launch operations before a wider
+            rollout, this is built for you.
           </CardContent>
         </Card>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
             <CardTitle>What you can expect</CardTitle>
             <CardDescription>
-              Clean project activation, SOL funding, API keys, relay access, and honest status surfaces.
+              Honest tooling: project activation, SOL funding, API keys, relay access, and clear status surfaces.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
-            The product does not claim fake production adoption or a finished mainnet commercial
-            model. It gives early users a credible devnet path and enough visibility to evaluate fit.
+            We are not going to pretend this is a finished mainnet product or claim adoption numbers
+            that do not exist. What you get is a credible devnet path and enough visibility to
+            decide whether Fyxvo is the right fit for your team.
           </CardContent>
         </Card>
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Useful next links</CardTitle>
+            <CardTitle>Where to go next</CardTitle>
             <CardDescription>
-              Pick the path that matches how far you want to go today.
+              Pick whichever path matches where you are right now.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">

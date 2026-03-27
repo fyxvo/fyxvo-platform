@@ -928,7 +928,7 @@ function PlaygroundContent() {
                   onClick={() => selectMethod(m)}
                   className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
                     selectedMethod.method === m.method
-                      ? "bg-brand-500/10 text-[var(--fyxvo-text)] font-medium"
+                      ? "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)] font-medium"
                       : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
                   }`}
                 >
@@ -966,7 +966,7 @@ function PlaygroundContent() {
                       onClick={() => setSchemaOpen((v) => !v)}
                       className={`rounded border px-2 py-1 text-xs font-medium transition-colors ${
                         schemaOpen
-                          ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                          ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                           : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                       }`}
                     >
@@ -1003,7 +1003,7 @@ function PlaygroundContent() {
                         onClick={() => setMode(m)}
                         className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                           mode === m
-                            ? "border-brand-500/50 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                            ? "border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                             : "border-[var(--fyxvo-border)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                         }`}
                       >
@@ -1011,7 +1011,7 @@ function PlaygroundContent() {
                       </button>
                     ))}
                     {compareMode && (
-                      <span className="rounded-lg border border-brand-500/50 bg-brand-500/10 px-3 py-1.5 text-xs font-medium text-[var(--fyxvo-text)]">
+                      <span className="rounded-lg border border-[var(--fyxvo-brand)]/50 bg-[var(--fyxvo-brand-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--fyxvo-text)]">
                         Standard vs Priority
                       </span>
                     )}
@@ -1025,7 +1025,7 @@ function PlaygroundContent() {
                       aria-checked={compareMode}
                       onClick={() => { setCompareMode((v) => !v); setResponse(null); setCompareResponse(null); }}
                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                        compareMode ? "bg-brand-500" : "bg-[var(--fyxvo-border-strong)]"
+                        compareMode ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border-strong)]"
                       }`}
                     >
                       <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${compareMode ? "translate-x-4" : "translate-x-0"}`} />
@@ -1491,7 +1491,7 @@ function PlaygroundContent() {
                       </div>
                       {errorExplanation && (
                         <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-                          <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">{errorExplanation.name}</p>
+                          <p className="text-xs font-semibold text-[var(--fyxvo-warning)]">{errorExplanation.name}</p>
                           <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">{errorExplanation.explanation}</p>
                         </div>
                       )}

@@ -9,7 +9,7 @@ function getSafeMessage(error: Error & { digest?: string }) {
     return error.message;
   }
 
-  return "The shell hit an unexpected problem. Reload the application or review the live status surface before retrying.";
+  return "The application ran into a problem it could not recover from. Reloading usually resolves this. If it does not, check the status page to see whether services are experiencing an outage.";
 }
 
 export default function GlobalError({
@@ -25,7 +25,7 @@ export default function GlobalError({
         <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-6">
           <div className="w-full space-y-6">
             <BrandLogo />
-            <Notice tone="danger" title="The application shell crashed">
+            <Notice tone="danger" title="The application could not recover">
               {getSafeMessage(error)}
             </Notice>
             <Button onClick={() => reset()}>Reload application</Button>

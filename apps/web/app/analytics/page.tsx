@@ -54,7 +54,7 @@ function RangeSelector({
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${value === opt.value ? "bg-brand-500 text-white" : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"}`}
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${value === opt.value ? "bg-[var(--fyxvo-brand)] text-white" : "text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"}`}
         >
           {opt.label}
         </button>
@@ -576,7 +576,7 @@ export default function AnalyticsPage() {
                           <td className="py-3 text-right text-xs">{m.count.toLocaleString()}</td>
                           <td className="py-3 text-right text-xs">{formatDuration(m.averageLatencyMs)}</td>
                           <td className="py-3 text-right text-xs">
-                            <span className={m.errorRate > 0.05 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}>
+                            <span className={m.errorRate > 0.05 ? "text-[var(--fyxvo-danger)]" : "text-[var(--fyxvo-success)]"}>
                               {formatPercent(m.errorRate * 100)}
                             </span>
                           </td>

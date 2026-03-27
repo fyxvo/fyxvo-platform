@@ -165,23 +165,24 @@ export default function CompareProjectsPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Compare"
-        title="Compare Projects"
-        description="Select up to 3 projects to compare key metrics side by side."
+        title="Compare Your Projects"
+        description="Pick two or three of your projects and see how they stack up against each other."
       />
 
       {/* Project selector */}
       <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
         <CardHeader>
-          <CardTitle>Select projects</CardTitle>
-          <CardDescription>Choose 2 or 3 projects to compare. Up to 3 can be selected at a time.</CardDescription>
+          <CardTitle>Pick your projects</CardTitle>
+          <CardDescription>Select anywhere from 2 to 3 projects. Once you have enough selected, the comparison will appear below.</CardDescription>
         </CardHeader>
         <CardContent>
           {projects.length === 0 ? (
-            <Notice tone="neutral" title="No projects">
-              Create a project to get started.{" "}
+            <Notice tone="neutral" title="No projects yet">
+              You will need at least one project before you can compare anything.{" "}
               <Link href="/dashboard" className="text-[var(--fyxvo-brand)] underline">
-                Go to Dashboard
-              </Link>
+                Head to the Dashboard
+              </Link>{" "}
+              to create one.
             </Notice>
           ) : (
             <div className="flex flex-wrap gap-3">
@@ -193,10 +194,10 @@ export default function CompareProjectsPage() {
                     key={project.id}
                     className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-2.5 transition ${
                       checked
-                        ? "border-brand-500 bg-brand-500/10 text-[var(--fyxvo-text)]"
+                        ? "border-[var(--fyxvo-brand-border)] bg-[var(--fyxvo-brand-soft)] text-[var(--fyxvo-text)]"
                         : disabled
                           ? "cursor-not-allowed border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] opacity-40"
-                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-soft)] hover:border-brand-400"
+                          : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-soft)] hover:border-[var(--fyxvo-brand-border)]"
                     }`}
                   >
                     <input
@@ -222,15 +223,15 @@ export default function CompareProjectsPage() {
 
       {/* Comparison table */}
       {selectedProjects.length < 2 ? (
-        <Notice tone="neutral" title="Select at least 2 projects to compare">
-          Pick projects above to see a side-by-side metric breakdown.
+        <Notice tone="neutral" title="Need at least 2 projects">
+          Pick a couple of projects above and the comparison table will show up right here.
         </Notice>
       ) : (
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Metric comparison</CardTitle>
+            <CardTitle>Side by side</CardTitle>
             <CardDescription>
-              Live data shown where available. Balance reflects the currently selected project&apos;s on-chain snapshot.
+              These numbers come from live data when it is available. The funded balance only shows for whichever project you currently have selected in the portal.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
@@ -271,9 +272,9 @@ export default function CompareProjectsPage() {
       {selectedProjects.length >= 2 && (
         <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
           <CardHeader>
-            <CardTitle>Request volume (last 7 days)</CardTitle>
+            <CardTitle>Request volume over the last 7 days</CardTitle>
             <CardDescription>
-              Relative request distribution for the selected projects. Derived from recent request log data.
+              A quick look at how request traffic has been distributed day by day for each project you picked.
             </CardDescription>
           </CardHeader>
           <CardContent>

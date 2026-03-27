@@ -188,7 +188,7 @@ export function InterestCaptureForm({
                     onClick={() => toggleInterestArea(option.value)}
                     className={`rounded-full border px-4 py-2 text-sm transition ${
                       selected
-                        ? "border-brand-500/40 bg-brand-500/12 text-brand-200"
+                        ? "border-[var(--fyxvo-brand)]/40 bg-[var(--fyxvo-brand)]/12 text-brand-200"
                         : "border-[color:var(--fyxvo-border)] bg-[color:var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
                     }`}
                   >

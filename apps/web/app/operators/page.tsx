@@ -463,10 +463,10 @@ export default function OperatorsPage() {
                       <span
                         className={`text-lg font-semibold capitalize ${
                           gatewayMetrics.circuitBreakerState === "closed"
-                            ? "text-emerald-600 dark:text-emerald-400"
+                            ? "text-[var(--fyxvo-success)]"
                             : gatewayMetrics.circuitBreakerState === "open"
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-amber-600 dark:text-amber-400"
+                              ? "text-[var(--fyxvo-danger)]"
+                              : "text-[var(--fyxvo-warning)]"
                         }`}
                       >
                         {gatewayMetrics.circuitBreakerState}
@@ -1007,7 +1007,7 @@ export default function OperatorsPage() {
                 return (
                   <div
                     key={d.day}
-                    className="flex-1 rounded-t bg-brand-500/20"
+                    className="flex-1 rounded-t bg-[var(--fyxvo-brand)]/20"
                     style={{
                       height: `${Math.round((d.requests / maxRequests) * 100)}%`,
                     }}

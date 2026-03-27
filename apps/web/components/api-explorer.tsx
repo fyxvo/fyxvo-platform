@@ -61,10 +61,10 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
 ];
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
-  POST: "text-blue-600 dark:text-blue-400 bg-blue-500/10",
-  PATCH: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
-  DELETE: "text-rose-600 dark:text-rose-400 bg-rose-500/10",
+  GET: "text-[var(--fyxvo-success)] bg-emerald-500/10",
+  POST: "text-blue-500 bg-blue-500/10",
+  PATCH: "text-[var(--fyxvo-warning)] bg-amber-500/10",
+  DELETE: "text-[var(--fyxvo-danger)] bg-rose-500/10",
 };
 
 export function ApiExplorer({ token }: { token?: string }) {
@@ -147,7 +147,7 @@ export function ApiExplorer({ token }: { token?: string }) {
               onClick={() => selectEndpoint(ep)}
               className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
                 selected.path === ep.path
-                  ? "bg-brand-500/10 text-[var(--fyxvo-text)]"
+                  ? "bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
                   : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-bg)] hover:text-[var(--fyxvo-text)]"
               }`}
             >

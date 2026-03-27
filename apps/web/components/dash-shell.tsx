@@ -83,7 +83,7 @@ function NavItem({
         "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium",
         "transition-colors duration-150",
         active
-          ? "border border-brand-500/15 bg-brand-500/8 text-[var(--fyxvo-text)]"
+          ? "border border-[var(--fyxvo-brand)]/15 bg-[var(--fyxvo-brand-subtle)] text-[var(--fyxvo-text)]"
           : "border border-transparent text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
       )}
     >
