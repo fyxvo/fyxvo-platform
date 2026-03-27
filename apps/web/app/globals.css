@@ -52,6 +52,7 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   h1,
@@ -183,6 +184,13 @@
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--fyxvo-brand) 18%, transparent),
       0 18px 50px color-mix(in srgb, var(--fyxvo-brand) 18%, transparent);
+  }
+
+  .fyxvo-glass-panel {
+    background: color-mix(in srgb, var(--fyxvo-panel) 82%, transparent);
+    backdrop-filter: blur(18px);
+    border: 1px solid color-mix(in srgb, var(--fyxvo-border) 92%, transparent);
+    box-shadow: 0 24px 64px color-mix(in srgb, var(--fyxvo-brand) 7%, transparent);
   }
 
   .fyxvo-scroll-section {

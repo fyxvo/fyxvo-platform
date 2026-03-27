@@ -26,7 +26,17 @@ const MARKETING_PATHS = new Set([
 ]);
 
 function isMarketingRoute(pathname: string) {
-  return MARKETING_PATHS.has(pathname);
+  if (MARKETING_PATHS.has(pathname)) {
+    return true;
+  }
+
+  return (
+    pathname.startsWith("/p/") ||
+    pathname.startsWith("/invite/") ||
+    pathname.startsWith("/join/") ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/widget/project/")
+  );
 }
 
 export function AppFrame({ children }: { readonly children: React.ReactNode }) {

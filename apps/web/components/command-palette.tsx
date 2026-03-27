@@ -235,8 +235,16 @@ export function CommandPalette() {
       }
     }
 
+    function onOpenRequest() {
+      setOpen(true);
+    }
+
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("fyxvo:open-command-palette", onOpenRequest);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("fyxvo:open-command-palette", onOpenRequest);
+    };
   }, [open, filtered, highlighted, router]);
 
   if (!open) return null;
