@@ -1333,6 +1333,7 @@ export interface BlockchainClient {
     readonly lastValidBlockHeight: number;
   }>;
   getProtocolReadiness(): Promise<FyxvoProtocolReadiness>;
+  getProtocolTreasuryBalance(): Promise<bigint>;
 }
 
 export interface JwtClaims {

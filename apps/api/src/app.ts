@@ -584,7 +584,7 @@ async function buildMainnetReleaseGateSnapshot(input: {
     source: process.env,
     protocolAuthorityFallback: input.env.FYXVO_ADMIN_AUTHORITY,
   });
-  const [gate, readiness, pendingMigrations, activeIncidentCount, supportBacklogCount, confirmedFundingRows] =
+  const [gate, readiness, pendingMigrations, activeIncidentCount, supportBacklogCount, confirmedFundingRows, liveTreasuryBalance] =
     await Promise.all([
       input.prisma.mainnetReleaseGate.findUnique({
         where: { environment },
@@ -605,17 +605,18 @@ async function buildMainnetReleaseGateSnapshot(input: {
         },
         select: { amount: true },
       }),
+      input.blockchain.getProtocolTreasuryBalance().catch(() => 0n),
     ]);
 
   const targetReserveLamports = gate?.targetReserveLamports ?? DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS;
   const confirmedFundingLamports = confirmedFundingRows.reduce((total, row) => total + BigInt(row.amount.toString()), 0n);
+  const actualUpgradeAuthority = readiness?.programUpgradeAuthority ?? null;
   const treasuryOverview = buildAdminProtocolOverview({
     env: input.env,
     readiness,
   }).treasury;
-  const actualUpgradeAuthority = readiness?.programUpgradeAuthority ?? null;
-  const treasurySolBalanceLamports = treasuryOverview.solBalance;
-  const treasurySolBalanceValue = treasurySolBalanceLamports ? BigInt(treasurySolBalanceLamports) : 0n;
+  const treasurySolBalanceLamports = liveTreasuryBalance.toString();
+  const treasurySolBalanceValue = liveTreasuryBalance;
   const observedReserveLamports =
     treasurySolBalanceValue > confirmedFundingLamports ? treasurySolBalanceValue : confirmedFundingLamports;
   const assistantAvailable = isAssistantConfigured(input.env);

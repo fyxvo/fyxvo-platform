@@ -2,6 +2,7 @@ import {
   anchorInstructionDiscriminator,
   createExplorerUrl,
   decodeFyxvoProjectFundingState,
+  deriveFyxvoProtocolAddresses,
   encodeU64,
   type FyxvoProtocolReadiness,
   fetchFyxvoProtocolReadiness,
@@ -86,6 +87,15 @@ export class SolanaBlockchainClient implements BlockchainClient {
       expectedUpgradeAuthorityHint: this.expectedUpgradeAuthorityHint,
       expectedUsdcMint: this.usdcMint.toBase58()
     });
+  }
+
+  async getProtocolTreasuryBalance() {
+    const addresses = deriveFyxvoProtocolAddresses({
+      programId: this.programId,
+      usdcMintAddress: this.usdcMint
+    });
+
+    return BigInt(await this.connection.getBalance(addresses.treasury, "confirmed"));
   }
 
   async prepareProjectCreationTransaction(input: {
