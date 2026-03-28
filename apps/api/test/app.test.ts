@@ -3254,7 +3254,7 @@ describe("Fyxvo API service", () => {
       item: {
         paidBetaEligible: true,
         mainnetBetaEligible: true,
-        targetReserveLamports: "100000000000",
+        targetReserveLamports: "25000000000",
         confirmedFundingLamports: "120000000000",
         gate: {
           armed: false,
@@ -3269,7 +3269,7 @@ describe("Fyxvo API service", () => {
         authorization: `Bearer ${auth.token}`,
       },
       payload: {
-        targetReserveLamports: "100000000000",
+        targetReserveLamports: "25000000000",
         notes: "Ready for the next manual approval review.",
         armed: true,
       },
