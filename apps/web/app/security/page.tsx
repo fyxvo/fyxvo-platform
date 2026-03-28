@@ -23,8 +23,8 @@ export default function SecurityPage() {
       <h1 className="text-4xl font-bold tracking-tight text-[var(--fyxvo-text)]">Security</h1>
       <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
         Security at Fyxvo is described in terms of the live product boundary rather than marketing
-        language. The control plane, relay gateway, wallet auth flow, on-chain program, and public
-        web surfaces are all part of the system users rely on today.
+        language. The control plane, relay gateway, wallet auth flow, on-chain program, webhook
+        delivery, and public web surfaces are all part of the system users rely on today.
       </p>
 
       <div className="mt-10 grid gap-5 lg:grid-cols-2">

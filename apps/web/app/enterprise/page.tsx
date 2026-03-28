@@ -69,9 +69,10 @@ export default function EnterprisePage() {
             For teams that need a closer operating relationship
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-            Fyxvo enterprise work is for private-alpha teams that need rollout planning, traffic
-            guidance, or operational alignment beyond the shared defaults. The discussion starts
-            with the actual request profile and the constraints your team cares about.
+            Fyxvo enterprise work is for teams validating real Solana devnet traffic that need
+            rollout planning, relay guidance, or operational review beyond the default shared
+            workflow. The conversation starts with your actual request mix, funding posture, and
+            reliability requirements.
           </p>
         </div>
       </section>

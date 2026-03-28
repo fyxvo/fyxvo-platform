@@ -4,16 +4,25 @@ import { CopyButton } from "../../components/copy-button";
 import { DocsApiExplorer } from "../../components/docs-api-explorer";
 import { protocolAddresses, requestPricingTiers } from "../../lib/public-data";
 
+const DOC_SECTIONS = [
+  { id: "wallet-authentication", label: "Wallet authentication" },
+  { id: "project-activation-and-funding", label: "Project activation and funding" },
+  { id: "gateway-usage", label: "Gateway usage" },
+  { id: "api-explorer", label: "API explorer" },
+  { id: "public-pricing-contract", label: "Public pricing contract" },
+  { id: "public-endpoints", label: "Public endpoints" },
+] as const;
+
 function CodeBlock({ code }: { code: string }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
       <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2">
         <span className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
           Example
         </span>
         <CopyButton text={code} />
       </div>
-      <pre className="overflow-x-auto p-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+      <pre className="w-full overflow-x-auto p-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
         <code>{code}</code>
       </pre>
     </div>
@@ -126,8 +135,46 @@ export default function DocsPage() {
       </section>
 
       <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl space-y-12">
-          <div className="space-y-4">
+        <div className="mx-auto max-w-7xl">
+          <details className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4 lg:hidden">
+            <summary className="cursor-pointer list-none text-sm font-medium text-[var(--fyxvo-text)]">
+              Toggle documentation sections
+            </summary>
+            <div className="mt-4 flex flex-col gap-2">
+              {DOC_SECTIONS.map((section) => (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  className="rounded-xl bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-sm text-[var(--fyxvo-text-muted)] transition-colors hover:text-[var(--fyxvo-text)]"
+                >
+                  {section.label}
+                </a>
+              ))}
+            </div>
+          </details>
+
+          <div className="mt-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-12">
+            <aside className="hidden lg:block">
+              <div className="sticky top-24 rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5">
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                  On this page
+                </p>
+                <div className="mt-4 flex flex-col gap-2">
+                  {DOC_SECTIONS.map((section) => (
+                    <a
+                      key={section.id}
+                      href={`#${section.id}`}
+                      className="rounded-xl px-3 py-2 text-sm text-[var(--fyxvo-text-muted)] transition-colors hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
+                    >
+                      {section.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </aside>
+
+            <div className="min-w-0 space-y-12">
+              <div id="wallet-authentication" className="min-w-0 scroll-mt-24 space-y-4">
             <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
               Wallet authentication
             </h2>
@@ -139,7 +186,7 @@ export default function DocsPage() {
             <CodeBlock code={authVerifyExample} />
           </div>
 
-          <div className="space-y-4">
+              <div id="project-activation-and-funding" className="min-w-0 scroll-mt-24 space-y-4">
             <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
               Project activation and funding
             </h2>
@@ -155,7 +202,7 @@ export default function DocsPage() {
             </p>
           </div>
 
-          <div className="space-y-4">
+              <div id="gateway-usage" className="min-w-0 scroll-mt-24 space-y-4">
             <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
               Gateway usage
             </h2>
@@ -166,16 +213,18 @@ export default function DocsPage() {
             </p>
             <CodeBlock code={gatewayExample} />
           </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+      <section id="api-explorer" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <DocsApiExplorer />
         </div>
       </section>
 
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+      <section id="public-pricing-contract" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
@@ -232,7 +281,7 @@ export default function DocsPage() {
         </div>
       </section>
 
-      <section className="px-4 py-20 sm:px-6 lg:px-8">
+      <section id="public-endpoints" className="scroll-mt-24 px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
           <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
             Public endpoints that do not require wallet auth

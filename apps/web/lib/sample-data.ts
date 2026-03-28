@@ -97,32 +97,40 @@ export const previewApiKeys: PortalApiKey[] = [
 ];
 
 export const previewOverview: AnalyticsOverview = {
-  requestsToday: 3_410,
-  requestsThisWeek: 22_140,
-  requestsThisMonth: 89_060,
-  p50Ms: 18,
-  p95Ms: 42,
-  p99Ms: 78,
-  errorRateToday: 0.003,
-  successRateToday: 0.997,
-  updatedAt: "2026-03-26T00:00:00.000Z",
+  totals: {
+    projects: 2,
+    apiKeys: 4,
+    fundingRequests: 3,
+    requestLogs: 89_060,
+  },
+  latency: {
+    averageMs: 18,
+    maxMs: 78,
+  },
+  requestsByService: [
+    { service: "gateway", count: 80_200 },
+    { service: "api", count: 8_860 },
+  ],
 };
 
 export const previewProjectAnalytics: ProjectAnalytics = {
-  projectId: "preview-project-1",
-  requestsToday: 1_820,
-  requestsThisWeek: 11_400,
-  requestsThisMonth: 46_200,
-  p50Ms: 16,
-  p95Ms: 38,
-  p99Ms: 72,
-  errorRateToday: 0.002,
-  topMethods: [
-    { method: "sendTransaction", count: 940 },
-    { method: "getLatestBlockhash", count: 520 },
-    { method: "getAccountInfo", count: 360 },
+  project: previewProjects[0]!,
+  totals: {
+    requestLogs: 46_200,
+    apiKeys: 2,
+    fundingRequests: 1,
+  },
+  latency: {
+    averageMs: 16,
+    maxMs: 72,
+    p95Ms: 38,
+  },
+  statusCodes: [
+    { statusCode: 200, count: 45_900 },
+    { statusCode: 429, count: 180 },
+    { statusCode: 500, count: 120 },
   ],
-  updatedAt: "2026-03-26T00:00:00.000Z",
+  recentRequests: [],
 };
 
 export const previewAdminOverview: AdminOverview = {

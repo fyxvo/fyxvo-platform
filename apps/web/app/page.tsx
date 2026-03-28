@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../components/copy-button";
 import { EmailSubscribeForm } from "../components/email-subscribe-form";
@@ -10,6 +11,12 @@ import {
   getPublicNetworkStats,
   protocolAddresses,
 } from "../lib/public-data";
+
+export const metadata: Metadata = {
+  title: "Fyxvo — Solana devnet control plane",
+  description:
+    "Fyxvo is a Solana devnet control plane for wallet auth, project activation, funded relay access, API keys, analytics, alerts, and public trust surfaces.",
+};
 
 const CAPABILITIES = [
   {

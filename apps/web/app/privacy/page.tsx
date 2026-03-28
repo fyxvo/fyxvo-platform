@@ -9,7 +9,7 @@ const SECTIONS = [
   },
   {
     title: "Operational retention",
-    body: "Some records are retained because they are required to operate the service responsibly, including auth events, request logs, notification history, webhook deliveries, and support or feedback submissions tied to the workspace.",
+    body: "Some records are retained because they are required to operate the service responsibly, including auth events, request logs, notification history, webhook deliveries, and support or feedback submissions tied to a workspace.",
   },
   {
     title: "Third-party processors",

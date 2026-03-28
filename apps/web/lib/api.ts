@@ -2,11 +2,14 @@ import { API_BASE } from "./env";
 import type {
   AdminOverview,
   AdminStats,
+  AlertCenterItem,
   AnalyticsOverview,
   ApiHealth,
   ApiStatus,
   AssistantConversation,
   AssistantRateLimitStatus,
+  MethodBreakdownItem,
+  NotificationPreferences,
   AuthChallenge,
   CreateApiKeyResult,
   CreateProjectResult,
@@ -18,11 +21,17 @@ import type {
   Operator,
   PortalApiKey,
   PortalProject,
+  ProjectDetail,
   ProjectActivationVerification,
   ProjectAnalytics,
   ProjectBudgetStatus,
+  ProjectMemberItem,
+  ProjectRequestLogList,
   PublicProjectProfile,
+  SupportTicket,
+  TransactionHistoryItem,
   WalletSession,
+  WebhookItem,
 } from "./types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,6 +114,47 @@ export async function verifyProjectActivation(params: {
       body: JSON.stringify({ signature }),
     }
   );
+  return response.item;
+}
+
+export async function getProject(params: {
+  projectId: string;
+  token: string;
+}): Promise<ProjectDetail> {
+  const response = await apiFetch<{ item: ProjectDetail }>(`/v1/projects/${params.projectId}`, {
+    token: params.token,
+  });
+  return response.item;
+}
+
+export async function updateProject(params: {
+  projectId: string;
+  token: string;
+  slug?: string;
+  name?: string;
+  description?: string | null;
+  displayName?: string | null;
+  isPublic?: boolean;
+  publicSlug?: string | null;
+  leaderboardVisible?: boolean;
+}): Promise<ProjectDetail> {
+  const { projectId, token, ...body } = params;
+  const response = await apiFetch<{ item: ProjectDetail }>(`/v1/projects/${projectId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+  return response.item;
+}
+
+export async function archiveProject(params: {
+  projectId: string;
+  token: string;
+}): Promise<PortalProject> {
+  const response = await apiFetch<{ item: PortalProject }>(`/v1/projects/${params.projectId}`, {
+    method: "DELETE",
+    token: params.token,
+  });
   return response.item;
 }
 
@@ -209,14 +259,49 @@ export async function getAnalyticsOverview(token: string): Promise<AnalyticsOver
 export async function getProjectAnalytics(params: {
   projectId: string;
   token: string;
+  range?: "1h" | "6h" | "24h" | "7d" | "30d";
 }): Promise<ProjectAnalytics> {
+  const search = params.range ? `?range=${params.range}` : "";
   const response = await apiFetch<{ item: ProjectAnalytics }>(
-    `/v1/analytics/projects/${params.projectId}`,
+    `/v1/analytics/projects/${params.projectId}${search}`,
     {
       token: params.token,
     }
   );
   return response.item;
+}
+
+export async function getMethodBreakdown(params: {
+  projectId: string;
+  token: string;
+  range?: "1h" | "6h" | "24h" | "7d" | "30d";
+}): Promise<MethodBreakdownItem[]> {
+  const search = params.range ? `?range=${params.range}` : "";
+  const response = await apiFetch<{ items: MethodBreakdownItem[] }>(
+    `/v1/projects/${params.projectId}/analytics/methods${search}`,
+    {
+      token: params.token,
+    }
+  );
+  return response.items;
+}
+
+export async function getProjectRequestLogs(params: {
+  projectId: string;
+  token: string;
+  range?: "1h" | "6h" | "24h" | "7d" | "30d";
+  page?: number;
+  pageSize?: number;
+}): Promise<ProjectRequestLogList> {
+  const search = new URLSearchParams();
+  if (params.range) search.set("range", params.range);
+  if (params.page) search.set("page", String(params.page));
+  if (params.pageSize) search.set("pageSize", String(params.pageSize));
+  const query = search.toString();
+  return apiFetch<ProjectRequestLogList>(
+    `/v1/projects/${params.projectId}/requests${query ? `?${query}` : ""}`,
+    { token: params.token }
+  );
 }
 
 // ─── Onchain ──────────────────────────────────────────────────────────────────
@@ -247,6 +332,175 @@ export async function getProjectBudgetStatus(params: {
     }
   );
   return response.item;
+}
+
+export async function getAlerts(token: string): Promise<AlertCenterItem[]> {
+  const response = await apiFetch<{ items: AlertCenterItem[] }>("/v1/alerts", { token });
+  return response.items;
+}
+
+export async function updateAlertState(params: {
+  alertKey: string;
+  token: string;
+  state: "new" | "acknowledged" | "resolved";
+  projectId?: string | null;
+}): Promise<void> {
+  await apiFetch(`/v1/alerts/${encodeURIComponent(params.alertKey)}`, {
+    method: "PATCH",
+    token: params.token,
+    body: JSON.stringify({
+      state: params.state,
+      projectId: params.projectId ?? null,
+    }),
+  });
+}
+
+export async function getTransactions(token: string): Promise<TransactionHistoryItem[]> {
+  const response = await apiFetch<{ items: TransactionHistoryItem[] }>("/v1/transactions", {
+    token,
+  });
+  return response.items;
+}
+
+export async function getNotificationPreferences(
+  token: string
+): Promise<NotificationPreferences> {
+  return apiFetch<NotificationPreferences>("/v1/notifications/preferences", { token });
+}
+
+export async function updateNotificationPreferences(params: {
+  token: string;
+  email?: string | null;
+  notifyProjectActivation?: boolean;
+  notifyApiKeyEvents?: boolean;
+  notifyFundingConfirmed?: boolean;
+  notifyLowBalance?: boolean;
+  notifyDailyAlert?: boolean;
+  notifyWeeklySummary?: boolean;
+  notifyReferralConversion?: boolean;
+}): Promise<{ success: true }> {
+  const { token, ...body } = params;
+  return apiFetch("/v1/notifications/preferences", {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function requestEmailVerification(token: string): Promise<{
+  requested?: boolean;
+  alreadyVerified?: boolean;
+  expiresAt?: string;
+  message?: string;
+}> {
+  return apiFetch("/v1/me/verify-email/request", {
+    method: "POST",
+    token,
+  });
+}
+
+export async function sendEmailDeliveryTest(token: string): Promise<{
+  sent?: boolean;
+  recipient?: string;
+  message?: string;
+}> {
+  return apiFetch("/v1/me/email-delivery/test", {
+    method: "POST",
+    token,
+  });
+}
+
+export async function enrollDigest(token: string): Promise<{ enrolled: true }> {
+  return apiFetch("/v1/me/digest", {
+    method: "POST",
+    token,
+  });
+}
+
+export async function unenrollDigest(token: string): Promise<{ removed: true }> {
+  return apiFetch("/v1/me/digest", {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function getProjectMembers(params: {
+  projectId: string;
+  token: string;
+}): Promise<ProjectMemberItem[]> {
+  const response = await apiFetch<{ items: ProjectMemberItem[] }>(
+    `/v1/projects/${params.projectId}/members`,
+    { token: params.token }
+  );
+  return response.items;
+}
+
+export async function inviteProjectMember(params: {
+  projectId: string;
+  token: string;
+  walletAddress: string;
+}): Promise<{ item: ProjectMemberItem }> {
+  return apiFetch(`/v1/projects/${params.projectId}/members/invite`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({ walletAddress: params.walletAddress }),
+  });
+}
+
+export async function getProjectWebhooks(params: {
+  projectId: string;
+  token: string;
+}): Promise<WebhookItem[]> {
+  const response = await apiFetch<{ items: WebhookItem[] }>(
+    `/v1/projects/${params.projectId}/webhooks`,
+    { token: params.token }
+  );
+  return response.items;
+}
+
+export async function createProjectWebhook(params: {
+  projectId: string;
+  token: string;
+  url: string;
+  events: string[];
+}): Promise<{ item: WebhookItem }> {
+  return apiFetch(`/v1/projects/${params.projectId}/webhooks`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({ url: params.url, events: params.events }),
+  });
+}
+
+export async function deleteProjectWebhook(params: {
+  projectId: string;
+  webhookId: string;
+  token: string;
+}): Promise<void> {
+  await apiFetch(`/v1/projects/${params.projectId}/webhooks/${params.webhookId}`, {
+    method: "DELETE",
+    token: params.token,
+  });
+}
+
+export async function getSupportTickets(token: string): Promise<SupportTicket[]> {
+  const response = await apiFetch<{ tickets: SupportTicket[] }>("/v1/support/tickets", { token });
+  return response.tickets;
+}
+
+export async function createSupportTicket(params: {
+  token: string;
+  projectId?: string;
+  category: "general" | "billing" | "technical" | "security";
+  priority: "low" | "normal" | "high" | "urgent";
+  subject: string;
+  description: string;
+}): Promise<SupportTicket> {
+  const { token, ...body } = params;
+  return apiFetch("/v1/support/tickets", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
 }
 
 // ─── Operators ────────────────────────────────────────────────────────────────

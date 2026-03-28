@@ -14,10 +14,11 @@ export default function ComparePage() {
         Fyxvo vs. generic RPC
       </h1>
       <p className="mt-4 text-[var(--fyxvo-text-muted)]">
-        The difference is not just faster nodes. Fyxvo adds project activation, funding, keys,
-        analytics, alerts, and public trust surfaces around the relay itself.
+        The difference is not just endpoint access. Fyxvo adds wallet-authenticated project
+        creation, on-chain activation, funded usage, scoped keys, request visibility, and public
+        trust surfaces around the relay itself.
       </p>
-      <div className="mt-8 overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
+      <div className="mt-8 overflow-x-auto rounded-xl border border-[var(--fyxvo-border)]">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">

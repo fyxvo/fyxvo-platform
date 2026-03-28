@@ -1,7 +1,7 @@
 const SECTIONS = [
   {
     title: "Using the service",
-    body: "By using Fyxvo, you agree to use the product lawfully and to respect the wallet, project, and API key boundaries that the platform enforces. You are responsible for activity that happens through your wallet session and keys.",
+    body: "By using Fyxvo, you agree to use the product lawfully and to respect the wallet, project, JWT session, and API key boundaries that the platform enforces. You are responsible for activity that happens through your wallet session and project-scoped keys.",
   },
   {
     title: "Alpha-stage expectations",
@@ -9,7 +9,7 @@ const SECTIONS = [
   },
   {
     title: "Funding and usage",
-    body: "Projects use funded devnet balances and published lamport pricing. If a project runs out of funded balance or is otherwise paused, the relay may stop serving requests until the project is topped up or re-enabled.",
+    body: "Projects use funded devnet balances and published lamport pricing. If a project runs out of funded balance, loses access, or is otherwise paused, the relay may stop serving requests until the project is topped up or re-enabled.",
   },
   {
     title: "Availability and liability",

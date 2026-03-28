@@ -27,14 +27,30 @@ export interface PortalProject {
   id: string;
   name: string;
   slug: string;
+  displayName?: string | null;
   publicSlug?: string | null;
   templateType?: string | null;
   description?: string | null;
+  tags?: string[];
+  isPublic?: boolean;
+  leaderboardVisible?: boolean;
   status: string;
   network: string;
   owner: PortalUser;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectDetail extends PortalProject {
+  ownerReputationLevel?: string;
+  notes?: string | null;
+  githubUrl?: string | null;
+  lowBalanceThresholdSol?: number | null;
+  dailyRequestAlertThreshold?: number | null;
+  dailyBudgetLamports?: string | null;
+  monthlyBudgetLamports?: string | null;
+  budgetWarningThresholdPct?: number | null;
+  budgetHardStop?: boolean;
 }
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
@@ -145,28 +161,163 @@ export interface OnchainSnapshot {
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export interface AnalyticsOverview {
-  requestsToday: number;
-  requestsThisWeek: number;
-  requestsThisMonth: number;
-  p50Ms: number;
-  p95Ms: number;
-  p99Ms: number;
-  errorRateToday: number;
-  successRateToday: number;
-  updatedAt: string;
+  totals: {
+    projects: number;
+    apiKeys: number;
+    fundingRequests: number;
+    requestLogs: number;
+  };
+  latency: {
+    averageMs: number;
+    maxMs: number;
+  };
+  requestsByService: Array<{
+    service: string;
+    count: number;
+  }>;
 }
 
 export interface ProjectAnalytics {
+  project: ProjectDetail;
+  totals: {
+    requestLogs: number;
+    apiKeys: number;
+    fundingRequests: number;
+  };
+  latency: {
+    averageMs: number;
+    maxMs: number;
+    p95Ms: number;
+  };
+  statusCodes: Array<{
+    statusCode: number;
+    count: number;
+  }>;
+  recentRequests: Array<Record<string, unknown>>;
+}
+
+export interface MethodBreakdownItem {
+  route: string;
+  service: string;
+  count: number;
+  averageLatencyMs: number;
+  errorRate: number;
+  errorCount: number;
+}
+
+export interface ProjectRequestLogItem {
+  id: string;
+  traceId: string | null;
+  timestamp: string;
+  route: string;
+  httpMethod: string;
+  mode: "standard" | "priority" | null;
+  latencyMs: number;
+  success: boolean;
+  statusCode: number;
+  apiKeyPrefix: string | null;
+  simulated: boolean;
+  upstreamNode: string | null;
+  region: string | null;
+  requestSize: number | null;
+  responseSize: number | null;
+  cacheHit: boolean | null;
+  fyxvoHint: unknown;
+  service: string;
+}
+
+export interface ProjectRequestLogList {
+  items: ProjectRequestLogItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface AlertCenterItem {
+  alertKey: string;
+  id: string;
+  type: "low_balance" | "daily_cost" | "error_rate" | "webhook_failure" | "assistant" | "incident" | "notification";
+  severity: "info" | "warning" | "critical";
+  state: "new" | "acknowledged" | "resolved";
+  projectId: string | null;
+  projectName: string | null;
+  title: string;
+  description: string;
+  createdAt: string;
+  groupCount?: number;
+  relatedIncident?: {
+    id: string;
+    serviceName: string;
+    description: string;
+  } | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface NotificationPreferences {
+  email: string | null;
+  notifyProjectActivation: boolean;
+  notifyApiKeyEvents: boolean;
+  notifyFundingConfirmed: boolean;
+  notifyLowBalance: boolean;
+  notifyDailyAlert: boolean;
+  notifyWeeklySummary: boolean;
+  notifyReferralConversion: boolean;
+}
+
+export interface WebhookItem {
+  id: string;
   projectId: string;
-  requestsToday: number;
-  requestsThisWeek: number;
-  requestsThisMonth: number;
-  p50Ms: number;
-  p95Ms: number;
-  p99Ms: number;
-  errorRateToday: number;
-  topMethods: { method: string; count: number }[];
+  url: string;
+  events: string[];
+  secret: string;
+  active: boolean;
+  lastTriggeredAt: string | null;
+  createdAt: string;
+}
+
+export interface ProjectMemberItem {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: string;
+  invitedBy: string | null;
+  invitedAt: string;
+  acceptedAt: string | null;
+  user: {
+    walletAddress: string;
+    displayName: string;
+  };
+}
+
+export interface TransactionHistoryItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  asset: string;
+  amount: string;
+  status: string;
+  transactionSignature: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  projectId: string | null;
+  projectName: string | null;
+  projectSlug: string | null;
+  category: string;
+  priority: string;
+  subject: string;
+  description: string;
+  status: string;
+  adminResponse: string | null;
+  adminRespondedAt: string | null;
+  createdAt: string;
   updatedAt: string;
+  resolvedAt: string | null;
 }
 
 // ─── Operators ────────────────────────────────────────────────────────────────

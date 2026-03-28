@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { createPageMetadata } from "../../lib/metadata";
 
-export default function DashboardLayout({ children }: { readonly children: ReactNode }) {
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      {children}
-    </div>
-  );
+export const metadata = createPageMetadata(
+  "Dashboard",
+  "Create projects, activate them on Solana devnet, and manage the authenticated Fyxvo workspace."
+);
+
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  return children;
 }

@@ -8,8 +8,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Fyxvo - Solana devnet control plane",
-    template: "%s | Fyxvo",
+    default: "Fyxvo — Solana devnet control plane",
+    template: "%s — Fyxvo",
   },
   description:
     "Fyxvo is a Solana devnet control plane for funded relay access, on-chain project activation, API keys, analytics, alerts, and assistant-guided operations.",

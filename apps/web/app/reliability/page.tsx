@@ -36,9 +36,9 @@ export default async function ReliabilityPage() {
     <div className="mx-auto max-w-6xl px-4 py-16">
       <h1 className="text-4xl font-bold tracking-tight text-[var(--fyxvo-text)]">Reliability</h1>
       <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
-        Reliability at Fyxvo is about making the operating model visible. The live product exposes
-        control-plane health, gateway health, protocol readiness, request counts, and public trust
-        surfaces instead of hiding them behind a dashboard only.
+        Reliability at Fyxvo means making the operating model inspectable. The live product exposes
+        control-plane health, relay health, protocol readiness, request counts, and public trust
+        surfaces so users can see how the service is behaving instead of relying on opaque claims.
       </p>
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

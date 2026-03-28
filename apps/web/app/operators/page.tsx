@@ -10,9 +10,9 @@ export default function OperatorsPage() {
       </h1>
       <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
         Fyxvo does have an operator model and a managed relay path, but the live public web app
-        does not publish a fabricated operator roster. Public users can verify protocol addresses,
-        watch gateway health, and track latency on the status surface, while operator-level details
-        remain an internal or elevated-access workflow.
+        does not publish invented operator inventory. Public users can verify protocol addresses,
+        watch gateway health, and track relay latency on the status surface, while operator-level
+        details remain part of the internal control plane and elevated-access workflows.
       </p>
 
       <div className="mt-10 grid gap-5 lg:grid-cols-2">

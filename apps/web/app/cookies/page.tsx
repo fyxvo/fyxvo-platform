@@ -1,7 +1,7 @@
 const SECTIONS = [
   {
     title: "Essential product cookies",
-    body: "Fyxvo uses essential browser storage and cookie-like mechanisms to preserve session state, theme preference, and other small pieces of information needed for the web app to behave consistently.",
+    body: "Fyxvo uses essential browser storage and cookie-like mechanisms to preserve theme preference, browser-side session context, and other small pieces of information needed for the web app to behave consistently.",
   },
   {
     title: "Operational analytics",

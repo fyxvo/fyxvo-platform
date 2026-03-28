@@ -116,7 +116,7 @@ export default function PricingPage() {
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
             Fyxvo charges per request in lamports. You activate a project, fund it with devnet
             SOL, and the relay debits published rates as traffic moves through the standard or
-            priority lanes.
+            priority lanes instead of hiding spend inside a subscription tier.
           </p>
           {solPriceLoading ? (
             <div className="mt-4 max-w-[16rem]">

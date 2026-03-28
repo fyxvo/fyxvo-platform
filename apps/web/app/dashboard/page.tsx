@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Button, Notice } from "@fyxvo/ui";
@@ -174,19 +175,31 @@ export default function DashboardPage() {
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
             <div className="space-y-3">
               {projects.map((project) => (
-                <button
+                <div
                   key={project.id}
-                  type="button"
-                  onClick={() => setSelectedProject(project)}
-                  className={`w-full rounded-2xl border px-4 py-4 text-left transition-colors ${
+                  className={`rounded-2xl border px-4 py-4 transition-colors ${
                     selectedProject?.id === project.id
                       ? "border-[var(--fyxvo-brand)] bg-[var(--fyxvo-panel)]"
                       : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] hover:border-[var(--fyxvo-border-strong)]"
                   }`}
                 >
-                  <p className="text-sm font-medium text-[var(--fyxvo-text)]">{project.name}</p>
-                  <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{project.slug}</p>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProject(project)}
+                    className="w-full text-left"
+                  >
+                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">{project.name}</p>
+                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{project.slug}</p>
+                  </button>
+                  <div className="mt-3">
+                    <Link
+                      href={`/projects/${project.slug}`}
+                      className="text-sm font-medium text-[var(--fyxvo-brand)] transition-colors hover:text-[var(--fyxvo-text)]"
+                    >
+                      Open project workspace
+                    </Link>
+                  </div>
+                </div>
               ))}
             </div>
             {selectedProject ? <ProjectSummary project={selectedProject} /> : null}
