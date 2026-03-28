@@ -33,7 +33,12 @@ export default function MainnetPage() {
 
     try {
       const item = await getMainnetReadinessGate(adminToken);
-      setSnapshot(item);
+      setSnapshot({
+        ...item,
+        checks: item.checks ?? [],
+        paidBetaBlockers: item.paidBetaBlockers ?? [],
+        mainnetBetaBlockers: item.mainnetBetaBlockers ?? [],
+      });
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -47,6 +52,13 @@ export default function MainnetPage() {
 
   useEffect(() => {
     void loadSnapshot();
+    const intervalId = window.setInterval(() => {
+      void loadSnapshot();
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
   }, [loadSnapshot]);
 
   const readinessPercentage = useMemo(() => {

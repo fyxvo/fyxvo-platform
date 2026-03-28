@@ -38,6 +38,15 @@ type CapacityResponse = {
   utilizationPct: number;
 };
 
+type NetworkStatsResponse = {
+  totalRequests: number;
+  totalProjects: number;
+  totalApiKeys: number;
+  totalSolFees: string;
+  updatedAt: string;
+  region?: string;
+};
+
 type HealthCalendarResponse = {
   calendar: Array<{ date: string; availability: number; color: string }>;
 };
@@ -48,6 +57,7 @@ type StatusErrors = {
   incidents: string | null;
   capacity: string | null;
   healthCalendar: string | null;
+  networkStats: string | null;
 };
 
 const INITIAL_ERRORS: StatusErrors = {
@@ -56,7 +66,18 @@ const INITIAL_ERRORS: StatusErrors = {
   incidents: null,
   capacity: null,
   healthCalendar: null,
+  networkStats: null,
 };
+
+function formatLamportsToSol(lamports: string | number | bigint | null | undefined) {
+  if (lamports == null) return "0.0000";
+  const value = typeof lamports === "bigint" ? lamports : BigInt(lamports);
+  const whole = value / 1_000_000_000n;
+  const fractional = ((value % 1_000_000_000n) * 10_000n / 1_000_000_000n)
+    .toString()
+    .padStart(4, "0");
+  return `${whole.toLocaleString()}.${fractional}`;
+}
 
 function FetchIndicator({ error }: { error: string | null }) {
   if (!error) return null;
@@ -98,6 +119,7 @@ export default function StatusPage() {
   const [incidents, setIncidents] = useState<IncidentsResponse | null>(null);
   const [capacity, setCapacity] = useState<CapacityResponse | null>(null);
   const [healthCalendar, setHealthCalendar] = useState<HealthCalendarResponse | null>(null);
+  const [networkStats, setNetworkStats] = useState<NetworkStatsResponse | null>(null);
   const [errors, setErrors] = useState<StatusErrors>(INITIAL_ERRORS);
   const [loading, setLoading] = useState(true);
 
@@ -187,6 +209,26 @@ export default function StatusPage() {
     }
 
     try {
+      const response = await fetch(`${API_BASE}/v1/network/stats`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as NetworkStatsResponse;
+      console.log("[StatusPage] /v1/network/stats", payload);
+      if (!disposed?.()) {
+        setNetworkStats(payload);
+        setErrors((current) => ({ ...current, networkStats: null }));
+      }
+    } catch (error) {
+      if (!disposed?.()) {
+        setErrors((current) => ({
+          ...current,
+          networkStats: error instanceof Error ? error.message : "Unable to refresh network stats",
+        }));
+      }
+    }
+
+    try {
       const response = await fetch(`${API_BASE}/v1/network/health-calendar`, { cache: "no-store" });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -231,7 +273,9 @@ export default function StatusPage() {
     () => (healthCalendar?.calendar ?? []).slice(-30),
     [healthCalendar]
   );
-  const hasAnyData = Boolean(apiHealth || gatewayStatus || incidents || capacity || healthCalendar);
+  const hasAnyData = Boolean(
+    apiHealth || gatewayStatus || incidents || capacity || healthCalendar || networkStats
+  );
   const combinedError = Object.values(errors).find(Boolean) ?? null;
 
   return (
@@ -391,6 +435,47 @@ export default function StatusPage() {
               <span>Total errors</span>
               <span>{(gatewayStatus?.metrics?.totals?.errors ?? 0).toLocaleString()}</span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-10 rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-[var(--fyxvo-text)]">Network statistics</h2>
+          <FetchIndicator error={errors.networkStats} />
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+              Total requests
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+              {(networkStats?.totalRequests ?? 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+              Total projects
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+              {(networkStats?.totalProjects ?? 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+              Total API keys
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+              {(networkStats?.totalApiKeys ?? 0).toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+              Total fees
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+              {formatLamportsToSol(networkStats?.totalSolFees)} SOL
+            </p>
           </div>
         </div>
       </div>

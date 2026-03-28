@@ -21,6 +21,9 @@ const DOC_SECTIONS = [
   { id: "api-explorer", label: "API explorer" },
   { id: "public-project-pages", label: "Public project pages" },
   { id: "public-pricing-contract", label: "Public pricing contract" },
+  { id: "rate-limits", label: "Rate limits" },
+  { id: "sdk", label: "SDK" },
+  { id: "troubleshooting", label: "Troubleshooting" },
   { id: "public-endpoints", label: "Public endpoints" },
 ] as const;
 
@@ -97,6 +100,27 @@ curl https://rpc.fyxvo.com/priority \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: fyxvo_live_YOUR_KEY" \\
   -d '{"jsonrpc":"2.0","id":1,"method":"sendTransaction","params":["BASE64_TX"]}'`;
+
+const sdkExample = `import { createFyxvoClient } from "@fyxvo/sdk";
+
+const client = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
+  apiKey: "fyxvo_live_YOUR_KEY",
+});
+
+const health = await client.rpc({
+  jsonrpc: "2.0",
+  id: 1,
+  method: "getHealth",
+  params: [],
+});
+
+const priority = await client.priorityRpc({
+  jsonrpc: "2.0",
+  id: 2,
+  method: "sendTransaction",
+  params: ["BASE64_TX"],
+});`;
 
 export default function DocsPage() {
   return (
@@ -420,6 +444,77 @@ export default function DocsPage() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="rate-limits" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Rate limits
+          </h2>
+          <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+            The relay and control plane enforce request limits to protect shared infrastructure and
+            maintain predictable latency for funded traffic. Standard relay, priority relay, and
+            public form endpoints all have lane-specific or abuse-specific thresholds, and the
+            gateway returns rate-limit headers so client applications can back off gracefully.
+          </p>
+        </div>
+      </section>
+
+      <section id="sdk" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              SDK
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              Developers can integrate with Fyxvo using the published JavaScript client instead of
+              building their own request wrapper. Install it with `npm install @fyxvo/sdk`, create
+              a gateway client with your API key, and send either standard or priority relay
+              requests with the same typed interface.
+            </p>
+            <div className="mt-6">
+              <CodeBlock code={sdkExample} />
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Resources
+            </p>
+            <div className="mt-5 space-y-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+              <p>
+                The SDK also includes a control-plane client for projects, API keys, analytics,
+                funding preparation, and alerts.
+              </p>
+              <p>
+                Read the full package guide in the{" "}
+                <a
+                  href="https://github.com/fyxvo/fyxvo-platform/blob/main/packages/sdk/README.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[var(--fyxvo-brand)] hover:underline"
+                >
+                  SDK README on GitHub
+                </a>
+                .
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="troubleshooting" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Troubleshooting
+          </h2>
+          <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+            If a request fails, start by checking wallet authentication, project funding state, API
+            key scopes, and the live status page. Most integration issues come from expired JWTs,
+            insufficient funded balance, a missing `priority:relay` scope, or sending requests to
+            the wrong lane for the workload.
+          </p>
         </div>
       </section>
 
