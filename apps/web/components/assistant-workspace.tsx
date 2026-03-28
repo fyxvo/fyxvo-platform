@@ -139,7 +139,8 @@ export function AssistantWorkspace() {
         content: m.content,
       }));
 
-      const response = await fetch(`${webEnv.apiBaseUrl}/v1/assistant/chat`, {
+      const chatUrl = `${webEnv.apiBaseUrl}/v1/assistant/chat`;
+      const response = await fetch(chatUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -150,6 +151,21 @@ export function AssistantWorkspace() {
           messages: allMessages,
         }),
       });
+
+      console.log("[assistant] fetch", chatUrl, "status:", response.status);
+
+      if (response.status === 401) {
+        throw new Error("Session expired — reconnect your wallet to continue.");
+      }
+      if (response.status === 429) {
+        const resetHeader =
+          response.headers.get("x-ratelimit-reset") ??
+          response.headers.get("retry-after");
+        const resetTime = resetHeader
+          ? ` Resets at ${new Date(Number(resetHeader) * 1000).toLocaleTimeString()}.`
+          : "";
+        throw new Error(`Rate limit reached.${resetTime}`);
+      }
 
       // Capture conversation ID from header
       const newConvId = response.headers.get("x-fyxvo-conversation-id");

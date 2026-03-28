@@ -129,6 +129,11 @@ export default function StatusPage() {
         fetch("https://api.fyxvo.com/v1/network/capacity").then((r) => r.json()),
       ]);
 
+      if (apiRes.status === "rejected") console.error("[status] api health fetch failed:", apiRes.reason);
+      if (gatewayRes.status === "rejected") console.error("[status] gateway status fetch failed:", gatewayRes.reason);
+      if (incidentsRes.status === "rejected") console.error("[status] incidents fetch failed:", incidentsRes.reason);
+      if (capacityRes.status === "rejected") console.error("[status] capacity fetch failed:", capacityRes.reason);
+
       setData({
         apiHealth: apiRes.status === "fulfilled" ? (apiRes.value as ApiHealth) : null,
         gatewayStatus:
@@ -152,10 +157,14 @@ export default function StatusPage() {
   }, []);
 
   const apiOk = data.apiHealth?.status === "ok";
+  // Gateway ok if fetch succeeded and response doesn't explicitly signal degraded/error
   const gatewayOk =
-    data.gatewayStatus?.status === "ok" || data.gatewayStatus?.health === "ok";
-  const protocolReady = data.gatewayStatus?.protocolReady === true;
-  const allGood = apiOk && gatewayOk && protocolReady;
+    data.gatewayStatus !== null &&
+    data.gatewayStatus?.status !== "degraded" &&
+    data.gatewayStatus?.health !== "degraded";
+  // Protocol ready unless gateway explicitly says false
+  const protocolReady = gatewayOk && data.gatewayStatus?.protocolReady !== false;
+  const allGood = apiOk && gatewayOk;
 
   const capacityUsed = data.capacity?.requestsPerMinute ?? 0;
   const capacityMax = data.capacity?.capacityPerMinute ?? 10_000;

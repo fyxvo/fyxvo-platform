@@ -87,16 +87,16 @@
   --fyxvo-transition-base: 200ms ease;
   --fyxvo-transition-slow: 300ms ease;
 
-  /* Backgrounds — light: warm off-white surfaces */
-  --fyxvo-bg: #f6f2eb;
-  --fyxvo-bg-elevated: #fffaf5;
-  --fyxvo-panel: rgba(255, 250, 245, 0.92);
-  --fyxvo-panel-strong: rgba(255, 255, 255, 0.94);
-  --fyxvo-panel-soft: rgba(255, 245, 235, 0.9);
+  /* Backgrounds — light: clean neutral surfaces */
+  --fyxvo-bg: #f8f9fa;
+  --fyxvo-bg-elevated: #ffffff;
+  --fyxvo-panel: rgba(255, 255, 255, 0.92);
+  --fyxvo-panel-strong: rgba(255, 255, 255, 0.98);
+  --fyxvo-panel-soft: rgba(248, 249, 250, 0.9);
 
   /* Borders */
-  --fyxvo-border: rgba(195, 164, 137, 0.34);
-  --fyxvo-border-strong: rgba(195, 164, 137, 0.60);
+  --fyxvo-border: rgba(148, 163, 184, 0.34);
+  --fyxvo-border-strong: rgba(148, 163, 184, 0.60);
 
   /* Text hierarchy */
   --fyxvo-text: #171b24;
@@ -119,9 +119,9 @@
   --fyxvo-danger-bg: rgba(225, 29, 72, 0.08);
 
   /* Shadows */
-  --fyxvo-shadow: 0 26px 70px rgba(108, 84, 58, 0.16);
-  --fyxvo-shadow-sm: 0 6px 18px rgba(108, 84, 58, 0.10);
-  --fyxvo-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --fyxvo-shadow: 0 26px 70px rgba(0, 0, 0, 0.10);
+  --fyxvo-shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.06);
+  --fyxvo-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 body {

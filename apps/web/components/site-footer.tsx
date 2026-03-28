@@ -164,7 +164,7 @@ export function SiteFooter() {
 
             {/* Discord */}
             <a
-              href="https://discord.gg/fyxvo"
+              href="https://discord.gg/Uggu236Jgj"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Fyxvo on Discord"

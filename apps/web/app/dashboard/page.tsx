@@ -297,10 +297,7 @@ export default function DashboardPage() {
   // ── Not authenticated ──
   if (portal.walletPhase !== "authenticated") {
     return (
-      <div
-        style={{ backgroundColor: "#0a0a0f" }}
-        className="min-h-screen flex items-center justify-center px-5"
-      >
+      <div className="flex items-center justify-center py-20 px-5">
         <div className="text-center max-w-lg">
           <div className="w-20 h-20 rounded-3xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto mb-8">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-10 h-10 text-[#64748b]">
@@ -324,7 +321,7 @@ export default function DashboardPage() {
   // ── Loading ──
   if (portal.loading) {
     return (
-      <div style={{ backgroundColor: "#0a0a0f" }} className="min-h-screen py-12 px-5">
+      <div className="py-12 px-5">
         <div className="mx-auto max-w-6xl">
           <div className="h-24 rounded-2xl bg-white/[0.04] animate-pulse mb-8" />
           <SkeletonCards />
@@ -338,7 +335,7 @@ export default function DashboardPage() {
   const analytics = portal.projectAnalytics;
 
   return (
-    <div style={{ backgroundColor: "#0a0a0f" }} className="min-h-screen py-12">
+    <div className="py-12">
       <div className="mx-auto max-w-6xl px-5 sm:px-8 space-y-10">
 
         {/* Header */}

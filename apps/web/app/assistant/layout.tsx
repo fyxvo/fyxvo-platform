@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { DashShell } from "../../components/dash-shell";
 import { webEnv } from "../../lib/env";
 
 export const metadata: Metadata = {
@@ -32,5 +31,5 @@ export const metadata: Metadata = {
 };
 
 export default function AssistantLayout({ children }: { readonly children: ReactNode }) {
-  return <DashShell fullbleed hideBottomNav>{children}</DashShell>;
+  return <>{children}</>;
 }

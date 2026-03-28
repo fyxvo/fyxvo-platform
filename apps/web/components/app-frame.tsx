@@ -52,5 +52,10 @@ export function AppFrame({ children }: { readonly children: React.ReactNode }) {
     );
   }
 
-  return <DashShell>{children}</DashShell>;
+  const isAssistant = pathname.startsWith("/assistant");
+  return (
+    <DashShell fullbleed={isAssistant} hideBottomNav={isAssistant}>
+      {children}
+    </DashShell>
+  );
 }
