@@ -571,7 +571,7 @@ function buildAdminProtocolOverview(input: {
   } satisfies AdminOverview["protocol"];
 }
 
-const DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS = 100_000_000_000n;
+const DEFAULT_MAINNET_TARGET_RESERVE_LAMPORTS = 25_000_000_000n; // devnet reserve target, raise to 500 SOL minimum for mainnet beta
 const MAINNET_SUPPORT_BACKLOG_LIMIT = 10;
 
 async function buildMainnetReleaseGateSnapshot(input: {
