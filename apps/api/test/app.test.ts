@@ -47,6 +47,7 @@ import type {
   CreateApiKeyInput,
   CreateNotificationInput,
   ApiKeyAnalyticsItem,
+  CreateOperatorRegistrationInput,
   CreateProjectInput,
   ErrorLogItem,
   FundingHistoryItem,
@@ -74,6 +75,8 @@ import type {
   DailyRequestCount,
   AdminPlatformStats,
   NewsletterSubscriberList,
+  OperatorRegistrationRecord,
+  OperatorNetworkEntry,
   SearchResults
 } from "../src/types.js";
 
@@ -133,6 +136,7 @@ class MemoryApiRepository implements ApiRepository {
     }
   >();
   private readonly operatorSummaries: OperatorSummary[];
+  private readonly operatorRegistrations = new Map<string, OperatorRegistrationRecord>();
   private readonly onProjectCreated?: (project: Project) => void;
 
   constructor(input: { onProjectCreated?: (project: Project) => void } = {}) {
@@ -189,6 +193,20 @@ class MemoryApiRepository implements ApiRepository {
         ]
       }
     ];
+
+    const registrationId = randomUUID();
+    this.operatorRegistrations.set(registrationId, {
+      id: registrationId,
+      endpoint: node.endpoint,
+      operatorWalletAddress: operator.walletAddress,
+      name: operator.name,
+      region: node.region,
+      contact: operator.email,
+      status: "APPROVED",
+      rejectionReason: null,
+      createdAt: now,
+      approvedAt: now
+    });
   }
 
   setUserRole(walletAddress: string, role: User["role"]) {
@@ -888,6 +906,113 @@ class MemoryApiRepository implements ApiRepository {
 
   async listOperators(): Promise<OperatorSummary[]> {
     return this.operatorSummaries;
+  }
+
+  async createOperatorRegistration(input: CreateOperatorRegistrationInput): Promise<OperatorRegistrationRecord> {
+    const registration: OperatorRegistrationRecord = {
+      id: randomUUID(),
+      endpoint: input.endpoint,
+      operatorWalletAddress: input.operatorWalletAddress,
+      name: input.name,
+      region: input.region,
+      contact: input.contact,
+      status: "PENDING",
+      rejectionReason: null,
+      createdAt: new Date(),
+      approvedAt: null
+    };
+
+    this.operatorRegistrations.set(registration.id, registration);
+    return registration;
+  }
+
+  async listOperatorRegistrationsByWallet(walletAddress: string): Promise<OperatorRegistrationRecord[]> {
+    return [...this.operatorRegistrations.values()].filter((item) => item.operatorWalletAddress === walletAddress);
+  }
+
+  async listOperatorRegistrations(): Promise<OperatorRegistrationRecord[]> {
+    return [...this.operatorRegistrations.values()].sort(
+      (left, right) => right.createdAt.getTime() - left.createdAt.getTime()
+    );
+  }
+
+  async getOperatorRegistrationById(id: string): Promise<OperatorRegistrationRecord | null> {
+    return this.operatorRegistrations.get(id) ?? null;
+  }
+
+  async approveOperatorRegistration(id: string): Promise<{
+    readonly registration: OperatorRegistrationRecord;
+    readonly operator: NodeOperator;
+    readonly node: Node;
+  }> {
+    const existing = this.operatorRegistrations.get(id);
+    if (!existing) {
+      throw new Error("Operator registration not found.");
+    }
+
+    const now = new Date();
+    const registration: OperatorRegistrationRecord = {
+      ...existing,
+      status: "APPROVED",
+      rejectionReason: null,
+      approvedAt: now
+    };
+
+    this.operatorRegistrations.set(id, registration);
+
+    const operatorId = randomUUID();
+    const nodeId = randomUUID();
+    const operator: NodeOperator = {
+      id: operatorId,
+      name: registration.name,
+      email: registration.contact,
+      walletAddress: registration.operatorWalletAddress,
+      status: NodeOperatorStatus.ACTIVE,
+      createdAt: now,
+      updatedAt: now
+    };
+    const node: Node = {
+      id: nodeId,
+      operatorId,
+      projectId: null,
+      name: `${registration.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-node`,
+      network: NodeNetwork.DEVNET,
+      endpoint: registration.endpoint,
+      region: registration.region,
+      status: NodeStatus.ONLINE,
+      lastHeartbeatAt: now,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    return { registration, operator, node };
+  }
+
+  async rejectOperatorRegistration(id: string, reason?: string | null): Promise<OperatorRegistrationRecord | null> {
+    const existing = this.operatorRegistrations.get(id);
+    if (!existing) {
+      return null;
+    }
+
+    const updated: OperatorRegistrationRecord = {
+      ...existing,
+      status: "REJECTED",
+      rejectionReason: reason ?? null,
+      approvedAt: null
+    };
+    this.operatorRegistrations.set(id, updated);
+    return updated;
+  }
+
+  async listActiveOperatorNetwork(): Promise<OperatorNetworkEntry[]> {
+    return this.operatorSummaries.map((summary) => ({
+      operatorId: summary.operator.id,
+      name: summary.operator.name,
+      region: summary.nodes[0]?.region ?? "unknown",
+      endpointHost: new URL(summary.nodes[0]?.endpoint ?? "https://example.com").hostname,
+      approvedAt: summary.operator.updatedAt,
+      status: summary.operator.status
+    }));
   }
 
   async getIdempotencyRecord(input: IdempotencyLookup) {
@@ -2897,6 +3022,13 @@ describe("Fyxvo API service", () => {
     expect(operators.statusCode).toBe(200);
     expect(operators.json()).toMatchObject({
       items: [
+        {
+          name: "Atlas Operator",
+          status: "APPROVED",
+          region: "us-east-1"
+        }
+      ],
+      activeOperators: [
         {
           operator: {
             name: "Atlas Operator",
