@@ -181,19 +181,19 @@ export const protocolAddresses = {
 export const requestPricingTiers = [
   {
     name: "Standard RPC",
-    lamports: 1000,
+    lamports: 5000,
     description:
       "Default lane for everyday JSON-RPC reads and standard gateway traffic.",
   },
   {
-    name: "Compute-heavy methods",
-    lamports: 3000,
+    name: "Write and compute-heavy methods",
+    lamports: 20000,
     description:
-      "Higher-cost lane for heavier methods such as getProgramAccounts and similar broad scans.",
+      "Higher-cost traffic is billed at the live 4x lane when methods or writes put more pressure on upstream nodes.",
   },
   {
     name: "Priority relay",
-    lamports: 5000,
+    lamports: 20000,
     description:
       "Low-latency path for time-sensitive transaction submission with its own scope and routing lane.",
   },
@@ -228,4 +228,3 @@ export const marketingMilestones: PublicUpdatePost[] = [
     publishedAt: "2026-03-26T00:00:00.000Z",
   },
 ];
-

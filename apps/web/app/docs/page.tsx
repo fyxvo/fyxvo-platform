@@ -10,6 +10,7 @@ const DOC_SECTIONS = [
   { id: "project-activation-and-funding", label: "Project activation and funding" },
   { id: "gateway-usage", label: "Gateway usage" },
   { id: "api-explorer", label: "API explorer" },
+  { id: "public-project-pages", label: "Public project pages" },
   { id: "public-pricing-contract", label: "Public pricing contract" },
   { id: "public-endpoints", label: "Public endpoints" },
 ] as const;
@@ -210,7 +211,8 @@ export default function DocsPage() {
             <p className="text-base leading-7 text-[var(--fyxvo-text-soft)]">
               Use `rpc.fyxvo.com/rpc` for standard JSON-RPC traffic and `rpc.fyxvo.com/priority`
               for time-sensitive relay traffic. Both paths require an API key. The priority lane
-              also requires the `priority:relay` scope.
+              also requires the `priority:relay` scope. The live gateway currently publishes
+              `5,000` lamports for standard RPC and `20,000` lamports for priority relay.
             </p>
             <CodeBlock code={gatewayExample} />
           </div>
@@ -222,6 +224,23 @@ export default function DocsPage() {
       <section id="api-explorer" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <DocsApiExplorer />
+        </div>
+      </section>
+
+      <section id="public-project-pages" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Public project pages
+          </h2>
+          <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+            Explore and the public project page system are opt-in. A project only appears on a
+            public page after the owner opens project settings, enables the public page, assigns a
+            public slug, and turns on discoverability for that workspace.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+            Once enabled, the public page can expose request volume, latency, success rate, and a
+            public slug under `/p/[publicSlug]` without exposing private workspace data.
+          </p>
         </div>
       </section>
 
@@ -248,9 +267,11 @@ export default function DocsPage() {
               ))}
             </div>
             <p className="mt-6 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              Discounts apply automatically at one million requests per month for 20 percent off
-              and at ten million requests per month for 40 percent off. There is no free tier in
-              the live devnet deployment.
+              The live gateway currently publishes 5,000 lamports for standard RPC and 20,000
+              lamports for both priority relay and the higher-cost 4x lane. Discounts apply
+              automatically at one million requests per month for 20 percent off and at ten
+              million requests per month for 40 percent off. There is no free tier in the live
+              devnet deployment.
             </p>
           </div>
 

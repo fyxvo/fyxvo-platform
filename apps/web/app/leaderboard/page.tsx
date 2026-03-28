@@ -47,8 +47,16 @@ export default async function LeaderboardPage() {
             No leaderboard entries yet
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-            The leaderboard route is live, but no project has opted into a public ranking yet.
+            The leaderboard fills in as projects route real traffic through the gateway and choose
+            to expose public ranking data. Once teams opt in, this page will rank live request
+            volume and latency for those public projects.
           </p>
+          <Link
+            href="/dashboard"
+            className="mt-5 inline-flex text-sm font-medium text-[var(--fyxvo-brand)]"
+          >
+            Create a project and start routing requests
+          </Link>
         </div>
       )}
     </div>

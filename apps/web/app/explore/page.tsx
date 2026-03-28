@@ -109,9 +109,16 @@ export default function ExplorePage() {
             No public projects are listed yet
           </h2>
           <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-            The explore surface is live. Projects appear here after the owner opens project
-            settings, enables a public page, assigns a public slug, and turns on discoverability.
+            No team has made a project public yet. A project appears here after the owner opens
+            project settings, enables the public page, assigns a public slug, and turns on
+            discoverability for that workspace.
           </p>
+          <Link
+            href="/docs#public-project-pages"
+            className="mt-5 inline-flex text-sm font-medium text-[var(--fyxvo-brand)]"
+          >
+            Read how public project pages work
+          </Link>
         </div>
       )}
     </div>

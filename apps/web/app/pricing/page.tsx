@@ -115,8 +115,9 @@ export default function PricingPage() {
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
             Fyxvo charges per request in lamports. You activate a project, fund it with devnet
-            SOL, and the relay debits published rates as traffic moves through the standard or
-            priority lanes instead of hiding spend inside a subscription tier.
+            SOL, and the relay debits the live gateway rates of 5,000 lamports for standard RPC
+            and 20,000 lamports for priority traffic instead of hiding spend inside a subscription
+            tier.
           </p>
           {solPriceLoading ? (
             <div className="mt-4 max-w-[16rem]">
@@ -234,7 +235,11 @@ export default function PricingPage() {
 
               {[
                 { label: "Standard RPC", value: standardPct, key: "standard" as const },
-                { label: "Compute-heavy", value: computePct, key: "compute" as const },
+                {
+                  label: "Write and compute-heavy",
+                  value: computePct,
+                  key: "compute" as const,
+                },
                 { label: "Priority relay", value: priorityPct, key: "priority" as const },
               ].map((row) => (
                 <label key={row.key} className="block">
