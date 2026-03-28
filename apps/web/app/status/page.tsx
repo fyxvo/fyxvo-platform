@@ -108,6 +108,7 @@ export default function StatusPage() {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = (await response.json()) as ApiHealthResponse;
+        console.log("[StatusPage] /health", payload);
         if (!disposed) {
           setApiHealth(payload);
           setErrors((current) => ({ ...current, apiHealth: null }));
@@ -127,6 +128,7 @@ export default function StatusPage() {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = (await response.json()) as GatewayStatusResponse;
+        console.log("[StatusPage] /v1/status", payload);
         if (!disposed) {
           setGatewayStatus(payload);
           setErrors((current) => ({ ...current, gatewayStatus: null }));
@@ -146,6 +148,7 @@ export default function StatusPage() {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = (await response.json()) as IncidentsResponse;
+        console.log("[StatusPage] /v1/incidents", payload);
         if (!disposed) {
           setIncidents(payload);
           setErrors((current) => ({ ...current, incidents: null }));
@@ -165,6 +168,7 @@ export default function StatusPage() {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = (await response.json()) as CapacityResponse;
+        console.log("[StatusPage] /v1/network/capacity", payload);
         if (!disposed) {
           setCapacity(payload);
           setErrors((current) => ({ ...current, capacity: null }));
@@ -184,6 +188,7 @@ export default function StatusPage() {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = (await response.json()) as HealthCalendarResponse;
+        console.log("[StatusPage] /v1/network/health-calendar", payload);
         if (!disposed) {
           setHealthCalendar(payload);
           setErrors((current) => ({ ...current, healthCalendar: null }));

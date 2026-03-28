@@ -14,6 +14,19 @@ const PREFERRED_WALLETS = [
   { name: "Trust", label: "Trust Wallet" },
 ] as const;
 
+const WALLET_ICON_FALLBACKS: Record<string, string> = {
+  Phantom:
+    "https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/phantom/icon.png",
+  Solflare:
+    "https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/solflare/icon.svg",
+  Backpack:
+    "https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/backpack/icon.png",
+  "Coinbase Wallet":
+    "https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/coinbase/icon.svg",
+  Trust:
+    "https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/trust/icon.svg",
+};
+
 export function WalletConnectButton() {
   const [open, setOpen] = useState(false);
   const [pendingWalletName, setPendingWalletName] = useState<string | null>(null);
@@ -100,33 +113,43 @@ export function WalletConnectButton() {
             </p>
           ) : (
             orderedWallets.map(({ wallet: walletOption, label }) => {
-              const icon = walletOption.adapter.icon;
               const name = walletOption.adapter.name;
+              const icon =
+                walletOption.adapter.icon ??
+                WALLET_ICON_FALLBACKS[name] ??
+                "/brand/logo.png";
               return (
                 <button
                   key={name}
                   type="button"
                   onClick={() => handleSelect(name)}
                   disabled={isConnecting}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-left text-sm font-medium text-[var(--fyxvo-text)] transition-colors hover:border-[var(--fyxvo-brand)] hover:bg-[var(--fyxvo-panel)]"
+                  className="flex items-center gap-4 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-left text-sm font-medium text-[var(--fyxvo-text)] shadow-[0_0_0_1px_rgba(255,255,255,0.02)] transition-all hover:border-[var(--fyxvo-brand)] hover:bg-[var(--fyxvo-panel)]"
                   aria-label={label}
                 >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--fyxvo-panel)] p-1">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                     <Image
                       src={icon}
                       alt={`${label} logo`}
-                      width={32}
-                      height={32}
+                      width={36}
+                      height={36}
                       unoptimized
-                      className="h-8 w-8 rounded-md object-contain"
+                      className="h-9 w-9 rounded-lg object-contain"
                     />
                   </span>
-                  <div className="flex flex-col">
-                    <span>{label}</span>
-                    <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                  <div className="flex flex-1 items-center justify-between gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-base font-semibold">{label}</span>
+                      <span className="text-xs text-[var(--fyxvo-text-muted)]">
+                        {walletOption.readyState === "Installed"
+                          ? "Available in this browser"
+                          : "Connect or open wallet"}
+                      </span>
+                    </div>
+                    <span className="rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-2.5 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                       {walletOption.readyState === "Installed"
-                        ? "Available in this browser"
-                        : "Connect or open wallet"}
+                        ? "Ready"
+                        : "Open"}
                     </span>
                   </div>
                 </button>

@@ -133,6 +133,46 @@ export function AssistantWorkspace() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const buildAssistantErrorMessage = async (response: Response) => {
+    type AssistantErrorBody = {
+      error?: string;
+      message?: string;
+      resetAt?: string;
+      windowResetAt?: string;
+    };
+
+    const rawBody = await response.text();
+    let parsedBody: AssistantErrorBody | null = null;
+
+    try {
+      parsedBody = rawBody ? (JSON.parse(rawBody) as AssistantErrorBody) : null;
+    } catch {
+      parsedBody = null;
+    }
+
+    if (response.status === 401) {
+      return "Your session has expired, please reconnect your wallet.";
+    }
+
+    if (response.status === 429) {
+      const resetAt = parsedBody?.resetAt ?? parsedBody?.windowResetAt;
+      return resetAt
+        ? `You have reached the rate limit, it resets at ${resetAt}.`
+        : "You have reached the rate limit. Please try again after it resets.";
+    }
+
+    if (response.status === 500) {
+      return "The assistant is temporarily unavailable.";
+    }
+
+    const rawMessage =
+      parsedBody?.error ??
+      parsedBody?.message ??
+      (rawBody.trim().length > 0 ? rawBody : null);
+
+    return rawMessage ?? `Assistant request failed with status ${response.status}.`;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || streaming) return;
     if (!token) {
@@ -184,7 +224,9 @@ export function AssistantWorkspace() {
         }),
       });
 
-      if (!res.ok) throw new Error(`Chat error: ${res.status}`);
+      if (!res.ok) {
+        throw new Error(await buildAssistantErrorMessage(res));
+      }
 
       // Extract conversation ID from header
       const headerConvId = res.headers.get("x-fyxvo-conversation-id");
@@ -235,12 +277,14 @@ export function AssistantWorkspace() {
       if (!streamCompleted) {
         setStreaming(false);
       }
-    } catch {
-      setSendError("Assistant request failed. Please try again.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Assistant request failed. Please try again.";
+      setSendError(message);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessageId
-            ? { ...m, content: "An error occurred. Please try again." }
+            ? { ...m, content: message }
             : m
         )
       );
