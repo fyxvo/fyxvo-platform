@@ -1,1023 +1,404 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Notice, Skeleton, Table, type TableColumn } from "@fyxvo/ui";
-import { MetricCard } from "../../components/metric-card";
-import { PageHeader } from "../../components/page-header";
-import { AuthGate } from "../../components/state-panels";
+import { useEffect, useState } from "react";
 import { usePortal } from "../../components/portal-provider";
-import { fetchGatewayStatus } from "../../lib/api";
-import { formatDuration, formatPercent, formatRelativeDate, shortenAddress } from "../../lib/format";
-import { liveDevnetState } from "../../lib/live-state";
-import type { OperatorSummary, PortalServiceStatus } from "../../lib/types";
 
-// ---------------------------------------------------------------------------
-// Health timeline helpers
-// ---------------------------------------------------------------------------
+const API = "https://api.fyxvo.com";
 
-type BucketTone = "healthy" | "degraded" | "unknown";
+const NODE_TYPES = [
+  "Solana validator",
+  "Dedicated RPC node",
+  "Cloud instance",
+] as const;
 
-function generateHealthTimeline(nodeStatus: string): BucketTone[] {
-  // 48 buckets = 24 hours in 30-minute increments
-  const buckets: BucketTone[] = [];
-  for (let i = 0; i < 48; i++) {
-    if (nodeStatus === "ONLINE") {
-      // Most buckets healthy; sprinkle a couple of "unknown" at the far-left (oldest)
-      if (i < 2) {
-        buckets.push("unknown");
-      } else if (i === 12 || i === 27) {
-        // brief degraded blips to make the timeline realistic
-        buckets.push("degraded");
-      } else {
-        buckets.push("healthy");
-      }
-    } else if (nodeStatus === "DEGRADED") {
-      buckets.push(i % 3 === 0 ? "degraded" : "healthy");
-    } else {
-      buckets.push("unknown");
-    }
-  }
-  return buckets;
+const REGIONS = [
+  "us-east-1",
+  "us-west-2",
+  "eu-west-1",
+  "eu-central-1",
+  "ap-southeast-1",
+  "ap-northeast-1",
+] as const;
+
+interface ActivityRow {
+  operatorId: string;
+  wallet: string;
+  requestsServed: number;
+  feesEarned: string;
+  status: string;
 }
 
-function bucketColor(tone: BucketTone): string {
-  if (tone === "healthy") return "var(--color-success, #22c55e)";
-  if (tone === "degraded") return "var(--color-warning, #f59e0b)";
-  return "var(--fyxvo-border)";
+interface DailyRequestRow {
+  date: string;
+  count: number;
 }
 
-function HealthTimeline({ nodeStatus }: { readonly nodeStatus: string }) {
-  const buckets = useMemo(() => generateHealthTimeline(nodeStatus), [nodeStatus]);
+type FormState = "idle" | "submitting" | "success" | "error";
+
+function AdminPanel({ token }: { readonly token: string }) {
+  const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [daily, setDaily] = useState<DailyRequestRow[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+  const [loadingDaily, setLoadingDaily] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [dailyError, setDailyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetch(`${API}/v1/operators/activity`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as ActivityRow[];
+        setActivity(data);
+      })
+      .catch((err: unknown) => {
+        setActivityError(err instanceof Error ? err.message : "Failed to load activity.");
+      })
+      .finally(() => setLoadingActivity(false));
+  }, [token]);
+
+  useEffect(() => {
+    void fetch(`${API}/v1/operators/daily-requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as DailyRequestRow[];
+        setDaily(data);
+      })
+      .catch((err: unknown) => {
+        setDailyError(err instanceof Error ? err.message : "Failed to load daily requests.");
+      })
+      .finally(() => setLoadingDaily(false));
+  }, [token]);
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">24h uptime timeline</span>
-        <span className="text-xs text-[var(--fyxvo-text-muted)]">← 24 h ago · now →</span>
-      </div>
-      <div className="flex gap-px overflow-hidden rounded-xl">
-        {buckets.map((tone, i) => (
-          <div
-            key={i}
-            title={tone}
-            style={{ backgroundColor: bucketColor(tone), flex: "1 1 0", height: "20px" }}
-          />
-        ))}
-      </div>
-      <div className="mt-2 flex gap-4">
-        {(["healthy", "degraded", "unknown"] as const).map((tone) => (
-          <div key={tone} className="flex items-center gap-1.5">
-            <div
-              className="h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: bucketColor(tone) }}
-            />
-            <span className="text-xs capitalize text-[var(--fyxvo-text-muted)]">{tone}</span>
+    <div className="space-y-10">
+      {/* Operator Activity */}
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+        <h3 className="text-lg font-semibold text-[#f1f5f9]">Operator activity</h3>
+        {loadingActivity && (
+          <p className="mt-4 text-sm text-[#64748b]">Loading activity&hellip;</p>
+        )}
+        {activityError && (
+          <p className="mt-4 text-sm text-rose-400">{activityError}</p>
+        )}
+        {!loadingActivity && !activityError && activity.length === 0 && (
+          <p className="mt-4 text-sm text-[#64748b]">No activity data available.</p>
+        )}
+        {!loadingActivity && !activityError && activity.length > 0 && (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[500px] text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.08]">
+                  <th className="pb-2 text-left font-medium text-[#64748b]">Wallet</th>
+                  <th className="pb-2 text-left font-medium text-[#64748b]">Requests</th>
+                  <th className="pb-2 text-left font-medium text-[#64748b]">Fees earned</th>
+                  <th className="pb-2 text-left font-medium text-[#64748b]">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {activity.map((row) => (
+                  <tr key={row.operatorId}>
+                    <td className="py-2 font-mono text-xs text-[#f1f5f9]">
+                      {row.wallet.slice(0, 8)}&hellip;{row.wallet.slice(-6)}
+                    </td>
+                    <td className="py-2 text-[#f1f5f9]">{row.requestsServed.toLocaleString()}</td>
+                    <td className="py-2 text-[#f97316]">{row.feesEarned}</td>
+                    <td className="py-2">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          row.status === "ONLINE"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : "bg-[#64748b]/10 text-[#64748b]"
+                        }`}
+                      >
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Daily Requests */}
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+        <h3 className="text-lg font-semibold text-[#f1f5f9]">Daily request counts</h3>
+        {loadingDaily && (
+          <p className="mt-4 text-sm text-[#64748b]">Loading daily data&hellip;</p>
+        )}
+        {dailyError && (
+          <p className="mt-4 text-sm text-rose-400">{dailyError}</p>
+        )}
+        {!loadingDaily && !dailyError && daily.length === 0 && (
+          <p className="mt-4 text-sm text-[#64748b]">No daily request data available.</p>
+        )}
+        {!loadingDaily && !dailyError && daily.length > 0 && (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[300px] text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.08]">
+                  <th className="pb-2 text-left font-medium text-[#64748b]">Date</th>
+                  <th className="pb-2 text-left font-medium text-[#64748b]">Requests</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {daily.map((row) => (
+                  <tr key={row.date}>
+                    <td className="py-2 text-[#f1f5f9]">{row.date}</td>
+                    <td className="py-2 text-[#f1f5f9]">{row.count.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Health check dot history
-// ---------------------------------------------------------------------------
-
-function HealthCheckHistory({ nodeStatus }: { readonly nodeStatus: string }) {
-  const isOnline = nodeStatus === "ONLINE";
-  const isDegraded = nodeStatus === "DEGRADED";
-
-  if (nodeStatus === "UNKNOWN" || (!isOnline && !isDegraded)) {
-    return (
-      <div className="flex items-center gap-3">
-        <span className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Health checks</span>
-        <Skeleton className="h-4 w-32" />
-        <span className="text-xs text-[var(--fyxvo-text-muted)]">Health checks pending</span>
-      </div>
-    );
-  }
-
-  // Generate 10 recent check dots
-  const dots: boolean[] = [];
-  for (let i = 0; i < 10; i++) {
-    if (isOnline) {
-      dots.push(i !== 4); // one failed check in the sequence
-    } else {
-      dots.push(i % 2 === 0);
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-3 flex-wrap">
-      <span className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Recent checks</span>
-      <div className="flex gap-1.5">
-        {dots.map((passed, i) => (
-          <div
-            key={i}
-            title={passed ? "pass" : "fail"}
-            className="h-3 w-3 rounded-full"
-            style={{
-              backgroundColor: passed
-                ? "var(--color-success, #22c55e)"
-                : "var(--color-danger, #ef4444)"
-            }}
-          />
-        ))}
-      </div>
-      <span className="text-xs text-[var(--fyxvo-text-muted)]">last 10 checks</span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Node table columns
-// ---------------------------------------------------------------------------
-
-const nodeColumns: readonly TableColumn<OperatorSummary["nodes"][number]>[] = [
-  {
-    key: "name",
-    header: "Node",
-    cell: (node) => (
-      <div>
-        <div className="font-medium text-[var(--fyxvo-text)]">{node.name}</div>
-        <div className="text-xs uppercase tracking-[0.12em] text-[var(--fyxvo-text-muted)]">{node.region}</div>
-      </div>
-    )
-  },
-  {
-    key: "status",
-    header: "Status",
-    cell: (node) => (
-      <Badge tone={node.status === "ONLINE" ? "success" : node.status === "DEGRADED" ? "warning" : "neutral"}>
-        {node.status}
-      </Badge>
-    )
-  },
-  {
-    key: "reliability",
-    header: "Reliability",
-    cell: (node) => formatPercent((node.reliabilityScore ?? 0.9) * 100)
-  },
-  {
-    key: "heartbeat",
-    header: "Heartbeat",
-    cell: (node) => (node.lastHeartbeatAt ? formatRelativeDate(node.lastHeartbeatAt) : "Unavailable")
-  },
-  {
-    key: "errorRate",
-    header: "Error rate",
-    cell: (node) =>
-      typeof node.latestMetrics?.errorRate === "number"
-        ? formatPercent(node.latestMetrics.errorRate * 100)
-        : "Pending"
-  }
-];
-
-// ---------------------------------------------------------------------------
-// Types for real API data
-// ---------------------------------------------------------------------------
-
-interface OperatorActivityItem {
-  readonly method: string;
-  readonly latencyMs: number;
-  readonly mode: string;
-  readonly success: boolean;
-  readonly upstreamNode: string | null;
-  readonly createdAt: string;
-}
-
-interface DailyRequestCount {
-  readonly date: string;
-  readonly count: number;
-}
-
-// ---------------------------------------------------------------------------
-// Static fallback activity + chart data
-// ---------------------------------------------------------------------------
-
-const SAMPLE_ACTIVITY: OperatorActivityItem[] = [
-  { method: "getSlot", latencyMs: 42, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getBalance", latencyMs: 67, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getLatestBlockhash", latencyMs: 38, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "sendTransaction", latencyMs: 95, mode: "priority", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getTransaction", latencyMs: 71, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getAccountInfo", latencyMs: 55, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getSlot", latencyMs: 39, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getBalance", latencyMs: 62, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "simulateTransaction", latencyMs: 88, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-  { method: "getBlockTime", latencyMs: 44, mode: "standard", success: true, upstreamNode: null, createdAt: new Date().toISOString() },
-];
-
-const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const FALLBACK_DAILY_DATA = [
-  { day: "Mon", requests: 2847 },
-  { day: "Tue", requests: 3102 },
-  { day: "Wed", requests: 2756 },
-  { day: "Thu", requests: 3441 },
-  { day: "Fri", requests: 3890 },
-  { day: "Sat", requests: 2134 },
-  { day: "Sun", requests: 1987 },
-];
-
-function subscribeNoop() {
-  return () => undefined;
-}
-
-function useIsClient() {
-  return useSyncExternalStore(subscribeNoop, () => true, () => false);
-}
-
-// ---------------------------------------------------------------------------
-// Gateway Performance types
-// ---------------------------------------------------------------------------
-
-interface GatewayMetrics {
-  requestsPerMinute?: number;
-  averageLatencyMs?: number;
-  p95LatencyMs?: number;
-  cacheHitRate?: number;
-  circuitBreakerState?: string;
-  uptimePercent24h?: number;
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 export default function OperatorsPage() {
   const portal = usePortal();
-  const canViewAdmin = portal.user?.role === "OWNER" || portal.user?.role === "ADMIN";
-  const [gatewayStatus, setGatewayStatus] = useState<PortalServiceStatus | null>(null);
-  const [activityData, setActivityData] = useState<OperatorActivityItem[]>(SAMPLE_ACTIVITY);
-  const [dailyData, setDailyData] = useState<{ day: string; requests: number }[]>(FALLBACK_DAILY_DATA);
-  const [loadingActivity, setLoadingActivity] = useState(false);
-  const isClient = useIsClient();
+  const isAdmin =
+    portal.user?.role === "OWNER" || portal.user?.role === "ADMIN";
 
-  // Upstream configuration (admin only)
-  const [upstreams, setUpstreams] = useState<Array<{ url: string; circuitStatus: string; failureCount: number }>>([]);
-  const [upstreamsLoaded, setUpstreamsLoaded] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [nodeType, setNodeType] = useState<string>("Solana validator");
+  const [region, setRegion] = useState<string>("us-east-1");
+  const [message, setMessage] = useState("");
+  const [formState, setFormState] = useState<FormState>("idle");
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Gateway performance metrics
-  const [gatewayMetrics, setGatewayMetrics] = useState<GatewayMetrics | null>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const res = await fetch(`${apiBase}/v1/network/stats`, { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json() as GatewayMetrics;
-          setTimeout(() => setGatewayMetrics(data), 0);
-        }
-      } catch {
-        // metrics unavailable
-      }
-    };
-    void fetchMetrics();
-    const interval = setInterval(() => { void fetchMetrics(); }, 30000);
-    return () => clearInterval(interval);
-  }, [apiBase]);
-
-  useEffect(() => {
-    void fetchGatewayStatus()
-      .then((status) => {
-        setGatewayStatus(status);
-      })
-      .catch(() => {
-        setGatewayStatus(null);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormState("submitting");
+    setFormError(null);
+    try {
+      const res = await fetch(`${API}/v1/operators/register-interest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, nodeType, region, message }),
       });
-  }, []);
-
-  useEffect(() => {
-    if (!portal.token) return;
-    let cancelled = false;
-    const loadTimer = setTimeout(() => { if (!cancelled) setLoadingActivity(true); }, 0);
-
-    const headers = { authorization: `Bearer ${portal.token}` };
-
-    Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/v1/operators/activity`, { headers, cache: "no-store" })
-        .then((r) => r.ok ? r.json() : Promise.reject(new Error("activity fetch failed")))
-        .then((body: unknown) => {
-          if (typeof body === "object" && body !== null && "items" in body && Array.isArray((body as Record<string, unknown>).items)) {
-            return (body as { items: OperatorActivityItem[] }).items;
-          }
-          return SAMPLE_ACTIVITY;
-        })
-        .catch(() => SAMPLE_ACTIVITY),
-      fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/v1/operators/daily-requests`, { headers, cache: "no-store" })
-        .then((r) => r.ok ? r.json() : Promise.reject(new Error("daily-requests fetch failed")))
-        .then((body: unknown) => {
-          if (typeof body === "object" && body !== null && "data" in body && Array.isArray((body as Record<string, unknown>).data)) {
-            return (body as { data: DailyRequestCount[] }).data.map((item) => ({
-              day: DAYS_OF_WEEK[new Date(item.date).getDay()] ?? item.date.slice(5),
-              requests: item.count,
-            }));
-          }
-          return FALLBACK_DAILY_DATA;
-        })
-        .catch(() => FALLBACK_DAILY_DATA),
-    ]).then(([activity, daily]) => {
-      if (!cancelled) {
-        setActivityData(activity);
-        setDailyData(daily);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { message?: string };
+        throw new Error(body.message ?? `HTTP ${res.status}`);
       }
-    }).catch(() => {
-      // fallback data already set
-    }).finally(() => {
-      if (!cancelled) setLoadingActivity(false);
-    });
-
-    return () => { cancelled = true; clearTimeout(loadTimer); };
-  }, [portal.token]);
-
-  useEffect(() => {
-    if (!portal.token || portal.user?.role !== "ADMIN") return;
-    void fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/v1/admin/gateway/upstreams`, {
-      headers: { authorization: `Bearer ${portal.token}` },
-      cache: "no-store",
-    })
-      .then((r) => r.ok ? r.json() : null)
-      .then((body: unknown) => {
-        if (body && typeof body === "object" && "items" in body && Array.isArray((body as Record<string, unknown>).items)) {
-          setUpstreams((body as { items: Array<{ url: string; circuitStatus: string; failureCount: number }> }).items);
-        }
-      })
-      .catch(() => undefined)
-      .finally(() => setUpstreamsLoaded(true));
-  }, [portal.token, portal.user?.role]);
-
-  const operatorSummary = useMemo(() => {
-    const nodes = portal.operators.flatMap((summary) => summary.nodes);
-    const onlineNodes = nodes.filter((node) => node.status === "ONLINE").length;
-    const degradedNodes = nodes.filter((node) => node.status === "DEGRADED").length;
-    const avgReliability =
-      nodes.length > 0
-        ? nodes.reduce((sum, node) => sum + (node.reliabilityScore ?? 0), 0) / nodes.length
-        : 0;
-
-    return {
-      totalNodes: nodes.length,
-      onlineNodes,
-      degradedNodes,
-      avgReliability
-    };
-  }, [portal.operators]);
-
-  // Derive an aggregate status for the timeline when there are no live nodes
-  const aggregateNodeStatus = useMemo(() => {
-    const nodes = portal.operators.flatMap((s) => s.nodes);
-    if (nodes.length === 0) return "UNKNOWN";
-    if (nodes.some((n) => n.status === "ONLINE")) return "ONLINE";
-    if (nodes.some((n) => n.status === "DEGRADED")) return "DEGRADED";
-    return "UNKNOWN";
-  }, [portal.operators]);
+      setFormState("success");
+    } catch (err: unknown) {
+      setFormError(
+        err instanceof Error ? err.message : "Something went wrong. Please try again."
+      );
+      setFormState("error");
+    }
+  }
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Operator dashboard"
-        title="Track managed operator health, routing posture, and reward context."
-        description="This surface is explicit about the current launch model: managed operator infrastructure today, with health, latency, and reward context kept visible for the teams running early traffic."
-      />
-
-      {!canViewAdmin ? (
-        <AuthGate
-          title="Admin access unlocks live operator data."
-          body="The preview below shows the operator experience, and admin sessions replace it with the current platform roster from the API."
-        />
-      ) : null}
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Gateway Performance Dashboard                                        */}
-      {/* ------------------------------------------------------------------ */}
-      <section>
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Gateway Performance</CardTitle>
-            <CardDescription>
-              Live gateway metrics updated every 30 seconds. Visible to all users.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Requests/min</div>
-                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {gatewayMetrics?.requestsPerMinute != null
-                    ? gatewayMetrics.requestsPerMinute.toLocaleString()
-                    : "—"}
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Avg Latency</div>
-                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {gatewayMetrics?.averageLatencyMs != null
-                    ? `${gatewayMetrics.averageLatencyMs}ms`
-                    : "—"}
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">P95 Latency</div>
-                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {gatewayMetrics?.p95LatencyMs != null
-                    ? `${gatewayMetrics.p95LatencyMs}ms`
-                    : "—"}
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Cache Hit Rate</div>
-                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {gatewayMetrics?.cacheHitRate != null
-                    ? `${(gatewayMetrics.cacheHitRate * 100).toFixed(1)}%`
-                    : "—"}
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Circuit Breaker</div>
-                <div className="mt-2 flex items-center gap-2">
-                  {gatewayMetrics?.circuitBreakerState ? (
-                    <>
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{
-                          backgroundColor:
-                            gatewayMetrics.circuitBreakerState === "closed"
-                              ? "#22c55e"
-                              : gatewayMetrics.circuitBreakerState === "open"
-                                ? "#ef4444"
-                                : "#f59e0b",
-                        }}
-                        aria-hidden="true"
-                      />
-                      <span
-                        className={`text-lg font-semibold capitalize ${
-                          gatewayMetrics.circuitBreakerState === "closed"
-                            ? "text-[var(--fyxvo-success)]"
-                            : gatewayMetrics.circuitBreakerState === "open"
-                              ? "text-[var(--fyxvo-danger)]"
-                              : "text-[var(--fyxvo-warning)]"
-                        }`}
-                      >
-                        {gatewayMetrics.circuitBreakerState}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-semibold text-[var(--fyxvo-text)]">—</span>
-                  )}
-                </div>
-              </div>
-              <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-                <div className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">24h Uptime</div>
-                <div className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                  {gatewayMetrics?.uptimePercent24h != null
-                    ? `${gatewayMetrics.uptimePercent24h.toFixed(2)}%`
-                    : "—"}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Metric cards                                                         */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Operators"
-          value={portal.adminStats ? String(portal.adminStats.totals.nodeOperators) : String(portal.operators.length)}
-          detail="Managed operator supply visible to current admin sessions."
-          accent={<Badge tone="brand">managed</Badge>}
-        />
-        <MetricCard
-          label="Managed nodes"
-          value={String(operatorSummary.totalNodes)}
-          detail={`${operatorSummary.onlineNodes} online, ${operatorSummary.degradedNodes} degraded.`}
-          accent={
-            <Badge tone={operatorSummary.degradedNodes > 0 ? "warning" : "success"}>
-              {operatorSummary.onlineNodes} online
-            </Badge>
-          }
-        />
-        <MetricCard
-          label="Average reliability"
-          value={operatorSummary.totalNodes > 0 ? formatPercent(operatorSummary.avgReliability * 100) : "Pending"}
-          detail="Based on the worker-owned node health view."
-          accent={<Badge tone="neutral">worker scored</Badge>}
-        />
-        <MetricCard
-          label="Relay latency"
-          value={
-            typeof gatewayStatus?.metrics?.priority?.averageLatencyMs === "number"
-              ? formatDuration(gatewayStatus.metrics.priority.averageLatencyMs)
-              : typeof gatewayStatus?.metrics?.standard?.averageLatencyMs === "number"
-                ? formatDuration(gatewayStatus.metrics.standard.averageLatencyMs)
-                : "Pending"
-          }
-          detail="Pulled from the live hosted gateway status surface."
-          accent={
-            <Badge tone="success">{gatewayStatus?.nodeCount ?? operatorSummary.totalNodes} nodes</Badge>
-          }
-        />
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Health timeline + Request routing                                    */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="grid gap-6 xl:grid-cols-2">
-        {/* Health timeline */}
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Node uptime — last 24 hours</CardTitle>
-            <CardDescription>
-              30-minute bucket view across all managed nodes. Green indicates healthy, amber degraded, gray unknown or no data.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <HealthTimeline nodeStatus={aggregateNodeStatus} />
-            <div className="text-xs text-[var(--fyxvo-text-muted)]">
-              Timeline is derived from current node status. Historical bucket data will populate once time-series health snapshots are available from the portal.
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Request routing breakdown */}
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Request routing breakdown</CardTitle>
-            <CardDescription>
-              Distribution of traffic across operator routing paths. With a single managed operator, all requests route through the managed path.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Managed node</span>
-                <span className="text-sm font-semibold text-[var(--fyxvo-text)]">100%</span>
-              </div>
-              {/* Simple progress bar using CSS variables, no hardcoded colors */}
-              <div
-                className="h-3 overflow-hidden rounded-full"
-                style={{ backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div
-                  className="h-full rounded-full transition-[width] duration-500"
-                  style={{
-                    width: "100%",
-                    background: "linear-gradient(90deg, var(--color-brand-400, #818cf8), var(--color-brand-500, #6366f1))"
-                  }}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Managed</div>
-                <div className="mt-1 text-xl font-semibold text-[var(--fyxvo-text)]">100%</div>
-              </div>
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Other paths</div>
-                <div className="mt-1 text-xl font-semibold text-[var(--fyxvo-text)]">0%</div>
-              </div>
-            </div>
-            <Notice tone="neutral" title="Routing model">
-              External operator routing paths will appear here once additional operators are registered and traffic policies are configured.
-            </Notice>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Operator posture + Roles                                             */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Managed operator launch posture</CardTitle>
-            <CardDescription>
-              The current launch path uses managed infrastructure first so routing and response quality stay predictable while early team traffic settles.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Notice tone="neutral" title="What is live today">
-              Managed operators participate in routing health, reward accrual context, and incident response. This page does not claim open decentralized supply that is not yet implemented.
-            </Notice>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Managed wallet</div>
-                <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                  {shortenAddress(liveDevnetState.managedOperatorWallet, 10, 8)}
-                </div>
-              </div>
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Operator account</div>
-                <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                  {shortenAddress(liveDevnetState.managedOperatorAccount, 10, 8)}
-                </div>
-              </div>
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Reward account</div>
-                <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                  {shortenAddress(liveDevnetState.managedRewardAccount, 10, 8)}
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild variant="secondary">
-                <Link href="/status">Open status</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/docs">Read docs</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Operator role today and later</CardTitle>
-            <CardDescription>
-              Keep the current scope clear so early teams know what to expect on devnet.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Notice tone="success" title="Today">
-              Fyxvo-managed operators provide the current launch supply, node monitoring, health scoring, and reward-context visibility.
-            </Notice>
-            <Notice tone="neutral" title="Later">
-              External operator participation is a future expansion path. It is not marketed as live until registration, governance, and routing policies are ready for broader participation.
-            </Notice>
-            <Notice tone="neutral" title="Reward visibility">
-              Reward accrual is real on chain, while this page stays focused on the managed operator account, reward account, and the worker-owned health signals that inform payout review.
-            </Notice>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Reward accrual context                                               */}
-      {/* ------------------------------------------------------------------ */}
-      <section>
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Reward accrual context</CardTitle>
-            <CardDescription>
-              On-chain protocol fee accumulation for the managed operator. Live snapshot data from the portal API will appear here once reward rollup data is available.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Treasury</div>
-                <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                  {shortenAddress(liveDevnetState.treasury, 8, 6)}
-                </div>
-              </div>
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">USDC vault</div>
-                <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                  {shortenAddress(liveDevnetState.treasuryUsdcVault, 8, 6)}
-                </div>
-              </div>
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Reward account</div>
-                <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                  {shortenAddress(liveDevnetState.managedRewardAccount, 8, 6)}
-                </div>
-              </div>
-              <div
-                className="rounded-[1.5rem] border p-4"
-                style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-              >
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Protocol fees accrued</div>
-                <div className="mt-2 flex items-center gap-2">
-                  <Skeleton className="h-5 w-20" />
-                  <span className="text-xs text-[var(--fyxvo-text-muted)]">pending</span>
-                </div>
-              </div>
-            </div>
-            <Notice tone="neutral" title="Reward snapshot">
-              Protocol fee data is indexed from on-chain activity. Snapshot totals from <code className="text-xs">portal.operators</code> will populate this card once the reward rollup worker has processed recent epochs.
-            </Notice>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Admin stats                                                           */}
-      {/* ------------------------------------------------------------------ */}
-      {portal.adminStats ? (
-        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {(
-            [
-              ["Users", String(portal.adminStats.totals.users)],
-              ["Projects", String(portal.adminStats.totals.projects)],
-              ["Nodes", String(portal.adminStats.totals.nodes)],
-              ["Operators", String(portal.adminStats.totals.nodeOperators)]
-            ] as const
-          ).map(([label, value]) => (
-            <Card key={label} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-              <CardHeader>
-                <CardTitle>{label}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-semibold text-[var(--fyxvo-text)]">{value}</CardContent>
-            </Card>
-          ))}
-        </section>
-      ) : null}
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Per-operator cards with timeline + health check history              */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="grid gap-6">
-        {portal.operators.map((summary) => (
-          <Card key={summary.operator.id} className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-            <CardHeader>
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <CardTitle>{summary.operator.name}</CardTitle>
-                  <CardDescription>
-                    {summary.operator.email} · reputation {(summary.operator.reputationScore ?? 0.96).toFixed(2)}
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge tone="brand">managed</Badge>
-                  <Badge tone={summary.operator.status === "ACTIVE" ? "success" : "warning"}>
-                    {summary.operator.status}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Address / quick stats row */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <div
-                  className="rounded-[1.5rem] border p-4"
-                  style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-                >
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Managed wallet</div>
-                  <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                    {shortenAddress(summary.operator.walletAddress, 8, 8)}
-                  </div>
-                </div>
-                <div
-                  className="rounded-[1.5rem] border p-4"
-                  style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-                >
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Healthy nodes</div>
-                  <div className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
-                    {summary.nodes.filter((node) => node.status === "ONLINE").length}/{summary.nodes.length}
-                  </div>
-                </div>
-                <div
-                  className="rounded-[1.5rem] border p-4"
-                  style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-                >
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Last heartbeat</div>
-                  <div className="mt-2 text-sm font-medium text-[var(--fyxvo-text)]">
-                    {summary.nodes[0]?.lastHeartbeatAt ? formatRelativeDate(summary.nodes[0].lastHeartbeatAt) : "Pending"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Per-node timeline and health check strips */}
-              {summary.nodes.map((node) => (
-                <div
-                  key={node.id}
-                  className="rounded-[1.5rem] border p-4 space-y-4"
-                  style={{ borderColor: "var(--fyxvo-border)", backgroundColor: "var(--fyxvo-panel-soft)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <Badge tone={node.status === "ONLINE" ? "success" : node.status === "DEGRADED" ? "warning" : "neutral"}>
-                      {node.status}
-                    </Badge>
-                    <span className="text-sm font-medium text-[var(--fyxvo-text)]">{node.name}</span>
-                    <span className="text-xs text-[var(--fyxvo-text-muted)]">{node.region}</span>
-                  </div>
-                  <HealthTimeline nodeStatus={node.status} />
-                  <HealthCheckHistory nodeStatus={node.status} />
-                </div>
-              ))}
-
-              <Notice tone="neutral" title="Why operator data matters">
-                Routing preference, incident response, and reward review all look different when node health, error rate, and reputation stay visible in the same view.
-              </Notice>
-              <Table columns={nodeColumns} rows={summary.nodes} getRowKey={(node) => node.id} />
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* CTA — Interested in running a node?                                  */}
-      {/* ------------------------------------------------------------------ */}
-      <section>
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <CardTitle>Interested in running a node?</CardTitle>
-                <CardDescription>
-                  Fyxvo is building toward open operator participation. If you want early access to run infrastructure, join the waitlist and tell us about your setup.
-                </CardDescription>
-              </div>
-              <Badge tone="neutral">Early access</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              Future node operators will be able to register through the on-chain operator registry, configure reward accounts, and participate in routing traffic. We are currently accepting interest submissions from teams who want to be first in line when external operator registration opens.
+    <main className="min-h-screen" style={{ backgroundColor: "#0a0a0f" }}>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="py-20">
+          {/* Hero */}
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#f97316]">
+              Operators
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="/contact">Express interest</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link href="/docs">Learn about the protocol</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Recent activity feed                                                 */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="mt-8">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-          Recent activity {portal.token ? "(live)" : "(sample data)"}
-        </h3>
-        {loadingActivity ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded-lg bg-[var(--fyxvo-panel-soft)]" />
-            ))}
+            <h1 className="mt-4 text-4xl font-bold tracking-tight text-[#f1f5f9] sm:text-5xl">
+              The Fyxvo Operator Program
+            </h1>
+            <p className="mt-5 text-base leading-7 text-[#64748b]">
+              Fyxvo operators route devnet RPC traffic through their nodes,
+              providing the relay capacity that powers the platform. In return,
+              operators earn a share of the request fees paid by developers for
+              every request their node serves.
+            </p>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {activityData.map((item, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2.5"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: item.success ? "var(--color-success, #22c55e)" : "var(--color-danger, #ef4444)" }}
-                  />
-                  <span className="font-mono text-sm text-[var(--fyxvo-text)]">{item.method}</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-[var(--fyxvo-text-muted)]">
-                  <span>{item.latencyMs}ms</span>
-                  <span className="rounded bg-[var(--fyxvo-border)] px-1.5 py-0.5">{item.mode}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Upstream Configuration (admin only)                                 */}
-      {/* ------------------------------------------------------------------ */}
-      {portal.user?.role === "ADMIN" && (
-        <section>
-          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-            <CardHeader>
-              <CardTitle>Upstream Configuration</CardTitle>
-              <CardDescription>
-                Live upstream URLs registered with the gateway, their circuit breaker status, and recent failure count.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!upstreamsLoaded ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-10 animate-pulse rounded-lg bg-[var(--fyxvo-panel-soft)]" />
-                  ))}
-                </div>
-              ) : upstreams.length === 0 ? (
-                <p className="text-sm text-[var(--fyxvo-text-muted)]">No upstream configuration data available.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-[var(--fyxvo-border)]">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Upstream URL</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Circuit</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-[var(--fyxvo-text-muted)]">Failures</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {upstreams.map((upstream, i) => (
-                        <tr key={i} className="border-b border-[var(--fyxvo-border)] last:border-0">
-                          <td className="px-4 py-2.5 font-mono text-xs text-[var(--fyxvo-text)] break-all">{upstream.url}</td>
-                          <td className="px-4 py-2.5">
-                            <Badge tone={upstream.circuitStatus === "closed" ? "success" : upstream.circuitStatus === "open" ? "danger" : "warning"}>
-                              {upstream.circuitStatus}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-2.5 font-mono text-sm text-[var(--fyxvo-text)]">{upstream.failureCount}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-      )}
+          {/* Revenue model */}
+          <div className="mx-auto mt-16 max-w-3xl">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8">
+              <h2 className="text-xl font-semibold text-[#f1f5f9]">Revenue model</h2>
+              <p className="mt-4 text-base leading-7 text-[#64748b]">
+                Eighty percent of each request fee goes directly to the operator
+                who served that request. Fyxvo retains twenty percent to cover
+                infrastructure, development, and governance overhead. Fees are
+                settled on-chain in SOL, with operator payouts recorded per
+                request and aggregated daily.
+              </p>
+              <p className="mt-4 text-base leading-7 text-[#64748b]">
+                During the devnet alpha, all fees are denominated in devnet SOL
+                and have no monetary value. The operator program in production
+                will use mainnet SOL and will include binding payout terms in the
+                operator agreement.
+              </p>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Daily requests chart                                                 */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="mt-8">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-          Requests routed (last 7 days)
-        </h3>
-        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-          {isClient ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart
-                data={dailyData}
-                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
-              >
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 11, fill: "var(--fyxvo-text-muted)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "var(--fyxvo-text-muted)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--fyxvo-bg-elevated)",
-                    border: "1px solid var(--fyxvo-border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    color: "var(--fyxvo-text)",
-                  }}
-                />
-                <Bar dataKey="requests" fill="var(--fyxvo-brand, #7c3aed)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ height: 180 }} className="flex items-end gap-1 px-2">
-              {dailyData.map((d) => {
-                const maxRequests = Math.max(...dailyData.map((x) => x.requests), 1);
-                return (
+              {/* Stats row */}
+              <div className="mt-8 grid grid-cols-3 gap-4">
+                {[
+                  { label: "Operator share", value: "80%" },
+                  { label: "Protocol fee", value: "20%" },
+                  { label: "Settlement", value: "On-chain" },
+                ].map((stat) => (
                   <div
-                    key={d.day}
-                    className="flex-1 rounded-t bg-[var(--fyxvo-brand)]/20"
-                    style={{
-                      height: `${Math.round((d.requests / maxRequests) * 100)}%`,
-                    }}
-                  />
-                );
-              })}
+                    key={stat.label}
+                    className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 text-center"
+                  >
+                    <p className="text-2xl font-bold text-[#f97316]">{stat.value}</p>
+                    <p className="mt-1 text-xs text-[#64748b]">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Registration interest form */}
+          <div className="mx-auto mt-16 max-w-xl">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-8">
+              <h2 className="text-xl font-semibold text-[#f1f5f9]">
+                Register your interest
+              </h2>
+              <p className="mt-2 text-sm text-[#64748b]">
+                Operator registration is coming soon. Submit your details below
+                and we will reach out when the program opens.
+              </p>
+
+              {formState === "success" ? (
+                <div className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4">
+                  <p className="text-sm font-medium text-emerald-400">
+                    Your interest has been registered. We will be in touch.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-4">
+                  <div>
+                    <label
+                      htmlFor="op-name"
+                      className="mb-1.5 block text-xs font-medium text-[#f1f5f9]"
+                    >
+                      Name
+                    </label>
+                    <input
+                      id="op-name"
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-[#f1f5f9] placeholder-[#64748b] outline-none focus:border-[#f97316]/50 focus:ring-1 focus:ring-[#f97316]/20"
+                      placeholder="Your name or company"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="op-email"
+                      className="mb-1.5 block text-xs font-medium text-[#f1f5f9]"
+                    >
+                      Email
+                    </label>
+                    <input
+                      id="op-email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-[#f1f5f9] placeholder-[#64748b] outline-none focus:border-[#f97316]/50 focus:ring-1 focus:ring-[#f97316]/20"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="op-node-type"
+                      className="mb-1.5 block text-xs font-medium text-[#f1f5f9]"
+                    >
+                      Node type
+                    </label>
+                    <select
+                      id="op-node-type"
+                      value={nodeType}
+                      onChange={(e) => setNodeType(e.target.value)}
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-4 py-2.5 text-sm text-[#f1f5f9] outline-none focus:border-[#f97316]/50 focus:ring-1 focus:ring-[#f97316]/20"
+                    >
+                      {NODE_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="op-region"
+                      className="mb-1.5 block text-xs font-medium text-[#f1f5f9]"
+                    >
+                      Region
+                    </label>
+                    <select
+                      id="op-region"
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-4 py-2.5 text-sm text-[#f1f5f9] outline-none focus:border-[#f97316]/50 focus:ring-1 focus:ring-[#f97316]/20"
+                    >
+                      {REGIONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="op-message"
+                      className="mb-1.5 block text-xs font-medium text-[#f1f5f9]"
+                    >
+                      Message{" "}
+                      <span className="font-normal text-[#64748b]">(optional)</span>
+                    </label>
+                    <textarea
+                      id="op-message"
+                      rows={4}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-[#f1f5f9] placeholder-[#64748b] outline-none focus:border-[#f97316]/50 focus:ring-1 focus:ring-[#f97316]/20"
+                      placeholder="Tell us about your infrastructure or any questions you have."
+                    />
+                  </div>
+
+                  {formState === "error" && formError && (
+                    <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.05] p-3">
+                      <p className="text-sm text-rose-400">{formError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={formState === "submitting"}
+                    className="w-full rounded-xl bg-[#f97316] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  >
+                    {formState === "submitting" ? "Submitting…" : "Register interest"}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+
+          {/* Admin section */}
+          {isAdmin && portal.token && (
+            <div className="mx-auto mt-16 max-w-3xl">
+              <h2 className="mb-6 text-xl font-semibold text-[#f1f5f9]">
+                Admin: operator data
+              </h2>
+              <AdminPanel token={portal.token} />
             </div>
           )}
         </div>
-      </section>
-    </div>
+      </div>
+    </main>
   );
 }

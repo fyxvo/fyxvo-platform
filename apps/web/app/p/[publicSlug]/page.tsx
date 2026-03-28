@@ -1,219 +1,123 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Badge } from "@fyxvo/ui";
-import { CopyButton } from "../../../components/copy-button";
-import { webEnv } from "../../../lib/env";
+import CopyButton from "./copy-button";
 
-interface PublicProjectData {
-  id: string;
-  name: string;
-  displayName: string | null;
-  slug: string;
-  publicSlug: string;
-  totalRequests: number;
-  avgLatencyMs: number;
-  requestVolume7d: unknown[];
-  ownerReputationLevel?: string;
+const API = "https://api.fyxvo.com";
+
+interface PublicProject {
+  name?: string;
+  displayName?: string;
+  totalRequests?: number;
+  requestCount?: number;
+  avgLatency?: number;
+  latency?: number;
+  weeklyVolume?: number[];
+  requestsLast7Days?: number[];
 }
 
-async function fetchPublicProject(publicSlug: string): Promise<PublicProjectData | null> {
+export async function generateMetadata({ params }: { params: Promise<{ publicSlug: string }> }): Promise<Metadata> {
+  const { publicSlug } = await params;
   try {
-    const res = await fetch(new URL(`/v1/public/projects/${publicSlug}`, webEnv.apiBaseUrl), {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    return res.json() as Promise<PublicProjectData>;
+    const res = await fetch(`${API}/v1/public/projects/${publicSlug}`, { cache: "no-store" });
+    if (!res.ok) return { title: "Project" };
+    const data = await res.json() as PublicProject;
+    return { title: data.displayName ?? data.name ?? "Project" };
   } catch {
-    return null;
+    return { title: "Project" };
   }
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ publicSlug: string }>;
-}): Promise<Metadata> {
+export default async function PublicProjectPage({ params }: { params: Promise<{ publicSlug: string }> }) {
   const { publicSlug } = await params;
-  const project = await fetchPublicProject(publicSlug).catch(() => null);
-  const name = project?.name ?? "Fyxvo Project";
-  const requests = project?.totalRequests ?? 0;
-  return {
-    title: `${name} — Fyxvo`,
-    description: `${name} is live on Solana Devnet via Fyxvo RPC gateway. ${requests.toLocaleString()} requests served.`,
-    alternates: {
-      canonical: `${webEnv.siteUrl}/p/${publicSlug}`,
-    },
-    openGraph: {
-      title: `${name} — Fyxvo`,
-      description: `${name} is routing Solana devnet traffic via Fyxvo. ${requests.toLocaleString()} requests served.`,
-      url: `${webEnv.siteUrl}/p/${publicSlug}`,
-      siteName: "Fyxvo",
-      type: "website",
-      images: [{ url: webEnv.socialImageUrl }],
-    },
-    twitter: {
-      card: "summary",
-      title: `${name} — Fyxvo`,
-      description: `${name} is routing Solana devnet traffic via Fyxvo. ${requests.toLocaleString()} requests served.`,
-      images: [webEnv.socialImageUrl],
-    },
-  };
-}
 
-export default async function PublicProjectPage({
-  params,
-}: {
-  params: Promise<{ publicSlug: string }>;
-}) {
-  const { publicSlug } = await params;
-  const project = await fetchPublicProject(publicSlug);
+  let project: PublicProject | null = null;
+  try {
+    const res = await fetch(`${API}/v1/public/projects/${publicSlug}`, { cache: "no-store" });
+    if (res.ok) project = await res.json() as PublicProject;
+  } catch {
+    // project remains null
+  }
 
-  if (!project) notFound();
-
-  const displayName = project.displayName ?? project.name;
-
-  const badgeMarkdown = `[![Fyxvo](${webEnv.apiBaseUrl}/badge/project/${project.publicSlug})](${webEnv.siteUrl}/p/${project.publicSlug})`;
-
-  return (
-    <div className="min-h-screen bg-[var(--fyxvo-bg)]">
-      {/* Sticky header */}
-      <header className="sticky top-0 z-10 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Link
-            href="/"
-            className="font-display text-lg font-bold text-[var(--fyxvo-text)]"
-          >
-            Fyxvo
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-1.5 text-xs font-medium text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-          >
-            Open dashboard
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center py-20">
+        <div className="text-center">
+          <p className="text-[#64748b] text-sm mb-4">Project not found.</p>
+          <Link href="/explore" className="text-sm text-[#f97316] hover:underline">
+            ← Browse projects
           </Link>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      <main className="mx-auto max-w-4xl px-6 py-12 space-y-10">
-        {/* Project header */}
-        <section>
-          {/* Live indicator */}
-          <div className="mb-4 flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-            </span>
-            <span className="text-xs font-medium text-[var(--fyxvo-success)]">
-              Live on Solana Devnet
-            </span>
+  const name = project.displayName ?? project.name ?? publicSlug;
+  const totalRequests = project.totalRequests ?? project.requestCount ?? 0;
+  const avgLatency = project.avgLatency ?? project.latency;
+  const weeklyData: number[] = project.weeklyVolume ?? project.requestsLast7Days ?? [0, 0, 0, 0, 0, 0, 0];
+  const maxVal = Math.max(...weeklyData, 1);
+
+  const badgeMarkdown = `![Fyxvo](${API}/badge/project/${publicSlug})`;
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <Link href="/explore" className="text-sm text-[#f97316] hover:underline mb-8 inline-block">
+          ← Back to explore
+        </Link>
+
+        <h1 className="text-4xl font-bold text-[#f1f5f9] mb-10">{name}</h1>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12 max-w-2xl">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+            <p className="text-xs text-[#64748b] uppercase tracking-wider mb-1">Total requests</p>
+            <p className="text-3xl font-bold text-[#f1f5f9]">{totalRequests.toLocaleString()}</p>
           </div>
-
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-                {displayName}
-              </h1>
-              <p className="mt-1 font-mono text-xs text-[var(--fyxvo-text-soft)]">
-                @{project.publicSlug}
-              </p>
-              <div className="mt-3">
-                <Badge tone="success">Active</Badge>
-              </div>
+          {avgLatency !== undefined && (
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+              <p className="text-xs text-[#64748b] uppercase tracking-wider mb-1">Avg latency</p>
+              <p className="text-3xl font-bold text-[#f1f5f9]">{avgLatency}ms</p>
             </div>
-            <div className="text-right">
-              <p className="font-mono text-2xl font-semibold text-[var(--fyxvo-text)]">
-                {project.totalRequests.toLocaleString()}
-              </p>
-              <p className="text-xs text-[var(--fyxvo-text-muted)]">total requests</p>
+          )}
+        </div>
+
+        {/* 7-day bar chart */}
+        <div className="mb-12 max-w-2xl">
+          <p className="text-sm font-medium text-[#f1f5f9] mb-4">Requests — last 7 days</p>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
+            <div className="flex items-end gap-2 h-24">
+              {weeklyData.map((val, idx) => (
+                <div
+                  key={idx}
+                  className="flex-1 rounded-sm bg-[#f97316]/70 hover:bg-[#f97316] transition-colors"
+                  style={{ height: `${Math.max((val / maxVal) * 100, 2)}%` }}
+                  title={`Day ${idx + 1}: ${val.toLocaleString()} requests`}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between mt-2">
+              {weeklyData.map((_, idx) => (
+                <span key={idx} className="text-xs text-[#64748b] flex-1 text-center">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][idx] ?? `D${idx + 1}`}
+                </span>
+              ))}
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* Metric cards */}
-        <section className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-            <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-              Total requests
-            </p>
-            <p className="mt-2 font-display text-3xl font-bold text-[var(--fyxvo-text)]">
-              {project.totalRequests.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-            <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-              Average latency
-            </p>
-            <p className="mt-2 font-display text-3xl font-bold text-[var(--fyxvo-text)]">
-              {project.avgLatencyMs}
-              <span className="ml-1 text-base font-normal text-[var(--fyxvo-text-muted)]">ms</span>
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
-            <p className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-              Status
-            </p>
-            <div className="mt-2">
-              <Badge tone="success">Active</Badge>
-            </div>
-            <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">Solana devnet RPC</p>
-          </div>
-        </section>
-
-        {/* Badge section */}
-        <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-4">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">
-              Add a badge to your project
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-              Show your project&apos;s live request count and status with a badge. Paste the
-              Markdown snippet into your README to display a real-time indicator.
-            </p>
-          </div>
-
-          {/* Badge preview */}
-          <div className="flex items-center gap-3">
-            <img
-              src={`${webEnv.apiBaseUrl}/badge/project/${project.publicSlug}`}
-              alt="Fyxvo project badge"
-              className="h-5"
-            />
-            <span className="text-xs text-[var(--fyxvo-text-muted)]">Live preview</span>
-          </div>
-
-          {/* Markdown snippet */}
-          <div>
-            <p className="mb-2 text-xs font-medium text-[var(--fyxvo-text-muted)]">
-              Markdown
-            </p>
-            <div className="flex items-start gap-2">
-              <pre className="flex-1 overflow-x-auto rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4 font-mono text-xs leading-6 text-[var(--fyxvo-text-soft)]">
+        {/* Badge */}
+        <div className="max-w-2xl">
+          <p className="text-sm font-medium text-[#f1f5f9] mb-4">Badge</p>
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5">
+            <div className="flex items-start justify-between gap-4">
+              <pre className="text-xs font-mono text-[#94a3b8] whitespace-pre-wrap break-all flex-1">
                 {badgeMarkdown}
               </pre>
-              <CopyButton value={badgeMarkdown} label="Copy" />
+              <CopyButton text={badgeMarkdown} />
             </div>
           </div>
-        </section>
-
-        {/* Footer links */}
-        <section className="flex flex-wrap items-center gap-4 border-t border-[var(--fyxvo-border)] pt-8">
-          <Link
-            href="/explore"
-            className="text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-          >
-            Back to Explore
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-          >
-            Build on Fyxvo
-          </Link>
-        </section>
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePortal } from "./portal-provider";
 import { WalletConnectButton } from "./wallet-connect-button";
 import { webEnv } from "../lib/env";
+import { clearAssistantConversation } from "../lib/api";
 
 interface ConversationSummary {
   id: string;
@@ -258,13 +259,11 @@ export function AssistantWorkspace() {
             </svg>
           </div>
           <h1 className="font-display text-2xl font-semibold text-[#f1f5f9] mb-3">
-            Connect your wallet to use the assistant
+            Getting started
           </h1>
-          <p className="text-sm leading-7 text-[#64748b] mb-8">
-            The Fyxvo assistant is project-aware and requires authentication. Connect your Solana
-            wallet to get help with onboarding, debugging, funding, and relay operations.
+          <p className="text-sm leading-7 text-[#64748b]">
+            Connect your wallet to use the assistant. The Fyxvo assistant is project-aware and helps with onboarding, debugging, funding, and relay operations.
           </p>
-          <WalletConnectButton />
         </div>
       </div>
     );
@@ -371,8 +370,7 @@ export function AssistantWorkspace() {
                 How can I help?
               </h2>
               <p className="text-sm text-[#64748b] max-w-sm">
-                Ask about onboarding, funding, relay operations, debugging, or anything related to
-                your Fyxvo projects.
+                Ask about onboarding, debugging, relay behavior, or live project state
               </p>
             </div>
           ) : (
@@ -389,9 +387,25 @@ export function AssistantWorkspace() {
                       : "bg-white/[0.04] border border-white/[0.08] text-[#f1f5f9]"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <div className="space-y-2">
+                    {msg.content.split("\n\n").map((paragraph, pIdx) => (
+                      <p key={pIdx} className="whitespace-pre-wrap">{paragraph}</p>
+                    ))}
+                  </div>
                   {msg.streaming ? (
                     <span className="inline-block w-2 h-4 bg-[#f97316] animate-pulse rounded-sm ml-1 align-text-bottom" />
+                  ) : null}
+                  {!msg.streaming && msg.content ? (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        aria-label="Copy"
+                        onClick={() => void navigator.clipboard.writeText(msg.content)}
+                        className="text-xs text-[#64748b] hover:text-[#f1f5f9] transition-colors px-2 py-0.5 rounded border border-white/[0.06] hover:border-white/20"
+                      >
+                        Copy
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -415,25 +429,43 @@ export function AssistantWorkspace() {
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
                 }}
                 onKeyDown={handleKeyDown}
+                aria-label="Message Fyxvo Assistant"
                 placeholder="Ask about your project, funding, relay, or anything else…"
                 disabled={streaming}
                 className="flex-1 resize-none bg-transparent text-sm text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none disabled:opacity-60 max-h-40"
               />
-              <button
-                type="button"
-                onClick={() => void sendMessage()}
-                disabled={!input.trim() || streaming}
-                aria-label="Send message"
-                className="flex-shrink-0 w-8 h-8 rounded-xl bg-[#f97316] flex items-center justify-center text-white transition hover:bg-[#f97316]/90 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {streaming ? (
-                  <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                  </svg>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                {messages.length > 0 && activeConversationId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeConversationId && portal.token) {
+                        void clearAssistantConversation(activeConversationId, portal.token).catch(() => undefined);
+                      }
+                      setMessages([]);
+                      setActiveConversationId(null);
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium text-[#64748b] border border-white/[0.08] hover:text-[#f1f5f9] hover:border-white/20 transition-colors"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void sendMessage()}
+                  disabled={!input.trim() || streaming}
+                  className="flex-shrink-0 px-4 py-1.5 rounded-xl bg-[#f97316] text-sm font-medium text-white transition hover:bg-[#f97316]/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {streaming ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      Sending
+                    </span>
+                  ) : (
+                    "Send"
+                  )}
+                </button>
+              </div>
             </div>
             <p className="mt-2 text-center text-xs text-[#64748b]">
               Enter to send &middot; Shift+Enter for new line

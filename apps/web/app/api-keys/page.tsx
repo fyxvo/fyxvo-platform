@@ -1,652 +1,337 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Modal,
-  Notice,
-} from "@fyxvo/ui";
-import { CopyButton } from "../../components/copy-button";
-import { ApiKeyDetail } from "../../components/api-key-detail";
-import { PageHeader } from "../../components/page-header";
-import { AuthGate } from "../../components/state-panels";
+import { useState } from "react";
+import { Modal, Notice, Badge } from "@fyxvo/ui";
 import { usePortal } from "../../components/portal-provider";
-import { webEnv } from "../../lib/env";
+import { AuthGate } from "../../components/state-panels";
+import { CopyButton } from "../../components/copy-button";
+import { PageHeader } from "../../components/page-header";
 import { formatRelativeDate } from "../../lib/format";
-import { rotateApiKey } from "../../lib/api";
 import type { PortalApiKey } from "../../lib/types";
+
+const SCOPE_OPTIONS = [
+  { value: "project:read", label: "project:read" },
+  { value: "rpc:request", label: "rpc:request" },
+  { value: "priority:relay", label: "priority:relay" },
+  { value: "analytics:read", label: "analytics:read" },
+  { value: "webhooks:write", label: "webhooks:write" },
+] as const;
+
+function exportApiKeyMetadata(keys: readonly PortalApiKey[]) {
+  const data = keys.map((k) => ({
+    label: k.label,
+    prefix: k.prefix,
+    scopes: k.scopes,
+    createdAt: k.createdAt,
+    lastUsedAt: k.lastUsedAt,
+    status: k.status,
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "api-keys.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function GenerateKeyModal({
+  open,
+  onClose,
+  onSubmit,
+  submitting,
+  lastGeneratedKey,
+}: {
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onSubmit: (label: string, colorTag: string, scopes: string[]) => Promise<void>;
+  readonly submitting: boolean;
+  readonly lastGeneratedKey: string | null;
+}) {
+  const [label, setLabel] = useState("Priority relay");
+  const [colorTag] = useState("violet");
+  const [scopes, setScopes] = useState<string[]>(["project:read", "rpc:request", "priority:relay"]);
+  const [submitted, setSubmitted] = useState(false);
+
+  function toggleScope(scope: string) {
+    setScopes((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope]
+    );
+  }
+
+  async function handleSubmit() {
+    if (!label.trim() || scopes.length === 0) return;
+    await onSubmit(label.trim(), colorTag, scopes);
+    setSubmitted(true);
+  }
+
+  function handleClose() {
+    setLabel("Priority relay");
+    setScopes(["project:read", "rpc:request", "priority:relay"]);
+    setSubmitted(false);
+    onClose();
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Generate an API key"
+      description="A new key will be generated for the selected project. The full key value is only shown once."
+    >
+      {submitted && lastGeneratedKey ? (
+        <div className="space-y-4">
+          <Notice tone="success" title="New API key generated">
+            Copy this key now. It will not be shown again after you close this dialog.
+          </Notice>
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3">
+            <code className="flex-1 break-all font-mono text-xs text-[#f1f5f9]">
+              {lastGeneratedKey}
+            </code>
+            <CopyButton value={lastGeneratedKey} />
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#64748b] hover:text-[#f1f5f9] transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div>
+            <label
+              htmlFor="key-label"
+              className="mb-1.5 block text-sm font-medium text-[#f1f5f9]"
+            >
+              Label
+            </label>
+            <input
+              id="key-label"
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Priority relay"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-[#f1f5f9] placeholder:text-[#64748b] focus:outline-none focus:border-[#f97316]/50"
+            />
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-[#f1f5f9]">Scopes</p>
+            <div className="space-y-2">
+              {SCOPE_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 hover:border-white/20 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={scopes.includes(opt.value)}
+                    onChange={() => toggleScope(opt.value)}
+                    className="h-4 w-4 shrink-0 accent-[#f97316]"
+                  />
+                  <span className="font-mono text-sm text-[#64748b]">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={submitting || !label.trim() || scopes.length === 0}
+            className="w-full rounded-xl bg-[#f97316] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#ea6c0a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {submitting ? "Generating…" : "Generate"}
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function KeyRow({
+  apiKey,
+  onRevoke,
+  revoking,
+}: {
+  readonly apiKey: PortalApiKey;
+  readonly onRevoke: (id: string) => Promise<void>;
+  readonly revoking: boolean;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const active = apiKey.status !== "revoked" && apiKey.status !== "REVOKED";
+
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+      <div className="min-w-0 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-medium text-[#f1f5f9]">{apiKey.label}</span>
+          {active ? (
+            <Badge tone="success">Active</Badge>
+          ) : (
+            <Badge tone="danger">Revoked</Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="rounded bg-white/[0.04] px-2 py-0.5 font-mono text-xs text-[#64748b]">
+            {apiKey.prefix}...
+          </code>
+          <CopyButton value={apiKey.prefix} />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {apiKey.scopes.map((scope) => (
+            <span
+              key={scope}
+              className="inline-block rounded px-2 py-0.5 text-xs font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20"
+            >
+              {scope}
+            </span>
+          ))}
+        </div>
+        <p className="text-xs text-[#64748b]">
+          Created {new Date(apiKey.createdAt).toLocaleDateString()} ·{" "}
+          {apiKey.lastUsedAt ? `Last used ${formatRelativeDate(apiKey.lastUsedAt)}` : "Never used"}
+        </p>
+      </div>
+      {active ? (
+        <div className="flex items-center gap-2">
+          {confirming ? (
+            <>
+              <span className="text-xs text-[#64748b]">Revoke this key?</span>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                className="rounded-lg border border-white/[0.08] px-3 py-1.5 text-xs text-[#64748b] hover:text-[#f1f5f9] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={revoking}
+                onClick={async () => {
+                  await onRevoke(apiKey.id);
+                  setConfirming(false);
+                }}
+                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/20 transition-colors disabled:opacity-50"
+              >
+                {revoking ? "Revoking…" : "Confirm revoke"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="rounded-lg border border-white/[0.08] px-3 py-1.5 text-xs text-[#64748b] hover:text-[#f1f5f9] transition-colors"
+            >
+              Revoke
+            </button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function ApiKeysPage() {
   const portal = usePortal();
-  const router = useRouter();
-  const [label, setLabel] = useState("Priority relay");
-  const [colorTag, setColorTag] = useState("violet");
-  const [scopes, setScopes] = useState("project:read, rpc:request, priority:relay");
-  const [expiresAt, setExpiresAt] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [revokeKey, setRevokeKey] = useState<PortalApiKey | null>(null);
-  const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null);
-  const [selectedKeyIds, setSelectedKeyIds] = useState<Set<string>>(new Set());
-  const [rotatingKeyId, setRotatingKeyId] = useState<string | null>(null);
-  const [bulkRevokeOpen, setBulkRevokeOpen] = useState(false);
+  const [keyCreating, setKeyCreating] = useState(false);
+  const [keyRevoking, setKeyRevoking] = useState<string | null>(null);
 
-  const expandedKey = portal.apiKeys.find((k) => k.id === expandedKeyId) ?? null;
+  if (portal.walletPhase !== "authenticated") {
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+        <AuthGate body="API key management is tied to your wallet session." />
+      </div>
+    );
+  }
 
-  // Countdown for newly generated key (60 seconds)
-  const [countdown, setCountdown] = useState(0);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const prevKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (portal.lastGeneratedApiKey && portal.lastGeneratedApiKey !== prevKeyRef.current) {
-      prevKeyRef.current = portal.lastGeneratedApiKey;
-      setCountdown(60);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      countdownRef.current = setInterval(() => {
-        setCountdown((c) => {
-          if (c <= 1) {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-            return 0;
-          }
-          return c - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, [portal.lastGeneratedApiKey]);
-
-  const handleRotateKey = async (key: PortalApiKey) => {
-    if (!portal.token) return;
-    if (!portal.selectedProject) return;
-    setRotatingKeyId(key.id);
+  async function handleCreateKey(label: string, colorTag: string, scopes: string[]) {
+    setKeyCreating(true);
     try {
-      await rotateApiKey({
-        projectId: portal.selectedProject.id,
-        apiKeyId: key.id,
-        token: portal.token,
-      });
-      await portal.refresh();
-    } catch (err) {
-      console.error("Rotate failed", err);
+      await portal.createApiKey({ label, colorTag, scopes });
     } finally {
-      setRotatingKeyId(null);
+      setKeyCreating(false);
     }
-  };
+  }
 
-  const handleBulkRevoke = async () => {
-    if (!portal.token || !portal.selectedProject) return;
-    const keyIds = Array.from(selectedKeyIds);
-    for (const keyId of keyIds) {
-      await portal.revokeApiKey(keyId).catch(() => {});
-    }
-    setSelectedKeyIds(new Set());
-    setBulkRevokeOpen(false);
-  };
-
-  const exampleApiKey = portal.lastGeneratedApiKey ?? "YOUR_API_KEY";
-  const standardRequest = `curl -X POST ${webEnv.gatewayBaseUrl}/rpc \\
-  -H "content-type: application/json" \\
-  -H "x-api-key: ${exampleApiKey}" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}'`;
-  const priorityRequest = `curl -X POST ${webEnv.gatewayBaseUrl}/priority \\
-  -H "content-type: application/json" \\
-  -H "x-api-key: ${exampleApiKey}" \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"getSlot"}'`;
-
-  const rateLimitedCount =
-    portal.projectAnalytics.statusCodes.find((entry) => entry.statusCode === 429)?.count ?? 0;
-  const availableSolCredits = (() => {
+  async function handleRevokeKey(id: string) {
+    setKeyRevoking(id);
     try {
-      return BigInt(portal.onchainSnapshot.balances?.availableSolCredits ?? "0");
-    } catch {
-      return 0n;
+      await portal.revokeApiKey(id);
+    } finally {
+      setKeyRevoking(null);
     }
-  })();
-
-  function exportApiKeyMetadata() {
-    const rows = [
-      ["name", "project", "scope", "createdAt", "lastUsedAt", "status", "expiryAt"],
-      ...portal.apiKeys.map((apiKey) => [
-        apiKey.label,
-        portal.selectedProject?.name ?? "",
-        apiKey.scopes.join(" "),
-        apiKey.createdAt,
-        apiKey.lastUsedAt ?? "",
-        apiKey.status,
-        apiKey.expiresAt ?? "",
-      ]),
-    ];
-    const csv = rows
-      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    anchor.download = "fyxvo-api-key-metadata.csv";
-    anchor.click();
-    URL.revokeObjectURL(href);
   }
 
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="API Keys"
+        eyebrow="Keys"
         title="Create project keys with clear scope and predictable usage."
-        description="Separate credentials for relay traffic, analytics, and internal tools. Each key carries explicit scopes so access never relies on guesswork."
+        description="API keys grant scoped access to the relay gateway. Each key is tied to a project and can be revoked at any time."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={exportApiKeyMetadata} disabled={portal.walletPhase !== "authenticated" || portal.apiKeys.length === 0}>
-              Export metadata
-            </Button>
-            <Button onClick={() => setCreateOpen(true)} disabled={portal.walletPhase !== "authenticated"}>
+            <button
+              type="button"
+              onClick={() => exportApiKeyMetadata(portal.apiKeys)}
+              disabled={portal.walletPhase !== "authenticated" || portal.apiKeys.length === 0}
+              className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#64748b] hover:text-[#f1f5f9] transition-colors disabled:opacity-40"
+            >
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              disabled={portal.walletPhase !== "authenticated"}
+              className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ea6c0a] disabled:opacity-50 transition-colors"
+            >
               Generate key
-            </Button>
+            </button>
           </div>
         }
       />
 
-      {portal.walletPhase !== "authenticated" ? (
-        <AuthGate body="Connect a wallet to list live keys, generate new credentials, and revoke compromised ones." />
-      ) : null}
-
-      {portal.lastGeneratedApiKey ? (
+      {portal.lastGeneratedApiKey && !createOpen ? (
         <Notice tone="success" title="New API key generated">
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="break-all font-mono text-sm text-[var(--fyxvo-text)]">
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-black/20 px-3 py-2">
+            <code className="flex-1 break-all font-mono text-xs text-emerald-200">
               {portal.lastGeneratedApiKey}
-            </span>
+            </code>
             <CopyButton value={portal.lastGeneratedApiKey} />
           </div>
-          <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-            Copy it now. This is the only time the full key is shown.
-            {countdown > 0 ? (
-              <span className="ml-2 font-mono text-xs text-[var(--fyxvo-text-muted)]">
-                ({countdown}s)
-              </span>
-            ) : null}
+          <p className="mt-2 text-xs text-emerald-300/70">
+            This key will not be shown again. Copy and store it securely now.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Next step 1</p>
-              <p className="mt-1 text-sm text-[var(--fyxvo-text)]">Copy a live curl example</p>
-              <div className="mt-2">
-                <CopyButton value={standardRequest} label="Copy curl example" />
-              </div>
-            </div>
-            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Next step 2</p>
-              <p className="mt-1 text-sm text-[var(--fyxvo-text)]">Open playground with this key selected</p>
-              <div className="mt-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => router.push("/playground")}
-                >
-                  Open playground
-                </Button>
-              </div>
-            </div>
-            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">Next step 3</p>
-              <p className="mt-1 text-sm text-[var(--fyxvo-text)]">Keep quickstart instructions nearby while you test</p>
-              <div className="mt-2">
-                <Button variant="secondary" size="sm" onClick={() => router.push("/docs#quickstart")}>
-                  Open docs quickstart
-                </Button>
-              </div>
-            </div>
-          </div>
         </Notice>
       ) : null}
 
-      {portal.selectedProject && !portal.onchainSnapshot.projectAccountExists ? (
-        <Notice tone="warning" title="Project activation still required">
-          Keys can be created now, but the gateway will only honor them once the selected project
-          has confirmed activation on chain.
-        </Notice>
-      ) : null}
-
-      {portal.selectedProject && availableSolCredits === 0n ? (
-        <Notice tone="warning" title="Funding still required">
-          The key path is ready, but funded relay usage still depends on project balance. Open
-          funding before using this endpoint in production.
-        </Notice>
-      ) : null}
-
-      <Notice tone="neutral" title="Scope enforcement is live">
-        Standard relay requires <code>rpc:request</code>. Priority relay requires both{" "}
-        <code>rpc:request</code> and <code>priority:relay</code>. Under-scoped keys are rejected
-        with a clear error.
-      </Notice>
-
-      {rateLimitedCount > 0 ? (
-        <Notice tone="neutral" title="Rate-limit pressure observed">
-          This project has seen {rateLimitedCount} rate-limited responses. Keep standard and
-          priority traffic separated so usage is easier to reason about.
-        </Notice>
-      ) : null}
-
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="overflow-hidden rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
-          {selectedKeyIds.size > 0 && (
-            <div className="flex items-center gap-3 border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2">
-              <span className="text-sm text-[var(--fyxvo-text-soft)]">{selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""} selected</span>
-              <button
-                type="button"
-                className="rounded px-2 py-1 text-xs text-[var(--fyxvo-danger)] hover:bg-[var(--fyxvo-danger-bg)] transition-colors"
-                onClick={() => setBulkRevokeOpen(true)}
-              >
-                Bulk revoke ({selectedKeyIds.size})
-              </button>
-              <button
-                type="button"
-                className="rounded px-2 py-1 text-xs text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-                onClick={() => setSelectedKeyIds(new Set())}
-              >
-                Clear
-              </button>
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[var(--fyxvo-border)] text-left text-sm">
-              <thead className="bg-[var(--fyxvo-panel-soft)]">
-                <tr>
-                  <th className="px-4 py-3" scope="col">
-                    <span className="sr-only">Select</span>
-                  </th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Key</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Scopes</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Last used</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Created</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]" scope="col">Status</th>
-                  <th className="px-4 py-3" scope="col"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--fyxvo-border)] text-[var(--fyxvo-text-soft)]">
-                {portal.apiKeys.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-8 text-center text-[var(--fyxvo-text-muted)]" colSpan={7}>
-                      No API keys yet.
-                    </td>
-                  </tr>
-                ) : (
-                  portal.apiKeys.map((apiKey) => {
-                    const isExpanded = expandedKeyId === apiKey.id;
-                    const isSelected = selectedKeyIds.has(apiKey.id);
-                    const isRotating = rotatingKeyId === apiKey.id;
-                    return (
-                      <tr
-                        key={apiKey.id}
-                        className={`cursor-pointer transition-colors hover:bg-[var(--fyxvo-panel-soft)] ${isExpanded ? "bg-[var(--fyxvo-panel-soft)]" : ""}`}
-                        onClick={() => setExpandedKeyId(isExpanded ? null : apiKey.id)}
-                      >
-                        <td className="px-4 py-4 align-middle" onClick={(e) => e.stopPropagation()}>
-                          {apiKey.status === "ACTIVE" && (
-                            <input
-                              type="checkbox"
-                              aria-label={`Select ${apiKey.label}`}
-                              checked={isSelected}
-                              onChange={(e) => {
-                                const next = new Set(selectedKeyIds);
-                                if (e.target.checked) {
-                                  next.add(apiKey.id);
-                                } else {
-                                  next.delete(apiKey.id);
-                                }
-                                setSelectedKeyIds(next);
-                              }}
-                              className="h-4 w-4 rounded border-[var(--fyxvo-border)] accent-[var(--fyxvo-accent)]"
-                            />
-                          )}
-                        </td>
-                        <td className="px-4 py-4 align-middle">
-                          <div className="font-medium text-[var(--fyxvo-text)]">{apiKey.label}</div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <div className="font-mono text-xs text-[var(--fyxvo-text-muted)]">
-                              {apiKey.prefix}••••••••••••
-                            </div>
-                            {apiKey.colorTag ? (
-                              <span className="rounded-full border border-[var(--fyxvo-border)] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                                {apiKey.colorTag}
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 align-middle">
-                          <div className="flex flex-wrap gap-1.5">
-                            {apiKey.scopes.map((scope) => (
-                              <Badge key={scope} tone="neutral">{scope}</Badge>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 align-middle">
-                          <div className="space-y-1">
-                            <span className="text-[var(--fyxvo-text-muted)]">
-                              {apiKey.lastUsedAt ? formatRelativeDate(apiKey.lastUsedAt) : "Never"}
-                            </span>
-                            {apiKey.lastUsedRegion || apiKey.lastUsedUpstreamNode ? (
-                              <div className="text-xs text-[var(--fyxvo-text-muted)]">
-                                {apiKey.lastUsedRegion ?? "unknown region"}{apiKey.lastUsedUpstreamNode ? ` · ${apiKey.lastUsedUpstreamNode}` : ""}
-                              </div>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 align-middle">
-                          <span className="text-[var(--fyxvo-text-muted)]">{formatRelativeDate(apiKey.createdAt)}</span>
-                        </td>
-                        <td className="px-4 py-4 align-middle">
-                          <div className="space-y-1">
-                            <Badge tone={apiKey.status === "ACTIVE" ? "success" : apiKey.status === "EXPIRED" ? "warning" : "danger"}>{apiKey.status}</Badge>
-                            {apiKey.expiresAt ? (
-                              <div className="text-xs text-[var(--fyxvo-text-muted)]">Expires {formatRelativeDate(apiKey.expiresAt)}</div>
-                            ) : null}
-                            {!apiKey.lastUsedAt || new Date(apiKey.lastUsedAt).getTime() < Date.now() - 14 * 24 * 60 * 60 * 1000 ? (
-                              <div className="text-xs text-[var(--fyxvo-warning)]">Dormant 14d+</div>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 align-middle text-right">
-                          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                            {apiKey.status === "ACTIVE" && (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={isRotating}
-                                  className="rounded px-2 py-1 text-xs text-[var(--fyxvo-accent)] hover:bg-[var(--fyxvo-panel-soft)] transition-colors disabled:opacity-50"
-                                  onClick={() => { void handleRotateKey(apiKey); }}
-                                >
-                                  {isRotating ? "Rotating…" : "Rotate"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rounded px-2 py-1 text-xs text-[var(--fyxvo-danger)] hover:bg-[var(--fyxvo-danger-bg)] transition-colors"
-                                  onClick={() => {
-                                    setRevokeKey(apiKey);
-                                  }}
-                                >
-                                  Revoke
-                                </button>
-                              </>
-                            )}
-                            <svg
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              className={`h-3 w-3 text-[var(--fyxvo-text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                              aria-hidden="true"
-                            >
-                              <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+      {portal.apiKeys.length === 0 ? (
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-12 text-center text-sm text-[#64748b]">
+          No API keys yet. Click &quot;Generate key&quot; to create your first key.
         </div>
+      ) : (
+        <div className="space-y-3">
+          {portal.apiKeys.map((key) => (
+            <KeyRow
+              key={key.id}
+              apiKey={key}
+              onRevoke={handleRevokeKey}
+              revoking={keyRevoking === key.id}
+            />
+          ))}
+        </div>
+      )}
 
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Endpoint defaults</CardTitle>
-            <CardDescription>
-              Each route requires a minimum scope. Under-scoped keys are rejected immediately.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              {
-                label: "Standard relay",
-                route: "POST /rpc",
-                scope: "rpc:request",
-              },
-              {
-                label: "Priority relay",
-                route: "POST /priority",
-                scope: "rpc:request, priority:relay",
-              },
-              {
-                label: "Analytics",
-                route: "GET /v1/analytics/overview",
-                scope: "project:read",
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
-              >
-                <div className="text-xs uppercase tracking-wider text-[var(--fyxvo-text-muted)]">
-                  {item.label}
-                </div>
-                <div className="mt-1 font-mono text-sm font-medium text-[var(--fyxvo-text)]">
-                  {item.route}
-                </div>
-                <div className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
-                  Required: {item.scope}
-                </div>
-              </div>
-            ))}
-            {!portal.selectedProject ? (
-              <Notice tone="neutral" title="Create a project first">
-                API keys belong to a specific project. Activate one project then return here.
-              </Notice>
-            ) : null}
-          </CardContent>
-        </Card>
-      </section>
-
-      {expandedKey && portal.token && portal.selectedProject ? (
-        <section>
-          <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <CardTitle>{expandedKey.label}</CardTitle>
-                  <CardDescription className="mt-1 font-mono">{expandedKey.prefix}…</CardDescription>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpandedKeyId(null)}
-                  className="rounded-md p-1 text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-                  aria-label="Close detail"
-                >
-                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
-                    <path d="M2 2l8 8M10 2l-8 8" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ApiKeyDetail
-                apiKey={expandedKey}
-                projectId={portal.selectedProject.id}
-                token={portal.token}
-                onRevoke={(id) => {
-                  void portal.revokeApiKey(id);
-                  setExpandedKeyId(null);
-                }}
-              />
-            </CardContent>
-          </Card>
-        </section>
-      ) : null}
-
-      <section className="grid gap-6 xl:grid-cols-2">
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Standard relay request</CardTitle>
-            <CardDescription>
-              Confirm the project, funding, gateway, and logging path are all connected.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="overflow-hidden rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-              <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2">
-                <span className="text-xs text-[var(--fyxvo-text-muted)]">curl</span>
-                <CopyButton value={standardRequest} label="Copy" />
-              </div>
-              <pre className="overflow-x-auto p-4 text-xs leading-6 text-[var(--fyxvo-text-soft)]">
-                <code>{standardRequest}</code>
-              </pre>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="fyxvo-surface border-[color:var(--fyxvo-border)]">
-          <CardHeader>
-            <CardTitle>Priority relay request</CardTitle>
-            <CardDescription>
-              Priority mode carries different routing and pricing. Opt in deliberately.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="overflow-hidden rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-              <div className="flex items-center justify-between border-b border-[var(--fyxvo-border)] px-4 py-2">
-                <span className="text-xs text-[var(--fyxvo-text-muted)]">curl</span>
-                <CopyButton value={priorityRequest} label="Copy" />
-              </div>
-              <pre className="overflow-x-auto p-4 text-xs leading-6 text-[var(--fyxvo-text-soft)]">
-                <code>{priorityRequest}</code>
-              </pre>
-            </div>
-            <Notice tone="warning" title="Priority scope is intentionally explicit">
-              A priority key should still include <code>rpc:request</code>. That keeps the key
-              capable of normal relay traffic while making the priority permission visible during
-              audits.
-            </Notice>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Modal
+      <GenerateKeyModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Generate an API key"
-        description="Pick a clear label and only the scopes this client truly needs."
-        footer={
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={() => setCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                await portal.createApiKey({
-                  label,
-                  colorTag,
-                  scopes: scopes
-                    .split(",")
-                    .map((scope) => scope.trim())
-                    .filter(Boolean),
-                  ...(expiresAt ? { expiresAt } : {}),
-                });
-                setCreateOpen(false);
-              }}
-            >
-              Generate
-            </Button>
-          </div>
-        }
-      >
-        <div className="grid gap-4">
-          <Input label="Label" value={label} onChange={(event) => setLabel(event.target.value)} />
-          <label className="grid gap-1 text-sm text-[var(--fyxvo-text)]">
-            <span>Color tag</span>
-            <select
-              value={colorTag}
-              onChange={(event) => setColorTag(event.target.value)}
-              className="h-10 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 text-sm text-[var(--fyxvo-text)]"
-            >
-              {["violet", "emerald", "amber", "sky", "rose", "slate"].map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
-          <Input
-            label="Scopes"
-            hint="Comma-separated: project:read, rpc:request, priority:relay. Priority keys must include rpc:request."
-            value={scopes}
-            onChange={(event) => setScopes(event.target.value)}
-          />
-          <Input
-            label="Expires at"
-            type="datetime-local"
-            value={expiresAt}
-            onChange={(event) => setExpiresAt(event.target.value)}
-          />
-        </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(revokeKey)}
-        onClose={() => setRevokeKey(null)}
-        title="Revoke API key"
-        description="This action cannot be undone. Any requests using this key will fail immediately."
-        footer={
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={() => setRevokeKey(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (revokeKey) {
-                  await portal.revokeApiKey(revokeKey.id);
-                  setRevokeKey(null);
-                }
-              }}
-            >
-              Revoke key
-            </Button>
-          </div>
-        }
-      >
-        {revokeKey ? (
-          <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-            <p className="font-medium text-[var(--fyxvo-text)]">{revokeKey.label}</p>
-            <p className="mt-1 font-mono text-xs text-[var(--fyxvo-text-muted)]">
-              {revokeKey.prefix}
-            </p>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
-        open={bulkRevokeOpen}
-        onClose={() => setBulkRevokeOpen(false)}
-        title={`Revoke ${selectedKeyIds.size} API key${selectedKeyIds.size !== 1 ? "s" : ""}`}
-        description="This action cannot be undone. All selected keys will stop working immediately."
-        footer={
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={() => setBulkRevokeOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => { void handleBulkRevoke(); }}
-            >
-              Revoke {selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""}
-            </Button>
-          </div>
-        }
-      >
-        <div className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-          <p className="text-sm text-[var(--fyxvo-text-soft)]">
-            {selectedKeyIds.size} key{selectedKeyIds.size !== 1 ? "s" : ""} will be permanently revoked. Any requests using these keys will fail immediately.
-          </p>
-        </div>
-      </Modal>
+        onSubmit={handleCreateKey}
+        submitting={keyCreating}
+        lastGeneratedKey={portal.lastGeneratedApiKey}
+      />
     </div>
   );
 }

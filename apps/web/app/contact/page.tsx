@@ -1,39 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { Notice } from "@fyxvo/ui";
-import { SocialLinks } from "../../components/social-links";
+import { type FormEvent, useState } from "react";
 
-const INTEREST_AREAS = [
-  "Standard RPC",
-  "Priority relay",
-  "Analytics",
-  "Operator participation",
-] as const;
-
-const VOLUME_OPTIONS = [
-  { label: "Under 10K", value: "under_10k" },
-  { label: "10K–100K", value: "10k_100k" },
-  { label: "100K–1M", value: "100k_1m" },
-  { label: "Over 1M", value: "over_1m" },
-] as const;
-
-const FEEDBACK_CATEGORIES = [
-  { label: "Bug report", value: "BUG_REPORT" },
-  { label: "Support request", value: "SUPPORT_REQUEST" },
-  { label: "Onboarding friction", value: "ONBOARDING_FRICTION" },
-  { label: "Product feedback", value: "PRODUCT_FEEDBACK" },
-] as const;
-
-type FeedbackCategory = "BUG_REPORT" | "SUPPORT_REQUEST" | "ONBOARDING_FRICTION" | "PRODUCT_FEEDBACK";
-
-type FormState = "idle" | "loading" | "success" | "error";
-
-const labelClass = "block text-sm font-medium text-[var(--fyxvo-text)] mb-1.5";
-const inputClass =
-  "w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-3 py-2.5 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] outline-none focus:border-[var(--fyxvo-brand)] transition";
-const fieldClass = "space-y-1.5";
+const INTEREST_AREAS = ["RPC relay", "Analytics", "Team access", "Enterprise"] as const;
+type InterestArea = (typeof INTEREST_AREAS)[number];
 
 function InterestForm() {
   const [name, setName] = useState("");
@@ -41,480 +11,324 @@ function InterestForm() {
   const [role, setRole] = useState("");
   const [team, setTeam] = useState("");
   const [useCase, setUseCase] = useState("");
-  const [volume, setVolume] = useState("under_10k");
-  const [areas, setAreas] = useState<string[]>([]);
-  const [state, setState] = useState<FormState>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [requestVolume, setRequestVolume] = useState("Under 100K/mo");
+  const [interestAreas, setInterestAreas] = useState<Set<InterestArea>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<"success" | { msg: string } | null>(null);
 
-  function toggleArea(area: string) {
-    setAreas((prev) =>
-      prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]
-    );
-  }
+  const toggleArea = (area: InterestArea) => {
+    setInterestAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(area)) next.delete(area);
+      else next.add(area);
+      return next;
+    });
+  };
 
-  async function handleSubmit(e: React.FormEvent) {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setState("loading");
-    setErrorMessage(null);
+    setSubmitting(true);
+    setResult(null);
     try {
-      const res = await fetch("/api/feedback", {
+      const r = await fetch("https://api.fyxvo.com/v1/interest", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: "interest",
-          name: name.trim(),
-          email: email.trim(),
-          role: role.trim(),
-          ...(team.trim() ? { team: team.trim() } : {}),
-          useCase: useCase.trim(),
-          expectedRequestVolume: volume,
-          interestAreas: areas,
-          operatorInterest: areas.includes("Operator participation"),
-          source: "contact-page-interest",
+          name,
+          email,
+          role,
+          team,
+          useCase,
+          requestVolume,
+          interestAreas: [...interestAreas],
         }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error ?? "Something went wrong. Please try again.");
+      if (!r.ok) {
+        const d = await r.json().catch(() => null) as { message?: string } | null;
+        throw new Error(d?.message ?? "Submission failed");
       }
-      setState("success");
-    } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Something went wrong. Please try again."
-      );
-      setState("error");
+      setResult("success");
+    } catch (e) {
+      setResult({ msg: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setSubmitting(false);
     }
-  }
+  };
 
-  if (state === "success") {
+  if (result === "success") {
     return (
-      <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 text-center space-y-3">
-        <div className="text-lg font-semibold text-[var(--fyxvo-text)]">Thank you</div>
-        <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-          Your interest submission has been received. We review every message and will follow up
-          with you directly when the time is right.
-        </p>
+      <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-8 text-center h-full flex flex-col items-center justify-center gap-3">
+        <p className="text-green-400 font-semibold text-lg">Thank you for your interest!</p>
+        <p className="text-sm text-[#64748b]">We will be in touch soon.</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-      <div className={fieldClass}>
-        <label htmlFor="interest-name" className={labelClass}>
-          Name
-        </label>
-        <input
-          id="interest-name"
-          type="text"
-          required
-          autoComplete="name"
-          placeholder="Your name"
-          className={inputClass}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 space-y-4">
+      <h2 className="text-xl font-semibold text-[#f1f5f9]">Express interest</h2>
+      <p className="text-sm text-[#64748b]">Tell us about your project and what you are looking for.</p>
 
-      <div className={fieldClass}>
-        <label htmlFor="interest-email" className={labelClass}>
-          Email
-        </label>
-        <input
-          id="interest-email"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-          className={inputClass}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
+      {result && typeof result === "object" && (
+        <p className="text-sm rounded-lg px-4 py-2 bg-red-500/10 text-red-400">{result.msg}</p>
+      )}
 
-      <div className={fieldClass}>
-        <label htmlFor="interest-role" className={labelClass}>
-          Role <span className="text-[var(--fyxvo-text-muted)] font-normal">(optional)</span>
-        </label>
-        <input
-          id="interest-role"
-          type="text"
-          autoComplete="organization-title"
-          placeholder="Engineer, founder, operator..."
-          className={inputClass}
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        />
-      </div>
+      <form onSubmit={(e) => void submit(e)} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Email</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Role</label>
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Team / Company</label>
+            <input
+              type="text"
+              value={team}
+              onChange={(e) => setTeam(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+            />
+          </div>
+        </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="interest-team" className={labelClass}>
-          Team <span className="text-[var(--fyxvo-text-muted)] font-normal">(optional)</span>
-        </label>
-        <input
-          id="interest-team"
-          type="text"
-          autoComplete="organization"
-          placeholder="Company or project name"
-          className={inputClass}
-          value={team}
-          onChange={(e) => setTeam(e.target.value)}
-        />
-      </div>
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Use case</label>
+          <textarea
+            value={useCase}
+            onChange={(e) => setUseCase(e.target.value)}
+            rows={3}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316] resize-none"
+          />
+        </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="interest-use-case" className={labelClass}>
-          Use case
-        </label>
-        <textarea
-          id="interest-use-case"
-          required
-          rows={4}
-          placeholder="What are you building?"
-          className={`${inputClass} resize-none`}
-          value={useCase}
-          onChange={(e) => setUseCase(e.target.value)}
-        />
-      </div>
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Estimated monthly requests</label>
+          <select
+            value={requestVolume}
+            onChange={(e) => setRequestVolume(e.target.value)}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+          >
+            <option>Under 100K/mo</option>
+            <option>100K-1M/mo</option>
+            <option>1M-10M/mo</option>
+            <option>10M+/mo</option>
+          </select>
+        </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="interest-volume" className={labelClass}>
-          Expected request volume
-        </label>
-        <select
-          id="interest-volume"
-          className={inputClass}
-          value={volume}
-          onChange={(e) => setVolume(e.target.value)}
-        >
-          {VOLUME_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className={fieldClass}>
-        <fieldset>
-          <legend className={labelClass}>Interest areas</legend>
-          <div className="space-y-2">
+        <div className="space-y-2">
+          <label className="text-xs text-[#64748b]">Areas of interest</label>
+          <div className="grid grid-cols-2 gap-2">
             {INTEREST_AREAS.map((area) => (
-              <label
-                key={area}
-                className="flex items-center gap-3 cursor-pointer select-none"
-              >
+              <label key={area} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={areas.includes(area)}
+                  checked={interestAreas.has(area)}
                   onChange={() => toggleArea(area)}
-                  className="h-4 w-4 rounded border-[var(--fyxvo-border)] accent-[var(--fyxvo-brand)]"
+                  className="rounded border-white/10 bg-white/[0.03] text-[#f97316] focus:ring-[#f97316]"
                 />
-                <span className="text-sm text-[var(--fyxvo-text-muted)]">{area}</span>
+                <span className="text-sm text-[#f1f5f9]">{area}</span>
               </label>
             ))}
           </div>
-        </fieldset>
-      </div>
+        </div>
 
-      {state === "error" && errorMessage ? (
-        <Notice tone="warning" title="Submission failed">
-          {errorMessage}
-        </Notice>
-      ) : null}
-
-      <button
-        type="submit"
-        disabled={state === "loading"}
-        className="w-full rounded-xl bg-[var(--fyxvo-brand)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-      >
-        {state === "loading" ? "Submitting..." : "Submit interest"}
-      </button>
-    </form>
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-xl bg-[#f97316] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#ea6c0a] transition-colors disabled:opacity-50"
+        >
+          {submitting ? "Sending…" : "Submit interest"}
+        </button>
+      </form>
+    </div>
   );
 }
 
 function FeedbackForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
-  const [team, setTeam] = useState("");
-  const [category, setCategory] = useState<FeedbackCategory>("BUG_REPORT");
-  const [message, setMessage] = useState("");
-  const [state, setState] = useState<FormState>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [category, setCategory] = useState("Product feedback");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<"success" | { msg: string } | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setState("loading");
-    setErrorMessage(null);
+    setSubmitting(true);
+    setResult(null);
     try {
-      const res = await fetch("/api/feedback", {
+      const r = await fetch("https://api.fyxvo.com/v1/feedback", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          type: "feedback",
-          name: name.trim(),
-          email: email.trim(),
-          ...(role.trim() ? { role: role.trim() } : {}),
-          ...(team.trim() ? { team: team.trim() } : {}),
-          category,
-          message: message.trim(),
-          source: "contact-page-feedback",
-          page: "/contact",
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, category, description }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(data.error ?? "Something went wrong. Please try again.");
+      if (!r.ok) {
+        const d = await r.json().catch(() => null) as { message?: string } | null;
+        throw new Error(d?.message ?? "Submission failed");
       }
-      setState("success");
-    } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : "Something went wrong. Please try again."
-      );
-      setState("error");
+      setResult("success");
+    } catch (e) {
+      setResult({ msg: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setSubmitting(false);
     }
-  }
+  };
 
-  if (state === "success") {
+  if (result === "success") {
     return (
-      <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-8 text-center space-y-3">
-        <div className="text-lg font-semibold text-[var(--fyxvo-text)]">Thank you</div>
-        <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-          Your feedback has been received. Every submission goes directly to the team and helps
-          us improve the platform for everyone on devnet.
-        </p>
+      <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-8 text-center h-full flex flex-col items-center justify-center gap-3">
+        <p className="text-green-400 font-semibold text-lg">Thanks for the feedback!</p>
+        <p className="text-sm text-[#64748b]">We read every submission.</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-      <div className={fieldClass}>
-        <label htmlFor="feedback-name" className={labelClass}>
-          Name
-        </label>
-        <input
-          id="feedback-name"
-          type="text"
-          required
-          autoComplete="name"
-          placeholder="Your name"
-          className={inputClass}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
+    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 space-y-4">
+      <h2 className="text-xl font-semibold text-[#f1f5f9]">Send feedback</h2>
+      <p className="text-sm text-[#64748b]">Bug reports, product ideas, or anything else — we are listening.</p>
 
-      <div className={fieldClass}>
-        <label htmlFor="feedback-email" className={labelClass}>
-          Email
-        </label>
-        <input
-          id="feedback-email"
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-          className={inputClass}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
+      {result && typeof result === "object" && (
+        <p className="text-sm rounded-lg px-4 py-2 bg-red-500/10 text-red-400">{result.msg}</p>
+      )}
 
-      <div className={fieldClass}>
-        <label htmlFor="feedback-role" className={labelClass}>
-          Role <span className="text-[var(--fyxvo-text-muted)] font-normal">(optional)</span>
-        </label>
-        <input
-          id="feedback-role"
-          type="text"
-          autoComplete="organization-title"
-          placeholder="Engineer, founder, operator..."
-          className={inputClass}
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-        />
-      </div>
+      <form onSubmit={(e) => void submit(e)} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Email</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+            />
+          </div>
+        </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="feedback-team" className={labelClass}>
-          Team <span className="text-[var(--fyxvo-text-muted)] font-normal">(optional)</span>
-        </label>
-        <input
-          id="feedback-team"
-          type="text"
-          autoComplete="organization"
-          placeholder="Company or project name"
-          className={inputClass}
-          value={team}
-          onChange={(e) => setTeam(e.target.value)}
-        />
-      </div>
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Category</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-3 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+          >
+            <option>Bug report</option>
+            <option>Support request</option>
+            <option>Onboarding friction</option>
+            <option>Product feedback</option>
+          </select>
+        </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="feedback-category" className={labelClass}>
-          Category
-        </label>
-        <select
-          id="feedback-category"
-          className={inputClass}
-          value={category}
-          onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Description</label>
+          <textarea
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={5}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316] resize-none"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-xl bg-[#f97316] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#ea6c0a] transition-colors disabled:opacity-50"
         >
-          {FEEDBACK_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className={fieldClass}>
-        <label htmlFor="feedback-message" className={labelClass}>
-          What happened
-        </label>
-        <textarea
-          id="feedback-message"
-          required
-          rows={5}
-          placeholder="Describe what you experienced..."
-          className={`${inputClass} resize-none`}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-      </div>
-
-      {state === "error" && errorMessage ? (
-        <Notice tone="warning" title="Submission failed">
-          {errorMessage}
-        </Notice>
-      ) : null}
-
-      <button
-        type="submit"
-        disabled={state === "loading"}
-        className="w-full rounded-xl bg-[var(--fyxvo-brand)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-      >
-        {state === "loading" ? "Submitting..." : "Send feedback"}
-      </button>
-    </form>
+          {submitting ? "Sending…" : "Send feedback"}
+        </button>
+      </form>
+    </div>
   );
 }
 
 export default function ContactPage() {
+  const communityLinks = [
+    {
+      title: "Community interest",
+      description: "Share your use case and join the list of teams building on Fyxvo.",
+      href: "/contact",
+    },
+    {
+      title: "Technical support",
+      description: "Open a support ticket for integration issues, errors, or unexpected behavior.",
+      href: "/support",
+    },
+    {
+      title: "Enterprise plans",
+      description: "Learn about dedicated nodes, custom rate limits, and SLA-backed support.",
+      href: "/enterprise",
+    },
+  ];
+
   return (
-    <div className="space-y-16 lg:space-y-20">
-      {/* Page heading */}
-      <div className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-          Contact
-        </p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-5xl">
-          Get in touch
-        </h1>
-        <p className="max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-          Use the interest form if you want to explore Fyxvo access or talk through what you are
-          building. Use the feedback form if something broke, confused you, or feels harder than it
-          should. Both go straight to the team.
-        </p>
+    <div className="min-h-screen bg-[#0a0a0f] py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-12">
+          <h1 className="text-4xl font-bold text-[#f1f5f9] mb-4">Get in touch</h1>
+          <p className="text-[#64748b] max-w-xl">
+            Express interest in Fyxvo or send us feedback. We respond to every message.
+          </p>
+        </div>
+
+        {/* Two forms */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-20">
+          <InterestForm />
+          <FeedbackForm />
+        </div>
+
+        {/* Community section */}
+        <div>
+          <h2 className="text-2xl font-bold text-[#f1f5f9] mb-8">More ways to connect</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {communityLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 transition-transform hover:-translate-y-1 block"
+              >
+                <h3 className="font-semibold text-[#f1f5f9] mb-2">{link.title}</h3>
+                <p className="text-sm text-[#64748b]">{link.description}</p>
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
-
-      {/* Two forms side by side */}
-      <div className="grid gap-10 lg:grid-cols-2 lg:gap-12">
-        {/* Form 1 — Interest */}
-        <section id="interest-form" className="space-y-6">
-          <div className="space-y-2">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
-              Get started
-            </h2>
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-              Tell us about what you are building and what matters most. That context makes every
-              follow-up conversation more useful for both sides.
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-            <InterestForm />
-          </div>
-        </section>
-
-        {/* Form 2 — Feedback */}
-        <section id="feedback-form" className="space-y-6">
-          <div className="space-y-2">
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
-              Send feedback
-            </h2>
-            <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-              If you hit a bug, ran into confusing onboarding, or want to flag something that felt
-              off, this is the right place. Every submission goes directly into our review queue.
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
-            <FeedbackForm />
-          </div>
-        </section>
-      </div>
-
-      {/* Community links */}
-      <section className="border-t border-[var(--fyxvo-border)] pt-16 space-y-6">
-        <div className="space-y-3">
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-3xl">
-            Join the community
-          </h2>
-          <p className="max-w-2xl text-base leading-7 text-[var(--fyxvo-text-muted)]">
-            We post updates and launch news on X, answer product and technical questions on
-            Discord, and use Telegram for quick back-and-forth around rollout logistics. Every
-            channel gets actual attention from the team.
-          </p>
-        </div>
-        <SocialLinks />
-      </section>
-
-      {/* Three path cards */}
-      <section className="grid gap-5 sm:grid-cols-3">
-        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-3">
-          <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Get access</div>
-          <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            Share what you are building and what you want to test on devnet. Use the interest form
-            to get your team on the Fyxvo alpha list.
-          </p>
-          <Link
-            href="#interest-form"
-            className="inline-flex text-sm font-medium text-[var(--fyxvo-brand)] hover:underline"
-          >
-            Open interest form
-          </Link>
-        </div>
-
-        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-3">
-          <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Get support</div>
-          <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            Hit a bug, ran into something confusing, or your relay request is not behaving as
-            expected? Use the feedback form and we will look into it directly.
-          </p>
-          <Link
-            href="#feedback-form"
-            className="inline-flex text-sm font-medium text-[var(--fyxvo-brand)] hover:underline"
-          >
-            Open feedback form
-          </Link>
-        </div>
-
-        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-3">
-          <div className="text-sm font-semibold text-[var(--fyxvo-text)]">Enterprise</div>
-          <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            If your scope is larger and you want to talk about dedicated rollout support, workload
-            sizing, or commercial terms, the enterprise path is the right starting point.
-          </p>
-          <Link
-            href="/enterprise"
-            className="inline-flex text-sm font-medium text-[var(--fyxvo-brand)] hover:underline"
-          >
-            View enterprise options
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }

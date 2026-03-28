@@ -1,504 +1,741 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Badge, Notice } from "@fyxvo/ui";
-import { AuthGate } from "../../../components/state-panels";
-import { PageHeader } from "../../../components/page-header";
+import { useEffect, useState } from "react";
 import { usePortal } from "../../../components/portal-provider";
-import {
-  listProjectMembers,
-  inviteProjectMember,
-  removeProjectMember,
-} from "../../../lib/api";
-import { shortenAddress } from "../../../lib/format";
-import { webEnv } from "../../../lib/env";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const API = "https://api.fyxvo.com";
 
-interface ProjectMember {
-  id: string;
-  userId: string;
+const WEBHOOK_EVENTS = [
+  "funding.confirmed",
+  "apikey.created",
+  "apikey.revoked",
+  "balance.low",
+  "project.activated",
+] as const;
+
+type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+
+interface Member {
+  walletAddress: string;
   role: string;
-  invitedAt: string;
-  acceptedAt: string | null;
-  user: {
-    walletAddress: string;
-    displayName: string;
-  };
+  invitedAt?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function updateProject(
-  id: string,
-  data: Record<string, unknown>,
-  token: string,
-): Promise<unknown> {
-  const res = await fetch(new URL(`/v1/projects/${id}`, webEnv.apiBaseUrl), {
-    method: "PATCH",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error("Failed to update project");
-  return res.json();
+interface Webhook {
+  id: string;
+  url: string;
+  events: string[];
+  lastDeliveryStatus?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+interface WebhookDelivery {
+  id: string;
+  status: number;
+  createdAt: string;
+}
 
-export default function ProjectSettingsPage() {
-  const portal = usePortal();
-  const project = portal.selectedProject;
-  const token = portal.token;
-
-  // Public profile
+function GeneralSection({
+  projectId,
+  token,
+  initialName,
+  initialDescription,
+}: {
+  projectId: string;
+  token: string;
+  initialName: string;
+  initialDescription: string | null;
+}) {
+  const [name, setName] = useState(initialName);
+  const [description, setDescription] = useState(initialDescription ?? "");
+  const [tags, setTags] = useState("");
   const [isPublic, setIsPublic] = useState(false);
-  const [publicSaving, setPublicSaving] = useState(false);
-  const [publicError, setPublicError] = useState<string | null>(null);
+  const [publicSlug, setPublicSlug] = useState("");
+  const [notice, setNotice] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Notes
-  const [notes, setNotes] = useState("");
-  const [notesSaving, setNotesSaving] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
-  const [notesSavedAt, setNotesSavedAt] = useState<string | null>(null);
-
-  // Runbook
-  const [runbook, setRunbook] = useState("");
-  const [runbookSaving, setRunbookSaving] = useState(false);
-  const [runbookError, setRunbookError] = useState<string | null>(null);
-  const [runbookSavedAt, setRunbookSavedAt] = useState<string | null>(null);
-
-  // Team
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [membersError, setMembersError] = useState<string | null>(null);
-  const [inviteWallet, setInviteWallet] = useState("");
-  const [inviteRole, setInviteRole] = useState<"ADMIN" | "MEMBER" | "VIEWER">("MEMBER");
-  const [inviting, setInviting] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteSuccess, setInviteSuccess] = useState(false);
-
-  // Sync project data into state on selection change
-  useEffect(() => {
-    if (!project) return;
-    setIsPublic(project.isPublic ?? false);
-    setNotes(project.notes ?? "");
-    setRunbook("");
-    setNotesSavedAt(project.notesUpdatedAt ?? null);
-  }, [project]);
-
-  // Load members when project changes
-  useEffect(() => {
-    if (!project || !token) return;
-    setMembersLoading(true);
-    setMembersError(null);
-    listProjectMembers(project.id, token)
-      .then((data) => setMembers(data.items ?? []))
-      .catch((err: unknown) =>
-        setMembersError(err instanceof Error ? err.message : "Failed to load members"),
-      )
-      .finally(() => setMembersLoading(false));
-  }, [project, token]);
-
-  // ---------------------------------------------------------------------------
-  // Handlers
-  // ---------------------------------------------------------------------------
-
-  async function handlePublicToggle(value: boolean) {
-    if (!project || !token) return;
-    setPublicSaving(true);
-    setPublicError(null);
+  const save = async () => {
+    setSaving(true);
+    setNotice(null);
     try {
-      await updateProject(project.id, { isPublic: value }, token);
-      setIsPublic(value);
-      await portal.refresh();
-    } catch (err) {
-      setPublicError(err instanceof Error ? err.message : "Failed to update visibility");
+      const r = await fetch(`${API}/v1/projects/${projectId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name, description, isPublic, publicSlug }),
+      });
+      if (!r.ok) throw new Error();
+
+      if (tags.trim()) {
+        const tagList = tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+        await fetch(`${API}/v1/projects/${projectId}/tags`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tags: tagList }),
+        });
+      }
+
+      setNotice({ type: "success", msg: "Project settings saved." });
+    } catch {
+      setNotice({ type: "error", msg: "Failed to save project settings." });
     } finally {
-      setPublicSaving(false);
+      setSaving(false);
     }
-  }
-
-  async function saveNotes() {
-    if (!project || !token) return;
-    setNotesSaving(true);
-    setNotesError(null);
-    try {
-      await updateProject(project.id, { notes }, token);
-      setNotesSavedAt(new Date().toISOString());
-      await portal.refresh();
-    } catch (err) {
-      setNotesError(err instanceof Error ? err.message : "Failed to save notes");
-    } finally {
-      setNotesSaving(false);
-    }
-  }
-
-  async function saveRunbook() {
-    if (!project || !token) return;
-    setRunbookSaving(true);
-    setRunbookError(null);
-    try {
-      await updateProject(project.id, { runbook }, token);
-      setRunbookSavedAt(new Date().toISOString());
-    } catch (err) {
-      setRunbookError(err instanceof Error ? err.message : "Failed to save runbook");
-    } finally {
-      setRunbookSaving(false);
-    }
-  }
-
-  async function handleInvite() {
-    if (!project || !token || !inviteWallet.trim()) return;
-    setInviting(true);
-    setInviteError(null);
-    setInviteSuccess(false);
-    try {
-      await inviteProjectMember(project.id, inviteWallet.trim(), token);
-      setInviteWallet("");
-      setInviteSuccess(true);
-      // Refresh member list
-      const data = await listProjectMembers(project.id, token);
-      setMembers(data.items ?? []);
-    } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Failed to invite member");
-    } finally {
-      setInviting(false);
-    }
-  }
-
-  async function handleRemoveMember(memberId: string) {
-    if (!project || !token) return;
-    try {
-      await removeProjectMember(project.id, memberId, token);
-      setMembers((prev) => prev.filter((m) => m.id !== memberId));
-    } catch (err) {
-      setMembersError(err instanceof Error ? err.message : "Failed to remove member");
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Auth / project guard
-  // ---------------------------------------------------------------------------
-
-  if (portal.walletPhase !== "authenticated") {
-    return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <AuthGate />
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-10 text-center">
-          <p className="text-sm text-[var(--fyxvo-text-muted)]">
-            Select a project to manage its settings.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const displayName = project.displayName ?? project.name;
+  };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <PageHeader
-        eyebrow="Settings"
-        title={displayName}
-        description="Manage visibility, notes, runbook, and team access for this project."
-      />
+    <section className="space-y-6">
+      <h2 className="text-xl font-semibold text-[#f1f5f9]">General</h2>
 
-      {/* Public profile */}
-      <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Public profile</h2>
-          <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            Enable public visibility for this project. A public project appears in the Explore view
-            and can generate a badge for your README.
-          </p>
+      {notice && (
+        <p
+          className={`text-sm rounded-lg px-4 py-2 ${
+            notice.type === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+          }`}
+        >
+          {notice.msg}
+        </p>
+      )}
+
+      <div className="space-y-4 max-w-lg">
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Project name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+          />
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:ring-2 focus:ring-[#f97316] resize-none"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-[#64748b]">Tags (comma-separated)</label>
+          <input
+            type="text"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="defi, solana, mainnet"
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
           <button
-            role="switch"
-            aria-checked={isPublic}
-            onClick={() => void handlePublicToggle(!isPublic)}
-            disabled={publicSaving}
-            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40 disabled:opacity-50 ${
-              isPublic ? "bg-[var(--fyxvo-brand)]" : "bg-[var(--fyxvo-border)]"
+            type="button"
+            onClick={() => setIsPublic(!isPublic)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              isPublic ? "bg-[#f97316]" : "bg-white/10"
             }`}
           >
             <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
-                isPublic ? "translate-x-5" : "translate-x-0"
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isPublic ? "translate-x-6" : "translate-x-1"
               }`}
             />
           </button>
-          <span className="text-sm text-[var(--fyxvo-text)]">
-            {isPublic ? "Public" : "Private"}
-          </span>
-          {publicSaving && (
-            <span className="text-xs text-[var(--fyxvo-text-muted)]">Saving...</span>
-          )}
+          <span className="text-sm text-[#f1f5f9]">Public profile</span>
         </div>
 
-        {publicError && (
-          <p className="text-xs text-rose-400">{publicError}</p>
-        )}
-
-        {isPublic && project.publicSlug && (
-          <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4 space-y-2">
-            <div>
-              <p className="text-xs font-medium text-[var(--fyxvo-text-muted)] mb-1">
-                Public page
-              </p>
-              <a
-                href={`/p/${project.publicSlug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-[var(--fyxvo-brand)] hover:underline"
-              >
-                {webEnv.siteUrl}/p/{project.publicSlug}
-              </a>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[var(--fyxvo-text-muted)] mb-1">
-                Badge URL
-              </p>
-              <p className="font-mono text-xs text-[var(--fyxvo-text-soft)]">
-                {webEnv.apiBaseUrl}/badge/project/{project.publicSlug}
-              </p>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Owner notes */}
-      <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Owner notes</h2>
-          <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            Private notes visible only to you and your team. Useful for runbooks, context, and
-            operational notes. Notes are never exposed publicly.
-          </p>
-        </div>
-
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={5}
-          placeholder="Add context, references, or anything useful for your team..."
-          className="w-full resize-y rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-4 py-3 text-sm text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40 leading-6"
-        />
-
-        <div className="flex items-center justify-between">
-          <div>
-            {notesSavedAt && (
-              <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                Last saved{" "}
-                {new Date(notesSavedAt).toLocaleString([], {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-                {project.notesEditedByWallet && (
-                  <span className="ml-1">
-                    by {shortenAddress(project.notesEditedByWallet)}
-                  </span>
-                )}
-              </p>
-            )}
-            {notesError && <p className="text-xs text-rose-400">{notesError}</p>}
-          </div>
-          <button
-            onClick={() => void saveNotes()}
-            disabled={notesSaving}
-            className="rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            {notesSaving ? "Saving..." : "Save notes"}
-          </button>
-        </div>
-      </section>
-
-      {/* Runbook */}
-      <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-4">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Runbook</h2>
-          <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            Document your standard operating procedures for this project. Runbooks help your team
-            respond consistently to incidents and routine tasks.
-          </p>
-        </div>
-
-        <textarea
-          value={runbook}
-          onChange={(e) => setRunbook(e.target.value)}
-          rows={6}
-          placeholder="Document procedures, escalation paths, and operational checklists..."
-          className="w-full resize-y rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-4 py-3 text-sm text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40 leading-6"
-        />
-
-        <div className="flex items-center justify-between">
-          <div>
-            {runbookSavedAt && (
-              <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                Last saved{" "}
-                {new Date(runbookSavedAt).toLocaleString([], {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            )}
-            {runbookError && <p className="text-xs text-rose-400">{runbookError}</p>}
-          </div>
-          <button
-            onClick={() => void saveRunbook()}
-            disabled={runbookSaving}
-            className="rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            {runbookSaving ? "Saving..." : "Save runbook"}
-          </button>
-        </div>
-      </section>
-
-      {/* Team management */}
-      <section className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5 space-y-6">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--fyxvo-text)]">Team members</h2>
-          <p className="mt-1 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
-            Manage who has access to this project. Invite members by wallet address and assign
-            roles to control what they can view or modify.
-          </p>
-        </div>
-
-        {membersError && (
-          <Notice tone="danger">{membersError}</Notice>
-        )}
-
-        {/* Current members */}
-        <div className="space-y-2">
-          {membersLoading && (
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">Loading members...</p>
-          )}
-
-          {!membersLoading && members.length === 0 && (
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">
-              No team members yet. Invite someone below.
-            </p>
-          )}
-
-          {members.map((member) => {
-            const isPending = !member.acceptedAt;
-            return (
-              <div
-                key={member.id}
-                className="flex items-center justify-between rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div>
-                    <p className="font-mono text-xs text-[var(--fyxvo-text)]">
-                      {shortenAddress(member.user.walletAddress)}
-                    </p>
-                    {member.user.displayName && (
-                      <p className="text-xs text-[var(--fyxvo-text-muted)]">
-                        {member.user.displayName}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge tone={member.role === "ADMIN" ? "brand" : "neutral"} className="text-xs">
-                      {member.role}
-                    </Badge>
-                    {isPending && (
-                      <Badge tone="warning" className="text-xs">
-                        Pending
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => void handleRemoveMember(member.id)}
-                  className="text-xs text-[var(--fyxvo-text-muted)] hover:text-rose-400 transition-colors"
-                >
-                  Remove
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Invite form */}
-        <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4 space-y-3">
-          <p className="text-xs font-medium text-[var(--fyxvo-text)]">Invite a member</p>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
+        {isPublic && (
+          <div className="space-y-1">
+            <label className="text-xs text-[#64748b]">Public slug</label>
             <input
               type="text"
-              value={inviteWallet}
-              onChange={(e) => setInviteWallet(e.target.value)}
-              placeholder="Wallet address"
-              className="flex-1 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 font-mono text-xs text-[var(--fyxvo-text)] placeholder-[var(--fyxvo-text-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40"
-              onKeyDown={(e) => e.key === "Enter" && void handleInvite()}
+              value={publicSlug}
+              onChange={(e) => setPublicSlug(e.target.value)}
+              placeholder="my-project"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
             />
+          </div>
+        )}
 
-            <select
-              value={inviteRole}
-              onChange={(e) =>
-                setInviteRole(e.target.value as "ADMIN" | "MEMBER" | "VIEWER")
-              }
-              className="rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2 text-xs text-[var(--fyxvo-text)] focus:outline-none focus:ring-2 focus:ring-[var(--fyxvo-brand)]/40"
-            >
-              <option value="ADMIN">Admin</option>
-              <option value="MEMBER">Member</option>
-              <option value="VIEWER">Viewer</option>
-            </select>
+        <button
+          onClick={() => void save()}
+          disabled={saving}
+          className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-medium text-white hover:bg-[#ea6c0a] transition-colors disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+    </section>
+  );
+}
 
+function TeamSection({ projectId, token }: { projectId: string; token: string }) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteWallet, setInviteWallet] = useState("");
+  const [inviteRole, setInviteRole] = useState("MEMBER");
+  const [inviteNotice, setInviteNotice] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [transferWallet, setTransferWallet] = useState("");
+  const [transferConfirm, setTransferConfirm] = useState(false);
+  const [transferNotice, setTransferNotice] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+
+  useEffect(() => {
+    fetch(`${API}/v1/projects/${projectId}/members`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setMembers(Array.isArray(d) ? (d as Member[]) : (d as { members?: Member[] }).members ?? []))
+      .catch(() => null)
+      .finally(() => setLoading(false));
+  }, [projectId, token]);
+
+  const inviteMember = async () => {
+    setInviteNotice(null);
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}/members/invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ walletAddress: inviteWallet, role: inviteRole }),
+      });
+      if (!r.ok) throw new Error();
+      setInviteNotice({ type: "success", msg: "Invitation sent." });
+      setInviteWallet("");
+    } catch {
+      setInviteNotice({ type: "error", msg: "Failed to send invitation." });
+    }
+  };
+
+  const getInviteLink = async () => {
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}/invite-link`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json() as { url?: string; link?: string };
+      setInviteLink(d.url ?? d.link ?? null);
+    } catch {
+      setInviteLink(null);
+    }
+  };
+
+  const transferOwnership = async () => {
+    setTransferNotice(null);
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}/transfer-ownership`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ walletAddress: transferWallet }),
+      });
+      if (!r.ok) throw new Error();
+      setTransferNotice({ type: "success", msg: "Ownership transferred." });
+      setTransferConfirm(false);
+      setTransferWallet("");
+    } catch {
+      setTransferNotice({ type: "error", msg: "Failed to transfer ownership." });
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <h2 className="text-xl font-semibold text-[#f1f5f9]">Team</h2>
+
+      {loading ? (
+        <p className="text-sm text-[#64748b]">Loading members…</p>
+      ) : members.length === 0 ? (
+        <p className="text-sm text-[#64748b]">No members yet.</p>
+      ) : (
+        <div className="rounded-2xl border border-white/[0.08] overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.08] bg-white/[0.02]">
+                <th className="px-4 py-3 text-left text-xs text-[#64748b] font-medium">Wallet</th>
+                <th className="px-4 py-3 text-left text-xs text-[#64748b] font-medium">Role</th>
+                <th className="px-4 py-3 text-left text-xs text-[#64748b] font-medium">Invited</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m, i) => (
+                <tr key={i} className="border-b border-white/[0.04] last:border-0">
+                  <td className="px-4 py-3 font-mono text-xs text-[#94a3b8]">
+                    {m.walletAddress.slice(0, 8)}…{m.walletAddress.slice(-4)}
+                  </td>
+                  <td className="px-4 py-3 text-[#f1f5f9]">{m.role}</td>
+                  <td className="px-4 py-3 text-[#64748b]">
+                    {m.invitedAt ? new Date(m.invitedAt).toLocaleDateString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-3 max-w-lg">
+        <p className="text-sm font-medium text-[#f1f5f9]">Invite member</p>
+        {inviteNotice && (
+          <p
+            className={`text-xs rounded px-3 py-2 ${
+              inviteNotice.type === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+            }`}
+          >
+            {inviteNotice.msg}
+          </p>
+        )}
+        <input
+          type="text"
+          value={inviteWallet}
+          onChange={(e) => setInviteWallet(e.target.value)}
+          placeholder="Wallet address"
+          className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+        />
+        <select
+          value={inviteRole}
+          onChange={(e) => setInviteRole(e.target.value)}
+          className="w-full rounded-xl border border-white/[0.08] bg-[#0a0a0f] px-4 py-2 text-sm text-[#f1f5f9] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+        >
+          <option value="MEMBER">Member</option>
+          <option value="ADMIN">Admin</option>
+          <option value="VIEWER">Viewer</option>
+        </select>
+        <button
+          onClick={() => void inviteMember()}
+          className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-medium text-white hover:bg-[#ea6c0a] transition-colors"
+        >
+          Send invite
+        </button>
+      </div>
+
+      <div className="space-y-2 max-w-lg">
+        <button
+          onClick={() => void getInviteLink()}
+          className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-medium text-[#f1f5f9] hover:bg-white/[0.08] transition-colors"
+        >
+          Get invite link
+        </button>
+        {inviteLink && (
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2">
+            <span className="text-xs font-mono text-[#94a3b8] truncate flex-1">{inviteLink}</span>
             <button
-              onClick={() => void handleInvite()}
-              disabled={inviting || !inviteWallet.trim()}
-              className="rounded-lg bg-[var(--fyxvo-brand)] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+              onClick={() => void navigator.clipboard.writeText(inviteLink)}
+              className="text-xs text-[#f97316] hover:underline shrink-0"
             >
-              {inviting ? "Inviting..." : "Invite"}
+              Copy
             </button>
           </div>
+        )}
+      </div>
 
-          {inviteError && (
-            <p className="text-xs text-rose-400">{inviteError}</p>
-          )}
-
-          {inviteSuccess && (
-            <p className="text-xs text-[var(--fyxvo-success)]">
-              Invitation sent successfully.
-            </p>
-          )}
-
-          <div className="space-y-1 pt-1">
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">
-              Admin members can manage API keys, settings, and team access.
-            </p>
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">
-              Members can view analytics and use the playground.
-            </p>
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">
-              Viewers have read-only access to project data.
-            </p>
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-3 max-w-lg">
+        <p className="text-sm font-medium text-[#f1f5f9]">Transfer ownership</p>
+        {transferNotice && (
+          <p
+            className={`text-xs rounded px-3 py-2 ${
+              transferNotice.type === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+            }`}
+          >
+            {transferNotice.msg}
+          </p>
+        )}
+        <input
+          type="text"
+          value={transferWallet}
+          onChange={(e) => setTransferWallet(e.target.value)}
+          placeholder="New owner wallet address"
+          className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+        />
+        {!transferConfirm ? (
+          <button
+            onClick={() => setTransferConfirm(true)}
+            disabled={!transferWallet}
+            className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm font-medium text-yellow-400 hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
+          >
+            Transfer ownership
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => void transferOwnership()}
+              className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors"
+            >
+              Confirm transfer
+            </button>
+            <button
+              onClick={() => setTransferConfirm(false)}
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-[#64748b] hover:text-[#f1f5f9] transition-colors"
+            >
+              Cancel
+            </button>
           </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function WebhooksSection({ projectId, token }: { projectId: string; token: string }) {
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newUrl, setNewUrl] = useState("");
+  const [newEvents, setNewEvents] = useState<Set<WebhookEvent>>(new Set());
+  const [createNotice, setCreateNotice] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, string>>({});
+  const [deliveries, setDeliveries] = useState<Record<string, WebhookDelivery[]>>({});
+
+  useEffect(() => {
+    fetch(`${API}/v1/projects/${projectId}/webhooks`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setWebhooks(Array.isArray(d) ? (d as Webhook[]) : (d as { webhooks?: Webhook[] }).webhooks ?? []))
+      .catch(() => null)
+      .finally(() => setLoading(false));
+  }, [projectId, token]);
+
+  const createWebhook = async () => {
+    setCreateNotice(null);
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}/webhooks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: newUrl, events: [...newEvents] }),
+      });
+      if (!r.ok) throw new Error();
+      const w = await r.json() as Webhook;
+      setWebhooks((prev) => [...prev, w]);
+      setNewUrl("");
+      setNewEvents(new Set());
+      setCreateNotice({ type: "success", msg: "Webhook created." });
+    } catch {
+      setCreateNotice({ type: "error", msg: "Failed to create webhook." });
+    }
+  };
+
+  const testWebhook = async (webhookId: string) => {
+    try {
+      const start = Date.now();
+      const r = await fetch(`${API}/v1/projects/${projectId}/webhooks/${webhookId}/test`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const latency = Date.now() - start;
+      setTestResults((prev) => ({ ...prev, [webhookId]: `${r.status} — ${latency}ms` }));
+    } catch {
+      setTestResults((prev) => ({ ...prev, [webhookId]: "Error" }));
+    }
+  };
+
+  const fetchDeliveries = async (webhookId: string) => {
+    if (deliveries[webhookId]) {
+      setDeliveries((prev) => {
+        const next = { ...prev };
+        delete next[webhookId];
+        return next;
+      });
+      return;
+    }
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}/webhooks/${webhookId}/deliveries`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json() as WebhookDelivery[] | { deliveries?: WebhookDelivery[] };
+      const list = Array.isArray(d) ? d : d.deliveries ?? [];
+      setDeliveries((prev) => ({ ...prev, [webhookId]: list }));
+    } catch {
+      setDeliveries((prev) => ({ ...prev, [webhookId]: [] }));
+    }
+  };
+
+  const toggleEvent = (event: WebhookEvent) => {
+    setNewEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(event)) next.delete(event);
+      else next.add(event);
+      return next;
+    });
+  };
+
+  return (
+    <section className="space-y-6">
+      <h2 className="text-xl font-semibold text-[#f1f5f9]">Webhooks</h2>
+
+      {loading ? (
+        <p className="text-sm text-[#64748b]">Loading webhooks…</p>
+      ) : webhooks.length === 0 ? (
+        <p className="text-sm text-[#64748b]">No webhooks configured.</p>
+      ) : (
+        <div className="space-y-3">
+          {webhooks.map((wh) => (
+            <div key={wh.id} className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-mono text-[#f1f5f9]">{wh.url}</p>
+                  <p className="text-xs text-[#64748b] mt-1">{wh.events.join(", ")}</p>
+                  {wh.lastDeliveryStatus && (
+                    <p className="text-xs text-[#64748b]">Last delivery: {wh.lastDeliveryStatus}</p>
+                  )}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => void testWebhook(wh.id)}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-[#f1f5f9] hover:bg-white/[0.05] transition-colors"
+                  >
+                    Test
+                  </button>
+                  <button
+                    onClick={() => void fetchDeliveries(wh.id)}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-[#f1f5f9] hover:bg-white/[0.05] transition-colors"
+                  >
+                    History
+                  </button>
+                </div>
+              </div>
+              {testResults[wh.id] && (
+                <p className="text-xs text-[#94a3b8] font-mono">Result: {testResults[wh.id]}</p>
+              )}
+              {deliveries[wh.id] != null && (
+                <div className="space-y-1">
+                  {(deliveries[wh.id] ?? []).length === 0 ? (
+                    <p className="text-xs text-[#64748b]">No deliveries.</p>
+                  ) : (
+                    (deliveries[wh.id] ?? []).slice(0, 10).map((d) => (
+                      <div key={d.id} className="flex gap-4 text-xs text-[#64748b]">
+                        <span className={d.status >= 200 && d.status < 300 ? "text-green-400" : "text-red-400"}>
+                          {d.status}
+                        </span>
+                        <span>{new Date(d.createdAt).toLocaleString()}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      </section>
+      )}
+
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-4 max-w-lg">
+        <p className="text-sm font-medium text-[#f1f5f9]">Create webhook</p>
+        {createNotice && (
+          <p
+            className={`text-xs rounded px-3 py-2 ${
+              createNotice.type === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+            }`}
+          >
+            {createNotice.msg}
+          </p>
+        )}
+        <input
+          type="url"
+          value={newUrl}
+          onChange={(e) => setNewUrl(e.target.value)}
+          placeholder="https://your-server.com/webhook"
+          className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm text-[#f1f5f9] placeholder-[#64748b] focus:outline-none focus:ring-2 focus:ring-[#f97316]"
+        />
+        <div className="space-y-2">
+          <p className="text-xs text-[#64748b]">Events</p>
+          {WEBHOOK_EVENTS.map((event) => (
+            <label key={event} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newEvents.has(event)}
+                onChange={() => toggleEvent(event)}
+                className="rounded border-white/10 bg-white/[0.03] text-[#f97316] focus:ring-[#f97316]"
+              />
+              <span className="text-sm text-[#f1f5f9] font-mono">{event}</span>
+            </label>
+          ))}
+        </div>
+        <button
+          onClick={() => void createWebhook()}
+          disabled={!newUrl || newEvents.size === 0}
+          className="rounded-xl bg-[#f97316] px-4 py-2 text-sm font-medium text-white hover:bg-[#ea6c0a] transition-colors disabled:opacity-50"
+        >
+          Create webhook
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 max-w-lg">
+        <p className="text-xs text-[#64748b] mb-1">Webhook signature secret</p>
+        <p className="text-sm text-[#94a3b8]">
+          Set <code className="font-mono text-[#f97316]">FYXVO_WEBHOOK_SECRET</code> in your environment to enable request signing.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function AdvancedSection({
+  projectId,
+  token,
+  isArchived,
+}: {
+  projectId: string;
+  token: string;
+  isArchived?: boolean;
+}) {
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [archiveNotice, setArchiveNotice] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [archived, setArchived] = useState(isArchived ?? false);
+
+  const archiveProject = async () => {
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error();
+      setArchived(true);
+      setArchiveNotice({ type: "success", msg: "Project archived." });
+      setArchiveConfirm(false);
+    } catch {
+      setArchiveNotice({ type: "error", msg: "Failed to archive project." });
+    }
+  };
+
+  const restoreProject = async () => {
+    try {
+      const r = await fetch(`${API}/v1/projects/${projectId}/restore`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error();
+      setArchived(false);
+      setArchiveNotice({ type: "success", msg: "Project restored." });
+    } catch {
+      setArchiveNotice({ type: "error", msg: "Failed to restore project." });
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <h2 className="text-xl font-semibold text-[#f1f5f9]">Advanced</h2>
+
+      <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.03] p-5 space-y-4 max-w-lg">
+        <p className="text-sm font-semibold text-red-400">Danger zone</p>
+
+        {archiveNotice && (
+          <p
+            className={`text-xs rounded px-3 py-2 ${
+              archiveNotice.type === "success" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+            }`}
+          >
+            {archiveNotice.msg}
+          </p>
+        )}
+
+        {!archived ? (
+          <div className="space-y-2">
+            <p className="text-sm text-[#64748b]">
+              Archiving this project will disable all API keys and stop request routing.
+            </p>
+            {!archiveConfirm ? (
+              <button
+                onClick={() => setArchiveConfirm(true)}
+                className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+              >
+                Archive project
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void archiveProject()}
+                  className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors"
+                >
+                  Confirm archive
+                </button>
+                <button
+                  onClick={() => setArchiveConfirm(false)}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-[#64748b] hover:text-[#f1f5f9] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-[#64748b]">This project is archived.</p>
+            <button
+              onClick={() => void restoreProject()}
+              className="rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+            >
+              Restore project
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export default function DashboardSettingsPage() {
+  const portal = usePortal();
+
+  if (portal.walletPhase !== "authenticated" || !portal.token) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center py-20">
+        <div className="mx-auto max-w-md text-center">
+          <p className="text-[#64748b] text-sm mb-4">Connect your wallet to access project settings.</p>
+          <p className="text-xs text-[#64748b]">Use the wallet button in the header to authenticate.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const project = portal.selectedProject;
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center py-20">
+        <p className="text-[#64748b] text-sm">No project selected.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-[#f1f5f9] mb-12">Project Settings</h1>
+
+        <div className="space-y-16">
+          <GeneralSection
+            projectId={project.id}
+            token={portal.token}
+            initialName={project.name}
+            initialDescription={project.description}
+          />
+
+          <div className="border-t border-white/[0.08]" />
+
+          <TeamSection projectId={project.id} token={portal.token} />
+
+          <div className="border-t border-white/[0.08]" />
+
+          <WebhooksSection projectId={project.id} token={portal.token} />
+
+          <div className="border-t border-white/[0.08]" />
+
+          <AdvancedSection projectId={project.id} token={portal.token} />
+        </div>
+      </div>
     </div>
   );
 }
