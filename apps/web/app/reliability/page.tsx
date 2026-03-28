@@ -87,6 +87,41 @@ export default async function ReliabilityPage() {
           </div>
         ))}
       </div>
+
+      <section className="mt-10 rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+        <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+          Path to decentralized infrastructure
+        </p>
+        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+          Managed first, open later
+        </h2>
+        <div className="mt-6 grid gap-5 lg:grid-cols-3">
+          <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
+            <h3 className="text-xl font-semibold text-[var(--fyxvo-text)]">Current devnet phase</h3>
+            <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+              The live devnet product routes through managed nodes operated by the team. This phase
+              is about proving the funded relay model, validating the control plane, and keeping
+              the operating posture visible while the network is still small.
+            </p>
+          </div>
+          <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
+            <h3 className="text-xl font-semibold text-[var(--fyxvo-text)]">Next operator phase</h3>
+            <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+              The next step is to introduce external operators into the routing layer. That work
+              includes onboarding, performance visibility, node economics, and reducing dependence
+              on one managed infrastructure footprint.
+            </p>
+          </div>
+          <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-6">
+            <h3 className="text-xl font-semibold text-[var(--fyxvo-text)]">Open governed network</h3>
+            <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+              The long-term target is a fully open operator network governed on chain. That target
+              exists in the protocol direction and roadmap, but this page does not claim a launch
+              date or that the open network is already live.
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

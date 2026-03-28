@@ -6,6 +6,9 @@ import { AddressLink } from "../../components/address-link";
 import { protocolAddresses, requestPricingTiers } from "../../lib/public-data";
 
 const DOC_SECTIONS = [
+  { id: "network-architecture", label: "Network architecture" },
+  { id: "operator-network", label: "Operator network" },
+  { id: "decentralization-roadmap", label: "Decentralization roadmap" },
   { id: "wallet-authentication", label: "Wallet authentication" },
   { id: "project-activation-and-funding", label: "Project activation and funding" },
   { id: "gateway-usage", label: "Gateway usage" },
@@ -99,9 +102,10 @@ export default function DocsPage() {
             Build against the real Fyxvo flow
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-            Fyxvo is a Solana devnet control plane with wallet authentication, on-chain project
-            activation, funded relay usage, scoped API keys, analytics, alerts, and public trust
-            surfaces.
+            Fyxvo is building decentralized Solana RPC and relay infrastructure. The live devnet
+            product still runs on managed infrastructure today, with wallet authentication,
+            on-chain project activation, funded relay usage, scoped API keys, analytics, alerts,
+            and public trust surfaces already operating.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button asChild>
@@ -133,6 +137,102 @@ export default function DocsPage() {
               <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section id="network-architecture" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Network Architecture
+          </h2>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
+            Fyxvo is built as four cooperating layers. The on-chain Anchor program manages project
+            accounts, treasury state, and operator-registry state. The API control plane handles
+            wallet authentication, project management, funding, API keys, analytics, and alerts.
+            The relay gateway prices and routes JSON-RPC traffic through the node pool. The worker
+            handles async tasks such as billing rollups, notifications, digests, and background
+            operational jobs.
+          </p>
+          <div className="mt-8 grid gap-4 lg:grid-cols-4">
+            {[
+              {
+                title: "On-chain protocol",
+                body: "Anchor program for project accounts, treasury state, and operator registry on Solana devnet.",
+              },
+              {
+                title: "API control plane",
+                body: "Wallet auth, projects, funding, analytics, alerts, assistant workflows, and admin operations.",
+              },
+              {
+                title: "Relay gateway",
+                body: "Scoped API key enforcement, request pricing, balance checks, upstream routing, and request logging.",
+              },
+              {
+                title: "Worker",
+                body: "Async billing rollups, notifications, digests, indexing, and background reliability tasks.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
+              >
+                <h3 className="text-lg font-semibold text-[var(--fyxvo-text)]">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="operator-network" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Operator Network
+          </h2>
+          <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+            The live network still runs on managed infrastructure today. The protocol already
+            exposes an operator registry on devnet, but the current production path does not yet
+            onboard third-party operators directly into the live relay. That is the transition
+            Fyxvo is preparing for next.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+            As that operator phase opens up, the intended fee split routes 80 percent of request
+            fees to node operators, 10 percent to the protocol treasury, and 10 percent to the
+            infrastructure fund. Operators will register through onboarding flows that connect
+            infrastructure identity, performance visibility, and on-chain protocol state.
+          </p>
+        </div>
+      </section>
+
+      <section id="decentralization-roadmap" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Decentralization Roadmap
+          </h2>
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {[
+              {
+                title: "Phase one",
+                body: "Managed devnet infrastructure proves the funded relay model, control plane, and on-chain project lifecycle with real users.",
+              },
+              {
+                title: "Phase two",
+                body: "External operator onboarding expands the node pool beyond the team-managed setup and introduces operator-facing workflows.",
+              },
+              {
+                title: "Phase three",
+                body: "A governed open network moves authority and routing participation closer to the protocol and away from one managed signer model.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
+              >
+                <h3 className="text-lg font-semibold text-[var(--fyxvo-text)]">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

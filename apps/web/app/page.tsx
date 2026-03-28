@@ -14,9 +14,9 @@ import {
 } from "../lib/public-data";
 
 export const metadata: Metadata = {
-  title: "Fyxvo — Solana devnet control plane",
+  title: "Fyxvo — Solana RPC and relay infrastructure network",
   description:
-    "Fyxvo is a Solana devnet control plane for wallet auth, project activation, funded relay access, API keys, analytics, alerts, and public trust surfaces.",
+    "Fyxvo is building decentralized Solana RPC and relay infrastructure, with a managed devnet network live today as the first phase toward open operator participation.",
 };
 
 const CAPABILITIES = [
@@ -116,12 +116,13 @@ export default async function HomePage() {
               Devnet private alpha
             </div>
             <h1 className="mt-6 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-              The control plane for funded Solana traffic.
+              Building decentralized Solana RPC and relay infrastructure.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-              Fyxvo is not a generic RPC node. It is a Solana devnet control plane for wallet
-              authentication, on-chain project activation, SOL-funded relay access, scoped API
-              keys, analytics, alerts, assistant workflows, and public trust surfaces.
+              Fyxvo is live on devnet today with managed infrastructure, wallet-authenticated
+              project funding, and a real relay stack. That managed network is the first operating
+              phase on the path toward an open operator network for decentralized Solana RPC and
+              relay infrastructure.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Button asChild size="lg">

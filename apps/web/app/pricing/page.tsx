@@ -179,6 +179,22 @@ export default function PricingPage() {
       </section>
 
       <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            How fees are distributed
+          </h2>
+          <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+            The network economics are designed so request fees flow to the infrastructure that
+            carries the traffic. In the operator phase, 80 percent of every request fee goes to
+            node operators who route the traffic, 10 percent goes to the protocol treasury to fund
+            on-chain governance, and 10 percent goes to the infrastructure fund that supports
+            development and operations. The current devnet phase still runs on managed
+            infrastructure, but that split reflects the direction the network is being built for.
+          </p>
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">

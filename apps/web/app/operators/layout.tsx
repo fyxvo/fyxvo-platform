@@ -3,7 +3,7 @@ import { createPageMetadata } from "../../lib/metadata";
 
 export const metadata = createPageMetadata(
   "Operators",
-  "Understand what operator and authority information is public in the live Fyxvo devnet deployment."
+  "Learn how Fyxvo operator participation is evolving from managed devnet infrastructure toward an open node operator network."
 );
 
 export default function OperatorsLayout({ children }: { children: ReactNode }) {
