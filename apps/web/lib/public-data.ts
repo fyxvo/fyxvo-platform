@@ -174,6 +174,8 @@ export const protocolAddresses = {
   treasury: "HvgY6dGviH5xosaHvVBNKwt2gTTnJYJ9aG7dWC4wqST1",
   operatorRegistry: "9k4Xr4qfVMSN14aNkFdDFHbd74syujkyYcGKGTWYxmRQ",
   treasuryUsdcVault: "2epkxnyGfX6FPYRmPa2tystcd1UrvjYFR5wJh6uKZj5i",
+  managedOperatorWallet: "8TZ1Q5TqNmbDkza57ZssfmufMxX8hxoKV28uhWg4Qnph",
+  managedOperatorAccount: "5DnhYryvZAKWLY6kuzQKYrUdNBCskQ3oZgnrMmj6Fwi6",
   protocolAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
   pauseAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
 } as const;

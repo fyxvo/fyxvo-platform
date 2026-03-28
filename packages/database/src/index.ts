@@ -35,6 +35,7 @@ export type {
   Node,
   NodeHealthCheck,
   NodeOperator,
+  OperatorRegistration,
   OperatorRewardSnapshot,
   Project,
   Prisma as PrismaNamespace,

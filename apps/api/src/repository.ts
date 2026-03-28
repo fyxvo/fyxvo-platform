@@ -1,6 +1,9 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import {
   ApiKeyStatus,
+  NodeNetwork,
+  NodeOperatorStatus,
+  NodeStatus,
   Prisma,
   UserRole,
   type PrismaClientType,
@@ -26,6 +29,7 @@ import type {
   AuthenticatedUser,
   CreateFeedbackSubmissionInput,
   CreateInterestSubmissionInput,
+  CreateOperatorRegistrationInput,
   CreateApiKeyInput,
   CreateNotificationInput,
   CreateProjectInput,
@@ -65,6 +69,8 @@ import type {
   DailyRequestCount,
   AdminPlatformStats,
   NewsletterSubscriberList,
+  OperatorNetworkEntry,
+  OperatorRegistrationRecord,
   SearchResults
 } from "./types.js";
 
@@ -590,6 +596,177 @@ export class PrismaApiRepository implements ApiRepository {
         page: input.page ?? null
       }
     });
+  }
+
+  async createOperatorRegistration(input: CreateOperatorRegistrationInput): Promise<OperatorRegistrationRecord> {
+    return this.prisma.operatorRegistration.create({
+      data: {
+        endpoint: input.endpoint,
+        operatorWalletAddress: input.operatorWalletAddress,
+        name: input.name,
+        region: input.region,
+        contact: input.contact,
+        status: "pending"
+      }
+    });
+  }
+
+  async listOperatorRegistrationsByWallet(walletAddress: string): Promise<OperatorRegistrationRecord[]> {
+    return this.prisma.operatorRegistration.findMany({
+      where: {
+        operatorWalletAddress: walletAddress
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+  }
+
+  async getOperatorRegistrationById(id: string): Promise<OperatorRegistrationRecord | null> {
+    return this.prisma.operatorRegistration.findUnique({
+      where: { id }
+    });
+  }
+
+  async approveOperatorRegistration(id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const registration = await tx.operatorRegistration.findUnique({
+        where: { id }
+      });
+
+      if (!registration) {
+        throw new Error("Operator registration not found.");
+      }
+
+      const matchingOperators = await tx.nodeOperator.findMany({
+        where: {
+          OR: [
+            { walletAddress: registration.operatorWalletAddress },
+            { email: registration.contact }
+          ]
+        }
+      });
+
+      const operatorByWallet = matchingOperators.find(
+        (entry) => entry.walletAddress === registration.operatorWalletAddress
+      );
+      const operatorByEmail = matchingOperators.find((entry) => entry.email === registration.contact);
+
+      if (operatorByWallet && operatorByEmail && operatorByWallet.id !== operatorByEmail.id) {
+        throw new Error("The registration conflicts with an existing operator record.");
+      }
+
+      const operator =
+        operatorByWallet ??
+        operatorByEmail ??
+        (await tx.nodeOperator.create({
+          data: {
+            name: registration.name,
+            email: registration.contact,
+            walletAddress: registration.operatorWalletAddress,
+            status: NodeOperatorStatus.ACTIVE
+          }
+        }));
+
+      const ensuredOperator =
+        operatorByWallet || operatorByEmail
+          ? await tx.nodeOperator.update({
+              where: { id: operator.id },
+              data: {
+                name: registration.name,
+                email: registration.contact,
+                walletAddress: registration.operatorWalletAddress,
+                status: NodeOperatorStatus.ACTIVE
+              }
+            })
+          : operator;
+
+      const existingNode = await tx.node.findUnique({
+        where: { endpoint: registration.endpoint }
+      });
+
+      const nodeName = registration.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "fyxvo-operator-node";
+      const node =
+        existingNode
+          ? await tx.node.update({
+              where: { id: existingNode.id },
+              data: {
+                operatorId: ensuredOperator.id,
+                name: nodeName,
+                network: NodeNetwork.DEVNET,
+                endpoint: registration.endpoint,
+                region: registration.region,
+                status: NodeStatus.ONLINE
+              }
+            })
+          : await tx.node.create({
+              data: {
+                operatorId: ensuredOperator.id,
+                name: nodeName,
+                network: NodeNetwork.DEVNET,
+                endpoint: registration.endpoint,
+                region: registration.region,
+                status: NodeStatus.ONLINE
+              }
+            });
+
+      const approvedRegistration = await tx.operatorRegistration.update({
+        where: { id: registration.id },
+        data: {
+          status: "approved",
+          rejectionReason: null,
+          approvedAt: new Date()
+        }
+      });
+
+      return {
+        registration: approvedRegistration,
+        operator: ensuredOperator,
+        node
+      };
+    });
+  }
+
+  async rejectOperatorRegistration(id: string, reason?: string | null): Promise<OperatorRegistrationRecord | null> {
+    const existing = await this.prisma.operatorRegistration.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    return this.prisma.operatorRegistration.update({
+      where: { id },
+      data: {
+        status: "rejected",
+        rejectionReason: reason ?? null
+      }
+    });
+  }
+
+  async listActiveOperatorNetwork(): Promise<OperatorNetworkEntry[]> {
+    const nodes = await this.prisma.node.findMany({
+      where: {
+        network: NodeNetwork.DEVNET,
+        status: {
+          in: [NodeStatus.ONLINE, NodeStatus.DEGRADED]
+        }
+      },
+      include: {
+        operator: true
+      },
+      orderBy: [
+        { createdAt: "asc" },
+        { name: "asc" }
+      ]
+    });
+
+    return nodes.map((node) => ({
+      name: node.operator.name,
+      region: node.region,
+      endpointHost: new URL(node.endpoint).hostname
+    }));
   }
 
   async revokeApiKey(projectId: string, apiKeyId: string) {

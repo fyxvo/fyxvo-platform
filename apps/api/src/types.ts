@@ -7,6 +7,7 @@ import type {
   IdempotencyRecord,
   Node,
   NodeOperator,
+  OperatorRegistration,
   Project,
   RequestLog,
   User
@@ -142,6 +143,14 @@ export interface CreateFeedbackSubmissionInput {
   readonly message: string;
   readonly source: string;
   readonly page?: string | null;
+}
+
+export interface CreateOperatorRegistrationInput {
+  readonly endpoint: string;
+  readonly operatorWalletAddress: string;
+  readonly name: string;
+  readonly region: string;
+  readonly contact: string;
 }
 
 export type LaunchEventName =
@@ -554,6 +563,20 @@ export interface OperatorSummary {
   >;
 }
 
+export type OperatorRegistrationRecord = OperatorRegistration;
+
+export interface OperatorNetworkEntry {
+  readonly name: string;
+  readonly region: string;
+  readonly endpointHost: string;
+}
+
+export interface OperatorNetworkSummary {
+  readonly activeOperatorCount: number;
+  readonly operators: OperatorNetworkEntry[];
+  readonly totalRegistered: number;
+}
+
 export interface FundingHistoryItem {
   readonly id: string;
   readonly projectId: string;
@@ -866,6 +889,16 @@ export interface ApiRepository {
   createApiKey(input: CreateApiKeyInput): Promise<ApiKeyRecord>;
   createInterestSubmission(input: CreateInterestSubmissionInput): Promise<InterestSubmission>;
   createFeedbackSubmission(input: CreateFeedbackSubmissionInput): Promise<FeedbackSubmission>;
+  createOperatorRegistration(input: CreateOperatorRegistrationInput): Promise<OperatorRegistrationRecord>;
+  listOperatorRegistrationsByWallet(walletAddress: string): Promise<OperatorRegistrationRecord[]>;
+  getOperatorRegistrationById(id: string): Promise<OperatorRegistrationRecord | null>;
+  approveOperatorRegistration(id: string): Promise<{
+    readonly registration: OperatorRegistrationRecord;
+    readonly operator: NodeOperator;
+    readonly node: Node;
+  }>;
+  rejectOperatorRegistration(id: string, reason?: string | null): Promise<OperatorRegistrationRecord | null>;
+  listActiveOperatorNetwork(): Promise<OperatorNetworkEntry[]>;
   revokeApiKey(projectId: string, apiKeyId: string): Promise<ApiKeyRecord | null>;
   saveFundingCoordinate(input: FundingRecordInput): Promise<FundingCoordinate>;
   findFundingCoordinate(fundingRequestId: string): Promise<FundingCoordinate | null>;

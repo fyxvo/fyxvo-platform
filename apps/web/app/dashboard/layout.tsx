@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { DashboardShell } from "../../components/dashboard-shell";
 import { createPageMetadata } from "../../lib/metadata";
 
 export const metadata = createPageMetadata(
@@ -7,5 +8,5 @@ export const metadata = createPageMetadata(
 );
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return children;
+  return <DashboardShell>{children}</DashboardShell>;
 }

@@ -41,6 +41,22 @@ enum NodeStatus {
   DECOMMISSIONED
 }
 
+model OperatorRegistration {
+  id                    String   @id @default(uuid()) @db.Uuid
+  endpoint              String
+  operatorWalletAddress String
+  name                  String
+  region                String
+  contact               String
+  status                String   @default("pending")
+  rejectionReason       String?
+  createdAt             DateTime @default(now())
+  approvedAt            DateTime?
+
+  @@index([operatorWalletAddress, createdAt])
+  @@index([status, createdAt])
+}
+
 enum NodeNetwork {
   DEVNET
   TESTNET

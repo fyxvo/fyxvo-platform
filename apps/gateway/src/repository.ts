@@ -78,7 +78,8 @@ function startOfUtcMonth(date = new Date()) {
 export class PrismaGatewayRepository implements GatewayRepository {
   constructor(
     private readonly prisma: PrismaClientType,
-    private readonly cluster: "devnet"
+    private readonly cluster: "devnet",
+    private readonly fallbackUpstreamUrls: readonly string[] = []
   ) {}
 
   async findProjectAccessByApiKey(apiKey: string): Promise<ProjectAccessContext | null> {
@@ -168,15 +169,28 @@ export class PrismaGatewayRepository implements GatewayRepository {
       }
     });
 
-    return nodes.map((node: DatabaseNode & { operator: { name: string } }) => ({
-      id: node.id,
-      projectId: node.projectId,
-      name: node.name,
-      endpoint: node.endpoint,
-      region: node.region,
-      status: node.status,
-      lastHeartbeatAt: node.lastHeartbeatAt,
-      operatorName: node.operator.name
+    if (nodes.length > 0) {
+      return nodes.map((node: DatabaseNode & { operator: { name: string } }) => ({
+        id: node.id,
+        projectId: node.projectId,
+        name: node.name,
+        endpoint: node.endpoint,
+        region: node.region,
+        status: node.status,
+        lastHeartbeatAt: node.lastHeartbeatAt,
+        operatorName: node.operator.name
+      }));
+    }
+
+    return this.fallbackUpstreamUrls.map((endpoint, index) => ({
+      id: `managed-fallback-${index + 1}`,
+      projectId: null,
+      name: `managed-upstream-${index + 1}`,
+      endpoint,
+      region: "managed",
+      status: NodeStatus.ONLINE,
+      lastHeartbeatAt: null,
+      operatorName: "Managed infrastructure"
     }));
   }
 

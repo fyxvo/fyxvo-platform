@@ -1193,7 +1193,11 @@ export async function buildProductionGatewayApp(input: {
   readonly env: GatewayEnv;
   readonly prismaClient?: PrismaClientType;
 }) {
-  const repository = new PrismaGatewayRepository(input.prismaClient ?? prisma, input.env.SOLANA_CLUSTER);
+  const repository = new PrismaGatewayRepository(
+    input.prismaClient ?? prisma,
+    input.env.SOLANA_CLUSTER,
+    input.env.GATEWAY_UPSTREAM_RPC_URLS
+  );
   const stateStore = new RedisGatewayStateStore({
     url: input.env.REDIS_URL,
     prefix: input.env.GATEWAY_REDIS_PREFIX

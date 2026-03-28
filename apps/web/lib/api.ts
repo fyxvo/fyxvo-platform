@@ -30,6 +30,8 @@ import type {
   ProjectRequestTrace,
   PublicProjectProfile,
   InviteMetadata,
+  OperatorNetworkSummary,
+  OperatorRegistration,
   ReferralStats,
   SearchResults,
   SupportTicket,
@@ -682,6 +684,30 @@ export async function confirmEmailVerification(token: string): Promise<{ success
     method: "POST",
     body: JSON.stringify({ token }),
   });
+}
+
+export async function registerOperator(params: {
+  endpoint: string;
+  operatorWalletAddress: string;
+  name: string;
+  region: string;
+  contact: string;
+}): Promise<{ item: OperatorRegistration }> {
+  return apiFetch<{ item: OperatorRegistration }>("/v1/operators/register", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getOperatorNetwork(): Promise<OperatorNetworkSummary> {
+  return apiFetch<OperatorNetworkSummary>("/v1/operators/network");
+}
+
+export async function getMyOperatorRegistrations(token: string): Promise<OperatorRegistration[]> {
+  const response = await apiFetch<{ items: OperatorRegistration[] }>("/v1/operators/my-registration", {
+    token
+  });
+  return response.items;
 }
 
 export async function getInviteMetadata(token: string): Promise<InviteMetadata> {

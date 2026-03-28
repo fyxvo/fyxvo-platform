@@ -378,6 +378,31 @@ export interface Operator {
   registeredAt: string;
 }
 
+export interface OperatorRegistration {
+  id: string;
+  endpoint: string;
+  operatorWalletAddress: string;
+  name: string;
+  region: string;
+  contact: string;
+  status: "pending" | "approved" | "rejected" | string;
+  rejectionReason?: string | null;
+  createdAt: string;
+  approvedAt?: string | null;
+}
+
+export interface OperatorNetworkEntry {
+  name: string;
+  region: string;
+  endpointHost: string;
+}
+
+export interface OperatorNetworkSummary {
+  activeOperatorCount: number;
+  operators: OperatorNetworkEntry[];
+  totalRegistered: number;
+}
+
 // ─── Assistant ────────────────────────────────────────────────────────────────
 
 export interface AssistantConversation {

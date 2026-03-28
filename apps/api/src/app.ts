@@ -296,6 +296,22 @@ const createFeedbackSubmissionSchema = z.object({
   walletAddress: z.string().trim().min(32).optional()
 });
 
+const createOperatorRegistrationSchema = z.object({
+  endpoint: z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => value.startsWith("https://"), "Operator endpoint must use HTTPS."),
+  operatorWalletAddress: z.string().trim().min(32).max(64),
+  name: z.string().trim().min(2).max(120),
+  region: z.string().trim().min(2).max(40),
+  contact: z.string().trim().email().max(320)
+});
+
+const operatorRegistrationActionSchema = z.object({
+  reason: z.string().trim().min(2).max(500).optional()
+});
+
 const createLaunchEventSchema = z.object({
   name: z.enum([
     "landing_cta_clicked",
@@ -2106,6 +2122,89 @@ export async function buildApiApp(input: {
     });
   });
 
+  app.post("/v1/operators/register", async (request, reply) => {
+    const body = createOperatorRegistrationSchema.parse(request.body);
+    ensureWalletAddress(body.operatorWalletAddress);
+
+    const registration = await input.repository.createOperatorRegistration({
+      endpoint: body.endpoint,
+      operatorWalletAddress: body.operatorWalletAddress,
+      name: body.name,
+      region: body.region,
+      contact: body.contact
+    });
+
+    await input.repository.createFeedbackSubmission({
+      name: body.name,
+      email: body.contact,
+      role: "Node operator",
+      walletAddress: body.operatorWalletAddress,
+      category: "PRODUCT_FEEDBACK",
+      message: [
+        "Operator registration submitted.",
+        `Endpoint: ${body.endpoint}`,
+        `Wallet: ${body.operatorWalletAddress}`,
+        `Region: ${body.region}`,
+        `Contact: ${body.contact}`,
+        `Registration ID: ${registration.id}`
+      ].join("\n"),
+      source: "operator-registration",
+      page: "/operators"
+    });
+
+    if (
+      input.env.EMAIL_REPLY_TO &&
+      isEmailDeliveryEnabled({ apiKey: input.env.RESEND_API_KEY, from: input.env.EMAIL_FROM })
+    ) {
+      void deliverEmail({
+        to: input.env.EMAIL_REPLY_TO,
+        subject: `[Fyxvo operators] Pending registration ${registration.name}`,
+        text: [
+          "A new operator registration has been submitted.",
+          `Registration ID: ${registration.id}`,
+          `Name: ${registration.name}`,
+          `Endpoint: ${registration.endpoint}`,
+          `Wallet: ${registration.operatorWalletAddress}`,
+          `Region: ${registration.region}`,
+          `Contact: ${registration.contact}`
+        ].join("\n"),
+        html:
+          `<div style="font-family:Inter,system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f172a;">` +
+          `<h1 style="font-size:24px;line-height:1.2;margin:0 0 16px;">New operator registration</h1>` +
+          `<p style="font-size:15px;line-height:1.7;margin:0 0 16px;">A new operator submitted a node for review.</p>` +
+          `<p style="font-size:14px;line-height:1.7;margin:0;"><strong>Registration ID:</strong> ${registration.id}</p>` +
+          `<p style="font-size:14px;line-height:1.7;margin:0;"><strong>Name:</strong> ${registration.name}</p>` +
+          `<p style="font-size:14px;line-height:1.7;margin:0;"><strong>Endpoint:</strong> ${registration.endpoint}</p>` +
+          `<p style="font-size:14px;line-height:1.7;margin:0;"><strong>Wallet:</strong> ${registration.operatorWalletAddress}</p>` +
+          `<p style="font-size:14px;line-height:1.7;margin:0;"><strong>Region:</strong> ${registration.region}</p>` +
+          `<p style="font-size:14px;line-height:1.7;margin:0;"><strong>Contact:</strong> ${registration.contact}</p>` +
+          `</div>`
+      }).catch(() => undefined);
+    }
+
+    return reply.status(201).send({
+      item: serializeForJson(registration)
+    });
+  });
+
+  app.get("/v1/operators/network", async () => {
+    const [operators, readiness] = await Promise.all([
+      input.repository.listActiveOperatorNetwork(),
+      input.blockchain.getProtocolReadiness().catch(() => null)
+    ]);
+
+    const totalRegistered =
+      readiness?.operatorRegistry?.totalRegistered !== undefined
+        ? Number(readiness.operatorRegistry.totalRegistered)
+        : 0;
+
+    return {
+      activeOperatorCount: operators.length,
+      operators,
+      totalRegistered
+    };
+  });
+
   app.post("/v1/feedback", async (request, reply) => {
     const body = createFeedbackSubmissionSchema.parse(request.body);
 
@@ -3268,6 +3367,44 @@ export async function buildApiApp(input: {
     requireAdmin(user);
     return {
       items: await input.repository.listOperators()
+    };
+  });
+
+  app.post("/v1/admin/operators/:registrationId/approve", async (request, reply) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const { registrationId } = z.object({ registrationId: z.string().uuid() }).parse(request.params);
+
+    try {
+      const approved = await input.repository.approveOperatorRegistration(registrationId);
+      return reply.status(201).send({
+        item: serializeForJson({
+          registration: approved.registration,
+          operatorId: approved.operator.id,
+          nodeId: approved.node.id,
+          nodeStatus: approved.node.status
+        })
+      });
+    } catch (error) {
+      throw new HttpError(
+        404,
+        "operator_registration_not_found",
+        error instanceof Error ? error.message : "Operator registration could not be approved."
+      );
+    }
+  });
+
+  app.post("/v1/admin/operators/:registrationId/reject", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    const { registrationId } = z.object({ registrationId: z.string().uuid() }).parse(request.params);
+    const body = operatorRegistrationActionSchema.parse(request.body ?? {});
+    const rejected = await input.repository.rejectOperatorRegistration(registrationId, body.reason ?? null);
+    if (!rejected) {
+      throw new HttpError(404, "operator_registration_not_found", "Operator registration not found.");
+    }
+    return {
+      item: serializeForJson(rejected)
     };
   });
 
@@ -5585,6 +5722,12 @@ ${liveContextLines.join("\n")}
     if (user.role !== "ADMIN" && user.role !== "OWNER") throw new HttpError(403, "forbidden", "Admin access required.");
     const items = await input.repository.getOperatorActivity(20);
     return { items };
+  });
+
+  app.get("/v1/operators/my-registration", async (request) => {
+    const user = requireUser(request);
+    const items = await input.repository.listOperatorRegistrationsByWallet(user.walletAddress);
+    return { items: serializeForJson(items) };
   });
 
   app.get("/v1/operators/daily-requests", async (request) => {
