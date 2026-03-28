@@ -1,18 +1,15 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import bs58 from "bs58";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createApiKey as apiCreateApiKey,
-  createAuthChallenge,
   listProjects,
   prepareFunding as apiPrepareFunding,
-  verifyWalletSession,
 } from "../lib/api";
 import { PortalContext, type WalletPhase } from "../lib/portal-context";
 import type { FundingPreparation, PortalApiKey, PortalProject, PortalUser } from "../lib/types";
-import { WalletProvider } from "./wallet-provider";
+import { authenticateWallet } from "../lib/wallet-auth";
 
 interface PortalProviderInnerProps {
   children: ReactNode;
@@ -20,6 +17,9 @@ interface PortalProviderInnerProps {
 
 function PortalProviderInner({ children }: PortalProviderInnerProps) {
   const wallet = useWallet();
+  const connectedWalletAddress = wallet.publicKey?.toBase58() ?? null;
+  const selectedWalletName = wallet.wallet?.adapter.name;
+  const signMessage = wallet.signMessage;
 
   const [walletPhase, setWalletPhase] = useState<WalletPhase>("disconnected");
   const [token, setToken] = useState<string | null>(null);
@@ -30,6 +30,7 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
   const [selectedProject, setSelectedProject] = useState<PortalProject | null>(null);
   const [apiKeys, setApiKeys] = useState<PortalApiKey[]>([]);
   const [fundingPreparation, setFundingPreparation] = useState<FundingPreparation | null>(null);
+  const authenticatingWalletAddressRef = useRef<string | null>(null);
 
   // Select first project by default when projects load
   useEffect(() => {
@@ -38,55 +39,26 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
     }
   }, [projects, selectedProject]);
 
+  const loadProjects = useCallback(async (sessionToken: string) => {
+    const loadedProjects = await listProjects(sessionToken);
+    setProjects(loadedProjects);
+    setSelectedProject((current) => {
+      if (!current) {
+        return loadedProjects[0] ?? null;
+      }
+
+      return loadedProjects.find((project) => project.id === current.id) ?? loadedProjects[0] ?? null;
+    });
+  }, []);
+
   const connectWallet = useCallback(
     async (walletName: string) => {
       try {
         setWalletPhase("connecting");
         setAuthError(null);
         setNetworkMismatch(false);
-
-        // Select the wallet
         wallet.select(walletName as Parameters<typeof wallet.select>[0]);
-
-        // Connect
         await wallet.connect();
-
-        // Get public key
-        const pk = wallet.publicKey ?? wallet.wallet?.adapter?.publicKey;
-        if (!pk) throw new Error("No public key after connect");
-        const walletAddress = pk.toBase58();
-
-        // Ensure Phantom is on devnet if applicable
-        if (walletName === "Phantom") {
-          const { ensureInjectedPhantomDevnet } = await import("../lib/phantom");
-          const onDevnet = await ensureInjectedPhantomDevnet();
-          if (!onDevnet) {
-            setNetworkMismatch(true);
-          }
-        }
-
-        setWalletPhase("authenticating");
-
-        // Challenge → sign → verify
-        const challenge = await createAuthChallenge(walletAddress);
-        const encoded = new TextEncoder().encode(challenge.message);
-
-        if (!wallet.signMessage) throw new Error("Wallet does not support signMessage");
-        const signatureBytes = await wallet.signMessage(encoded);
-        const signature = bs58.encode(signatureBytes);
-
-        const session = await verifyWalletSession({ walletAddress, message: challenge.message, signature });
-
-        setToken(session.token);
-        setUser(session.user);
-        setWalletPhase("authenticated");
-
-        // Load projects
-        const loadedProjects = await listProjects(session.token);
-        setProjects(loadedProjects);
-        if (loadedProjects.length > 0) {
-          setSelectedProject(loadedProjects[0]!);
-        }
       } catch (err) {
         setWalletPhase("error");
         setAuthError(err instanceof Error ? err.message : "Authentication failed");
@@ -94,6 +66,103 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
     },
     [wallet]
   );
+
+  useEffect(() => {
+    const walletAddress = connectedWalletAddress;
+
+    if (!wallet.connected || !walletAddress) {
+      return;
+    }
+
+    if (!signMessage) {
+      setWalletPhase("error");
+      setAuthError("This wallet does not support message signing.");
+      return;
+    }
+
+    if (
+      walletPhase === "authenticated" &&
+      token &&
+      user?.walletAddress === walletAddress
+    ) {
+      return;
+    }
+
+    if (authenticatingWalletAddressRef.current === walletAddress) {
+      return;
+    }
+
+    setWalletPhase("authenticating");
+    setAuthError(null);
+    authenticatingWalletAddressRef.current = walletAddress;
+
+    void (async () => {
+      try {
+        if (selectedWalletName === "Phantom") {
+          const { ensureInjectedPhantomDevnet } = await import("../lib/phantom");
+          const onDevnet = await ensureInjectedPhantomDevnet();
+          if (authenticatingWalletAddressRef.current === walletAddress) {
+            setNetworkMismatch(!onDevnet);
+          }
+        } else if (authenticatingWalletAddressRef.current === walletAddress) {
+          setNetworkMismatch(false);
+        }
+
+        const session = await authenticateWallet({
+          walletAddress,
+          signMessage: async (message) => {
+            const signature = await signMessage?.(message);
+            if (!signature) {
+              throw new Error("Wallet signature was not returned.");
+            }
+            return signature;
+          },
+        });
+
+        if (authenticatingWalletAddressRef.current !== walletAddress) return;
+
+        setToken(session.token);
+        setUser(session.user);
+        await loadProjects(session.token);
+        if (authenticatingWalletAddressRef.current !== walletAddress) return;
+        setWalletPhase("authenticated");
+      } catch (err) {
+        if (authenticatingWalletAddressRef.current !== walletAddress) return;
+        setWalletPhase("error");
+        setAuthError(err instanceof Error ? err.message : "Authentication failed");
+      } finally {
+        if (authenticatingWalletAddressRef.current === walletAddress) {
+          authenticatingWalletAddressRef.current = null;
+        }
+      }
+    })();
+  }, [
+    loadProjects,
+    token,
+    user?.walletAddress,
+    wallet.connected,
+    connectedWalletAddress,
+    selectedWalletName,
+    signMessage,
+    walletPhase,
+  ]);
+
+  useEffect(() => {
+    if (wallet.connected || connectedWalletAddress) {
+      return;
+    }
+
+    setWalletPhase("disconnected");
+    setToken(null);
+    setUser(null);
+    setProjects([]);
+    setSelectedProject(null);
+    setApiKeys([]);
+    setFundingPreparation(null);
+    setNetworkMismatch(false);
+    setAuthError(null);
+    authenticatingWalletAddressRef.current = null;
+  }, [connectedWalletAddress, wallet.connected]);
 
   const disconnectWallet = useCallback(async () => {
     await wallet.disconnect();
@@ -104,6 +173,9 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
     setSelectedProject(null);
     setNetworkMismatch(false);
     setAuthError(null);
+    setApiKeys([]);
+    setFundingPreparation(null);
+    authenticatingWalletAddressRef.current = null;
   }, [wallet]);
 
   const prepareFunding = useCallback(
@@ -180,9 +252,5 @@ export interface PortalProviderProps {
 }
 
 export function PortalProvider({ children }: PortalProviderProps) {
-  return (
-    <WalletProvider>
-      <PortalProviderInner>{children}</PortalProviderInner>
-    </WalletProvider>
-  );
+  return <PortalProviderInner>{children}</PortalProviderInner>;
 }

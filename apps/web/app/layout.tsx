@@ -8,12 +8,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Fyxvo — Solana RPC & Priority Relay",
+    default: "Fyxvo - Solana devnet control plane",
     template: "%s | Fyxvo",
   },
   description:
-    "Fyxvo provides high-performance RPC infrastructure and priority relay for Solana applications.",
-  metadataBase: new URL("https://fyxvo.com"),
+    "Fyxvo is a Solana devnet control plane for funded relay access, on-chain project activation, API keys, analytics, alerts, and assistant-guided operations.",
+  metadataBase: new URL("https://www.fyxvo.com"),
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {

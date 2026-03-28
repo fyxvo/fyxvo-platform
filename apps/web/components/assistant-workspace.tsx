@@ -101,13 +101,14 @@ function MessageBubble({ message }: { message: Message }) {
 }
 
 export function AssistantWorkspace() {
-  const { token, walletPhase } = usePortal();
+  const { token, walletPhase, selectedProject, projects } = usePortal();
   const isAuthenticated = walletPhase === "authenticated" && !!token;
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Load latest conversation when authenticated
@@ -133,17 +134,29 @@ export function AssistantWorkspace() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || streaming || !token) return;
+    if (!input.trim() || streaming) return;
+    if (!token) {
+      setSendError("Authenticate with a wallet before sending assistant messages.");
+      return;
+    }
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: "user",
       content: input.trim(),
     };
+    const outgoingMessages = [
+      ...messages.filter((message) => message.content.trim().length > 0),
+      userMessage,
+    ].map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
 
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setStreaming(true);
+    setSendError(null);
 
     const assistantMessageId = `assistant-${Date.now()}`;
     setMessages((prev) => [
@@ -159,8 +172,15 @@ export function AssistantWorkspace() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          message: userMessage.content,
           conversationId: conversationId ?? undefined,
+          messages: outgoingMessages,
+          projectContext: selectedProject
+            ? {
+                projectId: selectedProject.id,
+                projectName: selectedProject.name,
+                projectNames: projects.map((project) => project.name),
+              }
+            : undefined,
         }),
       });
 
@@ -175,6 +195,7 @@ export function AssistantWorkspace() {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let streamCompleted = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -188,6 +209,8 @@ export function AssistantWorkspace() {
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") {
+              streamCompleted = true;
+              setStreaming(false);
               reader.cancel();
               break;
             }
@@ -208,7 +231,12 @@ export function AssistantWorkspace() {
           }
         }
       }
+
+      if (!streamCompleted) {
+        setStreaming(false);
+      }
     } catch {
+      setSendError("Assistant request failed. Please try again.");
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantMessageId
@@ -259,6 +287,9 @@ export function AssistantWorkspace() {
       {/* Composer */}
       {isAuthenticated ? (
         <div className="flex flex-col gap-2">
+          {sendError ? (
+            <p className="text-sm text-rose-400">{sendError}</p>
+          ) : null}
           <div className="flex gap-2">
             <textarea
               aria-label="Message Fyxvo Assistant"

@@ -1,21 +1,24 @@
 const ENTRIES = [
   {
+    date: "2026-03-28",
+    version: "alpha-live",
+    title: "Hosted devnet private alpha",
+    description:
+      "Web, API, gateway, worker, wallet auth, project activation, funding, analytics, alerts, and assistant surfaces are running together as one hosted product.",
+  },
+  {
+    date: "2026-03-27",
+    version: "pricing-published",
+    title: "Lamport-based request pricing",
+    description:
+      "Pricing is now clearly framed around funded usage: 1,000 lamports for standard RPC, 3,000 for compute-heavy methods, and 5,000 for priority relay.",
+  },
+  {
     date: "2026-03-26",
-    version: "v0.9.0",
-    title: "Priority Relay GA",
-    description: "Priority relay is now generally available for all projects.",
-  },
-  {
-    date: "2026-02-15",
-    version: "v0.8.0",
-    title: "Fyxvo Assistant",
-    description: "Introducing the AI assistant for onboarding, debugging, and project insights.",
-  },
-  {
-    date: "2026-01-10",
-    version: "v0.7.0",
-    title: "On-chain Treasury",
-    description: "Projects can now fund their treasury directly on-chain.",
+    version: "trust-surfaces",
+    title: "Public trust surfaces online",
+    description:
+      "Status, security, reliability, explore, leaderboard, and public project surfaces are now treated as first-class parts of the product contract.",
   },
 ];
 
@@ -24,7 +27,7 @@ export default function ChangelogPage() {
     <div className="mx-auto max-w-3xl px-4 py-16">
       <h1 className="text-3xl font-bold tracking-tight text-[var(--fyxvo-text)]">Changelog</h1>
       <p className="mt-4 text-[var(--fyxvo-text-muted)]">
-        What&apos;s new in Fyxvo.
+        Milestones for the live devnet rollout.
       </p>
       <div className="mt-10 space-y-8">
         {ENTRIES.map((entry) => (

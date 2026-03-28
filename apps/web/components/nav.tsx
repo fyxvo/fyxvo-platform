@@ -20,11 +20,13 @@ function useMounted() {
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/explore", label: "Explore" },
+  { href: "/dashboard", label: "Workspace" },
   { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/explore", label: "Explore" },
+  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/status", label: "Status" },
+  { href: "/updates", label: "Updates" },
   { href: "/enterprise", label: "Enterprise" },
   { href: "/contact", label: "Contact" },
 ];
@@ -42,13 +44,18 @@ export function Nav() {
       style={{ height: 64 }}
     >
       <div className="mx-auto flex h-full max-w-7xl items-center gap-4 px-4 sm:px-6">
-        {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <Image src="/brand/logo.png" width={32} height={32} alt="Fyxvo" />
-          <span className="font-display text-lg font-bold text-[var(--fyxvo-brand)]">Fyxvo</span>
+          <div className="flex flex-col">
+            <span className="font-display text-lg font-bold leading-none text-[var(--fyxvo-brand)]">
+              Fyxvo
+            </span>
+            <span className="hidden text-[10px] uppercase tracking-[0.18em] text-[var(--fyxvo-text-muted)] sm:block">
+              Devnet control plane
+            </span>
+          </div>
         </Link>
 
-        {/* Center links – hidden on mobile */}
         <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
           {NAV_LINKS.map((link) => (
             <Link
@@ -66,7 +73,6 @@ export function Nav() {
           ))}
         </nav>
 
-        {/* Right side */}
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
@@ -89,7 +95,6 @@ export function Nav() {
             <WalletConnectButton />
           ) : null}
 
-          {/* Hamburger – mobile only */}
           <button
             type="button"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
@@ -116,7 +121,6 @@ export function Nav() {
         </div>
       </div>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden border-t border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] px-4 py-4">
           <div className="flex flex-col gap-1">

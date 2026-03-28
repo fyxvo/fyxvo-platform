@@ -53,18 +53,50 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 const walletMocks = vi.hoisted(() => {
+  const subscribers = new Set<() => void>();
+  let snapshot = {
+    connected: false,
+    selectedWalletName: "Phantom",
+  };
+  const updateSnapshot = () => {
+    snapshot = {
+      connected: state.connected,
+      selectedWalletName: state.selectedWalletName,
+    };
+  };
+  const notify = () => {
+    updateSnapshot();
+    subscribers.forEach((callback) => callback());
+  };
   const state = {
     connected: false,
     selectedWalletName: "Phantom",
+    reset: () => {
+      state.connected = false;
+      state.selectedWalletName = "Phantom";
+      snapshot = {
+        connected: false,
+        selectedWalletName: "Phantom",
+      };
+      subscribers.clear();
+    },
+    subscribe: (callback: () => void) => {
+      subscribers.add(callback);
+      return () => subscribers.delete(callback);
+    },
+    snapshot: () => snapshot,
     confirmTransaction: vi.fn(async () => ({ value: { err: null } })),
     connect: vi.fn(async () => {
       state.connected = true;
+      notify();
     }),
     disconnect: vi.fn(async () => {
       state.connected = false;
+      notify();
     }),
     select: vi.fn((name: string) => {
       state.selectedWalletName = name;
+      notify();
     }),
     signMessage: vi.fn(async () => new Uint8Array([1, 2, 3])),
     sendTransaction: vi.fn(async () => "5W6d7uQk2p"),
@@ -139,7 +171,13 @@ vi.mock("@solana/wallet-adapter-react", () => ({
     }
   }),
   useWallet: () => {
-    const publicKey = walletMocks.connected
+    const walletState = React.useSyncExternalStore(
+      walletMocks.subscribe,
+      walletMocks.snapshot,
+      walletMocks.snapshot
+    );
+
+    const publicKey = walletState.connected
       ? {
           toBase58: () => previewProjects[0]!.owner.walletAddress
         }
@@ -148,8 +186,11 @@ vi.mock("@solana/wallet-adapter-react", () => ({
     const makeWallet = (name: string) => ({
       adapter: {
         name,
+        icon: `data:image/svg+xml;base64,${btoa(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" rx="8" fill="#f97316"/><text x="16" y="20" font-size="12" text-anchor="middle" fill="white">${name.slice(0, 1)}</text></svg>`
+        )}`,
         get publicKey() {
-          return walletMocks.connected
+          return walletState.connected
             ? {
                 toBase58: () => previewProjects[0]!.owner.walletAddress
               }
@@ -159,7 +200,7 @@ vi.mock("@solana/wallet-adapter-react", () => ({
       readyState: "Installed"
     });
 
-    const selectedWallet = makeWallet(walletMocks.selectedWalletName);
+    const selectedWallet = makeWallet(walletState.selectedWalletName);
 
     return {
       connect: walletMocks.connect,
@@ -168,13 +209,15 @@ vi.mock("@solana/wallet-adapter-react", () => ({
       wallets: [
         selectedWallet,
         makeWallet("Solflare"),
-        makeWallet("Backpack")
+        makeWallet("Backpack"),
+        makeWallet("Coinbase Wallet"),
+        makeWallet("Trust"),
       ],
       wallet: selectedWallet,
       select: walletMocks.select,
       signMessage: walletMocks.signMessage,
       sendTransaction: walletMocks.sendTransaction,
-      connected: walletMocks.connected
+      connected: walletState.connected
     };
   }
 }));
@@ -236,8 +279,7 @@ async function connectAuthenticatedWallet() {
 
 beforeEach(() => {
   localStorage.clear();
-  walletMocks.connected = false;
-  walletMocks.selectedWalletName = "Phantom";
+  walletMocks.reset();
   Object.assign(navigator, {
     clipboard: {
       writeText: vi.fn().mockResolvedValue(undefined)
@@ -495,7 +537,7 @@ describe("frontend flows", () => {
 
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : String(input.url);
-      if (url.includes("/v1/assistant/chat")) {
+      if (url.includes("/v1/assistant/chat") || url.includes("/api/assistant")) {
         return new Response(streamedResponse, {
           status: 200,
           headers: {

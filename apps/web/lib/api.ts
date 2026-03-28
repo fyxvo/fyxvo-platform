@@ -68,7 +68,8 @@ export async function verifyWalletSession(params: {
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
 export async function listProjects(token: string): Promise<PortalProject[]> {
-  return apiFetch<PortalProject[]>("/v1/projects", { token });
+  const response = await apiFetch<{ items: PortalProject[] }>("/v1/projects", { token });
+  return response.items;
 }
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
@@ -77,9 +78,13 @@ export async function listApiKeys(params: {
   projectId: string;
   token: string;
 }): Promise<PortalApiKey[]> {
-  return apiFetch<PortalApiKey[]>(`/v1/projects/${params.projectId}/api-keys`, {
-    token: params.token,
-  });
+  const response = await apiFetch<{ items: PortalApiKey[] }>(
+    `/v1/projects/${params.projectId}/api-keys`,
+    {
+      token: params.token,
+    }
+  );
+  return response.items;
 }
 
 export async function createApiKey(params: {
@@ -102,8 +107,8 @@ export async function revokeApiKey(params: {
   keyId: string;
   token: string;
 }): Promise<void> {
-  await apiFetch<void>(`/v1/projects/${params.projectId}/api-keys/${params.keyId}/revoke`, {
-    method: "POST",
+  await apiFetch<void>(`/v1/projects/${params.projectId}/api-keys/${params.keyId}`, {
+    method: "DELETE",
     token: params.token,
   });
 }
@@ -118,18 +123,22 @@ export async function prepareFunding(params: {
   funderWalletAddress: string;
 }): Promise<FundingPreparation> {
   const { projectId, token, ...body } = params;
-  return apiFetch<FundingPreparation>(`/v1/projects/${projectId}/funding/prepare`, {
-    method: "POST",
-    token,
-    body: JSON.stringify(body),
-  });
+  const response = await apiFetch<{ item: FundingPreparation }>(
+    `/v1/projects/${projectId}/funding/prepare`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
+    }
+  );
+  return response.item;
 }
 
 export async function getFundingHistory(params: {
   projectId: string;
   token: string;
 }): Promise<FundingHistoryItem[]> {
-  return apiFetch<FundingHistoryItem[]>(`/v1/projects/${params.projectId}/funding/history`, {
+  return apiFetch<FundingHistoryItem[]>(`/v1/projects/${params.projectId}/activity`, {
     token: params.token,
   });
 }
@@ -137,16 +146,23 @@ export async function getFundingHistory(params: {
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export async function getAnalyticsOverview(token: string): Promise<AnalyticsOverview> {
-  return apiFetch<AnalyticsOverview>("/v1/analytics/overview", { token });
+  const response = await apiFetch<{ item: AnalyticsOverview }>("/v1/analytics/overview", {
+    token,
+  });
+  return response.item;
 }
 
 export async function getProjectAnalytics(params: {
   projectId: string;
   token: string;
 }): Promise<ProjectAnalytics> {
-  return apiFetch<ProjectAnalytics>(`/v1/projects/${params.projectId}/analytics`, {
-    token: params.token,
-  });
+  const response = await apiFetch<{ item: ProjectAnalytics }>(
+    `/v1/analytics/projects/${params.projectId}`,
+    {
+      token: params.token,
+    }
+  );
+  return response.item;
 }
 
 // ─── Onchain ──────────────────────────────────────────────────────────────────
@@ -155,9 +171,13 @@ export async function getOnchainSnapshot(params: {
   projectId: string;
   token: string;
 }): Promise<OnchainSnapshot> {
-  return apiFetch<OnchainSnapshot>(`/v1/projects/${params.projectId}/onchain`, {
-    token: params.token,
-  });
+  const response = await apiFetch<{ item: OnchainSnapshot }>(
+    `/v1/projects/${params.projectId}/onchain`,
+    {
+      token: params.token,
+    }
+  );
+  return response.item;
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────
@@ -166,15 +186,20 @@ export async function getProjectBudgetStatus(params: {
   projectId: string;
   token: string;
 }): Promise<ProjectBudgetStatus> {
-  return apiFetch<ProjectBudgetStatus>(`/v1/projects/${params.projectId}/budget`, {
-    token: params.token,
-  });
+  const response = await apiFetch<{ item: ProjectBudgetStatus }>(
+    `/v1/projects/${params.projectId}/budget`,
+    {
+      token: params.token,
+    }
+  );
+  return response.item;
 }
 
 // ─── Operators ────────────────────────────────────────────────────────────────
 
 export async function getOperators(token: string): Promise<Operator[]> {
-  return apiFetch<Operator[]>("/v1/operators", { token });
+  const response = await apiFetch<{ items: Operator[] }>("/v1/admin/operators", { token });
+  return response.items;
 }
 
 // ─── Assistant ────────────────────────────────────────────────────────────────
@@ -235,8 +260,8 @@ export async function clearAssistantConversation(
   conversationId: string,
   token: string
 ): Promise<void> {
-  await apiFetch<void>(`/v1/assistant/conversations/${conversationId}/clear`, {
-    method: "POST",
+  await apiFetch<void>(`/v1/assistant/conversations/${conversationId}`, {
+    method: "DELETE",
     token,
   });
 }
@@ -244,7 +269,7 @@ export async function clearAssistantConversation(
 export async function getAssistantRateLimitStatus(
   token: string
 ): Promise<AssistantRateLimitStatus> {
-  return apiFetch<AssistantRateLimitStatus>("/v1/assistant/rate-limit", { token });
+  return apiFetch<AssistantRateLimitStatus>("/v1/assistant/rate-limit-status", { token });
 }
 
 export async function submitAssistantFeedback(params: {
@@ -254,11 +279,11 @@ export async function submitAssistantFeedback(params: {
   note?: string;
   token: string;
 }): Promise<{ item: { id: string; rating: string; note: string | null; createdAt: string } }> {
-  const { conversationId, token, ...body } = params;
-  return apiFetch(`/v1/assistant/conversations/${conversationId}/feedback`, {
+  const { conversationId, messageId, token, ...body } = params;
+  return apiFetch(`/v1/assistant/messages/${messageId}/feedback`, {
     method: "POST",
     token,
-    body: JSON.stringify(body),
+    body: JSON.stringify({ conversationId, ...body }),
   });
 }
 
@@ -295,7 +320,7 @@ export async function getAdminAssistantStats(token: string): Promise<{
 // ─── Email ────────────────────────────────────────────────────────────────────
 
 export async function getEmailDeliveryStatus(token: string): Promise<EmailDeliveryStatus> {
-  return apiFetch<EmailDeliveryStatus>("/v1/settings/email", { token });
+  return apiFetch<EmailDeliveryStatus>("/v1/me/email-delivery-status", { token });
 }
 
 // ─── API Health ───────────────────────────────────────────────────────────────
@@ -305,14 +330,21 @@ export async function fetchApiHealth(): Promise<ApiHealth> {
 }
 
 export async function fetchApiStatus(): Promise<ApiStatus> {
-  return apiFetch<ApiStatus>("/status");
+  return apiFetch<ApiStatus>("/v1/status");
 }
 
 // ─── Interest ─────────────────────────────────────────────────────────────────
 
 export async function submitInterest(params: {
+  name: string;
   email: string;
-  useCase?: string;
+  role: string;
+  team?: string;
+  useCase: string;
+  expectedRequestVolume: string;
+  interestAreas: string[];
+  operatorInterest?: boolean;
+  source?: string;
 }): Promise<{ item: { id: string; status: string; createdAt: string; email: string }; message: string }> {
   return apiFetch("/v1/interest", {
     method: "POST",
@@ -323,10 +355,12 @@ export async function submitInterest(params: {
 // ─── Tracking ─────────────────────────────────────────────────────────────────
 
 export async function trackProductEvent(params: {
-  event: string;
+  name: string;
+  source: string;
+  projectId?: string;
   properties?: Record<string, unknown>;
 }): Promise<{ accepted: boolean; requestId: string }> {
-  return apiFetch("/v1/events/track", {
+  return apiFetch("/v1/events", {
     method: "POST",
     body: JSON.stringify(params),
   });

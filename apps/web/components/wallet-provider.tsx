@@ -9,6 +9,37 @@ interface WalletProviderProps {
   children: ReactNode;
 }
 
+function createWalletAdapters(): Adapter[] {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PhantomWalletAdapter } = require("@solana/wallet-adapter-phantom") as {
+    PhantomWalletAdapter: new () => Adapter;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { SolflareWalletAdapter } = require("@solana/wallet-adapter-solflare") as {
+    SolflareWalletAdapter: new () => Adapter;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { BackpackWalletAdapter } = require("@solana/wallet-adapter-backpack") as {
+    BackpackWalletAdapter: new () => Adapter;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { CoinbaseWalletAdapter } = require("@solana/wallet-adapter-coinbase") as {
+    CoinbaseWalletAdapter: new () => Adapter;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { TrustWalletAdapter } = require("@solana/wallet-adapter-trust") as {
+    TrustWalletAdapter: new () => Adapter;
+  };
+
+  return [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter(),
+    new BackpackWalletAdapter(),
+    new CoinbaseWalletAdapter(),
+    new TrustWalletAdapter(),
+  ];
+}
+
 export function WalletProvider({ children }: WalletProviderProps) {
   // In test environments the @solana/wallet-adapter-react hooks are mocked
   // directly and we skip the real providers to avoid conflicts.
@@ -25,43 +56,9 @@ function RealWalletProviders({ children }: { children: ReactNode }) {
     cluster === "mainnet-beta"
       ? "https://api.mainnet-beta.solana.com"
       : "https://api.devnet.solana.com";
-
-  // Wallet adapter constructors reference browser globals (window, localStorage).
-  // Skip instantiation during server-side rendering; the context still mounts
-  // with an empty wallet list, which is replaced on the client after hydration.
-  // We use require() for the adapters (not static imports) to keep the test
-  // environment free of real Solana adapter code.
   const wallets = useMemo((): Adapter[] => {
     if (typeof window === "undefined") return [];
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PhantomWalletAdapter } = require("@solana/wallet-adapter-phantom") as {
-      PhantomWalletAdapter: new () => Adapter;
-    };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { SolflareWalletAdapter } = require("@solana/wallet-adapter-solflare") as {
-      SolflareWalletAdapter: new () => Adapter;
-    };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { BackpackWalletAdapter } = require("@solana/wallet-adapter-backpack") as {
-      BackpackWalletAdapter: new () => Adapter;
-    };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { CoinbaseWalletAdapter } = require("@solana/wallet-adapter-coinbase") as {
-      CoinbaseWalletAdapter: new () => Adapter;
-    };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { TrustWalletAdapter } = require("@solana/wallet-adapter-trust") as {
-      TrustWalletAdapter: new () => Adapter;
-    };
-
-    return [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-      new BackpackWalletAdapter(),
-      new CoinbaseWalletAdapter(),
-      new TrustWalletAdapter(),
-    ];
+    return createWalletAdapters();
   }, []);
 
   return (

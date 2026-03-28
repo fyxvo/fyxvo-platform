@@ -1,34 +1,29 @@
 import Link from "next/link";
+import { getPublicUpdates, marketingMilestones } from "../../lib/public-data";
 
-const UPDATES = [
-  {
-    slug: "priority-relay-ga",
-    title: "Priority Relay is Generally Available",
-    date: "2026-03-26",
-    excerpt: "Our priority relay service is now GA for all projects.",
-  },
-  {
-    slug: "fyxvo-assistant",
-    title: "Introducing Fyxvo Assistant",
-    date: "2026-02-15",
-    excerpt: "An AI-powered assistant built into your dashboard.",
-  },
-];
+export default async function UpdatesPage() {
+  const livePosts = await getPublicUpdates();
+  const updates = livePosts.length > 0 ? livePosts : marketingMilestones;
 
-export default function UpdatesPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16">
+    <div className="mx-auto max-w-4xl px-4 py-16">
       <h1 className="text-3xl font-bold tracking-tight text-[var(--fyxvo-text)]">Updates</h1>
+      <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
+        Product and rollout notes for the live devnet deployment. When admin-authored update posts
+        exist, they appear here automatically.
+      </p>
       <div className="mt-8 space-y-6">
-        {UPDATES.map((u) => (
+        {updates.map((u) => (
           <Link
             key={u.slug}
             href={`/updates/${u.slug}`}
             className="block rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 transition-colors hover:border-[var(--fyxvo-brand)]"
           >
-            <p className="text-xs text-[var(--fyxvo-text-muted)]">{u.date}</p>
+            <p className="text-xs text-[var(--fyxvo-text-muted)]">
+              {(u.publishedAt ?? "").slice(0, 10) || "Unscheduled"}
+            </p>
             <h2 className="mt-1 font-semibold text-[var(--fyxvo-text)]">{u.title}</h2>
-            <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{u.excerpt}</p>
+            <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{u.summary}</p>
           </Link>
         ))}
       </div>
