@@ -3,12 +3,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { cn } from "@fyxvo/ui";
 import { usePortal } from "../lib/portal-context";
 import { useTheme } from "../lib/hooks";
 import { MoonIcon, SunIcon } from "./icons";
 import { WalletConnectButton } from "./wallet-connect-button";
+
+function useMounted() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+}
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -26,6 +34,7 @@ export function Nav() {
   const { walletPhase, user, disconnectWallet } = usePortal();
   const { theme, toggle } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mounted = useMounted();
 
   return (
     <header
@@ -68,7 +77,7 @@ export function Nav() {
             {theme === "dark" ? <SunIcon size={16} /> : <MoonIcon size={16} />}
           </button>
 
-          {walletPhase === "authenticated" && user?.walletAddress ? (
+          {mounted && walletPhase === "authenticated" && user?.walletAddress ? (
             <button
               type="button"
               onClick={() => void disconnectWallet()}
@@ -76,15 +85,15 @@ export function Nav() {
             >
               {user.walletAddress.slice(0, 4)}...{user.walletAddress.slice(-4)}
             </button>
-          ) : (
+          ) : mounted ? (
             <WalletConnectButton />
-          )}
+          ) : null}
 
           {/* Hamburger – mobile only */}
           <button
             type="button"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            onClick={() => setMobileOpen((v) => !v)}
+            onClick={() => setMobileOpen((v: boolean) => !v)}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] md:hidden transition-colors"
           >
             <svg
