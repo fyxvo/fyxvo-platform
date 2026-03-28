@@ -53,6 +53,7 @@ import type {
   PlaygroundRecipeRecord,
   RequestLogInput,
   SaveIdempotencyInput,
+  ServerErrorRecord,
   ServiceHealthHistory,
   SystemAnnouncementItem,
   UpdateProjectInput,
@@ -3069,6 +3070,61 @@ export class PrismaApiRepository implements ApiRepository {
   async recordClientError(_input: { component: string; message: string; page: string }): Promise<void> {
     // Best-effort: no-op until a dedicated error log table is available
     return Promise.resolve();
+  }
+
+  async createServerError(input: {
+    route: string;
+    method: string;
+    statusCode: number;
+    message: string;
+    stack?: string | null;
+    userAgent?: string | null;
+    requestId?: string | null;
+  }): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    await db.errorEntry.create({
+      data: {
+        route: input.route,
+        method: input.method,
+        statusCode: input.statusCode,
+        message: input.message,
+        stack: input.stack ?? null,
+        userAgent: input.userAgent ?? null,
+        requestId: input.requestId ?? null,
+      },
+    });
+  }
+
+  async listServerErrors(limit = 100): Promise<ServerErrorRecord[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = this.prisma as any;
+    const rows = await db.errorEntry.findMany({
+      orderBy: { createdAt: "desc" },
+      take: Math.min(Math.max(limit, 1), 100),
+    });
+
+    return rows.map((row: {
+      id: string;
+      route: string;
+      method: string;
+      statusCode: number;
+      message: string;
+      stack: string | null;
+      userAgent: string | null;
+      requestId: string | null;
+      createdAt: Date;
+    }) => ({
+      id: row.id,
+      route: row.route,
+      method: row.method,
+      statusCode: row.statusCode,
+      message: row.message,
+      stack: row.stack ?? null,
+      userAgent: row.userAgent ?? null,
+      requestId: row.requestId ?? null,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   async createSupportTicket(input: { userId: string; projectId?: string; category: string; priority: string; subject: string; description: string }): Promise<SupportTicketRecord> {

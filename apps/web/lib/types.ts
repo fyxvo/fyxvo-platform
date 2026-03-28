@@ -656,6 +656,18 @@ export interface FeedbackInboxItem {
   tags: string[];
 }
 
+export interface AdminErrorEntry {
+  id: string;
+  route: string;
+  method: string;
+  statusCode: number;
+  message: string;
+  stack: string | null;
+  userAgent: string | null;
+  requestId: string | null;
+  createdAt: string;
+}
+
 export interface IncidentUpdateItem {
   id: string;
   status: string;
@@ -722,6 +734,17 @@ export interface PublicProjectProfile {
   totalRequests: number;
   avgLatencyMs: number;
   requestVolume7d: Array<Record<string, unknown>>;
+}
+
+export interface ProjectWidgetData {
+  projectName: string;
+  projectSlug: string;
+  publicSlug: string | null;
+  requestsToday: number;
+  gatewayStatus: string;
+  avgLatencyMs: number;
+  requestVolume7d: Array<{ date: string; count: number }>;
+  isPublic: boolean;
 }
 
 // ─── Email ────────────────────────────────────────────────────────────────────

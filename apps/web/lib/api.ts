@@ -1,6 +1,7 @@
 import { API_BASE } from "./env";
 import type {
   AdminOverview,
+  AdminErrorEntry,
   AdminPlatformStats,
   AdminStats,
   AlertCenterItem,
@@ -30,6 +31,7 @@ import type {
   ProjectMemberItem,
   ProjectRequestLogList,
   ProjectRequestTrace,
+  ProjectWidgetData,
   PublicProjectProfile,
   InviteMetadata,
   MainnetReadinessSnapshot,
@@ -819,6 +821,13 @@ export async function getAdminPlatformStats(token: string): Promise<AdminPlatfor
   return response.item;
 }
 
+export async function getAdminErrors(token: string): Promise<AdminErrorEntry[]> {
+  const response = await apiFetch<{ items: AdminErrorEntry[] }>("/v1/admin/errors", {
+    token,
+  });
+  return response.items;
+}
+
 export async function getFeedbackInbox(params: {
   token: string;
   type?: "all" | "feedback_submission" | "assistant_feedback" | "support_ticket" | "newsletter_signup" | "referral_conversion";
@@ -991,6 +1000,14 @@ export async function submitFeedback(params: {
 export async function getPublicProject(publicSlug: string): Promise<PublicProjectProfile | null> {
   try {
     return await apiFetch<PublicProjectProfile>(`/v1/public/projects/${publicSlug}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function getProjectWidget(projectId: string): Promise<ProjectWidgetData | null> {
+  try {
+    return await apiFetch<ProjectWidgetData>(`/v1/projects/${projectId}/widget`);
   } catch {
     return null;
   }

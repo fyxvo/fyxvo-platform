@@ -567,6 +567,22 @@ model FeedbackInboxTriage {
   @@index([status, updatedAt])
 }
 
+model ErrorEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  route      String
+  method     String
+  statusCode Int
+  message    String
+  stack      String?
+  userAgent  String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([statusCode, createdAt])
+  @@index([route, createdAt])
+}
+
 model MainnetReleaseGate {
   id                  String    @id @default(uuid()) @db.Uuid
   environment         String    @unique

@@ -23,6 +23,7 @@ import { databaseHealthcheck } from "@fyxvo/database";
 import bs58 from "bs58";
 import type { PrismaClientType } from "@fyxvo/database";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import { createClient, type RedisClientType } from "redis";
 import nacl from "tweetnacl";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
@@ -1110,6 +1111,21 @@ export async function buildApiApp(input: {
     logger: input.logger ?? false
   });
   const allowedOrigins = new Set(resolveAllowedCorsOrigins(input.env));
+  let rateLimitRedis: RedisClientType | null = null;
+
+  try {
+    rateLimitRedis = createClient({ url: input.env.REDIS_URL });
+    await rateLimitRedis.connect();
+  } catch (error) {
+    app.log.warn(
+      {
+        event: "api.rate_limit.redis_unavailable",
+        message: error instanceof Error ? error.message : "Unknown Redis connection failure"
+      },
+      "API Redis rate limit helper is unavailable; custom abuse limits will degrade gracefully."
+    );
+    rateLimitRedis = null;
+  }
 
   function requirePrisma() {
     if (!input.prisma) {
@@ -1120,6 +1136,40 @@ export async function buildApiApp(input: {
       );
     }
     return input.prisma;
+  }
+
+  function clientIp(request: FastifyRequest) {
+    const forwarded = request.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.trim().length > 0) {
+      return forwarded.split(",")[0]?.trim() ?? request.ip;
+    }
+    return request.ip;
+  }
+
+  async function enforceRedisWindowLimit(inputLimit: {
+    request: FastifyRequest;
+    key: string;
+    max: number;
+    windowMs: number;
+    message: string;
+  }) {
+    if (!rateLimitRedis) {
+      return;
+    }
+
+    const windowSeconds = Math.max(1, Math.ceil(inputLimit.windowMs / 1000));
+    const current = await rateLimitRedis.incr(inputLimit.key);
+    if (current === 1) {
+      await rateLimitRedis.expire(inputLimit.key, windowSeconds);
+    }
+
+    if (current > inputLimit.max) {
+      const ttlSeconds = await rateLimitRedis.ttl(inputLimit.key).catch(() => -1);
+      throw new HttpError(429, "rate_limited", inputLimit.message, {
+        requestId: inputLimit.request.id,
+        retryAfterMs: ttlSeconds > 0 ? ttlSeconds * 1000 : inputLimit.windowMs,
+      });
+    }
   }
 
   async function deliverEmail(inputMessage: {
@@ -1289,6 +1339,17 @@ export async function buildApiApp(input: {
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof HttpError) {
+      if (error.statusCode >= 500) {
+        void input.repository.createServerError({
+          route: getRoutePattern(request),
+          method: request.method,
+          statusCode: error.statusCode,
+          message: error.message,
+          stack: error.stack ?? null,
+          userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : null,
+          requestId: request.id
+        }).catch(() => undefined);
+      }
       reply.status(error.statusCode).send({
         code: error.code,
         error: error.message,
@@ -1324,6 +1385,15 @@ export async function buildApiApp(input: {
     }
 
     requestLogger(app, error);
+    void input.repository.createServerError({
+      route: getRoutePattern(request),
+      method: request.method,
+      statusCode: 500,
+      message: error instanceof Error ? error.message : "Unknown internal API failure.",
+      stack: error instanceof Error ? error.stack ?? null : null,
+      userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : null,
+      requestId: request.id
+    }).catch(() => undefined);
     reply.status(500).send({
       code: "internal_error",
       error: "An unexpected error occurred.",
@@ -2130,6 +2200,13 @@ export async function buildApiApp(input: {
 
   app.post("/v1/interest", async (request, reply) => {
     const body = createInterestSubmissionSchema.parse(request.body);
+    await enforceRedisWindowLimit({
+      request,
+      key: `rate-limit:interest:${clientIp(request)}`,
+      max: 10,
+      windowMs: 60 * 60 * 1000,
+      message: "Interest submissions are limited to 10 requests per IP per hour."
+    });
     const submission = await input.repository.createInterestSubmission({
       name: body.name,
       email: body.email,
@@ -2156,6 +2233,13 @@ export async function buildApiApp(input: {
 
   app.post("/v1/operators/register", async (request, reply) => {
     const body = createOperatorRegistrationSchema.parse(request.body);
+    await enforceRedisWindowLimit({
+      request,
+      key: `rate-limit:operator-registration:${clientIp(request)}`,
+      max: 5,
+      windowMs: 60 * 60 * 1000,
+      message: "Operator registrations are limited to 5 requests per IP per hour."
+    });
     ensureWalletAddress(body.operatorWalletAddress);
 
     const registration = await input.repository.createOperatorRegistration({
@@ -2239,6 +2323,13 @@ export async function buildApiApp(input: {
 
   app.post("/v1/feedback", async (request, reply) => {
     const body = createFeedbackSubmissionSchema.parse(request.body);
+    await enforceRedisWindowLimit({
+      request,
+      key: `rate-limit:feedback:${clientIp(request)}`,
+      max: 10,
+      windowMs: 60 * 60 * 1000,
+      message: "Feedback submissions are limited to 10 requests per IP per hour."
+    });
 
     if (body.projectId) {
       const user = requireUser(request);
@@ -3464,6 +3555,14 @@ export async function buildApiApp(input: {
     requireAdmin(user);
     return {
       item: await input.repository.getAdminPlatformStats()
+    };
+  });
+
+  app.get("/v1/admin/errors", async (request) => {
+    const user = requireUser(request);
+    requireAdmin(user);
+    return {
+      items: await input.repository.listServerErrors(100)
     };
   });
 
@@ -4945,16 +5044,43 @@ ${liveContextLines.join("\n")}
       if (!project) return reply.status(404).send({ error: "Project not found" });
 
       const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const analytics = await input.repository.getProjectAnalytics(projectId, since24h).catch(() => null);
       const requestsToday = analytics?.totals?.requestLogs ?? 0;
       const avgLatencyMs = Math.round(analytics?.latency?.averageMs ?? 0);
+      const db = requirePrisma();
+      const requestRows = await db.requestLog.findMany({
+        where: {
+          projectId,
+          createdAt: { gte: since7d }
+        },
+        select: {
+          createdAt: true
+        }
+      });
+      const requestCounts = new Map<string, number>();
+      for (let index = 6; index >= 0; index -= 1) {
+        const date = new Date();
+        date.setUTCHours(0, 0, 0, 0);
+        date.setUTCDate(date.getUTCDate() - index);
+        requestCounts.set(date.toISOString().slice(0, 10), 0);
+      }
+      for (const row of requestRows) {
+        const dateKey = row.createdAt.toISOString().slice(0, 10);
+        if (requestCounts.has(dateKey)) {
+          requestCounts.set(dateKey, (requestCounts.get(dateKey) ?? 0) + 1);
+        }
+      }
 
       return reply.send({
         projectName: project.displayName ?? project.name,
+        projectSlug: project.slug,
+        publicSlug: project.publicSlug ?? null,
         requestsToday,
         gatewayStatus: "healthy",
         avgLatencyMs,
-        isPublic: true,
+        requestVolume7d: [...requestCounts.entries()].map(([date, count]) => ({ date, count })),
+        isPublic: project.isPublic ?? false,
       });
     } catch {
       return reply.status(500).send({ error: "Failed to fetch widget data" });
@@ -5677,6 +5803,13 @@ ${liveContextLines.join("\n")}
 
   app.post("/v1/status/subscribe", async (request, reply) => {
     const { email } = z.object({ email: z.string().email().max(256) }).parse(request.body);
+    await enforceRedisWindowLimit({
+      request,
+      key: `rate-limit:status-subscribe:${email.trim().toLowerCase()}`,
+      max: 3,
+      windowMs: 24 * 60 * 60 * 1000,
+      message: "Status subscriptions are limited to 3 attempts per email address per 24 hours."
+    });
     await input.repository.subscribeToStatus(email);
     return reply.status(201).send({ success: true });
   });
@@ -5747,7 +5880,12 @@ ${liveContextLines.join("\n")}
   }, 30_000);
 
   // Clean up on app close
-  app.addHook("onClose", () => { clearInterval(retryWorker); });
+  app.addHook("onClose", async () => {
+    clearInterval(retryWorker);
+    if (rateLimitRedis) {
+      await rateLimitRedis.quit().catch(() => undefined);
+    }
+  });
 
   // ── API version header on all responses ──────────────────────────────────
   app.addHook("onRequest", async (_req, reply) => {
@@ -5967,6 +6105,13 @@ ${liveContextLines.join("\n")}
     config: { rateLimit: { max: 5, timeWindow: "1 minute" } }
   }, async (request, reply) => {
     const body = z.object({ email: z.string().email() }).parse(request.body);
+    await enforceRedisWindowLimit({
+      request,
+      key: `rate-limit:newsletter:${body.email.trim().toLowerCase()}`,
+      max: 3,
+      windowMs: 24 * 60 * 60 * 1000,
+      message: "Newsletter subscriptions are limited to 3 attempts per email address per 24 hours."
+    });
     await input.repository.subscribeNewsletter({ email: body.email, source: "landing" });
     return reply.status(200).send({ success: true });
   });

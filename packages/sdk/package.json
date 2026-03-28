@@ -1,7 +1,7 @@
 {
   "name": "@fyxvo/sdk",
-  "version": "0.1.0",
-  "description": "Official TypeScript SDK for the Fyxvo Solana devnet RPC relay gateway",
+  "version": "0.2.0",
+  "description": "Official TypeScript SDK for the Fyxvo Solana devnet control plane and relay gateway",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

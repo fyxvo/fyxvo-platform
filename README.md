@@ -56,6 +56,14 @@ The long-term direction is a fully open operator network with governed protocol 
 - Status: `https://status.fyxvo.com`
 - Docs: `https://www.fyxvo.com/docs`
 
+## Current Network State
+
+The live network is currently running on Solana devnet with the program deployed at [`Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc`](https://explorer.solana.com/address/Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc?cluster=devnet). The public operator network summary currently reports `1` active operator in the managed pool, while the control plane reports `58,858` total requests processed across the live private alpha. The production service URLs are `https://www.fyxvo.com`, `https://api.fyxvo.com`, and `https://rpc.fyxvo.com`.
+
+## Integrating
+
+Developers can integrate through the published SDK in [`packages/sdk`](./packages/sdk/README.md), the hosted docs at `https://www.fyxvo.com/docs`, and the live request builder at `https://www.fyxvo.com/playground`. Together these surfaces cover gateway access, authenticated control-plane flows, and hands-on request testing against the live devnet stack.
+
 ## Community
 
 - X: `https://x.com/fyxvo`

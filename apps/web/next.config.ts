@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       "connect-src 'self' https://api.fyxvo.com https://rpc.fyxvo.com https://status.fyxvo.com https://api.coingecko.com wss:",
+      "frame-ancestors 'none'",
       "frame-src 'none'",
       "object-src 'none'",
       "base-uri 'self'",
@@ -45,10 +46,6 @@ const nextConfig: NextConfig = {
           {
             key: "X-Content-Type-Options",
             value: "nosniff"
-          },
-          {
-            key: "X-Frame-Options",
-            value: "DENY"
           },
           {
             key: "Referrer-Policy",

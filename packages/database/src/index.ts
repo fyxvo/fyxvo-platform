@@ -29,6 +29,7 @@ export type {
   ApiKey,
   FeedbackSubmission,
   FundingCoordinate,
+  ErrorEntry,
   IdempotencyRecord,
   InterestSubmission,
   Metrics,

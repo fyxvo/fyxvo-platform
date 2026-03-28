@@ -32,16 +32,7 @@ You will receive an acknowledgment within 48 hours. We aim to resolve critical v
 
 ## Disclosure Timeline
 
-| Step | Timeframe |
-|------|-----------|
-| Acknowledgment | Within 48 hours of report |
-| Initial assessment | Within 5 business days |
-| Fix deployed (critical) | Within 7 days |
-| Fix deployed (high) | Within 30 days |
-| Fix deployed (medium/low) | Best effort |
-| Public disclosure | After fix is deployed, coordinated with reporter |
-
-We follow coordinated disclosure. We ask that reporters keep the issue confidential until we have deployed a fix.
+Fyxvo follows coordinated disclosure with a 90 day disclosure window. We ask reporters to keep issues confidential while we investigate, validate, and ship a fix. If a fix is ready earlier, we prefer to coordinate disclosure as soon as the patch is deployed. If a report remains unresolved near the end of the 90 day window, we will stay in contact with the reporter and publish a shared update on status and mitigation.
 
 ## Rewards
 
@@ -57,7 +48,7 @@ We appreciate responsible disclosure regardless of reward.
 
 - Devnet only: no real user funds on mainnet
 - SOL credits are devnet SOL with no real monetary value
-- USDC funding is currently gated and not active
+- USDC funding is enabled on devnet
 - All sessions use wallet-signed JWTs
 
 For the most current security posture, see [docs/launch-readiness.md](./docs/launch-readiness.md).

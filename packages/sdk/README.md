@@ -1,112 +1,199 @@
 # @fyxvo/sdk
 
-Official TypeScript SDK for the [Fyxvo](https://www.fyxvo.com) Solana devnet RPC relay gateway.
-
-## What is Fyxvo?
-
-Fyxvo is a managed, wallet-authenticated RPC relay for Solana devnet. You fund a project with SOL, create scoped API keys, and route JSON-RPC requests through the Fyxvo gateway. Fyxvo handles the node infrastructure, rate limiting, and analytics.
+Official TypeScript SDK for the [Fyxvo](https://www.fyxvo.com) Solana devnet control plane and relay gateway.
 
 ## Installation
 
 ```bash
 npm install @fyxvo/sdk
-# or
-yarn add @fyxvo/sdk
-# or
-pnpm add @fyxvo/sdk
 ```
 
-## Quick Start
+## What this package covers
 
-```typescript
+`@fyxvo/sdk` ships two clients. `createFyxvoClient` is the API key-authenticated gateway client used for standard and priority Solana JSON-RPC traffic through `rpc.fyxvo.com`. `createFyxvoApiClient` is the JWT-authenticated control-plane client used for project creation, funding preparation, analytics, alerts, and network stats through `api.fyxvo.com`.
+
+## Authentication
+
+Use a Fyxvo API key for relay traffic:
+
+```ts
 import { createFyxvoClient } from "@fyxvo/sdk";
 
-const fyxvo = createFyxvoClient({
+const gateway = createFyxvoClient({
   baseUrl: "https://rpc.fyxvo.com",
-  apiKey: "fyxvo_live_YOUR_KEY_HERE",
-  timeoutMs: 10_000,
+  apiKey: "fyxvo_live_...",
+});
+```
+
+Use a Fyxvo JWT for authenticated control-plane access:
+
+```ts
+import { createFyxvoApiClient } from "@fyxvo/sdk";
+
+const api = createFyxvoApiClient({
+  baseUrl: "https://api.fyxvo.com",
+  jwtToken: "eyJhbGciOi...",
+});
+```
+
+## Common examples
+
+### 1. Send a standard RPC request
+
+```ts
+import { createFyxvoClient } from "@fyxvo/sdk";
+
+const gateway = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
+  apiKey: "fyxvo_live_...",
 });
 
-// Send a standard JSON-RPC request
-const slotResult = await fyxvo.rpc<number>({ method: "getSlot" });
-console.log("Current slot:", slotResult);
+const response = await gateway.rpc<number>({
+  method: "getSlot",
+});
 
-// Get the balance of a wallet
-const balance = await fyxvo.rpc<{ value: number }>({
+if ("result" in response) {
+  console.log("Current slot:", response.result);
+}
+```
+
+### 2. Send a priority relay request
+
+```ts
+import { createFyxvoClient } from "@fyxvo/sdk";
+
+const gateway = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
+  apiKey: "fyxvo_live_...",
+});
+
+const latestBlockhash = await gateway.priorityRpc<{
+  value: { blockhash: string; lastValidBlockHeight: number };
+}>({
+  method: "getLatestBlockhash",
+});
+
+console.log(latestBlockhash);
+```
+
+### 3. Create a project
+
+```ts
+import { createFyxvoApiClient } from "@fyxvo/sdk";
+
+const api = createFyxvoApiClient({
+  baseUrl: "https://api.fyxvo.com",
+  jwtToken: process.env.FYXVO_JWT!,
+});
+
+const project = await api.createProject({
+  slug: "my-devnet-project",
+  name: "My devnet project",
+  description: "Control plane integration test",
+  templateType: "blank",
+});
+
+console.log(project.item.id);
+console.log(project.activation.transactionBase64);
+```
+
+### 4. Prepare a SOL funding transaction
+
+```ts
+import { createFyxvoApiClient } from "@fyxvo/sdk";
+
+const api = createFyxvoApiClient({
+  baseUrl: "https://api.fyxvo.com",
+  jwtToken: process.env.FYXVO_JWT!,
+});
+
+const preparation = await api.prepareSOLFunding("PROJECT_ID", {
+  amount: "1000000000",
+  funderWalletAddress: "BASE58_WALLET",
+});
+
+console.log(preparation.transactionBase64);
+```
+
+### 5. Subscribe to alerts by polling the alerts center
+
+```ts
+import { createFyxvoApiClient } from "@fyxvo/sdk";
+
+const api = createFyxvoApiClient({
+  baseUrl: "https://api.fyxvo.com",
+  jwtToken: process.env.FYXVO_JWT!,
+});
+
+const alerts = await api.listAlerts();
+
+for (const alert of alerts) {
+  console.log(`[${alert.severity}] ${alert.title}`);
+}
+```
+
+## Raw request access
+
+Use `request` when you need an authenticated endpoint that is not wrapped yet.
+
+```ts
+const response = await api.request<{ item: unknown }>({
+  path: "/v1/admin/platform-stats",
+});
+```
+
+Use `rpc` and `priorityRpc` when you need a typed Solana method response.
+
+```ts
+const balance = await gateway.rpc<{ value: number }>({
   method: "getBalance",
-  params: ["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"]
+  params: ["Gsi8tsTm7BinEgcYd1Uc4wtNBjMrjYfbtKdoDpGdvkJc"],
 });
-console.log("Balance (lamports):", balance.value);
 ```
 
-## Priority Relay
+## Error handling
 
-Priority requests are routed through a low-latency path with guaranteed capacity:
+All SDK failures throw subclasses of `FyxvoError`.
 
-```typescript
-const fyxvo = createFyxvoClient({
-  baseUrl: "https://rpc.fyxvo.com/priority",
-  apiKey: "fyxvo_live_YOUR_KEY_HERE",
+```ts
+import {
+  FyxvoApiError,
+  FyxvoNetworkError,
+  FyxvoTimeoutError,
+  createFyxvoClient,
+} from "@fyxvo/sdk";
+
+const gateway = createFyxvoClient({
+  baseUrl: "https://rpc.fyxvo.com",
+  apiKey: "fyxvo_live_...",
 });
-
-const latestBlockhash = await fyxvo.rpc<{
-  value: { blockhash: string; lastValidBlockHeight: number }
-}>({ method: "getLatestBlockhash" });
-```
-
-## Error Handling
-
-```typescript
-import { createFyxvoClient, FyxvoApiError, FyxvoNetworkError } from "@fyxvo/sdk";
-
-const fyxvo = createFyxvoClient({ apiKey: "fyxvo_live_..." });
 
 try {
-  const result = await fyxvo.rpc({
-    method: "getBalance",
-    params: ["<pubkey>"]
-  });
-} catch (err) {
-  if (err instanceof FyxvoApiError) {
-    // API returned an error response (4xx/5xx)
-    console.error(`API error ${err.statusCode}: ${err.message}`);
-  } else if (err instanceof FyxvoNetworkError) {
-    // Network connectivity issue
-    console.error("Network error:", err.message);
+  await gateway.rpc({ method: "getHealth" });
+} catch (error) {
+  if (error instanceof FyxvoApiError) {
+    console.error(error.statusCode, error.code, error.details);
+  } else if (error instanceof FyxvoTimeoutError) {
+    console.error("Timed out");
+  } else if (error instanceof FyxvoNetworkError) {
+    console.error("Network failure");
   } else {
-    throw err;
+    throw error;
   }
 }
 ```
 
-## Configuration
+## Local development
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `baseUrl` | `string` | required | Base URL for the gateway or API you are calling |
-| `apiKey` | `string` | optional | Your Fyxvo API key (starts with `fyxvo_live_`) |
-| `timeoutMs` | `number` | `10000` | Request timeout in milliseconds |
-| `headers` | `HeadersInit` | optional | Extra headers to attach to every request |
-| `fetcher` | `typeof fetch` | optional | Custom fetch implementation |
-
-## Checking Gateway Health
-
-```typescript
-const health = await fyxvo.getGatewayHealth();
-console.log(health.status); // "ok" | "degraded"
-```
-
-## Publishing
-
-This package is published manually by the Fyxvo team. To publish a new version:
+From the monorepo root:
 
 ```bash
-# From the monorepo root
-cd /path/to/fyxvo
-npm login
-pnpm --filter @fyxvo/sdk publish --access public
+pnpm --filter @fyxvo/sdk build
+pnpm --filter @fyxvo/sdk test
 ```
 
-## License
+## Links
 
-MIT © Fyxvo
+- Docs: https://www.fyxvo.com/docs
+- Playground: https://www.fyxvo.com/playground
+- Status: https://status.fyxvo.com

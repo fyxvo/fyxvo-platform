@@ -60,6 +60,12 @@ export default function AdminOverviewPage() {
           Platform stats
         </Link>
         <Link
+          href="/admin/errors"
+          className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-4 py-2 text-sm text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand)]"
+        >
+          Errors
+        </Link>
+        <Link
           href="/admin/feedback"
           className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-4 py-2 text-sm text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand)]"
         >

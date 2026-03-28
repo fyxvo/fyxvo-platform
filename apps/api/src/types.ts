@@ -309,6 +309,18 @@ export interface ErrorLogItem {
   readonly apiKeyPrefix: string | null;
 }
 
+export interface ServerErrorRecord {
+  readonly id: string;
+  readonly route: string;
+  readonly method: string;
+  readonly statusCode: number;
+  readonly message: string;
+  readonly stack: string | null;
+  readonly userAgent: string | null;
+  readonly requestId: string | null;
+  readonly createdAt: string;
+}
+
 export type RequestLogRange = "1h" | "6h" | "24h" | "7d" | "30d";
 
 export interface ProjectRequestLogFilters {
@@ -1094,6 +1106,16 @@ export interface ApiRepository {
   findRequestByTraceId(projectId: string, traceId: string): Promise<Record<string, unknown> | null>;
   countRecentRequests(since: Date): Promise<number>;
   getSuccessRateTrend(projectId: string, range: "24h" | "7d" | "30d"): Promise<Array<{ time: string; successRate: number }>>;
+  createServerError(input: {
+    route: string;
+    method: string;
+    statusCode: number;
+    message: string;
+    stack?: string | null;
+    userAgent?: string | null;
+    requestId?: string | null;
+  }): Promise<void>;
+  listServerErrors(limit?: number): Promise<ServerErrorRecord[]>;
   getFirstSuccessfulProjectRequest(projectId: string): Promise<{
     method: string;
     durationMs: number;

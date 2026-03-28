@@ -44,6 +44,7 @@ export function proxy(request: NextRequest) {
   const primaryHost = getPrimaryHost();
   const apexHost = getApexHost(primaryHost);
   const statusHost = getStatusHost();
+  const isWidgetRoute = url.pathname.startsWith("/widget/project/");
 
   if (apexHost && primaryHost && host === apexHost) {
     url.protocol = "https";
@@ -55,11 +56,47 @@ export function proxy(request: NextRequest) {
     if (url.pathname !== "/status") {
       url.pathname = "/status";
       url.search = "";
-      return NextResponse.rewrite(url);
+      const response = NextResponse.rewrite(url);
+      if (isWidgetRoute) {
+        response.headers.set(
+          "Content-Security-Policy",
+          [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: https:",
+            "font-src 'self' data:",
+            "connect-src 'self' https://api.fyxvo.com https://rpc.fyxvo.com https://status.fyxvo.com",
+            "frame-ancestors *",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'"
+          ].join("; ")
+        );
+      }
+      return response;
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (isWidgetRoute) {
+    response.headers.set(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data:",
+        "connect-src 'self' https://api.fyxvo.com https://rpc.fyxvo.com https://status.fyxvo.com",
+        "frame-ancestors *",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'"
+      ].join("; ")
+    );
+  }
+  return response;
 }
 
 export const config = {
