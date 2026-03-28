@@ -197,3 +197,9 @@ pnpm --filter @fyxvo/sdk test
 - Docs: https://www.fyxvo.com/docs
 - Playground: https://www.fyxvo.com/playground
 - Status: https://status.fyxvo.com
+
+## Mainnet
+
+The SDK will work on Solana mainnet with no code changes once the deployment moves from devnet to mainnet. The integration pattern stays the same. The only runtime changes are the base URLs and credentials you pass to the clients.
+
+When mainnet launches, update the gateway URL from `https://rpc.fyxvo.com` to the final mainnet gateway URL if it differs, and update the control-plane base URL if the mainnet API is served from a different host. The client constructors do not need any application code changes beyond those environment values. API keys and JWT sessions created on devnet will not carry over to mainnet, so plan to create fresh projects, funding records, and API keys in the mainnet environment.

@@ -41,7 +41,7 @@ The current deployment runs on Solana devnet. The protocol addresses are public,
 
 ## Operations
 
-For the current deployment state, live addresses, deploy commands, devnet readiness notes, and the handoff checklist for future agents, read [`docs/OPERATIONS.md`](./docs/OPERATIONS.md).
+For the current deployment state, live addresses, deploy commands, devnet readiness notes, and the handoff checklist for future agents, read [`docs/OPERATIONS.md`](./docs/OPERATIONS.md). For the eventual mainnet cutover, use [`docs/MAINNET_RUNBOOK.md`](./docs/MAINNET_RUNBOOK.md) and [`docs/MAINNET_ENV_TEMPLATE.md`](./docs/MAINNET_ENV_TEMPLATE.md).
 
 ## Community
 
