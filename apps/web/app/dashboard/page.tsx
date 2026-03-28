@@ -1,13 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Button, Notice } from "@fyxvo/ui";
-import { verifyProjectActivation } from "../../lib/api";
+import { CopyButton } from "../../components/copy-button";
+import {
+  dismissWhatsNew,
+  generateReferralCode,
+  getReferralStats,
+  getWhatsNew,
+  verifyProjectActivation,
+} from "../../lib/api";
+import { SITE_URL } from "../../lib/env";
 import { usePortal } from "../../lib/portal-context";
 import { signAndSubmitVersionedTransaction } from "../../lib/solana-transactions";
-import type { PortalProject, ProjectActivationVerification } from "../../lib/types";
+import type {
+  PortalProject,
+  ProjectActivationVerification,
+  ReferralStats,
+  WhatsNewItem,
+} from "../../lib/types";
 import { AddressLink } from "../../components/address-link";
 import { AuthGate } from "../../components/state-panels";
 
@@ -78,11 +91,85 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<ProjectActivationVerification | null>(null);
+  const [whatsNew, setWhatsNew] = useState<WhatsNewItem | null>(null);
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
+  const [referralLoading, setReferralLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+
+    void (async () => {
+      try {
+        const [announcement, stats] = await Promise.all([
+          getWhatsNew(token),
+          getReferralStats(token),
+        ]);
+
+        if (
+          announcement &&
+          typeof window !== "undefined" &&
+          window.sessionStorage.getItem(`fyxvo-whats-new-dismissed:${announcement.version}`) === "1"
+        ) {
+          setWhatsNew(null);
+        } else {
+          setWhatsNew(announcement);
+        }
+
+        setReferralStats(stats);
+      } catch {
+        // Keep the dashboard usable even if ancillary widgets fail.
+      }
+    })();
+  }, [token]);
 
   const activeTemplate = useMemo(
     () => TEMPLATE_OPTIONS.find((option) => option.value === templateType) ?? TEMPLATE_OPTIONS[0],
     [templateType]
   );
+  const referralUrl = referralStats?.referralCode
+    ? `${SITE_URL}/join/${referralStats.referralCode}`
+    : null;
+
+  async function handleDismissWhatsNew() {
+    if (!token || !whatsNew) return;
+
+    try {
+      await dismissWhatsNew({ token, version: whatsNew.version });
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(`fyxvo-whats-new-dismissed:${whatsNew.version}`, "1");
+      }
+      setWhatsNew(null);
+    } catch (dismissError) {
+      setError(
+        dismissError instanceof Error
+          ? dismissError.message
+          : "Unable to dismiss the product announcement."
+      );
+    }
+  }
+
+  async function handleGenerateReferralCode() {
+    if (!token) return;
+    setReferralLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateReferralCode(token);
+      setReferralStats((current) => ({
+        referralCode: response.referralCode,
+        totalClicks: current?.totalClicks ?? 0,
+        conversions: current?.conversions ?? 0,
+      }));
+    } catch (generationError) {
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : "Unable to generate a referral code."
+      );
+    } finally {
+      setReferralLoading(false);
+    }
+  }
 
   async function handleCreateProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -163,6 +250,21 @@ export default function DashboardPage() {
         </div>
 
         {error ? <Notice tone="danger">{error}</Notice> : null}
+        {whatsNew ? (
+          <div className="rounded-2xl border border-[var(--fyxvo-brand)]/30 bg-[var(--fyxvo-brand)]/10 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--fyxvo-text)]">{whatsNew.title}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                  {whatsNew.description}
+                </p>
+              </div>
+              <Button type="button" variant="ghost" onClick={() => void handleDismissWhatsNew()}>
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {success ? (
           <Notice tone="success">
             Project activation verified. The project PDA is{" "}
@@ -170,6 +272,52 @@ export default function DashboardPage() {
             .
           </Notice>
         ) : null}
+
+        <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[var(--fyxvo-text)]">Referral code</p>
+              <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                Share your invite URL to send collaborators to the wallet onboarding flow.
+              </p>
+            </div>
+            {referralUrl ? (
+              <div className="flex items-center gap-2 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-2">
+                <span className="font-mono text-xs text-[var(--fyxvo-text)]">{referralUrl}</span>
+                <CopyButton text={referralUrl} />
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                loading={referralLoading}
+                onClick={() => void handleGenerateReferralCode()}
+              >
+                Generate code
+              </Button>
+            )}
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
+              <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Code</p>
+              <p className="mt-2 font-mono text-sm text-[var(--fyxvo-text)]">
+                {referralStats?.referralCode ?? "Not generated"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
+              <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Clicks</p>
+              <p className="mt-2 text-sm font-semibold text-[var(--fyxvo-text)]">
+                {referralStats?.totalClicks ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-3">
+              <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">Conversions</p>
+              <p className="mt-2 text-sm font-semibold text-[var(--fyxvo-text)]">
+                {referralStats?.conversions ?? 0}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {projects.length > 0 ? (
           <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">

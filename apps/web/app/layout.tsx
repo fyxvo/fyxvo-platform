@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { CommandPalette } from "../components/command-palette";
 import { WalletProvider } from "../components/wallet-provider";
 import { PortalProvider } from "../components/portal-provider";
 import { Footer } from "../components/footer";
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
         <WalletProvider>
           <PortalProvider>
             <Nav />
+            <CommandPalette />
             <main className="pt-16">{children}</main>
             <Footer />
           </PortalProvider>

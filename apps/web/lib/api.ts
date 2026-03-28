@@ -27,11 +27,17 @@ import type {
   ProjectBudgetStatus,
   ProjectMemberItem,
   ProjectRequestLogList,
+  ProjectRequestTrace,
   PublicProjectProfile,
+  InviteMetadata,
+  ReferralStats,
+  SearchResults,
   SupportTicket,
   TransactionHistoryItem,
   WalletSession,
   WebhookItem,
+  WebhookDeliveryRecord,
+  WhatsNewItem,
 } from "./types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,6 +59,15 @@ async function apiFetch<T>(
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`API error ${res.status}: ${body}`);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const contentLength = res.headers.get("content-length");
+  if (contentLength === "0") {
+    return undefined as T;
   }
 
   return res.json() as Promise<T>;
@@ -304,6 +319,17 @@ export async function getProjectRequestLogs(params: {
   );
 }
 
+export async function getProjectRequestTrace(params: {
+  projectId: string;
+  traceId: string;
+  token: string;
+}): Promise<ProjectRequestTrace> {
+  return apiFetch<ProjectRequestTrace>(
+    `/v1/projects/${params.projectId}/requests/${params.traceId}`,
+    { token: params.token }
+  );
+}
+
 // ─── Onchain ──────────────────────────────────────────────────────────────────
 
 export async function getOnchainSnapshot(params: {
@@ -482,6 +508,29 @@ export async function deleteProjectWebhook(params: {
   });
 }
 
+export async function getWebhookDeliveries(params: {
+  projectId: string;
+  webhookId: string;
+  token: string;
+}): Promise<WebhookDeliveryRecord[]> {
+  const response = await apiFetch<{ items: WebhookDeliveryRecord[] }>(
+    `/v1/projects/${params.projectId}/webhooks/${params.webhookId}/deliveries`,
+    { token: params.token }
+  );
+  return response.items;
+}
+
+export async function redeliverWebhookDelivery(params: {
+  projectId: string;
+  deliveryId: string;
+  token: string;
+}): Promise<{ success: true }> {
+  return apiFetch(`/v1/projects/${params.projectId}/webhooks/events/${params.deliveryId}/redeliver`, {
+    method: "POST",
+    token: params.token,
+  });
+}
+
 export async function getSupportTickets(token: string): Promise<SupportTicket[]> {
   const response = await apiFetch<{ tickets: SupportTicket[] }>("/v1/support/tickets", { token });
   return response.tickets;
@@ -592,6 +641,80 @@ export async function submitAssistantFeedback(params: {
     method: "POST",
     token,
     body: JSON.stringify({ conversationId, ...body }),
+  });
+}
+
+export async function getWhatsNew(token: string): Promise<WhatsNewItem | null> {
+  const response = await apiFetch<{ item: WhatsNewItem | null }>("/v1/whats-new", { token });
+  return response.item;
+}
+
+export async function dismissWhatsNew(params: {
+  token: string;
+  version: string;
+}): Promise<{ success: true }> {
+  return apiFetch("/v1/whats-new/dismiss", {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({ version: params.version }),
+  });
+}
+
+export async function getReferralStats(token: string): Promise<ReferralStats> {
+  return apiFetch<ReferralStats>("/v1/referral/stats", { token });
+}
+
+export async function generateReferralCode(token: string): Promise<{ referralCode: string }> {
+  return apiFetch<{ referralCode: string }>("/v1/referral/generate", {
+    method: "POST",
+    token,
+  });
+}
+
+export async function recordReferralClick(code: string): Promise<{ success: true }> {
+  return apiFetch<{ success: true }>(`/v1/referral/click/${code}`, {
+    method: "POST",
+  });
+}
+
+export async function confirmEmailVerification(token: string): Promise<{ success: true }> {
+  return apiFetch<{ success: true }>("/v1/me/verify-email/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export async function getInviteMetadata(token: string): Promise<InviteMetadata> {
+  return apiFetch<InviteMetadata>(`/v1/invite/${token}`);
+}
+
+export async function acceptInvite(params: {
+  token: string;
+  authToken: string;
+}): Promise<{ accepted: true }> {
+  return apiFetch<{ accepted: true }>(`/v1/invite/${params.token}/accept`, {
+    method: "POST",
+    token: params.authToken,
+  });
+}
+
+export async function declineInvite(params: {
+  token: string;
+  authToken: string;
+}): Promise<{ declined: true }> {
+  return apiFetch<{ declined: true }>(`/v1/invite/${params.token}/decline`, {
+    method: "POST",
+    token: params.authToken,
+  });
+}
+
+export async function searchWorkspace(params: {
+  token: string;
+  q: string;
+}): Promise<SearchResults> {
+  const query = new URLSearchParams({ q: params.q }).toString();
+  return apiFetch<SearchResults>(`/v1/search?${query}`, {
+    token: params.token,
   });
 }
 

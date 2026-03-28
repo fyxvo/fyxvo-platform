@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Button, Notice } from "@fyxvo/ui";
+import { Button, Modal, Notice } from "@fyxvo/ui";
 import { LoadingSkeleton } from "../../../components/loading-skeleton";
 import { RetryBanner } from "../../../components/retry-banner";
 import { AuthGate } from "../../../components/state-panels";
@@ -10,14 +10,21 @@ import {
   archiveProject,
   createProjectWebhook,
   deleteProjectWebhook,
+  getWebhookDeliveries,
   getProject,
   getProjectMembers,
   getProjectWebhooks,
   inviteProjectMember,
+  redeliverWebhookDelivery,
   updateProject,
 } from "../../../lib/api";
 import { usePortal } from "../../../lib/portal-context";
-import type { ProjectDetail, ProjectMemberItem, WebhookItem } from "../../../lib/types";
+import type {
+  ProjectDetail,
+  ProjectMemberItem,
+  WebhookDeliveryRecord,
+  WebhookItem,
+} from "../../../lib/types";
 
 const WEBHOOK_EVENTS = [
   "funding.confirmed",
@@ -33,6 +40,10 @@ export default function DashboardSettingsPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [members, setMembers] = useState<ProjectMemberItem[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookItem[]>([]);
+  const [selectedWebhook, setSelectedWebhook] = useState<WebhookItem | null>(null);
+  const [deliveries, setDeliveries] = useState<WebhookDeliveryRecord[]>([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  const [deliveryActionId, setDeliveryActionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +51,14 @@ export default function DashboardSettingsPage() {
   const [inviteWallet, setInviteWallet] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookEvents, setWebhookEvents] = useState<string[]>(["project.activated"]);
+
+  const getDeliveryLatency = (delivery: WebhookDeliveryRecord) => {
+    if (!delivery.deliveredAt) return null;
+    const attempted = new Date(delivery.attemptedAt).getTime();
+    const delivered = new Date(delivery.deliveredAt).getTime();
+    if (Number.isNaN(attempted) || Number.isNaN(delivered)) return null;
+    return Math.max(0, delivered - attempted);
+  };
 
   const loadSettings = useCallback(async () => {
     if (!token || !selectedProject) return;
@@ -164,6 +183,61 @@ export default function DashboardSettingsPage() {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to remove webhook.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleOpenDeliveries(webhook: WebhookItem) {
+    if (!token || !project) return;
+    setSelectedWebhook(webhook);
+    setDeliveries([]);
+    setDeliveriesLoading(true);
+    setError(null);
+
+    try {
+      const items = await getWebhookDeliveries({
+        projectId: project.id,
+        webhookId: webhook.id,
+        token,
+      });
+      setDeliveries(items);
+    } catch (deliveryError) {
+      setError(
+        deliveryError instanceof Error
+          ? deliveryError.message
+          : "Unable to load webhook deliveries."
+      );
+    } finally {
+      setDeliveriesLoading(false);
+    }
+  }
+
+  async function handleRedeliver(deliveryId: string) {
+    if (!token || !project || !selectedWebhook) return;
+    setDeliveryActionId(deliveryId);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await redeliverWebhookDelivery({
+        projectId: project.id,
+        deliveryId,
+        token,
+      });
+      const items = await getWebhookDeliveries({
+        projectId: project.id,
+        webhookId: selectedWebhook.id,
+        token,
+      });
+      setDeliveries(items);
+      setNotice("Webhook redelivery queued.");
+    } catch (redeliverError) {
+      setError(
+        redeliverError instanceof Error
+          ? redeliverError.message
+          : "Unable to redeliver this webhook event."
+      );
+    } finally {
+      setDeliveryActionId(null);
     }
   }
 
@@ -412,6 +486,14 @@ export default function DashboardSettingsPage() {
                       </div>
                       <Button
                         type="button"
+                        variant="ghost"
+                        onClick={() => void handleOpenDeliveries(webhook)}
+                        disabled={saving}
+                      >
+                        Deliveries
+                      </Button>
+                      <Button
+                        type="button"
                         variant="secondary"
                         onClick={() => void handleDeleteWebhook(webhook.id)}
                         disabled={saving}
@@ -439,6 +521,79 @@ export default function DashboardSettingsPage() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={selectedWebhook !== null}
+        onClose={() => {
+          setSelectedWebhook(null);
+          setDeliveries([]);
+        }}
+        title="Webhook deliveries"
+        description={
+          selectedWebhook
+            ? `Recent delivery attempts for ${selectedWebhook.url}`
+            : "Recent webhook delivery attempts."
+        }
+      >
+        {deliveriesLoading ? (
+          <div className="space-y-3">
+            <LoadingSkeleton className="h-16 rounded-2xl" />
+            <LoadingSkeleton className="h-16 rounded-2xl" />
+            <LoadingSkeleton className="h-16 rounded-2xl" />
+          </div>
+        ) : deliveries.length === 0 ? (
+          <p className="text-sm text-[var(--fyxvo-text-muted)]">
+            No delivery attempts have been recorded for this webhook yet.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {deliveries.map((delivery) => {
+              const latency = getDeliveryLatency(delivery);
+              return (
+                <div
+                  key={delivery.id}
+                  className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 text-sm text-[var(--fyxvo-text-soft)]">
+                      <p className="font-medium text-[var(--fyxvo-text)]">{delivery.eventType}</p>
+                      <p className="mt-2">
+                        HTTP status:{" "}
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                            delivery.responseStatus === 200
+                              ? "bg-emerald-500/10 text-emerald-300"
+                              : delivery.responseStatus === 429
+                                ? "bg-amber-500/10 text-amber-300"
+                                : delivery.responseStatus && delivery.responseStatus >= 400
+                                  ? "bg-rose-500/10 text-rose-300"
+                                  : "bg-[var(--fyxvo-panel)] text-[var(--fyxvo-text-muted)]"
+                          }`}
+                        >
+                          {delivery.responseStatus ?? delivery.status}
+                        </span>
+                      </p>
+                      <p className="mt-2">Latency: {latency === null ? "Unavailable" : `${latency}ms`}</p>
+                      <p className="mt-2">Attempted: {new Date(delivery.attemptedAt).toLocaleString()}</p>
+                      <p className="mt-2">Attempt: {delivery.attemptNumber}</p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={deliveryActionId === delivery.id}
+                        onClick={() => void handleRedeliver(delivery.id)}
+                      >
+                        {deliveryActionId === delivery.id ? "Queueing…" : "Redeliver"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
     </AuthGate>
   );
 }

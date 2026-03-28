@@ -635,7 +635,7 @@ describe("frontend flows", () => {
       );
     });
     expect(
-      await screen.findByText("Ask about onboarding, debugging, relay behavior, or live project state")
+      await screen.findByText("Ask about onboarding, debugging, relay behavior, or live project state.")
     ).toBeInTheDocument();
   }, 10000);
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AddressLink } from "../../components/address-link";
 import { protocolAddresses } from "../../lib/public-data";
 
 export default function OperatorsPage() {
@@ -48,15 +49,15 @@ export default function OperatorsPage() {
           <div className="mt-6 space-y-3 text-sm text-[var(--fyxvo-text-soft)]">
             <p>
               Operator registry:{" "}
-              <span className="font-mono text-[var(--fyxvo-text)]">{protocolAddresses.operatorRegistry}</span>
+              <AddressLink address={protocolAddresses.operatorRegistry} chars={8} />
             </p>
             <p>
               Program ID:{" "}
-              <span className="font-mono text-[var(--fyxvo-text)]">{protocolAddresses.programId}</span>
+              <AddressLink address={protocolAddresses.programId} chars={8} />
             </p>
             <p>
               Protocol authority:{" "}
-              <span className="font-mono text-[var(--fyxvo-text)]">{protocolAddresses.protocolAuthority}</span>
+              <AddressLink address={protocolAddresses.protocolAuthority} chars={8} />
             </p>
           </div>
         </div>

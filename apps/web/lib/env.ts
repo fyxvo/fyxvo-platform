@@ -4,6 +4,9 @@ export const API_BASE =
 export const GATEWAY_BASE =
   process.env.NEXT_PUBLIC_GATEWAY_BASE_URL ?? "https://rpc.fyxvo.com";
 
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.fyxvo.com";
+
 export const SOLANA_CLUSTER =
   process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
 

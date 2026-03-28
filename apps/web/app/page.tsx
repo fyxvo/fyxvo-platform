@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Button } from "@fyxvo/ui";
+import { AddressLink } from "../components/address-link";
 import { CopyButton } from "../components/copy-button";
 import { EmailSubscribeForm } from "../components/email-subscribe-form";
 import { AlertIcon, CodeIcon, KeyIcon, WalletIcon, ZapIcon } from "../components/icons";
@@ -339,9 +340,13 @@ export default async function HomePage() {
                     <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                       {key}
                     </p>
-                    <p className="mt-2 break-all font-mono text-sm text-[var(--fyxvo-text)]">
-                      {value}
-                    </p>
+                    <div className="mt-2">
+                      <AddressLink
+                        address={value}
+                        chars={10}
+                        className="break-all font-mono text-sm text-[var(--fyxvo-brand)] hover:underline"
+                      />
+                    </div>
                   </div>
                   <CopyButton text={value} className="shrink-0" />
                 </div>

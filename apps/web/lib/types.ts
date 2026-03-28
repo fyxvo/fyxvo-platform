@@ -234,6 +234,25 @@ export interface ProjectRequestLogList {
   totalPages: number;
 }
 
+export interface ProjectRequestTrace {
+  id: string;
+  requestId: string;
+  method: string;
+  durationMs: number;
+  statusCode: number;
+  route: string;
+  service: string;
+  createdAt: string;
+  upstreamNode: string | null;
+  region: string | null;
+  requestSize: number | null;
+  responseSize: number | null;
+  cacheHit: boolean | null;
+  simulated: boolean;
+  mode: "standard" | "priority" | null;
+  fyxvoHint: unknown;
+}
+
 export interface AlertCenterItem {
   alertKey: string;
   id: string;
@@ -274,6 +293,21 @@ export interface WebhookItem {
   active: boolean;
   lastTriggeredAt: string | null;
   createdAt: string;
+}
+
+export interface WebhookDeliveryRecord {
+  id: string;
+  webhookId: string;
+  eventType: string;
+  success: boolean;
+  status: string;
+  responseStatus: number | null;
+  responseBody: string | null;
+  attemptNumber: number;
+  nextRetryAt: string | null;
+  deliveredAt: string | null;
+  payload: Record<string, unknown> | null;
+  attemptedAt: string;
 }
 
 export interface ProjectMemberItem {
@@ -320,6 +354,18 @@ export interface SupportTicket {
   resolvedAt: string | null;
 }
 
+export interface ReferralStats {
+  referralCode: string | null;
+  totalClicks: number;
+  conversions: number;
+}
+
+export interface InviteMetadata {
+  projectId: string;
+  projectName: string;
+  inviterWallet: string;
+}
+
 // ─── Operators ────────────────────────────────────────────────────────────────
 
 export interface Operator {
@@ -361,6 +407,27 @@ export interface AssistantRateLimitStatus {
   resetAt: string;
   model: string;
   assistantAvailable: boolean;
+}
+
+export interface WhatsNewItem {
+  id: string;
+  title: string;
+  description: string;
+  version: string;
+  publishedAt: string;
+}
+
+export interface SearchResult {
+  type: "project" | "api_key" | "request";
+  displayName: string;
+  description?: string;
+  path: string;
+}
+
+export interface SearchResults {
+  projects: SearchResult[];
+  apiKeys: SearchResult[];
+  requests: SearchResult[];
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

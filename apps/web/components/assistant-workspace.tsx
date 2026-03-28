@@ -1,19 +1,29 @@
 "use client";
 
 import { Button } from "@fyxvo/ui";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   clearAssistantConversation,
+  getAssistantConversation,
   getLatestAssistantConversation,
   listAssistantConversations,
 } from "../lib/api";
 import { API_BASE } from "../lib/env";
 import { usePortal } from "../lib/portal-context";
+import type { AssistantConversation } from "../lib/types";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+}
+
+function mapConversationMessages(conversation: AssistantConversation): Message[] {
+  return (conversation.messages ?? []).map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+  }));
 }
 
 function parseMarkdownBlocks(content: string): Array<{ type: "text" | "code"; value: string; lang?: string }> {
@@ -104,6 +114,10 @@ export function AssistantWorkspace() {
   const { token, walletPhase, selectedProject, projects } = usePortal();
   const isAuthenticated = walletPhase === "authenticated" && !!token;
 
+  const [conversations, setConversations] = useState<AssistantConversation[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationsError, setConversationsError] = useState<string | null>(null);
+  const [activeConversationLoading, setActiveConversationLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -111,20 +125,84 @@ export function AssistantWorkspace() {
   const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load latest conversation when authenticated
+  const loadConversationIndex = useCallback(async () => {
+    if (!token) return [] as AssistantConversation[];
+
+    setConversationsLoading(true);
+    setConversationsError(null);
+
+    try {
+      const { items } = await listAssistantConversations(token);
+      setConversations(items);
+      return items;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to load assistant conversations.";
+      setConversationsError(message);
+      return [] as AssistantConversation[];
+    } finally {
+      setConversationsLoading(false);
+    }
+  }, [token]);
+
+  const loadConversation = useCallback(
+    async (nextConversationId: string) => {
+      if (!token) return;
+
+      setActiveConversationLoading(true);
+      setSendError(null);
+
+      try {
+        const { item } = await getAssistantConversation({
+          conversationId: nextConversationId,
+          token,
+        });
+        setConversationId(item.id);
+        setMessages(mapConversationMessages(item));
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unable to load the selected conversation.";
+        setSendError(message);
+      } finally {
+        setActiveConversationLoading(false);
+      }
+    },
+    [token]
+  );
+
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (!isAuthenticated || !token) {
+      setConversations([]);
+      setMessages([]);
+      setConversationId(null);
+      setSendError(null);
+      setConversationsError(null);
+      return;
+    }
 
     void (async () => {
+      setConversationsLoading(true);
+      setConversationsError(null);
       try {
-        await listAssistantConversations(token);
-        const { item } = await getLatestAssistantConversation(token);
-        if (item?.messages) {
-          setMessages(item.messages.map((m) => ({ id: m.id, role: m.role, content: m.content })));
-          setConversationId(item.id);
+        const [{ items }, latestResponse] = await Promise.all([
+          listAssistantConversations(token),
+          getLatestAssistantConversation(token),
+        ]);
+        setConversations(items);
+
+        if (latestResponse.item) {
+          setConversationId(latestResponse.item.id);
+          setMessages(mapConversationMessages(latestResponse.item));
+        } else {
+          setConversationId(null);
+          setMessages([]);
         }
-      } catch {
-        // ignore
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unable to load assistant workspace.";
+        setConversationsError(message);
+      } finally {
+        setConversationsLoading(false);
       }
     })();
   }, [isAuthenticated, token]);
@@ -277,6 +355,8 @@ export function AssistantWorkspace() {
       if (!streamCompleted) {
         setStreaming(false);
       }
+
+      await loadConversationIndex();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Assistant request failed. Please try again.";
@@ -298,82 +378,145 @@ export function AssistantWorkspace() {
     await clearAssistantConversation(conversationId, token);
     setMessages([]);
     setConversationId(null);
+    await loadConversationIndex();
   };
 
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Messages area */}
-      <div className="flex flex-col gap-3 min-h-[200px]">
-        {!hasMessages ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-12 text-center">
-            {!isAuthenticated ? (
-              <p className="text-[var(--fyxvo-text-muted)] text-sm">
-                Getting started
-              </p>
-            ) : (
-              <p className="text-[var(--fyxvo-text-muted)] text-sm">
-                Ask about onboarding, debugging, relay behavior, or live project state
-              </p>
-            )}
+    <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <aside className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--fyxvo-text)]">Conversations</p>
+            <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+              Resume recent assistant threads.
+            </p>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Composer */}
-      {isAuthenticated ? (
-        <div className="flex flex-col gap-2">
-          {sendError ? (
-            <p className="text-sm text-rose-400">{sendError}</p>
-          ) : null}
-          <div className="flex gap-2">
-            <textarea
-              aria-label="Message Fyxvo Assistant"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-              rows={3}
-              placeholder="Ask anything about your project, RPC, or relay setup…"
-              className="flex-1 resize-none rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] outline-none focus:border-[var(--fyxvo-brand)] focus:ring-2 focus:ring-[var(--fyxvo-brand)]/30"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex gap-2">
-              {hasMessages || conversationId ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleClear()}
-                >
-                  Clear
-                </Button>
-              ) : null}
-            </div>
+          {isAuthenticated ? (
             <Button
-              variant="primary"
               size="sm"
-              onClick={() => void handleSend()}
-              loading={streaming}
-              disabled={!input.trim() || streaming}
+              variant="ghost"
+              onClick={() => {
+                setConversationId(null);
+                setMessages([]);
+                setSendError(null);
+              }}
             >
-              Send
+              New
             </Button>
-          </div>
+          ) : null}
         </div>
-      ) : null}
+
+        <div className="mt-4 space-y-2">
+          {!isAuthenticated ? (
+            <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+              Connect your wallet to load saved assistant conversations.
+            </p>
+          ) : conversationsLoading ? (
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">Loading conversation history…</p>
+          ) : conversationsError ? (
+            <div className="space-y-2">
+              <p className="text-sm text-rose-400">{conversationsError}</p>
+              <Button size="sm" variant="ghost" onClick={() => void loadConversationIndex()}>
+                Retry
+              </Button>
+            </div>
+          ) : conversations.length === 0 ? (
+            <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+              No saved conversations yet. Send your first assistant message to create one.
+            </p>
+          ) : (
+            conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => void loadConversation(conversation.id)}
+                className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                  conversation.id === conversationId
+                    ? "border-[var(--fyxvo-brand)] bg-[var(--fyxvo-panel)]"
+                    : "border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] hover:border-[var(--fyxvo-border-strong)]"
+                }`}
+              >
+                <p className="truncate text-sm font-medium text-[var(--fyxvo-text)]">
+                  {conversation.title}
+                </p>
+                <p className="mt-1 text-xs text-[var(--fyxvo-text-muted)]">
+                  {conversation.messageCount} messages
+                </p>
+                <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
+                  {new Date(conversation.lastMessageAt || conversation.updatedAt).toLocaleString()}
+                </p>
+              </button>
+            ))
+          )}
+        </div>
+      </aside>
+
+      <div className="flex min-h-[28rem] flex-col gap-4 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4 sm:p-5">
+        <div className="flex flex-1 flex-col gap-3 overflow-hidden">
+          {!hasMessages ? (
+            <div className="flex min-h-[16rem] flex-col items-center justify-center gap-4 py-12 text-center">
+              {!isAuthenticated ? (
+                <p className="text-sm text-[var(--fyxvo-text-muted)]">Getting started</p>
+              ) : activeConversationLoading ? (
+                <p className="text-sm text-[var(--fyxvo-text-muted)]">Loading conversation…</p>
+              ) : (
+                <p className="text-sm text-[var(--fyxvo-text-muted)]">
+                  Ask about onboarding, debugging, relay behavior, or live project state.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex max-h-[32rem] flex-col gap-3 overflow-y-auto pr-1">
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+              <div ref={bottomRef} />
+            </div>
+          )}
+        </div>
+
+        {isAuthenticated ? (
+          <div className="flex flex-col gap-2">
+            {sendError ? <p className="text-sm text-rose-400">{sendError}</p> : null}
+            <div className="flex gap-2">
+              <textarea
+                aria-label="Message Fyxvo Assistant"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSend();
+                  }
+                }}
+                rows={3}
+                placeholder="Ask anything about your project, RPC, or relay setup…"
+                className="flex-1 resize-none rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-sm text-[var(--fyxvo-text)] placeholder:text-[var(--fyxvo-text-muted)] outline-none focus:border-[var(--fyxvo-brand)] focus:ring-2 focus:ring-[var(--fyxvo-brand)]/30"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-2">
+                {hasMessages || conversationId ? (
+                  <Button variant="ghost" size="sm" onClick={() => void handleClear()}>
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void handleSend()}
+                loading={streaming}
+                disabled={!input.trim() || streaming}
+              >
+                Send
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

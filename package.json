@@ -9,12 +9,12 @@
     "pnpm": ">=10.23.0"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel",
+    "dev": "pnpm exec turbo run dev --parallel",
     "dev:full": "pnpm exec tsx scripts/dev-full.ts",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "build": "pnpm exec turbo run build",
+    "lint": "pnpm exec turbo run lint",
+    "typecheck": "pnpm exec turbo run typecheck",
+    "test": "pnpm exec turbo run test",
     "ci:install": "pnpm install --frozen-lockfile",
     "ci:verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "prod:verify": "pnpm exec tsx scripts/verify-production.ts",

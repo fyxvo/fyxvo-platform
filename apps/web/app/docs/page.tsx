@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
 import { DocsApiExplorer } from "../../components/docs-api-explorer";
+import { AddressLink } from "../../components/address-link";
 import { protocolAddresses, requestPricingTiers } from "../../lib/public-data";
 
 const DOC_SECTIONS = [
@@ -268,9 +269,13 @@ export default function DocsPage() {
                       <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                         {label}
                       </p>
-                      <p className="mt-2 break-all font-mono text-xs text-[var(--fyxvo-text)]">
-                        {value}
-                      </p>
+                      <div className="mt-2">
+                        <AddressLink
+                          address={value}
+                          chars={10}
+                          className="break-all font-mono text-xs text-[var(--fyxvo-brand)] hover:underline"
+                        />
+                      </div>
                     </div>
                     <CopyButton text={value} className="shrink-0" />
                   </div>
