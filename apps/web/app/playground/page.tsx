@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const STANDARD_URL = "https://rpc.fyxvo.com/rpc";
 const PRIORITY_URL = "https://rpc.fyxvo.com/priority";
@@ -184,11 +184,18 @@ function ResponseView({
 // ---------------------------------------------------------------------------
 
 export default function PlaygroundPage() {
-  const [selectedMethod, setSelectedMethod] = useState("getBalance");
+  const [selectedMethod, setSelectedMethod] = useState(() => {
+    if (typeof window === "undefined") return "getBalance";
+    return new URLSearchParams(window.location.search).get("method") ?? "getBalance";
+  });
+  const [prevMethod, setPrevMethod] = useState(selectedMethod);
   const [pubkey, setPubkey] = useState("");
   const [slot, setSlot] = useState("");
   const [sig, setSig] = useState("");
-  const [genericJson, setGenericJson] = useState("[]");
+  const [genericJson, setGenericJson] = useState(() => {
+    if (typeof window === "undefined") return "[]";
+    return new URLSearchParams(window.location.search).get("params") ?? "[]";
+  });
   const [relayPath, setRelayPath] = useState<"standard" | "priority">("standard");
   const [apiKey, setApiKey] = useState("");
   const [simulate, setSimulate] = useState(false);
@@ -196,23 +203,14 @@ export default function PlaygroundPage() {
   const [panelA, setPanelA] = useState<ResponsePanel>(EMPTY_PANEL);
   const [panelB, setPanelB] = useState<ResponsePanel>(EMPTY_PANEL);
 
-  // Reset param fields when method changes
-  useEffect(() => {
+  // Reset param fields when method changes (setState during render)
+  if (prevMethod !== selectedMethod) {
+    setPrevMethod(selectedMethod);
     setPubkey("");
     setSlot("");
     setSig("");
     setGenericJson("[]");
-  }, [selectedMethod]);
-
-  // Handle share URL parsing
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const m = params.get("method");
-    if (m) setSelectedMethod(m);
-    const p = params.get("params");
-    if (p) setGenericJson(p);
-  }, []);
+  }
 
   function handleShare() {
     const params = new URLSearchParams({ method: selectedMethod });

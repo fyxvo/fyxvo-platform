@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePortal } from "./portal-provider";
-import { WalletConnectButton } from "./wallet-connect-button";
 import { webEnv } from "../lib/env";
 import { clearAssistantConversation } from "../lib/api";
 

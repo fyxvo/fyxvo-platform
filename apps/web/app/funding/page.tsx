@@ -75,28 +75,17 @@ function PhaseIndicator({ phase }: { readonly phase: string }) {
 
 export default function FundingPage() {
   const portal = usePortal();
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(() => portal.selectedProject?.id ?? "");
   const [amount, setAmount] = useState("1000000000");
   const [asset, setAsset] = useState<"SOL" | "USDC">("SOL");
   const [balances, setBalances] = useState<Record<string, ProjectBalance>>({});
   const [txHistory, setTxHistory] = useState<Transaction[]>([]);
   const [txLoading, setTxLoading] = useState(false);
 
-  // Set default project
-  useEffect(() => {
-    if (!selectedProjectId && portal.selectedProject?.id) {
-      setSelectedProjectId(portal.selectedProject.id);
-    }
-  }, [portal.selectedProject, selectedProjectId]);
-
   // Fetch on-chain balances per project
   useEffect(() => {
     if (!portal.token || portal.projects.length === 0) return;
     for (const proj of portal.projects) {
-      setBalances((prev) => ({
-        ...prev,
-        [proj.id]: { projectId: proj.id, balance: null, loading: true },
-      }));
       fetch(`${API}/v1/projects/${proj.id}/onchain`, {
         headers: { Authorization: `Bearer ${portal.token ?? ""}` },
       })
@@ -124,7 +113,6 @@ export default function FundingPage() {
   // Fetch transaction history
   useEffect(() => {
     if (!portal.token) return;
-    setTxLoading(true);
     fetch(`${API}/v1/transactions`, {
       headers: { Authorization: `Bearer ${portal.token}` },
     })

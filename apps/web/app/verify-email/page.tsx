@@ -21,7 +21,6 @@ export default function VerifyEmailPage() {
     if (!token) return;
 
     let cancelled = false;
-    setState("loading");
 
     void fetch(`${API}/v1/me/verify-email/confirm`, {
       method: "POST",
