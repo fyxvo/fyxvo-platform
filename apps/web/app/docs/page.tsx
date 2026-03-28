@@ -5,6 +5,12 @@ import { DocsApiExplorer } from "../../components/docs-api-explorer";
 import { AddressLink } from "../../components/address-link";
 import { protocolAddresses, requestPricingTiers } from "../../lib/public-data";
 
+const USDC_PRICING_DETAILS = [
+  "100 USDC base units, or 0.0001 USDC, per request.",
+  "300 USDC base units, or 0.0003 USDC, per request.",
+  "500 USDC base units, or 0.0005 USDC, per request.",
+] as const;
+
 const DOC_SECTIONS = [
   { id: "network-architecture", label: "Network architecture" },
   { id: "operator-network", label: "Operator network" },
@@ -65,8 +71,8 @@ Response:
 const fundingFlowExample = `POST https://api.fyxvo.com/v1/projects/:projectId/funding/prepare
 Authorization: Bearer JWT
 {
-  "asset": "SOL",
-  "amount": "1000000000",
+  "asset": "USDC",
+  "amount": "2500000",
   "funderWalletAddress": "BASE58_SOLANA_WALLET"
 }
 
@@ -76,7 +82,9 @@ Response:
     "fundingRequestId": "uuid",
     "transactionBase64": "base64-v0-transaction",
     "recentBlockhash": "base58",
-    "lastValidBlockHeight": 123
+    "lastValidBlockHeight": 123,
+    "asset": "USDC",
+    "amount": "2500000"
   }
 }`;
 
@@ -295,6 +303,8 @@ export default function DocsPage() {
             <p className="text-base leading-7 text-[var(--fyxvo-text-soft)]">
               Creating a project returns an activation transaction. Funding then follows a prepare,
               sign, and verify sequence so the on-chain treasury and workspace balance stay in sync.
+              The live devnet rollout now accepts either SOL lamports or USDC base units, depending
+              on which treasury asset the project wants to hold.
             </p>
             <CodeBlock code={fundingFlowExample} />
             <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
@@ -312,7 +322,9 @@ export default function DocsPage() {
               Use `rpc.fyxvo.com/rpc` for standard JSON-RPC traffic and `rpc.fyxvo.com/priority`
               for time-sensitive relay traffic. Both paths require an API key. The priority lane
               also requires the `priority:relay` scope. The live gateway currently publishes
-              `5,000` lamports for standard RPC and `20,000` lamports for priority relay.
+              `5,000` lamports for standard RPC, `20,000` lamports for the higher-cost 4x lane,
+              and `20,000` lamports for priority relay. Projects can also fund against USDC at
+              `100`, `300`, and `500` base units across those three lanes.
             </p>
             <CodeBlock code={gatewayExample} />
           </div>
@@ -351,7 +363,7 @@ export default function DocsPage() {
               Public pricing contract
             </h2>
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {requestPricingTiers.map((tier) => (
+              {requestPricingTiers.map((tier, index) => (
                 <div
                   key={tier.name}
                   className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
@@ -359,6 +371,9 @@ export default function DocsPage() {
                   <p className="text-sm font-medium text-[var(--fyxvo-text)]">{tier.name}</p>
                   <p className="mt-2 text-xl font-semibold text-[var(--fyxvo-brand)]">
                     {tier.lamports.toLocaleString()} lamports
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
+                    {USDC_PRICING_DETAILS[index]}
                   </p>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
                     {tier.description}
@@ -368,7 +383,8 @@ export default function DocsPage() {
             </div>
             <p className="mt-6 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
               The live gateway currently publishes 5,000 lamports for standard RPC and 20,000
-              lamports for both priority relay and the higher-cost 4x lane. Discounts apply
+              lamports for both priority relay and the higher-cost 4x lane. The same lanes can be
+              funded in devnet USDC at 100, 300, and 500 base units respectively. Discounts apply
               automatically at one million requests per month for 20 percent off and at ten
               million requests per month for 40 percent off. There is no free tier in the live
               devnet deployment.

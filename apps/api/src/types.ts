@@ -577,6 +577,19 @@ export interface OperatorNetworkSummary {
   readonly totalRegistered: number;
 }
 
+export interface AdminOperatorRegistrationSummary {
+  readonly id: string;
+  readonly endpoint: string;
+  readonly operatorWalletAddress: string;
+  readonly name: string;
+  readonly region: string;
+  readonly contact: string;
+  readonly status: string;
+  readonly rejectionReason: string | null;
+  readonly createdAt: string;
+  readonly approvedAt: string | null;
+}
+
 export interface FundingHistoryItem {
   readonly id: string;
   readonly projectId: string;
@@ -891,6 +904,7 @@ export interface ApiRepository {
   createFeedbackSubmission(input: CreateFeedbackSubmissionInput): Promise<FeedbackSubmission>;
   createOperatorRegistration(input: CreateOperatorRegistrationInput): Promise<OperatorRegistrationRecord>;
   listOperatorRegistrationsByWallet(walletAddress: string): Promise<OperatorRegistrationRecord[]>;
+  listOperatorRegistrations(): Promise<OperatorRegistrationRecord[]>;
   getOperatorRegistrationById(id: string): Promise<OperatorRegistrationRecord | null>;
   approveOperatorRegistration(id: string): Promise<{
     readonly registration: OperatorRegistrationRecord;

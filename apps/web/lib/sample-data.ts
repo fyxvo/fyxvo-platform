@@ -134,11 +134,57 @@ export const previewProjectAnalytics: ProjectAnalytics = {
 };
 
 export const previewAdminOverview: AdminOverview = {
-  totalProjects: 47,
-  totalUsers: 38,
-  totalRequests: 1_240_000,
-  activeProjects: 31,
-  updatedAt: "2026-03-26T00:00:00.000Z",
+  worker: {
+    status: "healthy",
+    lastCursorAt: "2026-03-26T00:00:00.000Z",
+    lastCursorKey: "digest:cursor",
+    lastRollupAt: "2026-03-26T00:00:00.000Z",
+    staleThresholdMinutes: 15,
+  },
+  recentErrors: [],
+  recentFundingEvents: [],
+  recentProjectActivity: [],
+  interestSubmissions: {
+    total: 47,
+    recent: [],
+  },
+  recentApiKeyActivity: [],
+  feedbackSubmissions: {
+    total: 12,
+    open: 4,
+    recent: [],
+  },
+  launchFunnel: {
+    periodDays: 30,
+    counts: {
+      landingCtaClicks: 130,
+      walletConnectIntent: 84,
+      projectCreationStarted: 32,
+      fundingFlowStarted: 18,
+      apiKeyCreated: 11,
+      interestSubmitted: 7,
+    },
+  },
+  protocol: {
+    readiness: null,
+    authorityPlan: {
+      mode: "single-signer",
+      protocolAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
+      pauseAuthority: "AgMDb4kHaUKqZSjZvFUoKpXYYTjz5Lg5pf3CwYuyAsem",
+      upgradeAuthorityHint: null,
+      splitAuthorities: false,
+    },
+    treasury: {
+      solBalance: "1000000000",
+      usdcBalance: "0",
+      reservedSolRewards: "0",
+      reservedUsdcRewards: "0",
+      protocolSolFeesOwed: "0",
+      protocolUsdcFeesOwed: "0",
+      feeWithdrawalReady: false,
+      reconciliationWarnings: [],
+    },
+  },
 };
 
 export const previewAdminStats: AdminStats = {

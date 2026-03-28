@@ -25,6 +25,7 @@ const NAV_LINKS = [
   { href: "/pricing", label: "Pricing" },
   { href: "/explore", label: "Explore" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/mainnet", label: "Mainnet gate" },
   { href: "/status", label: "Status" },
   { href: "/updates", label: "Updates" },
   { href: "/enterprise", label: "Enterprise" },

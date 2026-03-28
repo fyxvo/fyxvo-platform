@@ -403,6 +403,45 @@ export interface OperatorNetworkSummary {
   totalRegistered: number;
 }
 
+export interface MainnetReadinessCheck {
+  key: string;
+  label: string;
+  status: "healthy" | "needs_attention" | "blocked" | string;
+  detail: string;
+}
+
+export interface MainnetReadinessSnapshot {
+  timestamp: string;
+  environment: string;
+  targetReserveLamports: string;
+  confirmedFundingLamports: string;
+  treasurySolBalanceLamports: string | number | null;
+  assistantAvailable: boolean;
+  emailDeliveryConfigured: boolean;
+  authorityMode: string;
+  upgradeAuthorityConfigured: boolean;
+  protocolReady: boolean;
+  activeIncidentCount: number;
+  supportBacklogCount?: number;
+  pendingMigrations?: {
+    detected: boolean;
+    count: number;
+    names?: string[];
+  };
+  treasuryWarnings?: string[];
+  paidBetaEligible: boolean;
+  mainnetBetaEligible: boolean;
+  paidBetaBlockers: string[];
+  mainnetBetaBlockers: string[];
+  checks: MainnetReadinessCheck[];
+  gate: {
+    armed: boolean;
+    armedAt: string | null;
+    armedByWallet?: string | null;
+    notes: string | null;
+  };
+}
+
 // ─── Assistant ────────────────────────────────────────────────────────────────
 
 export interface AssistantConversation {
@@ -458,11 +497,120 @@ export interface SearchResults {
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export interface AdminOverview {
-  totalProjects: number;
-  totalUsers: number;
-  totalRequests: number;
-  activeProjects: number;
-  updatedAt: string;
+  worker: {
+    status: "healthy" | "attention" | "idle";
+    lastCursorAt: string | null;
+    lastCursorKey: string | null;
+    lastRollupAt: string | null;
+    staleThresholdMinutes: number;
+  };
+  recentErrors: Array<{
+    id: string;
+    service: string;
+    route: string;
+    method: string;
+    statusCode: number;
+    durationMs: number;
+    createdAt: string;
+    project: { id: string; name: string; slug: string } | null;
+  }>;
+  recentFundingEvents: Array<{
+    id: string;
+    asset: string;
+    amount: string;
+    createdAt: string;
+    confirmedAt: string | null;
+    transactionSignature: string | null;
+    project: { id: string; name: string; slug: string };
+    requestedBy: { id: string; displayName: string; walletAddress: string };
+  }>;
+  recentProjectActivity: Array<{
+    id: string;
+    service: string;
+    route: string;
+    method: string;
+    statusCode: number;
+    durationMs: number;
+    createdAt: string;
+    project: { id: string; name: string; slug: string } | null;
+  }>;
+  interestSubmissions: {
+    total: number;
+    recent: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      team: string | null;
+      useCase: string;
+      expectedRequestVolume: string;
+      interestAreas: string[];
+      operatorInterest: boolean;
+      source: string;
+      status: string;
+      createdAt: string;
+    }>;
+  };
+  recentApiKeyActivity: Array<{
+    id: string;
+    label: string;
+    prefix: string;
+    status: string;
+    lastUsedAt: string | null;
+    createdAt: string;
+    project: { id: string; name: string; slug: string };
+    createdBy: { id: string; displayName: string; walletAddress: string };
+  }>;
+  feedbackSubmissions: {
+    total: number;
+    open: number;
+    recent: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string | null;
+      team: string | null;
+      walletAddress: string | null;
+      category: string;
+      message: string;
+      source: string;
+      page: string | null;
+      status: string;
+      createdAt: string;
+      project: { id: string; name: string; slug: string } | null;
+    }>;
+  };
+  launchFunnel: {
+    periodDays: number;
+    counts: {
+      landingCtaClicks: number;
+      walletConnectIntent: number;
+      projectCreationStarted: number;
+      fundingFlowStarted: number;
+      apiKeyCreated: number;
+      interestSubmitted: number;
+    };
+  };
+  protocol: {
+    readiness: unknown;
+    authorityPlan: {
+      mode: string;
+      protocolAuthority: string | null;
+      pauseAuthority: string | null;
+      upgradeAuthorityHint: string | null;
+      splitAuthorities: boolean;
+    };
+    treasury: {
+      solBalance: string | null;
+      usdcBalance: string | null;
+      reservedSolRewards: string | null;
+      reservedUsdcRewards: string | null;
+      protocolSolFeesOwed: string | null;
+      protocolUsdcFeesOwed: string | null;
+      feeWithdrawalReady: boolean;
+      reconciliationWarnings: string[];
+    };
+  };
 }
 
 export interface AdminStats {
@@ -475,6 +623,56 @@ export interface AdminStats {
   p95Ms: number;
   errorRateToday: number;
   updatedAt: string;
+}
+
+export interface AdminPlatformStats {
+  totalUsers: number;
+  totalProjects: number;
+  requestsToday: number;
+  requestsThisWeek: number;
+  newsletterCount: number;
+  recentSignups: Array<{
+    walletAddress: string;
+    createdAt: string;
+    projectCount: number;
+  }>;
+}
+
+export interface FeedbackInboxItem {
+  id: string;
+  type:
+    | "feedback_submission"
+    | "assistant_feedback"
+    | "support_ticket"
+    | "newsletter_signup"
+    | "referral_conversion";
+  title: string;
+  summary: string;
+  source: string;
+  createdAt: string;
+  actor: string;
+  project: { id: string; name: string; slug: string } | null;
+  status: "new" | "reviewed" | "planned" | "resolved" | string;
+  tags: string[];
+}
+
+export interface IncidentUpdateItem {
+  id: string;
+  status: string;
+  severity: string | null;
+  message: string;
+  affectedServices: string[];
+  createdAt: string;
+}
+
+export interface IncidentItem {
+  id: string;
+  serviceName: string;
+  severity: string;
+  description: string;
+  startedAt: string;
+  resolvedAt: string | null;
+  updates?: IncidentUpdateItem[];
 }
 
 // ─── Budget ───────────────────────────────────────────────────────────────────

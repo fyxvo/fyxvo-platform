@@ -7,6 +7,8 @@ import { Button, Notice } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
 import {
   dismissWhatsNew,
+  enrollDigest,
+  getEmailDeliveryStatus,
   generateReferralCode,
   getReferralStats,
   getWhatsNew,
@@ -94,15 +96,18 @@ export default function DashboardPage() {
   const [whatsNew, setWhatsNew] = useState<WhatsNewItem | null>(null);
   const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
   const [referralLoading, setReferralLoading] = useState(false);
+  const [showDigestPrompt, setShowDigestPrompt] = useState(false);
+  const [digestLoading, setDigestLoading] = useState(false);
 
   useEffect(() => {
     if (!token) return;
 
     void (async () => {
       try {
-        const [announcement, stats] = await Promise.all([
+        const [announcement, stats, delivery] = await Promise.all([
           getWhatsNew(token),
           getReferralStats(token),
+          getEmailDeliveryStatus(token),
         ]);
 
         if (
@@ -116,6 +121,15 @@ export default function DashboardPage() {
         }
 
         setReferralStats(stats);
+        if (
+          typeof window !== "undefined" &&
+          !delivery.digestEnabled &&
+          window.localStorage.getItem("fyxvo-digest-prompt-dismissed") !== "1"
+        ) {
+          setShowDigestPrompt(true);
+        } else {
+          setShowDigestPrompt(false);
+        }
       } catch {
         // Keep the dashboard usable even if ancillary widgets fail.
       }
@@ -169,6 +183,31 @@ export default function DashboardPage() {
     } finally {
       setReferralLoading(false);
     }
+  }
+
+  async function handleEnrollDigest() {
+    if (!token) return;
+
+    setDigestLoading(true);
+    setError(null);
+
+    try {
+      await enrollDigest(token);
+      setShowDigestPrompt(false);
+    } catch (digestError) {
+      setError(
+        digestError instanceof Error ? digestError.message : "Unable to enroll in the weekly digest."
+      );
+    } finally {
+      setDigestLoading(false);
+    }
+  }
+
+  function handleDismissDigestPrompt() {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("fyxvo-digest-prompt-dismissed", "1");
+    }
+    setShowDigestPrompt(false);
   }
 
   async function handleCreateProject(event: React.FormEvent<HTMLFormElement>) {
@@ -262,6 +301,34 @@ export default function DashboardPage() {
               <Button type="button" variant="ghost" onClick={() => void handleDismissWhatsNew()}>
                 Dismiss
               </Button>
+            </div>
+          </div>
+        ) : null}
+        {showDigestPrompt ? (
+          <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--fyxvo-text)]">
+                  Weekly digest
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                  Receive a weekly summary of your project traffic, funding posture, and platform
+                  updates without checking the workspace every day.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={digestLoading}
+                  onClick={() => void handleEnrollDigest()}
+                >
+                  Enroll
+                </Button>
+                <Button type="button" variant="ghost" onClick={handleDismissDigestPrompt}>
+                  Dismiss
+                </Button>
+              </div>
             </div>
           </div>
         ) : null}

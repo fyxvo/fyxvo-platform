@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePortal } from "../lib/portal-context";
 
@@ -88,4 +89,38 @@ export function ErrorPanel({ message }: { message: string }) {
       {message}
     </div>
   );
+}
+
+export function AdminGate({ children }: { children: ReactNode }) {
+  const { walletPhase, user } = usePortal();
+
+  if (walletPhase !== "authenticated") {
+    return (
+      <AuthGate message="Administrative tools require an authenticated wallet session.">
+        <></>
+      </AuthGate>
+    );
+  }
+
+  if (user?.role !== "ADMIN" && user?.role !== "OWNER") {
+    return (
+      <div className="mx-auto max-w-3xl rounded-[2rem] border border-rose-500/20 bg-rose-500/8 p-8 text-center">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-rose-400">403</p>
+        <h2 className="mt-3 text-2xl font-semibold text-[var(--fyxvo-text)]">
+          Admin access is required
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+          This part of the workspace is reserved for owner and admin wallets.
+        </p>
+        <Link
+          href="/dashboard"
+          className="mt-6 inline-flex rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] px-4 py-2 text-sm font-medium text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand)]"
+        >
+          Back to dashboard
+        </Link>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }

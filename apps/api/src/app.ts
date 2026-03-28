@@ -767,6 +767,38 @@ async function buildMainnetReleaseGateSnapshot(input: {
   };
 }
 
+function isPrivilegedAdminUser(user: AuthenticatedUser | undefined): boolean {
+  return user?.role === "OWNER" || user?.role === "ADMIN";
+}
+
+function toPublicMainnetReleaseGateSnapshot(
+  snapshot: Awaited<ReturnType<typeof buildMainnetReleaseGateSnapshot>>
+) {
+  return {
+    timestamp: snapshot.timestamp,
+    environment: snapshot.environment,
+    targetReserveLamports: snapshot.targetReserveLamports,
+    confirmedFundingLamports: snapshot.confirmedFundingLamports,
+    treasurySolBalanceLamports: snapshot.treasurySolBalanceLamports,
+    assistantAvailable: snapshot.assistantAvailable,
+    emailDeliveryConfigured: snapshot.emailDeliveryConfigured,
+    authorityMode: snapshot.authorityMode,
+    upgradeAuthorityConfigured: snapshot.upgradeAuthorityConfigured,
+    protocolReady: snapshot.protocolReady,
+    activeIncidentCount: snapshot.activeIncidentCount,
+    paidBetaEligible: snapshot.paidBetaEligible,
+    mainnetBetaEligible: snapshot.mainnetBetaEligible,
+    paidBetaBlockers: snapshot.paidBetaBlockers,
+    mainnetBetaBlockers: snapshot.mainnetBetaBlockers,
+    checks: snapshot.checks,
+    gate: {
+      armed: snapshot.gate.armed,
+      armedAt: snapshot.gate.armedAt,
+      notes: snapshot.gate.notes,
+    },
+  };
+}
+
 async function withBlockchainErrors<T>(action: () => Promise<T>) {
   try {
     return await action();
@@ -3366,7 +3398,8 @@ export async function buildApiApp(input: {
     const user = requireUser(request);
     requireAdmin(user);
     return {
-      items: await input.repository.listOperators()
+      items: serializeForJson(await input.repository.listOperatorRegistrations()),
+      activeOperators: serializeForJson(await input.repository.listOperators())
     };
   });
 
@@ -4154,16 +4187,21 @@ export async function buildApiApp(input: {
   });
 
   app.get("/v1/admin/mainnet-readiness-gate", async (request) => {
-    const user = requireUser(request);
-    requireAdmin(user);
     const db = requirePrisma();
+    const snapshot = await buildMainnetReleaseGateSnapshot({
+      env: input.env,
+      prisma: db,
+      blockchain: input.blockchain,
+    });
+
+    if (!isPrivilegedAdminUser(request.currentUser)) {
+      return {
+        item: toPublicMainnetReleaseGateSnapshot(snapshot),
+      };
+    }
 
     return {
-      item: await buildMainnetReleaseGateSnapshot({
-        env: input.env,
-        prisma: db,
-        blockchain: input.blockchain,
-      }),
+      item: snapshot,
     };
   });
 

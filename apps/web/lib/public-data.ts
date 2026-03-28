@@ -217,7 +217,7 @@ export const marketingMilestones: PublicUpdatePost[] = [
     summary:
       "Pricing is request-based in lamports instead of monthly SaaS plans or free-tier bundles.",
     content:
-      "The relay charges 1,000 lamports for standard RPC, 3,000 lamports for compute-heavy methods, and 5,000 lamports for priority relay requests. Volume discounts apply automatically at one million and ten million monthly requests. There is no free tier in the live devnet deployment.",
+      "The relay charges 5,000 lamports for standard RPC and 20,000 lamports for both the higher-cost 4x lane and priority relay requests. Projects can also fund in devnet USDC at 100, 300, and 500 base units across those same lanes. Volume discounts apply automatically at one million and ten million monthly requests. There is no free tier in the live devnet deployment.",
     publishedAt: "2026-03-27T00:00:00.000Z",
   },
   {

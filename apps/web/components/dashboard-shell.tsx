@@ -13,11 +13,15 @@ const DASHBOARD_LINKS = [
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { walletPhase } = usePortal();
+  const { walletPhase, user } = usePortal();
 
   if (walletPhase !== "authenticated") {
     return <>{children}</>;
   }
+
+  const links = user?.role === "ADMIN" || user?.role === "OWNER"
+    ? [...DASHBOARD_LINKS, { href: "/admin", label: "Admin panel" as const }]
+    : DASHBOARD_LINKS;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row">
@@ -27,7 +31,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             Dashboard
           </p>
           <nav className="mt-4 space-y-2">
-            {DASHBOARD_LINKS.map((link) => {
+            {links.map((link) => {
               const active = pathname === link.href;
 
               return (

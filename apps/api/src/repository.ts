@@ -622,6 +622,15 @@ export class PrismaApiRepository implements ApiRepository {
     });
   }
 
+  async listOperatorRegistrations(): Promise<OperatorRegistrationRecord[]> {
+    return this.prisma.operatorRegistration.findMany({
+      orderBy: [
+        { createdAt: "desc" },
+        { name: "asc" }
+      ]
+    });
+  }
+
   async getOperatorRegistrationById(id: string): Promise<OperatorRegistrationRecord | null> {
     return this.prisma.operatorRegistration.findUnique({
       where: { id }

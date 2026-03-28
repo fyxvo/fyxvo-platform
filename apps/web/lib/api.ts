@@ -1,6 +1,7 @@
 import { API_BASE } from "./env";
 import type {
   AdminOverview,
+  AdminPlatformStats,
   AdminStats,
   AlertCenterItem,
   AnalyticsOverview,
@@ -14,11 +15,12 @@ import type {
   CreateApiKeyResult,
   CreateProjectResult,
   EmailDeliveryStatus,
+  FeedbackInboxItem,
   FundingHistoryItem,
   FundingPreparation,
   FundingVerification,
+  IncidentItem,
   OnchainSnapshot,
-  Operator,
   PortalApiKey,
   PortalProject,
   ProjectDetail,
@@ -30,6 +32,7 @@ import type {
   ProjectRequestTrace,
   PublicProjectProfile,
   InviteMetadata,
+  MainnetReadinessSnapshot,
   OperatorNetworkSummary,
   OperatorRegistration,
   ReferralStats,
@@ -556,9 +559,42 @@ export async function createSupportTicket(params: {
 
 // ─── Operators ────────────────────────────────────────────────────────────────
 
-export async function getOperators(token: string): Promise<Operator[]> {
-  const response = await apiFetch<{ items: Operator[] }>("/v1/admin/operators", { token });
-  return response.items;
+export async function getAdminOperators(token: string): Promise<{
+  items: OperatorRegistration[];
+  activeOperators: unknown[];
+}> {
+  return apiFetch<{ items: OperatorRegistration[]; activeOperators: unknown[] }>("/v1/admin/operators", {
+    token,
+  });
+}
+
+export async function approveOperatorRegistration(params: {
+  registrationId: string;
+  token: string;
+}): Promise<{
+  item: {
+    registration: OperatorRegistration;
+    operatorId: string;
+    nodeId: string;
+    nodeStatus: string;
+  };
+}> {
+  return apiFetch(`/v1/admin/operators/${params.registrationId}/approve`, {
+    method: "POST",
+    token: params.token,
+  });
+}
+
+export async function rejectOperatorRegistration(params: {
+  registrationId: string;
+  token: string;
+  reason?: string;
+}): Promise<{ item: OperatorRegistration }> {
+  return apiFetch(`/v1/admin/operators/${params.registrationId}/reject`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify(params.reason ? { reason: params.reason } : {}),
+  });
 }
 
 // ─── Assistant ────────────────────────────────────────────────────────────────
@@ -747,11 +783,13 @@ export async function searchWorkspace(params: {
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export async function getAdminOverview(token: string): Promise<AdminOverview> {
-  return apiFetch<AdminOverview>("/v1/admin/overview", { token });
+  const response = await apiFetch<{ item: AdminOverview }>("/v1/admin/overview", { token });
+  return response.item;
 }
 
 export async function getAdminStats(token: string): Promise<AdminStats> {
-  return apiFetch<AdminStats>("/v1/admin/stats", { token });
+  const response = await apiFetch<{ item: AdminStats }>("/v1/admin/stats", { token });
+  return response.item;
 }
 
 export async function getAdminAssistantStats(token: string): Promise<{
@@ -774,10 +812,130 @@ export async function getAdminAssistantStats(token: string): Promise<{
   return apiFetch("/v1/admin/assistant/stats", { token });
 }
 
+export async function getAdminPlatformStats(token: string): Promise<AdminPlatformStats> {
+  const response = await apiFetch<{ item: AdminPlatformStats }>("/v1/admin/platform-stats", {
+    token,
+  });
+  return response.item;
+}
+
+export async function getFeedbackInbox(params: {
+  token: string;
+  type?: "all" | "feedback_submission" | "assistant_feedback" | "support_ticket" | "newsletter_signup" | "referral_conversion";
+  status?: "all" | "new" | "reviewed" | "planned" | "resolved";
+}): Promise<FeedbackInboxItem[]> {
+  const query = new URLSearchParams();
+  if (params.type) query.set("type", params.type);
+  if (params.status) query.set("status", params.status);
+  const response = await apiFetch<{ items: FeedbackInboxItem[] }>(
+    `/v1/admin/feedback-inbox${query.toString() ? `?${query.toString()}` : ""}`,
+    { token: params.token }
+  );
+  return response.items;
+}
+
+export async function reviewFeedbackInboxItem(params: {
+  token: string;
+  itemType: FeedbackInboxItem["type"];
+  itemId: string;
+  status?: "new" | "reviewed" | "planned" | "resolved";
+  tags?: string[];
+}): Promise<{
+  item: {
+    id: string;
+    itemType: string;
+    itemId: string;
+    status: string;
+    tags: string[];
+    updatedAt: string;
+  };
+}> {
+  return apiFetch(`/v1/admin/feedback-inbox/${params.itemType}/${params.itemId}`, {
+    method: "PATCH",
+    token: params.token,
+    body: JSON.stringify({
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.tags ? { tags: params.tags } : {}),
+    }),
+  });
+}
+
+export async function listIncidents(): Promise<IncidentItem[]> {
+  const response = await apiFetch<{ incidents: IncidentItem[] }>("/v1/incidents");
+  return response.incidents;
+}
+
+export async function createIncident(params: {
+  token: string;
+  serviceName: string;
+  severity: "info" | "warning" | "critical" | "degraded";
+  description: string;
+}): Promise<IncidentItem> {
+  const response = await apiFetch<{ item: IncidentItem }>("/v1/admin/incidents", {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({
+      serviceName: params.serviceName,
+      severity: params.severity,
+      description: params.description,
+    }),
+  });
+  return response.item;
+}
+
+export async function updateIncident(params: {
+  token: string;
+  incidentId: string;
+  severity?: "info" | "warning" | "critical" | "degraded";
+  description?: string;
+  status?: "open" | "resolved";
+}): Promise<IncidentItem> {
+  const response = await apiFetch<{ item: IncidentItem }>(`/v1/admin/incidents/${params.incidentId}`, {
+    method: "PATCH",
+    token: params.token,
+    body: JSON.stringify({
+      ...(params.severity ? { severity: params.severity } : {}),
+      ...(params.description ? { description: params.description } : {}),
+      ...(params.status ? { status: params.status } : {}),
+    }),
+  });
+  return response.item;
+}
+
+export async function addIncidentUpdate(params: {
+  token: string;
+  incidentId: string;
+  message: string;
+  status?: "update" | "escalated" | "resolved";
+  severity?: "info" | "warning" | "critical" | "degraded";
+  affectedServices?: string[];
+}): Promise<{ item: IncidentItem }> {
+  return apiFetch(`/v1/admin/incidents/${params.incidentId}/updates`, {
+    method: "POST",
+    token: params.token,
+    body: JSON.stringify({
+      message: params.message,
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.severity ? { severity: params.severity } : {}),
+      ...(params.affectedServices ? { affectedServices: params.affectedServices } : {}),
+    }),
+  });
+}
+
+export async function getMainnetReadinessGate(token?: string | null): Promise<MainnetReadinessSnapshot> {
+  const response = await apiFetch<{ item: MainnetReadinessSnapshot }>("/v1/admin/mainnet-readiness-gate", {
+    ...(token ? { token } : {}),
+  });
+  return response.item;
+}
+
 // ─── Email ────────────────────────────────────────────────────────────────────
 
 export async function getEmailDeliveryStatus(token: string): Promise<EmailDeliveryStatus> {
-  return apiFetch<EmailDeliveryStatus>("/v1/me/email-delivery-status", { token });
+  const response = await apiFetch<{ item: EmailDeliveryStatus }>("/v1/me/email-delivery-status", {
+    token,
+  });
+  return response.item;
 }
 
 // ─── API Health ───────────────────────────────────────────────────────────────

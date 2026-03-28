@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   getPublicApiHealth,
   getPublicApiStatus,
@@ -120,6 +121,20 @@ export default async function ReliabilityPage() {
               date or that the open network is already live.
             </p>
           </div>
+        </div>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/mainnet"
+            className="inline-flex rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm font-medium text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand)]"
+          >
+            Review the mainnet gate
+          </Link>
+          <Link
+            href="/operators"
+            className="inline-flex rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm font-medium text-[var(--fyxvo-text)] transition hover:border-[var(--fyxvo-brand)]"
+          >
+            See operator onboarding
+          </Link>
         </div>
       </section>
     </div>

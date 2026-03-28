@@ -5,7 +5,26 @@ import { useEffect, useState } from "react";
 import { Button } from "@fyxvo/ui";
 import { LoadingSkeleton } from "../../components/loading-skeleton";
 import { RetryBanner } from "../../components/retry-banner";
+import { ENABLE_USDC } from "../../lib/env";
 import { requestPricingTiers } from "../../lib/public-data";
+
+const USDC_PRICING_TIERS = [
+  {
+    name: "Standard RPC",
+    units: 100,
+    description: "USDC billing is available for the standard relay lane at 0.0001 USDC per request.",
+  },
+  {
+    name: "Write and compute-heavy methods",
+    units: 300,
+    description: "The higher-cost compute lane bills 300 USDC base units, or 0.0003 USDC, per request.",
+  },
+  {
+    name: "Priority relay",
+    units: 500,
+    description: "Priority relay bills 500 USDC base units, or 0.0005 USDC, per request.",
+  },
+] as const;
 
 const FAQ_ITEMS = [
   {
@@ -22,7 +41,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Can projects fund with USDC?",
-    a: "USDC support exists in the protocol shape but it is still gated off in the live deployment. SOL funding is the active path today.",
+    a: "Yes. The live devnet deployment now supports both SOL funding and devnet USDC funding, so projects can choose the treasury asset that best matches their testing flow.",
   },
 ] as const;
 
@@ -34,6 +53,7 @@ export default function PricingPage() {
   const [standardPct, setStandardPct] = useState(70);
   const [computePct, setComputePct] = useState(20);
   const [priorityPct, setPriorityPct] = useState(10);
+  const [billingAsset, setBillingAsset] = useState<"SOL" | "USDC">("SOL");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   async function loadSolPrice() {
@@ -64,13 +84,21 @@ export default function PricingPage() {
   const standardLamports = volume * (standardPct / 100) * requestPricingTiers[0].lamports;
   const computeLamports = volume * (computePct / 100) * requestPricingTiers[1].lamports;
   const priorityLamports = volume * (priorityPct / 100) * requestPricingTiers[2].lamports;
+  const standardUsdcUnits = volume * (standardPct / 100) * USDC_PRICING_TIERS[0].units;
+  const computeUsdcUnits = volume * (computePct / 100) * USDC_PRICING_TIERS[1].units;
+  const priorityUsdcUnits = volume * (priorityPct / 100) * USDC_PRICING_TIERS[2].units;
   const rawLamports = standardLamports + computeLamports + priorityLamports;
+  const rawUsdcUnits = standardUsdcUnits + computeUsdcUnits + priorityUsdcUnits;
   const discount = volume >= 10_000_000 ? 0.4 : volume >= 1_000_000 ? 0.2 : 0;
   const discountedLamports = Math.round(rawLamports * (1 - discount));
+  const discountedUsdcUnits = Math.round(rawUsdcUnits * (1 - discount));
   const totalSol = discountedLamports / 1_000_000_000;
   const totalUsd = solPrice != null ? totalSol * solPrice : null;
+  const totalUsdc = discountedUsdcUnits / 1_000_000;
+  const totalUsdcUsd = totalUsdc;
   const rawSpendSol = rawLamports / 1_000_000_000;
   const rawSpendUsd = solPrice != null ? rawSpendSol * solPrice : null;
+  const rawSpendUsdc = rawUsdcUnits / 1_000_000;
 
   function rebalance(
     field: "standard" | "compute" | "priority",
@@ -114,10 +142,10 @@ export default function PricingPage() {
             Request pricing tied to funded usage, not generic SaaS plans
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-            Fyxvo charges per request in lamports. You activate a project, fund it with devnet
-            SOL, and the relay debits the live gateway rates of 5,000 lamports for standard RPC
-            and 20,000 lamports for priority traffic instead of hiding spend inside a subscription
-            tier.
+            Fyxvo charges per request against funded project treasuries. You can fund with devnet
+            SOL or devnet USDC, and the relay debits the live gateway rates of 5,000 lamports for
+            standard RPC and 20,000 lamports for priority traffic, or 100, 300, and 500 USDC base
+            units across the same lanes, instead of hiding spend inside a subscription tier.
           </p>
           {solPriceLoading ? (
             <div className="mt-4 max-w-[16rem]">
@@ -142,6 +170,8 @@ export default function PricingPage() {
             {requestPricingTiers.map((tier) => {
               const solPerRequest = tier.lamports / 1_000_000_000;
               const usdPerRequest = solPrice != null ? solPerRequest * solPrice : null;
+              const usdcTier = USDC_PRICING_TIERS.find((item) => item.name === tier.name);
+              const usdcPerRequest = usdcTier ? usdcTier.units / 1_000_000 : null;
               return (
                 <div
                   key={tier.name}
@@ -159,6 +189,11 @@ export default function PricingPage() {
                   <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
                     {solPerRequest.toFixed(6)} SOL per request
                   </p>
+                  {ENABLE_USDC && usdcPerRequest != null ? (
+                    <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                      {usdcTier?.units.toLocaleString()} USDC base units ({usdcPerRequest.toFixed(4)} USDC) per request
+                    </p>
+                  ) : null}
                   {solPriceLoading ? (
                     <div className="mt-2">
                       <LoadingSkeleton className="h-4 w-40" />
@@ -231,6 +266,25 @@ export default function PricingPage() {
               Estimate monthly relay spend
             </h2>
             <div className="mt-8 space-y-6">
+              {ENABLE_USDC ? (
+                <div className="flex flex-wrap gap-2">
+                  {(["SOL", "USDC"] as const).map((asset) => (
+                    <button
+                      key={asset}
+                      type="button"
+                      onClick={() => setBillingAsset(asset)}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        billingAsset === asset
+                          ? "bg-[var(--fyxvo-brand)] text-black"
+                          : "border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
+                      }`}
+                    >
+                      Estimate in {asset}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
               <label className="block">
                 <span className="text-sm font-medium text-[var(--fyxvo-text)]">
                   Monthly requests
@@ -279,21 +333,37 @@ export default function PricingPage() {
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                     Estimated cost
                   </p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                    {discountedLamports.toLocaleString()} lamports
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                    {totalSol.toFixed(6)} SOL
-                  </p>
-                  {solPriceLoading ? (
-                    <div className="mt-2">
-                      <LoadingSkeleton className="h-4 w-24" />
-                    </div>
-                  ) : totalUsd != null ? (
-                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                      ≈ ${totalUsd.toFixed(2)} USD
-                    </p>
-                  ) : null}
+                  {billingAsset === "SOL" ? (
+                    <>
+                      <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                        {discountedLamports.toLocaleString()} lamports
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                        {totalSol.toFixed(6)} SOL
+                      </p>
+                      {solPriceLoading ? (
+                        <div className="mt-2">
+                          <LoadingSkeleton className="h-4 w-24" />
+                        </div>
+                      ) : totalUsd != null ? (
+                        <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                          ≈ ${totalUsd.toFixed(2)} USD
+                        </p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                        {discountedUsdcUnits.toLocaleString()} units
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                        {totalUsdc.toFixed(4)} USDC
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                        ≈ ${totalUsdcUsd.toFixed(2)} USD
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
@@ -302,18 +372,31 @@ export default function PricingPage() {
                   <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
                     {(discount * 100).toFixed(0)}%
                   </p>
-                  <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                    Raw spend: {Math.round(rawLamports).toLocaleString()} lamports
-                  </p>
-                  {solPriceLoading ? (
-                    <div className="mt-2">
-                      <LoadingSkeleton className="h-4 w-24" />
-                    </div>
-                  ) : rawSpendUsd != null ? (
-                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                      ≈ ${rawSpendUsd.toFixed(2)} USD before discounts
-                    </p>
-                  ) : null}
+                  {billingAsset === "SOL" ? (
+                    <>
+                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                        Raw spend: {Math.round(rawLamports).toLocaleString()} lamports
+                      </p>
+                      {solPriceLoading ? (
+                        <div className="mt-2">
+                          <LoadingSkeleton className="h-4 w-24" />
+                        </div>
+                      ) : rawSpendUsd != null ? (
+                        <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                          ≈ ${rawSpendUsd.toFixed(2)} USD before discounts
+                        </p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                        Raw spend: {Math.round(rawUsdcUnits).toLocaleString()} USDC base units
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                        ≈ ${rawSpendUsdc.toFixed(2)} USD before discounts
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -331,8 +414,9 @@ export default function PricingPage() {
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
             The live path is straightforward: create a project, sign the activation transaction,
-            fund the treasury with devnet SOL, issue an API key, and start routing traffic. When
-            the funded balance is empty, requests stop until the project is topped up again.
+            fund the treasury with devnet SOL or devnet USDC, issue an API key, and start routing
+            traffic. When the funded balance is empty, requests stop until the project is topped
+            up again.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild>

@@ -155,6 +155,9 @@ export default function OperatorsPage() {
             <Button asChild variant="secondary">
               <Link href="/docs">Read network docs</Link>
             </Button>
+            <Button asChild variant="secondary">
+              <Link href="/mainnet">View mainnet gate</Link>
+            </Button>
           </div>
         </div>
       </div>

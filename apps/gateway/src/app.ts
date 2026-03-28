@@ -1168,6 +1168,10 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         priority: input.env.GATEWAY_PRIORITY_PRICE_LAMPORTS,
         writeMultiplier: input.env.GATEWAY_WRITE_METHOD_MULTIPLIER
       },
+      acceptedAssets: {
+        sol: true,
+        usdcEnabled: input.env.FYXVO_ENABLE_USDC
+      },
       scopeEnforcement: {
         enabled: true,
         standardRequiredScopes: gatewayRequiredApiKeyScopes("standard"),
