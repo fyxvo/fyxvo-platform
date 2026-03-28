@@ -15,6 +15,30 @@ export const metadata: Metadata = {
   description:
     "Fyxvo is a Solana devnet control plane for funded relay access, on-chain project activation, API keys, analytics, alerts, and assistant-guided operations.",
   metadataBase: new URL("https://www.fyxvo.com"),
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    type: "website",
+    url: "https://www.fyxvo.com",
+    siteName: "Fyxvo",
+    title: "Fyxvo",
+    description: "Decentralized Solana RPC data and relay infrastructure network",
+    images: [
+      {
+        url: "https://www.fyxvo.com/brand/logo.png",
+        width: 512,
+        height: 512,
+        alt: "Fyxvo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    site: "@fyxvo",
+    creator: "@fyxvo",
+  },
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
