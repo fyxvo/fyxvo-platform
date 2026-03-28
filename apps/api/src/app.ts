@@ -800,6 +800,27 @@ function toPublicMainnetReleaseGateSnapshot(
   };
 }
 
+function toPublicNetworkReadinessSummary(
+  snapshot: Awaited<ReturnType<typeof buildMainnetReleaseGateSnapshot>>
+) {
+  const readinessPercentage =
+    snapshot.checks.length < 1
+      ? 0
+      : Math.round(
+          (snapshot.checks.filter((check) => check.status === "healthy").length / snapshot.checks.length) * 100
+        );
+
+  return {
+    ready: snapshot.mainnetBetaEligible,
+    readinessPercentage,
+    gates: snapshot.checks.map((check) => ({
+      name: check.label,
+      status: check.status === "healthy" ? "pass" : "fail",
+    })),
+    blockers: snapshot.mainnetBetaBlockers,
+  };
+}
+
 async function withBlockchainErrors<T>(action: () => Promise<T>) {
   try {
     return await action();
@@ -4301,6 +4322,19 @@ export async function buildApiApp(input: {
 
     return {
       item: snapshot,
+    };
+  });
+
+  app.get("/v1/network/readiness", async () => {
+    const db = requirePrisma();
+    const snapshot = await buildMainnetReleaseGateSnapshot({
+      env: input.env,
+      prisma: db,
+      blockchain: input.blockchain,
+    });
+
+    return {
+      item: toPublicNetworkReadinessSummary(snapshot),
     };
   });
 
