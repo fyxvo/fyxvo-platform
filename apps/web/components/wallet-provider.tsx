@@ -53,9 +53,10 @@ export function WalletProvider({ children }: WalletProviderProps) {
 function RealWalletProviders({ children }: { children: ReactNode }) {
   const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
   const endpoint =
-    cluster === "mainnet-beta"
+    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ??
+    (cluster === "mainnet-beta"
       ? "https://api.mainnet-beta.solana.com"
-      : "https://api.devnet.solana.com";
+      : "https://api.devnet.solana.com");
   const wallets = useMemo((): Adapter[] => {
     if (typeof window === "undefined") return [];
     return createWalletAdapters();

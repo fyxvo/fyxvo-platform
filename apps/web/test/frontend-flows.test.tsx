@@ -25,6 +25,7 @@ const apiMocks = vi.hoisted(() => ({
   createApiKey: vi.fn(),
   createAssistantConversation: vi.fn(),
   createAuthChallenge: vi.fn(),
+  createProject: vi.fn(),
   fetchApiHealth: vi.fn(),
   fetchApiStatus: vi.fn(),
   getEmailDeliveryStatus: vi.fn(),
@@ -45,11 +46,22 @@ const apiMocks = vi.hoisted(() => ({
   listProjects: vi.fn(),
   prepareFunding: vi.fn(),
   revokeApiKey: vi.fn(),
+  submitFeedback: vi.fn(),
   submitInterest: vi.fn(),
   submitAssistantFeedback: vi.fn(),
   trackProductEvent: vi.fn(),
   updateAssistantConversation: vi.fn(),
+  verifyFunding: vi.fn(),
+  verifyProjectActivation: vi.fn(),
   verifyWalletSession: vi.fn()
+}));
+
+const solanaFlowMocks = vi.hoisted(() => ({
+  signAndSubmitVersionedTransaction: vi.fn(async () => "5W6d7uQk2p"),
+  solToLamportsString: vi.fn((value: string) => {
+    if (value === "1") return "1000000000";
+    return value;
+  }),
 }));
 
 const walletMocks = vi.hoisted(() => {
@@ -99,6 +111,7 @@ const walletMocks = vi.hoisted(() => {
       notify();
     }),
     signMessage: vi.fn(async () => new Uint8Array([1, 2, 3])),
+    signTransaction: vi.fn(async (transaction: unknown) => transaction),
     sendTransaction: vi.fn(async () => "5W6d7uQk2p"),
     ensureInjectedPhantomDevnet: vi.fn(async () => true)
   };
@@ -127,6 +140,7 @@ vi.mock("../lib/api", () => ({
   createApiKey: apiMocks.createApiKey,
   createAssistantConversation: apiMocks.createAssistantConversation,
   createAuthChallenge: apiMocks.createAuthChallenge,
+  createProject: apiMocks.createProject,
   fetchApiHealth: apiMocks.fetchApiHealth,
   fetchApiStatus: apiMocks.fetchApiStatus,
   getEmailDeliveryStatus: apiMocks.getEmailDeliveryStatus,
@@ -147,11 +161,19 @@ vi.mock("../lib/api", () => ({
   listProjects: apiMocks.listProjects,
   prepareFunding: apiMocks.prepareFunding,
   revokeApiKey: apiMocks.revokeApiKey,
+  submitFeedback: apiMocks.submitFeedback,
   submitInterest: apiMocks.submitInterest,
   submitAssistantFeedback: apiMocks.submitAssistantFeedback,
   trackProductEvent: apiMocks.trackProductEvent,
   updateAssistantConversation: apiMocks.updateAssistantConversation,
+  verifyFunding: apiMocks.verifyFunding,
+  verifyProjectActivation: apiMocks.verifyProjectActivation,
   verifyWalletSession: apiMocks.verifyWalletSession
+}));
+
+vi.mock("../lib/solana-transactions", () => ({
+  signAndSubmitVersionedTransaction: solanaFlowMocks.signAndSubmitVersionedTransaction,
+  solToLamportsString: solanaFlowMocks.solToLamportsString,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -216,6 +238,7 @@ vi.mock("@solana/wallet-adapter-react", () => ({
       wallet: selectedWallet,
       select: walletMocks.select,
       signMessage: walletMocks.signMessage,
+      signTransaction: walletMocks.signTransaction,
       sendTransaction: walletMocks.sendTransaction,
       connected: walletState.connected
     };
@@ -428,6 +451,16 @@ beforeEach(() => {
   });
   apiMocks.createApiKey.mockResolvedValue(createApiKeyResult());
   apiMocks.revokeApiKey.mockResolvedValue(undefined);
+  apiMocks.verifyFunding.mockResolvedValue({
+    fundingRequestId: "funding-request-1",
+    signature: "5W6d7uQk2p",
+    confirmedAt: "2026-03-28T00:00:00.000Z",
+    explorerUrl: "https://explorer.solana.com/tx/5W6d7uQk2p?cluster=devnet",
+    onchain: {
+      projectPda: previewOnchain.projectPda,
+      treasuryPda: previewOnchain.treasuryPda,
+    }
+  });
   apiMocks.submitInterest.mockResolvedValue({
     item: {
       id: "interest-1",
@@ -443,6 +476,11 @@ beforeEach(() => {
   });
   walletMocks.ensureInjectedPhantomDevnet.mockResolvedValue(true);
   walletMocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
+  solanaFlowMocks.signAndSubmitVersionedTransaction.mockResolvedValue("5W6d7uQk2p");
+  solanaFlowMocks.solToLamportsString.mockImplementation((value: string) => {
+    if (value === "1") return "1000000000";
+    return value;
+  });
 });
 
 afterEach(() => {
@@ -473,11 +511,9 @@ describe("frontend flows", () => {
     );
 
     await connectAuthenticatedWallet();
-    await userEvent.click(screen.getByRole("button", { name: "Prepare only" }));
+    await userEvent.click(screen.getByRole("button", { name: "Prepare and fund" }));
 
-    expect(
-      await screen.findByText("Unsigned transaction prepared. You can now review, copy, or sign it in the connected wallet.")
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Funding confirmed\./)).toBeInTheDocument();
     expect(await screen.findByText("funding-request-1")).toBeInTheDocument();
     expect(apiMocks.prepareFunding).toHaveBeenCalledWith({
       projectId: previewProjects[0]!.id,
@@ -485,6 +521,12 @@ describe("frontend flows", () => {
       asset: "SOL",
       amount: "1000000000",
       funderWalletAddress: owner.walletAddress
+    });
+    expect(apiMocks.verifyFunding).toHaveBeenCalledWith({
+      projectId: previewProjects[0]!.id,
+      token: "session-token",
+      fundingRequestId: "funding-request-1",
+      signature: "5W6d7uQk2p"
     });
   });
 
@@ -617,14 +659,14 @@ describe("frontend flows", () => {
     await userEvent.click(screen.getByRole("button", { name: "Join list" }));
 
     await waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith("/api/status-subscribe", {
+      expect(globalThis.fetch).toHaveBeenCalledWith("https://api.fyxvo.com/v1/status/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "alerts@example.com" }),
+        body: JSON.stringify({ email: "alerts@example.com", source: "status-page" }),
       });
     });
     expect(
-      await screen.findByText("✓ Your email is on the Fyxvo status subscriber list for incident updates.")
+      await screen.findByText("Your email is now subscribed to incident and resolution updates.")
     ).toBeInTheDocument();
   });
 });

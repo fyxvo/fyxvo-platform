@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, Notice } from "@fyxvo/ui";
+import { API_BASE } from "../../lib/env";
 
 const FEATURES = [
   "Capacity planning for expected request shape and relay lane selection",
@@ -26,7 +27,7 @@ export default function EnterprisePage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/enterprise-interest", {
+      const response = await fetch(`${API_BASE}/v1/enterprise/interest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -37,9 +38,12 @@ export default function EnterprisePage() {
         }),
       });
 
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
       if (!response.ok) {
-        throw new Error(body.error ?? "Request failed");
+        throw new Error(body.message ?? body.error ?? "Request failed");
       }
 
       setSubmitted(true);

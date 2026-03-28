@@ -1,36 +1,89 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
-import { useState } from "react";
-import { AuthGate } from "../../components/state-panels";
+import { verifyFunding } from "../../lib/api";
 import { usePortal } from "../../lib/portal-context";
-import type { FundingPreparation } from "../../lib/types";
+import { signAndSubmitVersionedTransaction, solToLamportsString } from "../../lib/solana-transactions";
+import type { FundingVerification } from "../../lib/types";
+import { AddressLink } from "../../components/address-link";
+import { AuthGate } from "../../components/state-panels";
 
 export default function FundingPage() {
-  const { selectedProject, prepareFunding, fundingPreparation, setFundingPreparation } =
-    usePortal();
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  const {
+    token,
+    selectedProject,
+    prepareFunding,
+    fundingPreparation,
+    setFundingPreparation,
+  } = usePortal();
 
-  const [preparing, setPreparing] = useState(false);
+  const [amountSol, setAmountSol] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [localPrep, setLocalPrep] = useState<FundingPreparation | null>(fundingPreparation);
+  const [verification, setVerification] = useState<FundingVerification | null>(null);
 
-  const handlePrepareOnly = async () => {
-    if (!selectedProject) return;
-    setPreparing(true);
-    setError(null);
+  const lamportsPreview = useMemo(() => {
     try {
-      const prep = await prepareFunding({ asset: "SOL", amount: "1000000000", submit: false });
-      setLocalPrep(prep);
-      setFundingPreparation(prep);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Preparation failed");
-    } finally {
-      setPreparing(false);
+      return solToLamportsString(amountSol);
+    } catch {
+      return null;
     }
-  };
+  }, [amountSol]);
+
+  async function handleFund() {
+    if (!selectedProject || !token || !wallet.publicKey) {
+      setError("Select a project and reconnect your wallet before funding.");
+      return;
+    }
+
+    if (!wallet.signTransaction) {
+      setError("This wallet does not support transaction signing.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setVerification(null);
+
+    try {
+      const preparation = await prepareFunding({
+        asset: "SOL",
+        amount: solToLamportsString(amountSol),
+        submit: false,
+      });
+      setFundingPreparation(preparation);
+
+      const signature = await signAndSubmitVersionedTransaction({
+        connection,
+        transactionBase64: preparation.transactionBase64,
+        recentBlockhash: preparation.recentBlockhash,
+        lastValidBlockHeight: preparation.lastValidBlockHeight,
+        signTransaction: wallet.signTransaction,
+      });
+
+      const verified = await verifyFunding({
+        projectId: selectedProject.id,
+        token,
+        fundingRequestId: preparation.fundingRequestId,
+        signature,
+      });
+
+      setVerification(verified);
+    } catch (fundingError) {
+      setError(
+        fundingError instanceof Error ? fundingError.message : "Unable to complete the funding flow."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-8">
       <AuthGate>
         <div className="space-y-6">
           <div>
@@ -38,82 +91,137 @@ export default function FundingPage() {
               Fund Project
             </h1>
             <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-              Deposit SOL or USDC to your project treasury on-chain.
+              Prepare a real SOL funding transaction, sign it in the connected wallet, send it to
+              devnet, and verify it against the control plane.
             </p>
           </div>
 
+          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {verification ? (
+            <Notice tone="success">
+              Funding confirmed. View the transaction in the explorer at{" "}
+              <a
+                href={verification.explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-[var(--fyxvo-brand)]"
+              >
+                {verification.signature}
+              </a>
+              .
+            </Notice>
+          ) : null}
+
           <Card>
             <CardHeader>
-              <CardTitle>Prepare funding transaction</CardTitle>
+              <CardTitle>Funding flow</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-[var(--fyxvo-text-muted)]">
-                  Prepare an unsigned transaction to fund{" "}
-                  <strong className="text-[var(--fyxvo-text)]">
-                    {selectedProject?.name ?? "your project"}
-                  </strong>{" "}
-                  with 1 SOL.
-                </p>
-
-                {error ? (
-                  <Notice tone="danger">{error}</Notice>
-                ) : null}
-
-                {localPrep ? (
-                  <div className="space-y-3">
-                    <Notice tone="success">
-                      Unsigned transaction prepared. You can now review, copy, or sign it in the
-                      connected wallet.
-                    </Notice>
-                    <div className="rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[var(--fyxvo-text-muted)]">Request ID</span>
-                        <span className="font-mono text-[var(--fyxvo-text)]">
-                          {localPrep.fundingRequestId}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[var(--fyxvo-text-muted)]">Asset</span>
-                        <span className="text-[var(--fyxvo-text)]">{localPrep.asset}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[var(--fyxvo-text-muted)]">Amount (lamports)</span>
-                        <span className="text-[var(--fyxvo-text)]">{localPrep.amount}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          void navigator.clipboard.writeText(localPrep.transactionBase64);
-                        }}
-                      >
-                        Copy transaction
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setLocalPrep(null);
-                          setFundingPreparation(null);
-                        }}
-                      >
-                        Reset
-                      </Button>
-                    </div>
+              <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
+                      Selected project
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">
+                      {selectedProject?.name ?? "No project selected"}
+                    </p>
+                    {selectedProject ? (
+                      <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                        Treasury PDA funding is tied to the current workspace. The preparation call
+                        will use this project ID and your connected wallet address.
+                      </p>
+                    ) : null}
                   </div>
-                ) : (
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-[var(--fyxvo-text)]">Amount in SOL</span>
+                    <input
+                      value={amountSol}
+                      onChange={(event) => setAmountSol(event.target.value)}
+                      inputMode="decimal"
+                      className="mt-2 h-11 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 text-sm text-[var(--fyxvo-text)] outline-none focus:border-[var(--fyxvo-brand)]"
+                    />
+                  </label>
+
+                  <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 text-sm text-[var(--fyxvo-text-soft)]">
+                    {lamportsPreview ? (
+                      <p>This request will prepare a funding transaction for {lamportsPreview} lamports.</p>
+                    ) : (
+                      <p>Enter a valid SOL amount to see the lamport value that will be sent to the API.</p>
+                    )}
+                  </div>
+
                   <Button
-                    variant="primary"
-                    onClick={() => void handlePrepareOnly()}
-                    loading={preparing}
-                    disabled={preparing || !selectedProject}
+                    type="button"
+                    onClick={() => void handleFund()}
+                    loading={submitting}
+                    disabled={submitting || !selectedProject}
                   >
-                    Prepare only
+                    Prepare and fund
                   </Button>
-                )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
+                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">
+                      Latest funding preparation
+                    </p>
+                    {fundingPreparation ? (
+                      <div className="mt-4 space-y-3 text-sm text-[var(--fyxvo-text-soft)]">
+                        <p>
+                          Funding request ID:{" "}
+                          <span className="font-mono text-[var(--fyxvo-text)]">
+                            {fundingPreparation.fundingRequestId}
+                          </span>
+                        </p>
+                        <p>
+                          Project PDA: <AddressLink address={fundingPreparation.projectPda} />
+                        </p>
+                        <p>
+                          Treasury PDA: <AddressLink address={fundingPreparation.treasuryPda} />
+                        </p>
+                        <p>Amount: {fundingPreparation.amount} lamports</p>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                        No funding preparation has been created yet in this session.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
+                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">
+                      Verified funding result
+                    </p>
+                    {verification ? (
+                      <div className="mt-4 space-y-3 text-sm text-[var(--fyxvo-text-soft)]">
+                        <p>
+                          Explorer:{" "}
+                          <a
+                            href={verification.explorerUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-[var(--fyxvo-brand)]"
+                          >
+                            View transaction
+                          </a>
+                        </p>
+                        <p>
+                          Project PDA: <AddressLink address={verification.onchain.projectPda} />
+                        </p>
+                        <p>
+                          Treasury PDA: <AddressLink address={verification.onchain.treasuryPda} />
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                        Once the verify step succeeds, the explorer link and confirmed on-chain
+                        addresses will appear here.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

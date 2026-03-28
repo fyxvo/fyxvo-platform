@@ -1,41 +1,65 @@
-import { previewOperators } from "../../lib/sample-data";
+import Link from "next/link";
+import { protocolAddresses } from "../../lib/public-data";
 
 export default function OperatorsPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-16">
-      <h1 className="text-3xl font-bold tracking-tight text-[var(--fyxvo-text)]">Operators</h1>
-      <p className="mt-4 text-[var(--fyxvo-text-muted)]">
-        The decentralized network of nodes powering Fyxvo.
+      <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">Operators</p>
+      <h1 className="mt-3 text-4xl font-bold tracking-tight text-[var(--fyxvo-text)]">
+        Operator visibility follows the real product boundary
+      </h1>
+      <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
+        Fyxvo does have an operator model and a managed relay path, but the live public web app
+        does not publish a fabricated operator roster. Public users can verify protocol addresses,
+        watch gateway health, and track latency on the status surface, while operator-level details
+        remain an internal or elevated-access workflow.
       </p>
-      <div className="mt-8 overflow-hidden rounded-xl border border-[var(--fyxvo-border)]">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)]">
-              <th className="px-4 py-3 text-left font-medium text-[var(--fyxvo-text-muted)]">Node</th>
-              <th className="px-4 py-3 text-left font-medium text-[var(--fyxvo-text-muted)]">Region</th>
-              <th className="px-4 py-3 text-left font-medium text-[var(--fyxvo-text-muted)]">Status</th>
-              <th className="px-4 py-3 text-right font-medium text-[var(--fyxvo-text-muted)]">Uptime</th>
-            </tr>
-          </thead>
-          <tbody>
-            {previewOperators.map((op) => (
-              <tr
-                key={op.id}
-                className="border-b border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] last:border-0"
-              >
-                <td className="px-4 py-3 font-medium text-[var(--fyxvo-text)]">{op.name}</td>
-                <td className="px-4 py-3 text-[var(--fyxvo-text-muted)]">{op.region}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {op.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right text-[var(--fyxvo-brand)]">{op.uptimePct}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="mt-10 grid gap-5 lg:grid-cols-2">
+        <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+          <h2 className="text-2xl font-semibold text-[var(--fyxvo-text)]">
+            What is public today
+          </h2>
+          <p className="mt-4 text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+            Public users can inspect the gateway status page, review live latency, see current
+            request counts, and verify the on-chain program, config, treasury, and authority
+            addresses that the live devnet deployment uses.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/status"
+              className="inline-flex rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm text-[var(--fyxvo-text)]"
+            >
+              View status
+            </Link>
+            <Link
+              href="/docs"
+              className="inline-flex rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-2 text-sm text-[var(--fyxvo-text)]"
+            >
+              Read docs
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+          <h2 className="text-2xl font-semibold text-[var(--fyxvo-text)]">
+            Registry and authorities
+          </h2>
+          <div className="mt-6 space-y-3 text-sm text-[var(--fyxvo-text-soft)]">
+            <p>
+              Operator registry:{" "}
+              <span className="font-mono text-[var(--fyxvo-text)]">{protocolAddresses.operatorRegistry}</span>
+            </p>
+            <p>
+              Program ID:{" "}
+              <span className="font-mono text-[var(--fyxvo-text)]">{protocolAddresses.programId}</span>
+            </p>
+            <p>
+              Protocol authority:{" "}
+              <span className="font-mono text-[var(--fyxvo-text)]">{protocolAddresses.protocolAuthority}</span>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

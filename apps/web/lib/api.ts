@@ -9,15 +9,19 @@ import type {
   AssistantRateLimitStatus,
   AuthChallenge,
   CreateApiKeyResult,
+  CreateProjectResult,
   EmailDeliveryStatus,
   FundingHistoryItem,
   FundingPreparation,
+  FundingVerification,
   OnchainSnapshot,
   Operator,
   PortalApiKey,
   PortalProject,
+  ProjectActivationVerification,
   ProjectAnalytics,
   ProjectBudgetStatus,
+  PublicProjectProfile,
   WalletSession,
 } from "./types";
 
@@ -70,6 +74,38 @@ export async function verifyWalletSession(params: {
 export async function listProjects(token: string): Promise<PortalProject[]> {
   const response = await apiFetch<{ items: PortalProject[] }>("/v1/projects", { token });
   return response.items;
+}
+
+export async function createProject(params: {
+  token: string;
+  slug: string;
+  name: string;
+  description?: string;
+  templateType?: "blank" | "defi" | "indexing";
+}): Promise<CreateProjectResult> {
+  const { token, ...body } = params;
+  return apiFetch<CreateProjectResult>("/v1/projects", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
+export async function verifyProjectActivation(params: {
+  projectId: string;
+  token: string;
+  signature: string;
+}): Promise<ProjectActivationVerification> {
+  const { projectId, token, signature } = params;
+  const response = await apiFetch<{ item: ProjectActivationVerification }>(
+    `/v1/projects/${projectId}/activation/verify`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ signature }),
+    }
+  );
+  return response.item;
 }
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
@@ -129,6 +165,24 @@ export async function prepareFunding(params: {
       method: "POST",
       token,
       body: JSON.stringify(body),
+    }
+  );
+  return response.item;
+}
+
+export async function verifyFunding(params: {
+  projectId: string;
+  token: string;
+  fundingRequestId: string;
+  signature: string;
+}): Promise<FundingVerification> {
+  const { projectId, token, fundingRequestId, signature } = params;
+  const response = await apiFetch<{ item: FundingVerification }>(
+    `/v1/projects/${projectId}/funding/verify`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify({ fundingRequestId, signature }),
     }
   );
   return response.item;
@@ -350,6 +404,35 @@ export async function submitInterest(params: {
     method: "POST",
     body: JSON.stringify(params),
   });
+}
+
+export async function submitFeedback(params: {
+  name: string;
+  email: string;
+  role?: string;
+  team?: string;
+  category: "BUG_REPORT" | "SUPPORT_REQUEST" | "ONBOARDING_FRICTION" | "PRODUCT_FEEDBACK";
+  message: string;
+  source?: string;
+  page?: string;
+  projectId?: string;
+  walletAddress?: string;
+  token?: string;
+}): Promise<{ item: { id: string; status: string; createdAt: string; email: string }; message: string }> {
+  const { token, ...body } = params;
+  return apiFetch("/v1/feedback", {
+    method: "POST",
+    ...(token ? { token } : {}),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getPublicProject(publicSlug: string): Promise<PublicProjectProfile | null> {
+  try {
+    return await apiFetch<PublicProjectProfile>(`/v1/public/projects/${publicSlug}`);
+  } catch {
+    return null;
+  }
 }
 
 // ─── Tracking ─────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
+import { DocsApiExplorer } from "../../components/docs-api-explorer";
 import { protocolAddresses, requestPricingTiers } from "../../lib/public-data";
 
 function CodeBlock({ code }: { code: string }) {
@@ -169,6 +170,12 @@ export default function DocsPage() {
       </section>
 
       <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <DocsApiExplorer />
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
@@ -230,6 +237,10 @@ export default function DocsPage() {
           <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
             Public endpoints that do not require wallet auth
           </h2>
+          <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+            These routes are safe to call without a JWT or API key. Authenticated project and
+            analytics routes require the wallet challenge flow first.
+          </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             {[
               "GET /health",

@@ -4,6 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createApiKey as apiCreateApiKey,
+  createProject as apiCreateProject,
   listProjects,
   prepareFunding as apiPrepareFunding,
 } from "../lib/api";
@@ -49,7 +50,15 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
 
       return loadedProjects.find((project) => project.id === current.id) ?? loadedProjects[0] ?? null;
     });
+    return loadedProjects;
   }, []);
+
+  const refreshProjects = useCallback(async () => {
+    if (!token) {
+      throw new Error("Not authenticated");
+    }
+    return loadProjects(token);
+  }, [loadProjects, token]);
 
   const connectWallet = useCallback(
     async (walletName: string) => {
@@ -208,6 +217,25 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
     [token, selectedProject]
   );
 
+  const createProject = useCallback(
+    async (params: {
+      slug: string;
+      name: string;
+      description?: string;
+      templateType?: "blank" | "defi" | "indexing";
+    }) => {
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      return apiCreateProject({
+        token,
+        ...params,
+      });
+    },
+    [token]
+  );
+
   const value = useMemo(
     () => ({
       walletPhase,
@@ -218,6 +246,7 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
       projects,
       selectedProject,
       setSelectedProject,
+      refreshProjects,
       apiKeys,
       setApiKeys,
       fundingPreparation,
@@ -225,6 +254,7 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
       connectWallet,
       disconnectWallet,
       prepareFunding,
+      createProject,
       createApiKey,
     }),
     [
@@ -240,7 +270,9 @@ function PortalProviderInner({ children }: PortalProviderInnerProps) {
       connectWallet,
       disconnectWallet,
       prepareFunding,
+      createProject,
       createApiKey,
+      refreshProjects,
     ]
   );
 

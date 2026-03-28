@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@fyxvo/ui";
+import { LoadingSkeleton } from "../../components/loading-skeleton";
+import { RetryBanner } from "../../components/retry-banner";
 import { requestPricingTiers } from "../../lib/public-data";
 
 const FAQ_ITEMS = [
@@ -26,29 +28,49 @@ const FAQ_ITEMS = [
 
 export default function PricingPage() {
   const [solPrice, setSolPrice] = useState<number | null>(null);
+  const [solPriceLoading, setSolPriceLoading] = useState(true);
+  const [solPriceError, setSolPriceError] = useState<string | null>(null);
   const [volume, setVolume] = useState(100_000);
   const [standardPct, setStandardPct] = useState(70);
   const [computePct, setComputePct] = useState(20);
   const [priorityPct, setPriorityPct] = useState(10);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
+  async function loadSolPrice() {
+    setSolPriceLoading(true);
+    setSolPriceError(null);
+
+    try {
+      const response = await fetch("/api/sol-price", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { usd?: number; error?: string };
+      if (!response.ok || typeof payload.usd !== "number") {
+        throw new Error(payload.error ?? "Unable to load the live SOL price.");
+      }
+      setSolPrice(payload.usd);
+    } catch (error) {
+      setSolPrice(null);
+      setSolPriceError(
+        error instanceof Error ? error.message : "Unable to load the live SOL price."
+      );
+    } finally {
+      setSolPriceLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-    )
-      .then((response) => response.json())
-      .then((data: { solana?: { usd?: number } }) => setSolPrice(data.solana?.usd ?? null))
-      .catch(() => setSolPrice(null));
+    void loadSolPrice();
   }, []);
 
-  const standardLamports = volume * (standardPct / 100) * 1000;
-  const computeLamports = volume * (computePct / 100) * 3000;
-  const priorityLamports = volume * (priorityPct / 100) * 5000;
+  const standardLamports = volume * (standardPct / 100) * requestPricingTiers[0].lamports;
+  const computeLamports = volume * (computePct / 100) * requestPricingTiers[1].lamports;
+  const priorityLamports = volume * (priorityPct / 100) * requestPricingTiers[2].lamports;
   const rawLamports = standardLamports + computeLamports + priorityLamports;
   const discount = volume >= 10_000_000 ? 0.4 : volume >= 1_000_000 ? 0.2 : 0;
   const discountedLamports = Math.round(rawLamports * (1 - discount));
   const totalSol = discountedLamports / 1_000_000_000;
   const totalUsd = solPrice != null ? totalSol * solPrice : null;
+  const rawSpendSol = rawLamports / 1_000_000_000;
+  const rawSpendUsd = solPrice != null ? rawSpendSol * solPrice : null;
 
   function rebalance(
     field: "standard" | "compute" | "priority",
@@ -96,10 +118,19 @@ export default function PricingPage() {
             SOL, and the relay debits published rates as traffic moves through the standard or
             priority lanes.
           </p>
-          {solPrice != null ? (
+          {solPriceLoading ? (
+            <div className="mt-4 max-w-[16rem]">
+              <LoadingSkeleton className="h-4 w-full" />
+            </div>
+          ) : solPrice != null ? (
             <p className="mt-4 text-sm text-[var(--fyxvo-text-muted)]">
               Live reference price: 1 SOL ≈ ${solPrice.toFixed(2)} USD
             </p>
+          ) : null}
+          {solPriceError ? (
+            <div className="mt-6 max-w-2xl">
+              <RetryBanner message={solPriceError} onRetry={loadSolPrice} />
+            </div>
           ) : null}
         </div>
       </section>
@@ -127,7 +158,11 @@ export default function PricingPage() {
                   <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
                     {solPerRequest.toFixed(6)} SOL per request
                   </p>
-                  {usdPerRequest != null ? (
+                  {solPriceLoading ? (
+                    <div className="mt-2">
+                      <LoadingSkeleton className="h-4 w-40" />
+                    </div>
+                  ) : usdPerRequest != null ? (
                     <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
                       About ${usdPerRequest.toFixed(6)} USD per request at current SOL pricing
                     </p>
@@ -229,7 +264,11 @@ export default function PricingPage() {
                   <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
                     {totalSol.toFixed(6)} SOL
                   </p>
-                  {totalUsd != null ? (
+                  {solPriceLoading ? (
+                    <div className="mt-2">
+                      <LoadingSkeleton className="h-4 w-24" />
+                    </div>
+                  ) : totalUsd != null ? (
                     <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
                       ≈ ${totalUsd.toFixed(2)} USD
                     </p>
@@ -245,6 +284,15 @@ export default function PricingPage() {
                   <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
                     Raw spend: {Math.round(rawLamports).toLocaleString()} lamports
                   </p>
+                  {solPriceLoading ? (
+                    <div className="mt-2">
+                      <LoadingSkeleton className="h-4 w-24" />
+                    </div>
+                  ) : rawSpendUsd != null ? (
+                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                      ≈ ${rawSpendUsd.toFixed(2)} USD before discounts
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>

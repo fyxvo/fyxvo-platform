@@ -28,6 +28,7 @@ export interface PortalProject {
   name: string;
   slug: string;
   publicSlug?: string | null;
+  templateType?: string | null;
   description?: string | null;
   status: string;
   network: string;
@@ -72,6 +73,49 @@ export interface FundingPreparation {
   amount: string;
   asset: string;
   treasuryUsdcVault?: string;
+}
+
+export interface ProjectActivation {
+  projectPda: string;
+  protocolConfigPda: string;
+  treasuryPda: string;
+  recentBlockhash: string;
+  transactionBase64: string;
+  lastValidBlockHeight: number;
+}
+
+export interface ProjectActivationVerification {
+  signature: string;
+  confirmedAt: string;
+  explorerUrl: string;
+  onchain: {
+    projectPda: string;
+    treasuryPda: string;
+    treasurySolBalance?: number;
+    projectAccountExists?: boolean;
+    projectAccountDataLength?: number;
+    balances?: Record<string, string | number>;
+  };
+}
+
+export interface FundingVerification {
+  fundingRequestId: string;
+  signature: string;
+  confirmedAt: string;
+  explorerUrl: string;
+  onchain: {
+    projectPda: string;
+    treasuryPda: string;
+    treasurySolBalance?: number;
+    projectAccountExists?: boolean;
+    projectAccountDataLength?: number;
+    balances?: Record<string, string | number>;
+  };
+}
+
+export interface CreateProjectResult {
+  item: PortalProject;
+  activation: ProjectActivation;
 }
 
 export interface FundingHistoryItem {
@@ -226,6 +270,17 @@ export interface ApiHealth {
 
 export interface ApiStatus extends ApiHealth {
   environment: string;
+}
+
+export interface PublicProjectProfile {
+  id: string;
+  name: string;
+  displayName: string | null;
+  slug: string;
+  publicSlug: string;
+  totalRequests: number;
+  avgLatencyMs: number;
+  requestVolume7d: Array<Record<string, unknown>>;
 }
 
 // ─── Email ────────────────────────────────────────────────────────────────────

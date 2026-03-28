@@ -1,7 +1,13 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { FundingPreparation, PortalApiKey, PortalProject, PortalUser } from "./types";
+import type {
+  CreateProjectResult,
+  FundingPreparation,
+  PortalApiKey,
+  PortalProject,
+  PortalUser,
+} from "./types";
 
 export type WalletPhase =
   | "disconnected"
@@ -22,6 +28,7 @@ export interface PortalContextValue {
   projects: PortalProject[];
   selectedProject: PortalProject | null;
   setSelectedProject: (project: PortalProject) => void;
+  refreshProjects: () => Promise<PortalProject[]>;
 
   // API Keys
   apiKeys: PortalApiKey[];
@@ -41,6 +48,12 @@ export interface PortalContextValue {
     amount: string;
     submit: boolean;
   }) => Promise<FundingPreparation>;
+  createProject: (params: {
+    slug: string;
+    name: string;
+    description?: string;
+    templateType?: "blank" | "defi" | "indexing";
+  }) => Promise<CreateProjectResult>;
 
   createApiKey: (params: {
     label: string;

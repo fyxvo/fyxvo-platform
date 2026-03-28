@@ -35,16 +35,16 @@ export default function ComparePage() {
                 <td className="px-4 py-3 text-[var(--fyxvo-text)]">{row.feature}</td>
                 <td className="px-4 py-3 text-center">
                   {row.fyxvo ? (
-                    <span className="text-emerald-400">✓</span>
+                    <span className="text-emerald-400">Included</span>
                   ) : (
-                    <span className="text-rose-400">✗</span>
+                    <span className="text-rose-400">Not included</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   {row.competitor ? (
-                    <span className="text-emerald-400">✓</span>
+                    <span className="text-emerald-400">Included</span>
                   ) : (
-                    <span className="text-rose-400">✗</span>
+                    <span className="text-rose-400">Not included</span>
                   )}
                 </td>
               </tr>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { LoadingSkeleton } from "../../components/loading-skeleton";
+import { RetryBanner } from "../../components/retry-banner";
 import { StatusSubscribeForm } from "../../components/status-subscribe-form";
 import { API_BASE, GATEWAY_BASE } from "../../lib/env";
 
@@ -97,128 +99,140 @@ export default function StatusPage() {
   const [capacity, setCapacity] = useState<CapacityResponse | null>(null);
   const [healthCalendar, setHealthCalendar] = useState<HealthCalendarResponse | null>(null);
   const [errors, setErrors] = useState<StatusErrors>(INITIAL_ERRORS);
+  const [loading, setLoading] = useState(true);
+
+  const loadStatusData = useCallback(async (disposed?: () => boolean) => {
+    if (!disposed?.()) {
+      setLoading(true);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as ApiHealthResponse;
+      console.log("[StatusPage] /health", payload);
+      if (!disposed?.()) {
+        setApiHealth(payload);
+        setErrors((current) => ({ ...current, apiHealth: null }));
+      }
+    } catch (error) {
+      if (!disposed?.()) {
+        setErrors((current) => ({
+          ...current,
+          apiHealth: error instanceof Error ? error.message : "Unable to refresh control plane health",
+        }));
+      }
+    }
+
+    try {
+      const response = await fetch(`${GATEWAY_BASE}/v1/status`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as GatewayStatusResponse;
+      console.log("[StatusPage] /v1/status", payload);
+      if (!disposed?.()) {
+        setGatewayStatus(payload);
+        setErrors((current) => ({ ...current, gatewayStatus: null }));
+      }
+    } catch (error) {
+      if (!disposed?.()) {
+        setErrors((current) => ({
+          ...current,
+          gatewayStatus: error instanceof Error ? error.message : "Unable to refresh gateway status",
+        }));
+      }
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/v1/incidents`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as IncidentsResponse;
+      console.log("[StatusPage] /v1/incidents", payload);
+      if (!disposed?.()) {
+        setIncidents(payload);
+        setErrors((current) => ({ ...current, incidents: null }));
+      }
+    } catch (error) {
+      if (!disposed?.()) {
+        setErrors((current) => ({
+          ...current,
+          incidents: error instanceof Error ? error.message : "Unable to refresh incidents",
+        }));
+      }
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/v1/network/capacity`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as CapacityResponse;
+      console.log("[StatusPage] /v1/network/capacity", payload);
+      if (!disposed?.()) {
+        setCapacity(payload);
+        setErrors((current) => ({ ...current, capacity: null }));
+      }
+    } catch (error) {
+      if (!disposed?.()) {
+        setErrors((current) => ({
+          ...current,
+          capacity: error instanceof Error ? error.message : "Unable to refresh capacity",
+        }));
+      }
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/v1/network/health-calendar`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = (await response.json()) as HealthCalendarResponse;
+      console.log("[StatusPage] /v1/network/health-calendar", payload);
+      if (!disposed?.()) {
+        setHealthCalendar(payload);
+        setErrors((current) => ({ ...current, healthCalendar: null }));
+      }
+    } catch (error) {
+      if (!disposed?.()) {
+        setErrors((current) => ({
+          ...current,
+          healthCalendar: error instanceof Error ? error.message : "Unable to refresh health calendar",
+        }));
+      }
+    }
+
+    if (!disposed?.()) {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let disposed = false;
+    const isDisposed = () => disposed;
 
-    const load = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/health`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = (await response.json()) as ApiHealthResponse;
-        console.log("[StatusPage] /health", payload);
-        if (!disposed) {
-          setApiHealth(payload);
-          setErrors((current) => ({ ...current, apiHealth: null }));
-        }
-      } catch (error) {
-        if (!disposed) {
-          setErrors((current) => ({
-            ...current,
-            apiHealth: error instanceof Error ? error.message : "Unable to refresh control plane health",
-          }));
-        }
-      }
-
-      try {
-        const response = await fetch(`${GATEWAY_BASE}/v1/status`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = (await response.json()) as GatewayStatusResponse;
-        console.log("[StatusPage] /v1/status", payload);
-        if (!disposed) {
-          setGatewayStatus(payload);
-          setErrors((current) => ({ ...current, gatewayStatus: null }));
-        }
-      } catch (error) {
-        if (!disposed) {
-          setErrors((current) => ({
-            ...current,
-            gatewayStatus: error instanceof Error ? error.message : "Unable to refresh gateway status",
-          }));
-        }
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/v1/incidents`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = (await response.json()) as IncidentsResponse;
-        console.log("[StatusPage] /v1/incidents", payload);
-        if (!disposed) {
-          setIncidents(payload);
-          setErrors((current) => ({ ...current, incidents: null }));
-        }
-      } catch (error) {
-        if (!disposed) {
-          setErrors((current) => ({
-            ...current,
-            incidents: error instanceof Error ? error.message : "Unable to refresh incidents",
-          }));
-        }
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/v1/network/capacity`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = (await response.json()) as CapacityResponse;
-        console.log("[StatusPage] /v1/network/capacity", payload);
-        if (!disposed) {
-          setCapacity(payload);
-          setErrors((current) => ({ ...current, capacity: null }));
-        }
-      } catch (error) {
-        if (!disposed) {
-          setErrors((current) => ({
-            ...current,
-            capacity: error instanceof Error ? error.message : "Unable to refresh capacity",
-          }));
-        }
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/v1/network/health-calendar`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = (await response.json()) as HealthCalendarResponse;
-        console.log("[StatusPage] /v1/network/health-calendar", payload);
-        if (!disposed) {
-          setHealthCalendar(payload);
-          setErrors((current) => ({ ...current, healthCalendar: null }));
-        }
-      } catch (error) {
-        if (!disposed) {
-          setErrors((current) => ({
-            ...current,
-            healthCalendar: error instanceof Error ? error.message : "Unable to refresh health calendar",
-          }));
-        }
-      }
-    };
-
-    void load();
+    void loadStatusData(isDisposed);
     const intervalId = window.setInterval(() => {
-      void load();
+      void loadStatusData(isDisposed);
     }, 60_000);
 
     return () => {
       disposed = true;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [loadStatusData]);
 
   const openIncidents = incidents?.incidents.filter((incident) => !incident.resolvedAt) ?? [];
   const recentCalendar = useMemo(
     () => (healthCalendar?.calendar ?? []).slice(-30),
     [healthCalendar]
   );
+  const hasAnyData = Boolean(apiHealth || gatewayStatus || incidents || capacity || healthCalendar);
+  const combinedError = Object.values(errors).find(Boolean) ?? null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-16">
@@ -227,6 +241,29 @@ export default function StatusPage() {
         Live view of the Fyxvo control plane, relay gateway, protocol readiness, incident state,
         and current network capacity. Each data source refreshes independently every 60 seconds.
       </p>
+
+      {!hasAnyData && loading ? (
+        <div className="mt-10 grid gap-4 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={`status-skeleton-${index}`}
+              className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6"
+            >
+              <LoadingSkeleton className="h-4 w-28" />
+              <LoadingSkeleton className="mt-6 h-6 w-32" />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {combinedError ? (
+        <div className="mt-8">
+          <RetryBanner
+            message="One or more live status sources failed to refresh. Last known good data is still shown below."
+            onRetry={loadStatusData}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-10 grid gap-4 lg:grid-cols-3">
         <CardStatus

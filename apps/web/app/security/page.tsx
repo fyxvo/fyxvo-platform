@@ -1,44 +1,54 @@
+const SECTIONS = [
+  {
+    title: "Program and treasury safety",
+    body: "The live scope includes the Anchor program, project activation path, funding instructions, treasury accounting, and authority configuration that govern how devnet balances are managed.",
+  },
+  {
+    title: "API and gateway security",
+    body: "The live scope also includes wallet authentication, JWT session handling, project authorization, API key issuance, scope enforcement, rate limiting, webhook delivery, and relay routing at api.fyxvo.com and rpc.fyxvo.com.",
+  },
+  {
+    title: "Frontend and session integrity",
+    body: "The web app is part of the real security boundary. Browser-side issues such as XSS, CSRF, broken auth transitions, and client-side exposure of protected actions are all treated as meaningful reportable findings.",
+  },
+  {
+    title: "Current alpha posture",
+    body: "Fyxvo is live on devnet private alpha. That means the product is operating for real users, but it is not presented as a public paid mainnet service and does not claim the risk profile of a finalized production rollout.",
+  },
+] as const;
+
 export default function SecurityPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-16">
       <h1 className="text-4xl font-bold tracking-tight text-[var(--fyxvo-text)]">Security</h1>
       <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
-        The live security posture is openly scoped: the Anchor program, API, gateway, and web app
-        are in scope for vulnerability reports. Fyxvo is still devnet private alpha, which means
-        the product is live but not yet claiming public paid mainnet readiness.
+        Security at Fyxvo is described in terms of the live product boundary rather than marketing
+        language. The control plane, relay gateway, wallet auth flow, on-chain program, and public
+        web surfaces are all part of the system users rely on today.
       </p>
 
       <div className="mt-10 grid gap-5 lg:grid-cols-2">
-        <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
-          <h2 className="text-xl font-semibold text-[var(--fyxvo-text)]">In scope</h2>
-          <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-            <li>Anchor program fund accounting, project activation, and treasury management</li>
-            <li>api.fyxvo.com authentication, authorization, project, webhook, and assistant flows</li>
-            <li>rpc.fyxvo.com API key validation, scope enforcement, routing, and rate limiting</li>
-            <li>www.fyxvo.com frontend issues such as XSS, CSRF, or auth bypass</li>
-          </ul>
-        </div>
-        <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
-          <h2 className="text-xl font-semibold text-[var(--fyxvo-text)]">Current status</h2>
-          <ul className="mt-4 space-y-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-            <li>Devnet only, with no live mainnet funds represented in the product today</li>
-            <li>Sessions are created from wallet-signed authentication messages</li>
-            <li>USDC funding remains gated off in the current deployment</li>
-            <li>Security disclosures are coordinated privately before public write-up</li>
-          </ul>
-        </div>
+        {SECTIONS.map((section) => (
+          <div
+            key={section.title}
+            className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6"
+          >
+            <h2 className="text-xl font-semibold text-[var(--fyxvo-text)]">{section.title}</h2>
+            <p className="mt-3 text-sm leading-7 text-[var(--fyxvo-text-soft)]">{section.body}</p>
+          </div>
+        ))}
       </div>
 
       <div className="mt-10 rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
         <h2 className="text-2xl font-semibold text-[var(--fyxvo-text)]">Responsible disclosure</h2>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--fyxvo-text-soft)]">
           Do not file public issues for vulnerabilities. Send the issue description, reproduction
-          steps, impact, and any mitigations to{" "}
+          steps, impact, and any mitigation ideas to{" "}
           <a href="mailto:security@fyxvo.com" className="text-[var(--fyxvo-brand)]">
             security@fyxvo.com
           </a>
-          . The public security policy targets acknowledgment within 48 hours, critical fixes within
-          7 days, and high-severity fixes within 30 days.
+          . The working target is acknowledgment within 48 hours, critical remediation inside 7
+          days when feasible, and a coordinated write-up only after the risk has been addressed.
         </p>
       </div>
     </div>

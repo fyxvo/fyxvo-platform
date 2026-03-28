@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { EmailSubscribeForm } from "./email-subscribe-form";
 
 const SOCIAL_LINKS = [
   {
@@ -79,6 +80,22 @@ export function Footer() {
             Fund projects on devnet, route traffic through the managed relay, inspect request
             history, and operate from one wallet-authenticated workspace.
           </p>
+          <div className="max-w-md rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
+            <p className="text-sm font-medium text-[var(--fyxvo-text)]">Newsletter</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+              Subscribe for product updates, rollout notes, and changes to the devnet operating
+              contract.
+            </p>
+            <div className="mt-4">
+              <EmailSubscribeForm
+                endpoint="/v1/newsletter/subscribe"
+                buttonLabel="Subscribe"
+                successMessage="Your email has been added to the Fyxvo newsletter list."
+                source="footer"
+                compact
+              />
+            </div>
+          </div>
           <div className="flex flex-wrap gap-3 text-sm text-[var(--fyxvo-text-muted)]">
             <a
               href="https://www.fyxvo.com"

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../components/copy-button";
+import { EmailSubscribeForm } from "../components/email-subscribe-form";
 import { AlertIcon, CodeIcon, KeyIcon, WalletIcon, ZapIcon } from "../components/icons";
 import {
   getPublicApiHealth,
@@ -362,6 +363,21 @@ export default async function HomePage() {
             <Button asChild variant="secondary" size="lg">
               <Link href="/docs">Read the quickstart</Link>
             </Button>
+          </div>
+          <div className="mt-10 max-w-2xl rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+            <p className="text-sm font-medium text-[var(--fyxvo-text)]">Newsletter</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+              Subscribe if you want release notes, pricing updates, and public rollout changes sent
+              to your inbox as the devnet product matures.
+            </p>
+            <div className="mt-4">
+              <EmailSubscribeForm
+                endpoint="/v1/newsletter/subscribe"
+                buttonLabel="Subscribe"
+                successMessage="Your email has been added to the Fyxvo newsletter list."
+                source="home"
+              />
+            </div>
           </div>
         </div>
       </section>

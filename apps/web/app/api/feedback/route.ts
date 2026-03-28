@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
+import { API_BASE } from "../../../lib/env";
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const body = await request.json() as { type?: string; message?: string };
-    if (!body.message) {
-      return NextResponse.json({ error: "Message is required" }, { status: 400 });
+    const body = await request.json();
+    const authorization = request.headers.get("authorization");
+    const upstream = await fetch(`${API_BASE}/v1/feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authorization ? { Authorization: authorization } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+
+    const payload = (await upstream.json().catch(() => ({}))) as { error?: string; message?: string };
+    if (!upstream.ok) {
+      return NextResponse.json(
+        { error: payload.message ?? payload.error ?? "Unable to submit feedback" },
+        { status: upstream.status }
+      );
     }
-    // In production this would be forwarded to a feedback service
-    console.info("[Feedback]", body);
-    return NextResponse.json({ success: true }, { status: 201 });
+
+    return NextResponse.json(payload, { status: upstream.status });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
