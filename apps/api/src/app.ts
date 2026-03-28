@@ -615,12 +615,15 @@ async function buildMainnetReleaseGateSnapshot(input: {
   }).treasury;
   const actualUpgradeAuthority = readiness?.programUpgradeAuthority ?? null;
   const treasurySolBalanceLamports = treasuryOverview.solBalance;
+  const treasurySolBalanceValue = treasurySolBalanceLamports ? BigInt(treasurySolBalanceLamports) : 0n;
+  const observedReserveLamports =
+    treasurySolBalanceValue > confirmedFundingLamports ? treasurySolBalanceValue : confirmedFundingLamports;
   const assistantAvailable = isAssistantConfigured(input.env);
   const emailDeliveryConfigured = isEmailDeliveryEnabled({
     apiKey: input.env.RESEND_API_KEY,
     from: input.env.EMAIL_FROM,
   });
-  const reserveReady = confirmedFundingLamports >= targetReserveLamports;
+  const reserveReady = observedReserveLamports >= targetReserveLamports;
   const protocolReady = readiness?.ready ?? false;
 
   const paidBetaBlockers = [
@@ -641,7 +644,7 @@ async function buildMainnetReleaseGateSnapshot(input: {
     ...paidBetaBlockers,
     !protocolReady ? "Protocol readiness is not fully green on the current cluster." : null,
     !reserveReady
-      ? `Confirmed SOL funding is ${confirmedFundingLamports.toString()} lamports, below the target reserve of ${targetReserveLamports.toString()} lamports.`
+      ? `Observed treasury reserve is ${observedReserveLamports.toString()} lamports (confirmed funding ${confirmedFundingLamports.toString()}, on-chain treasury balance ${treasurySolBalanceValue.toString()}), below the target reserve of ${targetReserveLamports.toString()} lamports.`
       : null,
     authorityPlan.mode === "single-signer"
       ? "Authority mode is still single-signer. Governed or multisig control is required before mainnet beta."
@@ -662,7 +665,7 @@ async function buildMainnetReleaseGateSnapshot(input: {
       key: "confirmed_reserve",
       label: "Confirmed reserve",
       status: reserveReady ? "healthy" : "needs_attention",
-      detail: `${confirmedFundingLamports.toString()} / ${targetReserveLamports.toString()} lamports confirmed`,
+      detail: `${observedReserveLamports.toString()} / ${targetReserveLamports.toString()} lamports observed between confirmed funding and live treasury balance`,
     },
     {
       key: "assistant",
