@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -34,6 +35,7 @@ export function Nav() {
       <div className="mx-auto flex h-full max-w-7xl items-center gap-4 px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2">
+          <Image src="/brand/logo.png" width={32} height={32} alt="Fyxvo" />
           <span className="font-display text-lg font-bold text-[var(--fyxvo-brand)]">Fyxvo</span>
         </Link>
 
