@@ -1,101 +1,80 @@
 "use client";
 
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Button, Modal } from "@fyxvo/ui";
 import { useState } from "react";
-import { Badge, Button, Modal } from "@fyxvo/ui";
-import { trackLaunchEvent } from "../lib/tracking";
-import { usePortal } from "./portal-provider";
+import { usePortal } from "../lib/portal-context";
 
-function walletTone(readyState: string) {
-  if (readyState === "Installed" || readyState === "Loadable") {
-    return "success" as const;
-  }
-  return "neutral" as const;
-}
-
-export function WalletConnectButton({
-  className,
-  compact = false,
-}: {
-  readonly className?: string;
-  readonly compact?: boolean;
-}) {
-  const portal = usePortal();
+export function WalletConnectButton() {
   const [open, setOpen] = useState(false);
-  const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
+  const { connectWallet, walletPhase } = usePortal();
+  const { wallets } = useWallet();
+
+  const isConnecting = walletPhase === "connecting" || walletPhase === "authenticating";
+
+  const handleSelect = async (name: string) => {
+    setOpen(false);
+    await connectWallet(name);
+  };
 
   return (
     <>
       <Button
-        className={className}
-        onClick={() => {
-          setOpen(true);
-          void trackLaunchEvent({
-            name: "wallet_connect_intent",
-            source: compact ? "header-compact" : "header-primary",
-          });
-        }}
-        loading={
-          portal.walletPhase === "connecting" || portal.walletPhase === "authenticating"
-        }
+        variant="primary"
+        onClick={() => setOpen(true)}
+        loading={isConnecting}
+        disabled={isConnecting}
       >
-        {compact ? "Connect" : "Connect wallet"}
+        Connect wallet
       </Button>
+
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title="Connect a Solana wallet"
-        description="Choose a wallet to authenticate your Fyxvo session. Phantom, Solflare, Backpack, Coinbase Wallet, Trust Wallet, and Wallet Standard compatible wallets are supported."
+        description="Choose a wallet to connect and authenticate with Fyxvo."
       >
-        <div className="space-y-2">
-          {portal.walletOptions.map((wallet) => (
-            <button
-              key={wallet.name}
-              type="button"
-              disabled={connectingWallet !== null}
-              onClick={async () => {
-                setConnectingWallet(wallet.name);
-                try {
-                  await portal.connectWallet(wallet.name);
-                  setOpen(false);
-                } finally {
-                  setConnectingWallet(null);
-                }
-              }}
-              className="flex w-full items-center gap-4 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-left transition hover:border-brand-500/40 hover:bg-[var(--fyxvo-panel)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {wallet.icon ? (
-                <img
-                  src={wallet.icon}
-                  alt={`${wallet.name} logo`}
-                  className="h-9 w-9 shrink-0 rounded-xl object-contain"
-                  aria-hidden="true"
-                />
-              ) : (
-                <div className="h-9 w-9 shrink-0 rounded-xl bg-[var(--fyxvo-panel)] ring-1 ring-[var(--fyxvo-border)]" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-[var(--fyxvo-text)]">
-                  {wallet.name}
-                </div>
-                <div className="mt-0.5 text-xs text-[var(--fyxvo-text-muted)]">
-                  {wallet.installed
-                    ? "Ready in this browser"
-                    : "Not detected — install the extension to connect"}
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Badge tone={walletTone(wallet.readyState)}>{wallet.readyState}</Badge>
-                {connectingWallet === wallet.name ? (
-                  <span className="text-xs text-[var(--fyxvo-text-muted)]">Connecting…</span>
-                ) : null}
-              </div>
-            </button>
-          ))}
+        <div className="flex flex-col gap-2">
+          {wallets.length === 0 ? (
+            <p className="text-sm text-[var(--fyxvo-text-muted)]">
+              No wallets detected. Please install Phantom or another Solana wallet.
+            </p>
+          ) : (
+            wallets.map((w) => {
+              const name =
+                typeof w.adapter?.name === "string"
+                  ? w.adapter.name
+                  : (w as { adapter?: { name?: string } }).adapter?.name ?? "Unknown";
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => handleSelect(name)}
+                  className="flex items-center gap-3 rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 py-3 text-left text-sm font-medium text-[var(--fyxvo-text)] transition-colors hover:border-[var(--fyxvo-brand)] hover:bg-[var(--fyxvo-panel)]"
+                  aria-label={name}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--fyxvo-panel)]">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      width={18}
+                      height={18}
+                      aria-hidden="true"
+                    >
+                      <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
+                      <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
+                      <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+                    </svg>
+                  </span>
+                  <span>{name}</span>
+                </button>
+              );
+            })
+          )}
         </div>
-        <p className="mt-4 text-xs text-[var(--fyxvo-text-muted)]">
-          Wallet Standard compatible wallets are detected automatically. Fyxvo never stores private
-          keys.
-        </p>
       </Modal>
     </>
   );

@@ -1,262 +1,149 @@
-import type { SVGProps } from "react";
+import type { ReactElement, SVGProps } from "react";
 
-function Icon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    />
-  );
+type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+
+function icon(path: string | ReactElement, viewBox = "0 0 24 24") {
+  return function Icon({ size = 16, width, height, ...props }: IconProps) {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={viewBox}
+        width={width ?? size}
+        height={height ?? size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        {...props}
+      >
+        {typeof path === "string" ? <path d={path} /> : path}
+      </svg>
+    );
+  };
 }
 
-export function HomeIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M3 10.5L12 3l9 7.5" />
-      <path d="M5 9.75V21h14V9.75" />
-      <path d="M9 21v-6h6v6" />
-    </Icon>
-  );
-}
+export const SunIcon = icon(
+  <>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+  </>
+);
 
-export function GaugeIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M4 13a8 8 0 1116 0" />
-      <path d="M12 13l4-4" />
-      <path d="M12 17h.01" />
-    </Icon>
-  );
-}
+export const MoonIcon = icon(
+  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+);
 
-export function FolderIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M3 7.5A2.5 2.5 0 015.5 5H10l2 2h6.5A2.5 2.5 0 0121 9.5v8A2.5 2.5 0 0118.5 20h-13A2.5 2.5 0 013 17.5z" />
-    </Icon>
-  );
-}
+export const CopyIcon = icon(
+  <>
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </>
+);
 
-export function KeyIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="8" cy="15" r="3" />
-      <path d="M10.5 13.5L21 3" />
-      <path d="M18 3h3v3" />
-      <path d="M15 6l3 3" />
-    </Icon>
-  );
-}
+export const CheckIcon = icon(
+  <path d="M20 6 9 17l-5-5" />
+);
 
-export function FundingIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M12 3v18" />
-      <path d="M17 7.5c0-1.9-2.24-3.5-5-3.5S7 5.6 7 7.5 9.24 11 12 11s5 1.6 5 3.5S14.76 18 12 18s-5-1.6-5-3.5" />
-    </Icon>
-  );
-}
+export const KeyIcon = icon(
+  <>
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3" />
+  </>
+);
 
-export function ChartIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M4 19h16" />
-      <path d="M7 15v-4" />
-      <path d="M12 15V8" />
-      <path d="M17 15v-7" />
-    </Icon>
-  );
-}
+export const WalletIcon = icon(
+  <>
+    <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
+    <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
+    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+  </>
+);
 
-export function ServerIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <rect x="3" y="4" width="18" height="6" rx="2" />
-      <rect x="3" y="14" width="18" height="6" rx="2" />
-      <path d="M7 7h.01" />
-      <path d="M7 17h.01" />
-    </Icon>
-  );
-}
+export const AlertIcon = icon(
+  <>
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" x2="12" y1="9" y2="13" />
+    <line x1="12" x2="12.01" y1="17" y2="17" />
+  </>
+);
 
-export function BookIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M5 4h12a2 2 0 012 2v12H7a2 2 0 00-2 2z" />
-      <path d="M5 4v16a2 2 0 012-2h12" />
-    </Icon>
-  );
-}
+export const ChevronDownIcon = icon(
+  <path d="m6 9 6 6 6-6" />
+);
 
-export function PulseIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M3 12h4l2.2-5 3.6 10L15 12h6" />
-    </Icon>
-  );
-}
+export const ChevronRightIcon = icon(
+  <path d="m9 18 6-6-6-6" />
+);
 
-export function CopyIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <rect x="9" y="9" width="11" height="11" rx="2" />
-      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-    </Icon>
-  );
-}
+export const XIcon = icon(
+  <>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </>
+);
 
-export function WalletIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M3 7.5A2.5 2.5 0 015.5 5h12A2.5 2.5 0 0120 7.5v9A2.5 2.5 0 0117.5 19h-12A2.5 2.5 0 013 16.5z" />
-      <path d="M16 12h4" />
-      <path d="M16 9.5h4v5h-4a2.5 2.5 0 010-5z" />
-    </Icon>
-  );
-}
+export const SendIcon = icon(
+  <>
+    <path d="m22 2-7 20-4-9-9-4Z" />
+    <path d="M22 2 11 13" />
+  </>
+);
 
-export function SparklesIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" />
-      <path d="M5 18l.8 1.8L7.5 21l-1.7.8L5 23.5l-.8-1.7L2.5 21l1.7-.8z" />
-      <path d="M18.5 15l1 2.2 2.2 1-2.2 1-1 2.3-1-2.3-2.3-1 2.3-1z" />
-    </Icon>
-  );
-}
+export const RefreshIcon = icon(
+  <>
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </>
+);
 
-export function AlertIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M12 4l9 16H3z" />
-      <path d="M12 10v4" />
-      <path d="M12 18h.01" />
-    </Icon>
-  );
-}
+export const TrashIcon = icon(
+  <>
+    <path d="M3 6h18" />
+    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+  </>
+);
 
-export function CheckIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M5 12.5l4.2 4.2L19 7" />
-    </Icon>
-  );
-}
+export const ExternalLinkIcon = icon(
+  <>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" x2="21" y1="14" y2="3" />
+  </>
+);
 
-export function MenuIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M4 7h16" />
-      <path d="M4 12h16" />
-      <path d="M4 17h16" />
-    </Icon>
-  );
-}
+export const ThumbUpIcon = icon(
+  <>
+    <path d="M7 10v12" />
+    <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
+  </>
+);
 
-export function CloseIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M6 6l12 12" />
-      <path d="M18 6L6 18" />
-    </Icon>
-  );
-}
+export const ThumbDownIcon = icon(
+  <>
+    <path d="M17 14V2" />
+    <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z" />
+  </>
+);
 
-export function SunIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2.5v2.2" />
-      <path d="M12 19.3v2.2" />
-      <path d="M4.9 4.9l1.6 1.6" />
-      <path d="M17.5 17.5l1.6 1.6" />
-      <path d="M2.5 12h2.2" />
-      <path d="M19.3 12h2.2" />
-      <path d="M4.9 19.1l1.6-1.6" />
-      <path d="M17.5 6.5l1.6-1.6" />
-    </Icon>
-  );
-}
+export const PlusIcon = icon(
+  <>
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </>
+);
 
-export function MoonIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M18 15.8A7.5 7.5 0 018.2 6a8.6 8.6 0 1010 9.8z" />
-    </Icon>
-  );
-}
+export const ZapIcon = icon(
+  <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+);
 
-export function XSocialIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-      <path d="M18.244 2H21l-6.013 6.872L22 22h-5.58l-4.37-6.377L6.47 22H3.71l6.43-7.35L2 2h5.72l3.95 5.94zm-.978 18h1.53L6.89 3.895H5.25z" />
-    </svg>
-  );
-}
-
-export function DiscordIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-      <path d="M19.54 5.34A16.4 16.4 0 0015.5 4l-.2.41a15.04 15.04 0 013.67 1.41 13.9 13.9 0 00-6.97-1.83 13.9 13.9 0 00-6.97 1.83A15.05 15.05 0 018.7 4.41L8.5 4a16.4 16.4 0 00-4.04 1.34C1.9 9.14 1.24 12.85 1.57 16.5A16.62 16.62 0 006.52 19l.9-1.48a10.66 10.66 0 01-1.41-.69l.34-.26a11.97 11.97 0 0011.3 0l.34.26c-.45.27-.92.5-1.42.69l.9 1.48a16.62 16.62 0 004.95-2.5c.4-4.23-.68-7.9-2.88-11.16zM8.97 14.2c-.94 0-1.7-.86-1.7-1.93s.75-1.93 1.7-1.93 1.71.87 1.7 1.93-.76 1.93-1.7 1.93zm6.06 0c-.94 0-1.7-.86-1.7-1.93s.75-1.93 1.7-1.93 1.71.87 1.7 1.93-.75 1.93-1.7 1.93z" />
-    </svg>
-  );
-}
-
-export function TelegramIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-      <path d="M21.46 4.61a1.7 1.7 0 00-1.8-.24L3.1 10.78a1.27 1.27 0 00.08 2.38l4.13 1.35 1.6 4.97a1.27 1.27 0 002.16.45l2.3-2.35 4.51 3.31a1.7 1.7 0 002.68-1.01l2.38-13.49a1.7 1.7 0 00-.48-1.78zM9.32 14.01l8.58-6.21-6.56 7.12-.3 3.06z" />
-    </svg>
-  );
-}
-
-export function TransactionsIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" {...props}>
-      <path d="M2 4h12M2 8h8M2 12h5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-    </Icon>
-  );
-}
-
-export function BeakerIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <path d="M9 3h6M9 3v7l-4 8a1 1 0 00.9 1.45h12.2A1 1 0 0023 18l-4-8V3" />
-      <path d="M9 3H7M15 3h2" />
-    </Icon>
-  );
-}
-
-export function SupportIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v4" />
-      <path d="M12 16h.01" />
-    </Icon>
-  );
-}
-
-export function SearchIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <Icon {...props}>
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="M16 16l4 4" />
-    </Icon>
-  );
-}
+export const CodeIcon = icon(
+  <>
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+  </>
+);

@@ -1,96 +1,91 @@
-import Link from "next/link";
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Notice, Skeleton } from "@fyxvo/ui";
-import { AlertIcon, SparklesIcon, WalletIcon } from "./icons";
+"use client";
 
-export function AuthGate({
-  title = "Connect a wallet to continue.",
-  body = "Wallet authentication keeps project activation, funding, API key management, and analytics tied to the same session boundary without exposing private keys."
-}: {
-  readonly title?: string;
-  readonly body?: string;
-}) {
-  return (
-    <Notice tone="brand" title={title} icon={<WalletIcon className="h-4 w-4" />}>
-      {body}
-    </Notice>
-  );
+import type { ReactNode } from "react";
+import { usePortal } from "../lib/portal-context";
+
+interface AuthGateProps {
+  children: ReactNode;
+  message?: string;
 }
 
-export function ErrorPanel({
-  title = "Something went wrong",
-  message,
-  details,
-  retry,
-}: {
-  title?: string;
-  message?: string;
-  details?: string;
-  retry?: () => void;
-}) {
+export function AuthGate({ children, message }: AuthGateProps) {
+  const { walletPhase } = usePortal();
+
+  if (walletPhase !== "authenticated") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 py-16 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            width={28}
+            height={28}
+            className="text-[var(--fyxvo-text-muted)]"
+            aria-hidden="true"
+          >
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <div>
+          <p className="font-semibold text-[var(--fyxvo-text)]">Connect your wallet to continue</p>
+          {message ? (
+            <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{message}</p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  icon?: ReactNode;
+}
+
+export function EmptyState({ title, description, action, icon }: EmptyStateProps) {
   return (
-    <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6 text-center">
-      <AlertIcon className="mx-auto mb-3 h-8 w-8 text-rose-400" />
-      <h3 className="font-medium text-[var(--fyxvo-text)]">{title}</h3>
-      {message && <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{message}</p>}
-      {details && <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)] italic">{details}</p>}
-      {retry && (
-        <button
-          onClick={retry}
-          className="mt-4 rounded-lg border border-[var(--fyxvo-border)] px-4 py-2 text-sm text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)] transition-colors"
-        >
-          Try again
-        </button>
-      )}
+    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+      {icon ? (
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+          {icon}
+        </div>
+      ) : null}
+      <div>
+        <p className="font-semibold text-[var(--fyxvo-text)]">{title}</p>
+        {description ? (
+          <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{description}</p>
+        ) : null}
+      </div>
+      {action ?? null}
     </div>
   );
 }
 
-export function LoadingGrid() {
+export function LoadingPanel({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <Card key={index} className="fyxvo-surface border-white/5">
-          <CardHeader>
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-9 w-40" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-4 w-full" />
-          </CardContent>
-        </Card>
+    <div className="space-y-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="h-12 rounded-xl animate-pulse bg-[var(--fyxvo-panel-soft)]"
+        />
       ))}
     </div>
   );
 }
 
-export function EmptyProjectState() {
+export function ErrorPanel({ message }: { message: string }) {
   return (
-    <Card className="fyxvo-surface border-white/5">
-      <CardHeader>
-        <CardTitle>No projects connected yet</CardTitle>
-        <CardDescription>
-          Start by creating one project from the dashboard. Once the activation transaction confirms, funding, API keys, request logs, and analytics all unlock from the same place.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-3">
-        <Button asChild variant="secondary">
-          <Link href="/docs">Open quickstart</Link>
-        </Button>
-        <Button asChild variant="ghost">
-          <Link href="/funding">Review funding flow</Link>
-        </Button>
-        <Button asChild variant="ghost">
-          <Link href="/contact">Get alpha support</Link>
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function PremiumCallout() {
-  return (
-    <Notice tone="neutral" title="Designed for devnet operations" icon={<SparklesIcon className="h-4 w-4" />}>
-      The interface stays opinionated, calm, and operational so engineering, operator, and treasury work can move through one product instead of a stitched admin panel.
-    </Notice>
+    <div className="rounded-xl border border-rose-500/20 bg-rose-500/8 p-4 text-sm text-rose-400">
+      {message}
+    </div>
   );
 }

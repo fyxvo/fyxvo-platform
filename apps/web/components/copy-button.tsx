@@ -1,33 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@fyxvo/ui";
-import { CopyIcon } from "./icons";
+import { useState } from "react";
+import { CheckIcon, CopyIcon } from "./icons";
 
-export function CopyButton({
-  value,
-  label = "Copy",
-  className,
-}: {
-  readonly value: string;
-  readonly label?: string;
-  readonly className?: string;
-}) {
+interface CopyButtonProps {
+  text: string;
+  className?: string;
+}
+
+export function CopyButton({ text, className }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <Button
       variant="ghost"
       size="sm"
+      onClick={handleCopy}
+      aria-label="Copy"
       className={className}
-      leadingIcon={<CopyIcon className="h-4 w-4" />}
-      onClick={async () => {
-        await navigator.clipboard.writeText(value);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1600);
-      }}
     >
-      {copied ? "Copied" : label}
+      {copied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+      <span className="sr-only">Copy</span>
     </Button>
   );
 }

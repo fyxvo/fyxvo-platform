@@ -1,14 +1,10 @@
-import { LoadingGrid } from "../components/state-panels";
-
 export default function Loading() {
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <div className="h-4 w-28 rounded-full bg-[var(--fyxvo-panel-soft)]" />
-        <div className="h-14 w-full max-w-xl rounded-3xl bg-[var(--fyxvo-panel-soft)]" />
-        <div className="h-6 w-full max-w-3xl rounded-2xl bg-[var(--fyxvo-panel-soft)]" />
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--fyxvo-border)] border-t-[var(--fyxvo-brand)]" />
+        <p className="text-sm text-[var(--fyxvo-text-muted)]">Loading…</p>
       </div>
-      <LoadingGrid />
     </div>
   );
 }

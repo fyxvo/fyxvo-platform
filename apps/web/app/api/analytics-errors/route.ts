@@ -1,24 +1,11 @@
-import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { webEnv } from "../../../lib/env";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const body = await request.json() as { component?: string; message?: string; page?: string };
-    if (!body.component && !body.message) {
-      return NextResponse.json({ error: "Missing component or message" }, { status: 400 });
-    }
-    await fetch(new URL("/v1/analytics/errors", webEnv.apiBaseUrl), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        component: body.component ?? "unknown",
-        message: body.message ?? "unknown",
-        page: body.page ?? "unknown",
-      }),
-    });
-    return NextResponse.json({ ok: true });
+    const body = await request.json();
+    console.error("[Analytics Error]", JSON.stringify(body));
+    return NextResponse.json({ accepted: true }, { status: 202 });
   } catch {
-    return NextResponse.json({ ok: true }); // silent fail — never block the client
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 }

@@ -1,18 +1,11 @@
-import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { webEnv } from "../../../lib/env";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const body = await request.json() as { page?: string; fcp?: number; lcp?: number; ua?: string };
-    if (!body.page) return NextResponse.json({ error: "Missing page" }, { status: 400 });
-    await fetch(new URL("/v1/analytics/performance", webEnv.apiBaseUrl), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    return NextResponse.json({ ok: true });
+    const body = await request.json();
+    console.info("[Performance]", JSON.stringify(body));
+    return NextResponse.json({ accepted: true }, { status: 202 });
   } catch {
-    return NextResponse.json({ ok: true }); // silent fail
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 }

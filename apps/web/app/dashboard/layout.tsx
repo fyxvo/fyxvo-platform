@@ -1,10 +1,9 @@
-import type { Metadata } from "next";
+import type { ReactNode } from "react";
 
-export const metadata: Metadata = {
-  title: "Dashboard — Fyxvo",
-  description: "Your Fyxvo workspace overview: gateway health, project status, API key activity, and on-chain balance at a glance.",
-};
-
-export default function DashboardLayout({ children }: { readonly children: React.ReactNode }) {
-  return <>{children}</>;
+export default function DashboardLayout({ children }: { readonly children: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      {children}
+    </div>
+  );
 }
