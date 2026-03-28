@@ -1,6 +1,6 @@
 {
   "name": "@fyxvo/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Official TypeScript SDK for the Fyxvo Solana devnet control plane and relay gateway",
   "type": "module",
   "main": "./dist/index.js",
