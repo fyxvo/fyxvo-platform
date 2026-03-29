@@ -39,6 +39,9 @@ export const metadata: Metadata = {
     site: "@fyxvo",
     creator: "@fyxvo",
   },
+  verification: {
+    google: "a4kZyFOCBfoVihbdI3gh4qsEFgIwP0W8Q0Ygki6pvMg",
+  },
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
