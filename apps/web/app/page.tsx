@@ -116,12 +116,13 @@ export default async function HomePage() {
               Devnet private alpha
             </div>
             <h1 className="mt-6 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-              Wallet-authenticated Solana RPC relay with on-chain funding and live analytics.
+              Decentralized Solana RPC and relay infrastructure
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-              Fyxvo is live on devnet today. Connect a wallet, activate a project, fund it with
-              SOL or USDC, issue a scoped API key, and start routing real JSON-RPC traffic through
-              the managed gateway in minutes.
+              Connect a wallet, activate a project, fund it with SOL or USDC, and start routing
+              real Solana JSON-RPC traffic through the managed gateway. The network is live on
+              devnet today with full project control, analytics, alerts, and a priority relay
+              lane.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Button asChild size="lg">
