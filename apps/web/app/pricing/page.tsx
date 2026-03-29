@@ -224,7 +224,8 @@ export default function PricingPage() {
             node operators who route the traffic, 10 percent goes to the protocol treasury to fund
             on-chain governance, and 10 percent goes to the infrastructure fund that supports
             development and operations. The current devnet phase still runs on managed
-            infrastructure, but that split reflects the direction the network is being built for.
+            infrastructure, but that split already defines how the network will account for fee
+            distribution as external operators join.
           </p>
         </div>
       </section>
@@ -420,7 +421,7 @@ export default function PricingPage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild>
-              <Link href="/dashboard">Open workspace</Link>
+              <Link href="/dashboard">Open dashboard</Link>
             </Button>
             <Button asChild variant="secondary">
               <Link href="/docs">Read the flow</Link>

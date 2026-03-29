@@ -20,15 +20,12 @@ function useMounted() {
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
-  { href: "/dashboard", label: "Workspace" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/docs", label: "Docs" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/status", label: "Status" },
   { href: "/network", label: "Network" },
   { href: "/explore", label: "Explore" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/mainnet", label: "Mainnet gate" },
-  { href: "/status", label: "Status" },
-  { href: "/updates", label: "Updates" },
   { href: "/enterprise", label: "Enterprise" },
   { href: "/contact", label: "Contact" },
 ];

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { usePortal } from "../lib/portal-context";
 
 const DASHBOARD_LINKS = [
-  { href: "/dashboard", label: "Workspace" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/settings", label: "Project settings" },
   { href: "/operators/dashboard", label: "Node operator" }
 ] as const;

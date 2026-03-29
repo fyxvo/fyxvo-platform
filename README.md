@@ -1,6 +1,6 @@
 # Fyxvo
 
-Fyxvo is a Solana infrastructure platform moving from a managed devnet private alpha toward a decentralized RPC, data, and relay network. The live stack already supports wallet authentication, on-chain project activation, project funding, scoped API keys, request analytics, alerts, operator onboarding, public trust surfaces, and an embeddable network status experience.
+Fyxvo is a live Solana devnet control plane for funded RPC relay access, wallet-authenticated project management, on-chain SOL and USDC funding, scoped API keys, request analytics, alerts, webhooks, and operator onboarding. The hosted stack is already running with a managed gateway, public trust surfaces, and a published operator path on top of the live devnet protocol.
 
 The current deployment runs on Solana devnet. The protocol addresses are public, the control plane and relay are live, USDC support is enabled, and the operator network layer is partially opened through registration and approval workflows. The network is not yet a public mainnet operator marketplace, and the authority model is still managed while the mainnet path is hardened.
 

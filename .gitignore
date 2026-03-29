@@ -12,6 +12,8 @@ coverage
 # Environment files
 .env
 .env.local
+.env.production
+.env.production.local
 .env.*.local
 .npmrc
 
@@ -36,6 +38,10 @@ programs/**/target
 *.sqlite-shm
 *.sqlite-wal
 .vercel
+*.pem
+*.key
+id.json
+keypair.json
 
 # Claude Code internal state
 .claude/

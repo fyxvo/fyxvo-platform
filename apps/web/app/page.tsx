@@ -16,7 +16,7 @@ import {
 export const metadata: Metadata = {
   title: "Fyxvo — Solana RPC and relay infrastructure network",
   description:
-    "Fyxvo is building decentralized Solana RPC and relay infrastructure, with a managed devnet network live today as the first phase toward open operator participation.",
+    "Fyxvo is a live Solana devnet control plane for wallet-authenticated project activation, SOL and USDC funding, funded RPC relay access, and live analytics.",
 };
 
 const CAPABILITIES = [
@@ -116,17 +116,16 @@ export default async function HomePage() {
               Devnet private alpha
             </div>
             <h1 className="mt-6 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-              Building decentralized Solana RPC and relay infrastructure.
+              Wallet-authenticated Solana RPC relay with on-chain funding and live analytics.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-              Fyxvo is live on devnet today with managed infrastructure, wallet-authenticated
-              project funding, and a real relay stack. That managed network is the first operating
-              phase on the path toward an open operator network for decentralized Solana RPC and
-              relay infrastructure.
+              Fyxvo is live on devnet today. Connect a wallet, activate a project, fund it with
+              SOL or USDC, issue a scoped API key, and start routing real JSON-RPC traffic through
+              the managed gateway in minutes.
             </p>
             <div className="mt-10 flex flex-wrap gap-3">
               <Button asChild size="lg">
-                <Link href="/dashboard">Open workspace</Link>
+                <Link href="/dashboard">Open dashboard</Link>
               </Button>
               <Button asChild variant="secondary" size="lg">
                 <Link href="/docs">Read docs</Link>
@@ -363,7 +362,7 @@ export default async function HomePage() {
             Start here
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
-            Build against the real product contract, not a generic RPC landing page
+            Integrate against the real product contract, not a generic RPC landing page
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
             The quickest path is to connect a wallet, create a project, prepare a funding
@@ -371,7 +370,7 @@ export default async function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="/dashboard">Open workspace</Link>
+              <Link href="/dashboard">Open dashboard</Link>
             </Button>
             <Button asChild variant="secondary" size="lg">
               <Link href="/docs">Read the quickstart</Link>
