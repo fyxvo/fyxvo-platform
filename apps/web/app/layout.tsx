@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: "%s — Fyxvo",
   },
   description:
-    "Fyxvo is a Solana devnet control plane for funded relay access, on-chain project activation, API keys, analytics, alerts, and assistant-guided operations.",
+    "Decentralized Solana RPC and relay infrastructure network. Connect a wallet, activate a project, fund it with SOL or USDC, and start routing real Solana JSON-RPC traffic through the managed gateway on devnet today.",
   metadataBase: new URL("https://www.fyxvo.com"),
   robots: {
     index: true,

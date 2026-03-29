@@ -131,13 +131,13 @@ export default function DocsPage() {
             Documentation
           </p>
           <h1 className="mt-3 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-            Build against the real Fyxvo flow
+            Start with the real Fyxvo flow
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-            Fyxvo is building decentralized Solana RPC and relay infrastructure. The live devnet
-            product still runs on managed infrastructure today, with wallet authentication,
-            on-chain project activation, funded relay usage, scoped API keys, analytics, alerts,
-            and public trust surfaces already operating.
+            Fyxvo is a decentralized Solana RPC and relay infrastructure network live on devnet
+            today. The managed network already supports wallet authentication, on-chain project
+            activation, funded relay usage, scoped API keys, analytics, alerts, and public trust
+            surfaces.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button asChild>
@@ -469,7 +469,7 @@ export default function DocsPage() {
             </h2>
             <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
               Developers can integrate with Fyxvo using the published JavaScript client instead of
-              building their own request wrapper. Install it with `npm install @fyxvo/sdk`, create
+              writing their own request wrapper. Install it with `npm install @fyxvo/sdk`, create
               a gateway client with your API key, and send either standard or priority relay
               requests with the same typed interface.
             </p>
