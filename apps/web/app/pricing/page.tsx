@@ -1,60 +1,79 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@fyxvo/ui";
 import { LoadingSkeleton } from "../../components/loading-skeleton";
 import { RetryBanner } from "../../components/retry-banner";
-import { ENABLE_USDC } from "../../lib/env";
-import { requestPricingTiers } from "../../lib/public-data";
+import {
+  mainnetPayAsYouGo,
+  mainnetPricingTiers,
+  mainnetRevenueSplit,
+} from "../../lib/public-data";
 
-const USDC_PRICING_TIERS = [
-  {
-    name: "Standard RPC",
-    units: 100,
-    description: "USDC billing is available for the standard relay lane at 0.0001 USDC per request.",
-  },
-  {
-    name: "Write and compute-heavy methods",
-    units: 300,
-    description: "The higher-cost compute lane bills 300 USDC base units, or 0.0003 USDC, per request.",
-  },
-  {
-    name: "Priority relay",
-    units: 500,
-    description: "Priority relay bills 500 USDC base units, or 0.0005 USDC, per request.",
-  },
+const comparisonRows = [
+  { label: "Monthly price", key: "monthlyPrice" },
+  { label: "Standard requests included", key: "standardRequests" },
+  { label: "Priority requests included", key: "priorityRequests" },
+  { label: "Projects", key: "projects" },
+  { label: "API keys", key: "apiKeys" },
+  { label: "Analytics retention", key: "analyticsRetention" },
+  { label: "Webhooks", key: "webhooks" },
+  { label: "Team members", key: "teamMembers" },
+  { label: "SLA", key: "sla" },
+  { label: "Support response time", key: "supportResponse" },
 ] as const;
 
-const FAQ_ITEMS = [
-  {
-    q: "Is there a free tier?",
-    a: "No. The live devnet deployment does not use a free-tier subscription model. Projects are activated on chain, funded with devnet SOL, and charged published lamport rates as requests pass through the relay.",
-  },
-  {
-    q: "How do discounts work?",
-    a: "Discounts apply automatically by monthly request volume. At one million requests the project gets 20 percent off, and at ten million requests it gets 40 percent off for the rest of that month.",
-  },
-  {
-    q: "What is compute-heavy traffic?",
-    a: "It covers heavier Solana methods such as getProgramAccounts and similar wide scans that put more pressure on upstream nodes than everyday reads.",
-  },
-  {
-    q: "Can projects fund with USDC?",
-    a: "Yes. The live devnet deployment now supports both SOL funding and devnet USDC funding, so projects can choose the treasury asset that best matches their testing flow.",
-  },
-] as const;
+function PlanCard({
+  name,
+  price,
+  summary,
+  details,
+  accent = "var(--fyxvo-brand)",
+}: {
+  name: string;
+  price: string;
+  summary: string;
+  details: readonly string[];
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+      <p className="text-xs uppercase tracking-[0.16em]" style={{ color: accent }}>
+        {name}
+      </p>
+      <p className="mt-4 text-3xl font-semibold text-[var(--fyxvo-text)]">{price}</p>
+      <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{summary}</p>
+      <div className="mt-6 space-y-3">
+        {details.map((detail) => (
+          <div
+            key={detail}
+            className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]"
+          >
+            {detail}
+          </div>
+        ))}
+      </div>
+      <div className="mt-6">
+        <Button asChild>
+          <Link href="/dashboard">Open dashboard</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function PricingPage() {
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [solPriceLoading, setSolPriceLoading] = useState(true);
   const [solPriceError, setSolPriceError] = useState<string | null>(null);
-  const [volume, setVolume] = useState(100_000);
-  const [standardPct, setStandardPct] = useState(70);
-  const [computePct, setComputePct] = useState(20);
-  const [priorityPct, setPriorityPct] = useState(10);
-  const [billingAsset, setBillingAsset] = useState<"SOL" | "USDC">("SOL");
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [monthlyRequests, setMonthlyRequests] = useState(10_000_000);
+  const [priorityPct, setPriorityPct] = useState(20);
+
+  const individualPlans = mainnetPricingTiers.filter((plan) => plan.segment === "individual");
+  const teamPlans = mainnetPricingTiers.filter((plan) => plan.segment === "team");
+  const enterprisePlans = mainnetPricingTiers.filter((plan) => plan.segment === "enterprise");
+  const paygPlan = mainnetPricingTiers.find((plan) => plan.segment === "payg");
 
   async function loadSolPrice() {
     setSolPriceLoading(true);
@@ -81,55 +100,33 @@ export default function PricingPage() {
     void loadSolPrice();
   }, []);
 
-  const standardLamports = volume * (standardPct / 100) * requestPricingTiers[0].lamports;
-  const computeLamports = volume * (computePct / 100) * requestPricingTiers[1].lamports;
-  const priorityLamports = volume * (priorityPct / 100) * requestPricingTiers[2].lamports;
-  const standardUsdcUnits = volume * (standardPct / 100) * USDC_PRICING_TIERS[0].units;
-  const computeUsdcUnits = volume * (computePct / 100) * USDC_PRICING_TIERS[1].units;
-  const priorityUsdcUnits = volume * (priorityPct / 100) * USDC_PRICING_TIERS[2].units;
-  const rawLamports = standardLamports + computeLamports + priorityLamports;
-  const rawUsdcUnits = standardUsdcUnits + computeUsdcUnits + priorityUsdcUnits;
-  const discount = volume >= 10_000_000 ? 0.4 : volume >= 1_000_000 ? 0.2 : 0;
-  const discountedLamports = Math.round(rawLamports * (1 - discount));
-  const discountedUsdcUnits = Math.round(rawUsdcUnits * (1 - discount));
-  const totalSol = discountedLamports / 1_000_000_000;
-  const totalUsd = solPrice != null ? totalSol * solPrice : null;
-  const totalUsdc = discountedUsdcUnits / 1_000_000;
-  const totalUsdcUsd = totalUsdc;
-  const rawSpendSol = rawLamports / 1_000_000_000;
-  const rawSpendUsd = solPrice != null ? rawSpendSol * solPrice : null;
-  const rawSpendUsdc = rawUsdcUnits / 1_000_000;
+  const estimator = useMemo(() => {
+    const priorityRequests = Math.round(monthlyRequests * (priorityPct / 100));
+    const standardRequests = monthlyRequests - priorityRequests;
+    const rawLamports =
+      standardRequests * mainnetPayAsYouGo.standardLamports +
+      priorityRequests * mainnetPayAsYouGo.priorityLamports;
+    const rawUsdc =
+      standardRequests * mainnetPayAsYouGo.standardUsdc +
+      priorityRequests * mainnetPayAsYouGo.priorityUsdc;
+    const discount =
+      monthlyRequests >= 100_000_000 ? 0.2 : monthlyRequests >= 10_000_000 ? 0.1 : 0;
+    const discountedLamports = Math.round(rawLamports * (1 - discount));
+    const discountedUsdc = rawUsdc * (1 - discount);
 
-  function rebalance(
-    field: "standard" | "compute" | "priority",
-    value: number
-  ) {
-    const clamped = Math.max(0, Math.min(100, value));
+    return {
+      standardRequests,
+      priorityRequests,
+      discount,
+      rawLamports,
+      rawUsdc,
+      discountedLamports,
+      discountedUsdc,
+      totalSol: discountedLamports / 1_000_000_000,
+    };
+  }, [monthlyRequests, priorityPct]);
 
-    if (field === "standard") {
-      const remaining = 100 - clamped;
-      const ratio = computePct + priorityPct > 0 ? computePct / (computePct + priorityPct) : 0.5;
-      setStandardPct(clamped);
-      setComputePct(Math.round(remaining * ratio));
-      setPriorityPct(remaining - Math.round(remaining * ratio));
-      return;
-    }
-
-    if (field === "compute") {
-      const remaining = 100 - clamped;
-      const ratio = standardPct + priorityPct > 0 ? standardPct / (standardPct + priorityPct) : 0.5;
-      setComputePct(clamped);
-      setStandardPct(Math.round(remaining * ratio));
-      setPriorityPct(remaining - Math.round(remaining * ratio));
-      return;
-    }
-
-    const remaining = 100 - clamped;
-    const ratio = standardPct + computePct > 0 ? standardPct / (standardPct + computePct) : 0.5;
-    setPriorityPct(clamped);
-    setStandardPct(Math.round(remaining * ratio));
-    setComputePct(remaining - Math.round(remaining * ratio));
-  }
+  const totalUsd = solPrice != null ? estimator.totalSol * solPrice : null;
 
   return (
     <div>
@@ -138,14 +135,16 @@ export default function PricingPage() {
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
             Pricing
           </p>
-          <h1 className="mt-3 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-            Request pricing tied to funded usage, not generic SaaS plans
+          <h1 className="mt-3 max-w-5xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
+            Self-serve plans for mainnet launch, plus treasury-funded pay per request
           </h1>
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-            Fyxvo charges per request against funded project treasuries. You can fund with devnet
-            SOL or devnet USDC, and the relay debits the live gateway rates of 5,000 lamports for
-            standard RPC and 20,000 lamports for priority traffic, or 100, 300, and 500 USDC base
-            units across the same lanes, instead of hiding spend inside a subscription tier.
+          <p className="mt-6 max-w-4xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
+            Mainnet billing is fully automatic. Developers can choose a monthly subscription, move
+            up to a larger team or enterprise plan, or stay on a treasury-funded pay-per-request
+            model without waiting on approvals or contacting sales. Stripe checkout is not wired
+            into this deployment yet, so the launch path activates billing through confirmed USDC
+            funding on chain first and can add card checkout later without changing the plan
+            structure.
           </p>
           {solPriceLoading ? (
             <div className="mt-4 max-w-[16rem]">
@@ -166,49 +165,206 @@ export default function PricingPage() {
 
       <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <div className="grid gap-6 lg:grid-cols-3">
-            {requestPricingTiers.map((tier) => {
-              const solPerRequest = tier.lamports / 1_000_000_000;
-              const usdPerRequest = solPrice != null ? solPerRequest * solPrice : null;
-              const usdcTier = USDC_PRICING_TIERS.find((item) => item.name === tier.name);
-              const usdcPerRequest = usdcTier ? usdcTier.units / 1_000_000 : null;
-              return (
-                <div
-                  key={tier.name}
-                  className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6"
-                >
-                  <p className="text-sm font-medium uppercase tracking-[0.14em] text-[var(--fyxvo-brand)]">
-                    {tier.name}
+          <div className="max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Individual plans
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              One plan for a single developer who wants fast activation and predictable spend
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              The Starter subscription is the simplest way to move from wallet connection to live
+              relay traffic on mainnet without manually topping up every workload.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-6 lg:grid-cols-1">
+            {individualPlans.map((plan) => (
+              <PlanCard
+                key={plan.slug}
+                name={plan.name}
+                price={plan.monthlyPrice}
+                summary={plan.summary}
+                details={plan.details}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Team plans
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              Builder and Scale keep larger workspaces on a predictable monthly contract
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              These plans add more included traffic, better analytics retention, collaboration,
+              webhooks, and faster support while still activating automatically through treasury
+              funding.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            {teamPlans.map((plan) => (
+              <PlanCard
+                key={plan.slug}
+                name={plan.name}
+                price={plan.monthlyPrice}
+                summary={plan.summary}
+                details={plan.details}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+              Enterprise plans
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              Growth, Business, and Network activate automatically with no approval gate
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              Enterprise no longer depends on a contact form. A project treasury funded with the
+              matching monthly USDC amount can move into the corresponding enterprise tier
+              immediately, with overages continuing to bill automatically.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-6 lg:grid-cols-3">
+            {enterprisePlans.map((plan) => (
+              <PlanCard
+                key={plan.slug}
+                name={plan.name}
+                price={plan.monthlyPrice}
+                summary={plan.summary}
+                details={plan.details}
+                accent="#f3c96a"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {paygPlan ? (
+        <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Pay per request
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+                Keep billing on chain if you prefer treasury-funded metering instead of subscriptions
+              </h2>
+              <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+                The pay-per-request path keeps the same funded treasury model the product already
+                uses today, but with the published mainnet rates and automatic volume discounts
+                instead of a free-tier or a hidden custom quote.
+              </p>
+              <div className="mt-8 space-y-4">
+                {paygPlan.details.map((detail) => (
+                  <div
+                    key={detail}
+                    className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 text-sm leading-6 text-[var(--fyxvo-text-soft)]"
+                  >
+                    {detail}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6 sm:p-8">
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+                Published rates
+              </p>
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+                  <p className="text-sm font-medium text-[var(--fyxvo-text)]">Standard RPC</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                    {mainnetPayAsYouGo.standardLamports.toLocaleString()} lamports
                   </p>
-                  <p className="mt-5 text-3xl font-semibold text-[var(--fyxvo-text)]">
-                    {tier.lamports.toLocaleString()}
-                    <span className="ml-2 text-base font-normal text-[var(--fyxvo-text-muted)]">
-                      lamports
-                    </span>
-                  </p>
-                  <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
-                    {solPerRequest.toFixed(6)} SOL per request
-                  </p>
-                  {ENABLE_USDC && usdcPerRequest != null ? (
-                    <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                      {usdcTier?.units.toLocaleString()} USDC base units ({usdcPerRequest.toFixed(4)} USDC) per request
-                    </p>
-                  ) : null}
-                  {solPriceLoading ? (
-                    <div className="mt-2">
-                      <LoadingSkeleton className="h-4 w-40" />
-                    </div>
-                  ) : usdPerRequest != null ? (
-                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                      About ${usdPerRequest.toFixed(6)} USD per request at current SOL pricing
-                    </p>
-                  ) : null}
-                  <p className="mt-5 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                    {tier.description}
+                  <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                    {mainnetPayAsYouGo.standardUsdc} USDC per request
                   </p>
                 </div>
-              );
-            })}
+                <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5">
+                  <p className="text-sm font-medium text-[var(--fyxvo-text)]">Priority relay</p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                    {mainnetPayAsYouGo.priorityLamports.toLocaleString()} lamports
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                    {mainnetPayAsYouGo.priorityUsdc} USDC per request
+                  </p>
+                </div>
+                {mainnetPayAsYouGo.volumeDiscounts.map((discount) => (
+                  <div
+                    key={discount.threshold}
+                    className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-5"
+                  >
+                    <p className="text-sm font-medium text-[var(--fyxvo-text)]">
+                      {discount.threshold}
+                    </p>
+                    <p className="mt-2 text-xl font-semibold text-emerald-400">
+                      {discount.discount}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                      {discount.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+            Comparison
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+            Every launch tier in one table
+          </h2>
+          <div className="mt-8 overflow-x-auto">
+            <table className="min-w-[1100px] w-full border-separate border-spacing-0 overflow-hidden rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]">
+              <thead>
+                <tr>
+                  <th className="border-b border-[var(--fyxvo-border)] px-4 py-4 text-left text-sm font-medium text-[var(--fyxvo-text)]">
+                    Tier
+                  </th>
+                  {mainnetPricingTiers.map((plan) => (
+                    <th
+                      key={plan.slug}
+                      className="border-b border-[var(--fyxvo-border)] px-4 py-4 text-left text-sm font-medium text-[var(--fyxvo-text)]"
+                    >
+                      {plan.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map((row) => (
+                  <tr key={row.key}>
+                    <td className="border-b border-[var(--fyxvo-border)] px-4 py-4 text-sm font-medium text-[var(--fyxvo-text)]">
+                      {row.label}
+                    </td>
+                    {mainnetPricingTiers.map((plan) => (
+                      <td
+                        key={`${plan.slug}-${row.key}`}
+                        className="border-b border-[var(--fyxvo-border)] px-4 py-4 text-sm text-[var(--fyxvo-text-soft)]"
+                      >
+                        {plan[row.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -219,243 +375,112 @@ export default function PricingPage() {
             How fees are distributed
           </h2>
           <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
-            The network economics are designed so request fees flow to the infrastructure that
-            carries the traffic. In the operator phase, 80 percent of every request fee goes to
-            node operators who route the traffic, 10 percent goes to the protocol treasury to fund
-            on-chain governance, and 10 percent goes to the infrastructure fund that supports
-            development and operations. The current devnet phase still runs on managed
-            infrastructure, but that split already defines how the network will account for fee
-            distribution as external operators join.
+            The network economics send {mainnetRevenueSplit.operators} of every per-request fee to
+            node operators, {mainnetRevenueSplit.treasury} to the protocol treasury for governance,
+            and {mainnetRevenueSplit.infrastructureFund} to the infrastructure fund that supports
+            operations and continued development. Subscription plan fees flow through the protocol
+            treasury and are distributed on the same schedule, so the network accounting model
+            stays aligned whether usage is metered request by request or prepaid through a monthly
+            plan.
           </p>
         </div>
       </section>
 
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+      <section className="px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-              Discounts
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-              Automatic reductions at scale
-            </h2>
-            <div className="mt-8 space-y-4">
-              <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
-                <p className="text-3xl font-semibold text-[var(--fyxvo-text)]">1M+</p>
-                <p className="mt-2 text-sm font-medium text-emerald-400">20% off</p>
-                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  Once a project crosses one million monthly requests, pricing automatically drops
-                  to 80 percent of the published lamport rate.
-                </p>
-              </div>
-              <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
-                <p className="text-3xl font-semibold text-[var(--fyxvo-text)]">10M+</p>
-                <p className="mt-2 text-sm font-medium text-emerald-400">40% off</p>
-                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                  At ten million monthly requests, the project receives a 40 percent reduction for
-                  the rest of that calendar month.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6 sm:p-8">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
               Cost estimator
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-              Estimate monthly relay spend
+              Estimate pay-per-request spend at the published mainnet rates
             </h2>
-            <div className="mt-8 space-y-6">
-              {ENABLE_USDC ? (
-                <div className="flex flex-wrap gap-2">
-                  {(["SOL", "USDC"] as const).map((asset) => (
-                    <button
-                      key={asset}
-                      type="button"
-                      onClick={() => setBillingAsset(asset)}
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                        billingAsset === asset
-                          ? "bg-[var(--fyxvo-brand)] text-black"
-                          : "border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] hover:text-[var(--fyxvo-text)]"
-                      }`}
-                    >
-                      Estimate in {asset}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              The estimator defaults to the treasury-funded billing model and applies the automatic
+              10 percent and 20 percent volume discounts at the same request thresholds shown
+              above.
+            </p>
+          </div>
 
+          <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6 sm:p-8">
+            <div className="space-y-6">
               <label className="block">
                 <span className="text-sm font-medium text-[var(--fyxvo-text)]">
                   Monthly requests
                 </span>
                 <input
                   type="range"
-                  min={10_000}
-                  max={12_000_000}
-                  step={10_000}
-                  value={volume}
-                  onChange={(event) => setVolume(Number(event.target.value))}
+                  min={100_000}
+                  max={250_000_000}
+                  step={100_000}
+                  value={monthlyRequests}
+                  onChange={(event) => setMonthlyRequests(Number(event.target.value))}
                   className="mt-3 w-full"
                 />
                 <div className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
-                  {volume.toLocaleString()} requests
+                  {monthlyRequests.toLocaleString()} total requests
                 </div>
               </label>
 
-              {[
-                { label: "Standard RPC", value: standardPct, key: "standard" as const },
-                {
-                  label: "Write and compute-heavy",
-                  value: computePct,
-                  key: "compute" as const,
-                },
-                { label: "Priority relay", value: priorityPct, key: "priority" as const },
-              ].map((row) => (
-                <label key={row.key} className="block">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm font-medium text-[var(--fyxvo-text)]">{row.label}</span>
-                    <span className="text-sm text-[var(--fyxvo-text-muted)]">{row.value}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={row.value}
-                    onChange={(event) => rebalance(row.key, Number(event.target.value))}
-                    className="mt-3 w-full"
-                  />
-                </label>
-              ))}
+              <label className="block">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium text-[var(--fyxvo-text)]">
+                    Priority relay share
+                  </span>
+                  <span className="text-sm text-[var(--fyxvo-text-muted)]">{priorityPct}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={priorityPct}
+                  onChange={(event) => setPriorityPct(Number(event.target.value))}
+                  className="mt-3 w-full"
+                />
+                <div className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
+                  {estimator.standardRequests.toLocaleString()} standard requests and{" "}
+                  {estimator.priorityRequests.toLocaleString()} priority requests
+                </div>
+              </label>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                    Estimated cost
+                    Estimated SOL spend
                   </p>
-                  {billingAsset === "SOL" ? (
-                    <>
-                      <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                        {discountedLamports.toLocaleString()} lamports
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                        {totalSol.toFixed(6)} SOL
-                      </p>
-                      {solPriceLoading ? (
-                        <div className="mt-2">
-                          <LoadingSkeleton className="h-4 w-24" />
-                        </div>
-                      ) : totalUsd != null ? (
-                        <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                          ≈ ${totalUsd.toFixed(2)} USD
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                        {discountedUsdcUnits.toLocaleString()} units
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                        {totalUsdc.toFixed(4)} USDC
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                        ≈ ${totalUsdcUsd.toFixed(2)} USD
-                      </p>
-                    </>
-                  )}
+                  <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+                    {estimator.discountedLamports.toLocaleString()} lamports
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                    {estimator.totalSol.toFixed(6)} SOL
+                  </p>
+                  {solPriceLoading ? (
+                    <div className="mt-2">
+                      <LoadingSkeleton className="h-4 w-24" />
+                    </div>
+                  ) : totalUsd != null ? (
+                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                      ≈ ${totalUsd.toFixed(2)} USD
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
                   <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                    Applied discount
+                    Estimated USDC spend
                   </p>
                   <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                    {(discount * 100).toFixed(0)}%
+                    {estimator.discountedUsdc.toFixed(2)} USDC
                   </p>
-                  {billingAsset === "SOL" ? (
-                    <>
-                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                        Raw spend: {Math.round(rawLamports).toLocaleString()} lamports
-                      </p>
-                      {solPriceLoading ? (
-                        <div className="mt-2">
-                          <LoadingSkeleton className="h-4 w-24" />
-                        </div>
-                      ) : rawSpendUsd != null ? (
-                        <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                          ≈ ${rawSpendUsd.toFixed(2)} USD before discounts
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
-                        Raw spend: {Math.round(rawUsdcUnits).toLocaleString()} USDC base units
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
-                        ≈ ${rawSpendUsdc.toFixed(2)} USD before discounts
-                      </p>
-                    </>
-                  )}
+                  <p className="mt-1 text-sm text-[var(--fyxvo-text-soft)]">
+                    Raw spend: {estimator.rawUsdc.toFixed(2)} USDC before discounts
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                    Discount applied: {(estimator.discount * 100).toFixed(0)}%
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-            Funding model
-          </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
-            Start with a funded project, not a subscription checkout
-          </h2>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
-            The live path is straightforward: create a project, sign the activation transaction,
-            fund the treasury with devnet SOL or devnet USDC, issue an API key, and start routing
-            traffic. When the funded balance is empty, requests stop until the project is topped
-            up again.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/dashboard">Open dashboard</Link>
-            </Button>
-            <Button asChild variant="secondary">
-              <Link href="/docs">Read the flow</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">FAQ</p>
-          <div className="mt-6 space-y-4">
-            {FAQ_ITEMS.map((item, index) => (
-              <div
-                key={item.q}
-                className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)]"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
-                >
-                  <span className="text-base font-medium text-[var(--fyxvo-text)]">{item.q}</span>
-                  <span className="text-xl text-[var(--fyxvo-brand)]">
-                    {openFaq === index ? "−" : "+"}
-                  </span>
-                </button>
-                {openFaq === index ? (
-                  <div className="border-t border-[var(--fyxvo-border)] px-6 py-5 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-                    {item.a}
-                  </div>
-                ) : null}
-              </div>
-            ))}
           </div>
         </div>
       </section>

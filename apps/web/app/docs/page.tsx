@@ -3,12 +3,17 @@ import { Button } from "@fyxvo/ui";
 import { CopyButton } from "../../components/copy-button";
 import { DocsApiExplorer } from "../../components/docs-api-explorer";
 import { AddressLink } from "../../components/address-link";
-import { protocolAddresses, requestPricingTiers } from "../../lib/public-data";
+import {
+  mainnetPayAsYouGo,
+  mainnetPricingTiers,
+  protocolAddresses,
+  requestPricingTiers,
+} from "../../lib/public-data";
 
 const USDC_PRICING_DETAILS = [
-  "100 USDC base units, or 0.0001 USDC, per request.",
-  "300 USDC base units, or 0.0003 USDC, per request.",
-  "500 USDC base units, or 0.0005 USDC, per request.",
+  "0.5 USDC per request.",
+  "2 USDC per request.",
+  "2 USDC per request.",
 ] as const;
 
 const DOC_SECTIONS = [
@@ -21,6 +26,7 @@ const DOC_SECTIONS = [
   { id: "api-explorer", label: "API explorer" },
   { id: "public-project-pages", label: "Public project pages" },
   { id: "public-pricing-contract", label: "Public pricing contract" },
+  { id: "billing-and-plans", label: "Billing and plans" },
   { id: "rate-limits", label: "Rate limits" },
   { id: "sdk", label: "SDK" },
   { id: "troubleshooting", label: "Troubleshooting" },
@@ -345,10 +351,10 @@ export default function DocsPage() {
             <p className="text-base leading-7 text-[var(--fyxvo-text-soft)]">
               Use `rpc.fyxvo.com/rpc` for standard JSON-RPC traffic and `rpc.fyxvo.com/priority`
               for time-sensitive relay traffic. Both paths require an API key. The priority lane
-              also requires the `priority:relay` scope. The live gateway currently publishes
-              `5,000` lamports for standard RPC, `20,000` lamports for the higher-cost 4x lane,
-              and `20,000` lamports for priority relay. Projects can also fund against USDC at
-              `100`, `300`, and `500` base units across those three lanes.
+              also requires the `priority:relay` scope. The mainnet pricing contract publishes
+              `50,000` lamports for standard RPC, `200,000` lamports for the higher-cost 4x lane,
+              and `200,000` lamports for priority relay. Projects can also fund against USDC at
+              `0.5`, `2`, and `2` USDC across those same lanes.
             </p>
             <CodeBlock code={gatewayExample} />
           </div>
@@ -406,12 +412,11 @@ export default function DocsPage() {
               ))}
             </div>
             <p className="mt-6 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              The live gateway currently publishes 5,000 lamports for standard RPC and 20,000
+              The mainnet billing contract publishes 50,000 lamports for standard RPC and 200,000
               lamports for both priority relay and the higher-cost 4x lane. The same lanes can be
-              funded in devnet USDC at 100, 300, and 500 base units respectively. Discounts apply
-              automatically at one million requests per month for 20 percent off and at ten
-              million requests per month for 40 percent off. There is no free tier in the live
-              devnet deployment.
+              funded in USDC at 0.5, 2, and 2 USDC respectively. Discounts apply automatically at
+              10 million requests per month for 10 percent off and at 100 million requests per
+              month for 20 percent off. There is no free tier on mainnet.
             </p>
           </div>
 
@@ -443,6 +448,58 @@ export default function DocsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="billing-and-plans" className="scroll-mt-24 border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-4xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)]">
+              Billing and plans
+            </h2>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              Mainnet billing combines subscriptions, self-serve enterprise activation, and
+              treasury-funded pay-per-request usage in one product flow. A project can start on a
+              monthly plan, stay fully metered against its treasury, or move into an enterprise
+              tier without waiting on manual pricing approval. Overage traffic is billed
+              automatically at the published per-request rate, so funded usage keeps flowing
+              without separate invoicing logic.
+            </p>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              Subscription and enterprise tiers activate when the project treasury receives the
+              matching monthly USDC funding amount on chain. Teams that prefer not to pre-commit
+              to a monthly subscription can keep the same treasury-funded model and pay by request
+              at the published standard and priority rates.
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4 lg:grid-cols-4">
+            {mainnetPricingTiers.slice(0, 4).map((plan) => (
+              <div
+                key={plan.slug}
+                className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
+              >
+                <h3 className="text-lg font-semibold text-[var(--fyxvo-text)]">{plan.name}</h3>
+                <p className="mt-3 text-sm font-medium text-[var(--fyxvo-brand)]">
+                  {plan.monthlyPrice}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                  {plan.summary}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-8">
+            <p className="text-sm leading-7 text-[var(--fyxvo-text-soft)]">
+              The pay-per-request lane currently publishes {mainnetPayAsYouGo.standardLamports.toLocaleString()} lamports
+              or {mainnetPayAsYouGo.standardUsdc} USDC for standard RPC and{" "}
+              {mainnetPayAsYouGo.priorityLamports.toLocaleString()} lamports or{" "}
+              {mainnetPayAsYouGo.priorityUsdc} USDC for priority relay. The first automatic volume
+              discount starts at {mainnetPayAsYouGo.volumeDiscounts[0].threshold} and the second
+              starts at {mainnetPayAsYouGo.volumeDiscounts[1].threshold}.
+            </p>
           </div>
         </div>
       </section>

@@ -183,23 +183,227 @@ export const protocolAddresses = {
 export const requestPricingTiers = [
   {
     name: "Standard RPC",
-    lamports: 5000,
+    lamports: 50_000,
     description:
       "Default lane for everyday JSON-RPC reads and standard gateway traffic.",
   },
   {
     name: "Write and compute-heavy methods",
-    lamports: 20000,
+    lamports: 200_000,
     description:
-      "Higher-cost traffic is billed at the live 4x lane when methods or writes put more pressure on upstream nodes.",
+      "Higher-cost traffic is billed at the 4x lane when methods or writes put more pressure on upstream nodes.",
   },
   {
     name: "Priority relay",
-    lamports: 20000,
+    lamports: 200_000,
     description:
       "Low-latency path for time-sensitive transaction submission with its own scope and routing lane.",
   },
 ] as const;
+
+export const mainnetPayAsYouGo = {
+  standardLamports: 50_000,
+  standardUsdc: 0.5,
+  priorityLamports: 200_000,
+  priorityUsdc: 2,
+  volumeDiscounts: [
+    {
+      threshold: "10 million monthly requests",
+      discount: "10% off",
+      detail: "The discount applies automatically once a project crosses 10 million requests in a billing month.",
+    },
+    {
+      threshold: "100 million monthly requests",
+      discount: "20% off",
+      detail: "The higher discount applies automatically once a project crosses 100 million requests in a billing month.",
+    },
+  ],
+} as const;
+
+export interface MainnetPlanTier {
+  readonly slug: string;
+  readonly name: string;
+  readonly segment: "individual" | "team" | "enterprise" | "payg";
+  readonly monthlyPrice: string;
+  readonly standardRequests: string;
+  readonly priorityRequests: string;
+  readonly projects: string;
+  readonly apiKeys: string;
+  readonly analyticsRetention: string;
+  readonly webhooks: string;
+  readonly teamMembers: string;
+  readonly sla: string;
+  readonly supportResponse: string;
+  readonly summary: string;
+  readonly details: readonly string[];
+}
+
+export const mainnetPricingTiers: readonly MainnetPlanTier[] = [
+  {
+    slug: "starter",
+    name: "Starter",
+    segment: "individual",
+    monthlyPrice: "29 USDC / month",
+    standardRequests: "2 million",
+    priorityRequests: "100,000",
+    projects: "3",
+    apiKeys: "10",
+    analyticsRetention: "7 days",
+    webhooks: "Not included",
+    teamMembers: "1",
+    sla: "Shared infrastructure",
+    supportResponse: "Email support",
+    summary:
+      "A simple self-serve subscription for a solo developer who wants a funded project, scoped keys, analytics, and alerts without managing a large team workspace.",
+    details: [
+      "Includes 2 million standard RPC requests and 100,000 priority relay requests each month.",
+      "Supports up to 3 projects and 10 API keys.",
+      "Includes standard analytics with 7-day retention and email alerts.",
+      "Overages are billed automatically at the published per-request rate.",
+    ],
+  },
+  {
+    slug: "builder",
+    name: "Builder",
+    segment: "team",
+    monthlyPrice: "99 USDC / month",
+    standardRequests: "10 million",
+    priorityRequests: "500,000",
+    projects: "10",
+    apiKeys: "50",
+    analyticsRetention: "30 days",
+    webhooks: "Included",
+    teamMembers: "Up to 5",
+    sla: "Shared infrastructure",
+    supportResponse: "Within 24 hours",
+    summary:
+      "A collaborative plan for a product team that wants more traffic headroom, better analytics retention, webhook support, and shared workspace access.",
+    details: [
+      "Includes 10 million standard RPC requests and 500,000 priority relay requests each month.",
+      "Supports up to 10 projects and 50 API keys.",
+      "Includes advanced analytics with 30-day retention, webhook support, and team collaboration for up to 5 members.",
+      "Overages are billed automatically.",
+    ],
+  },
+  {
+    slug: "scale",
+    name: "Scale",
+    segment: "team",
+    monthlyPrice: "299 USDC / month",
+    standardRequests: "50 million",
+    priorityRequests: "2 million",
+    projects: "Unlimited",
+    apiKeys: "Unlimited",
+    analyticsRetention: "90 days + CSV export",
+    webhooks: "Included",
+    teamMembers: "Up to 20",
+    sla: "Priority shared infrastructure",
+    supportResponse: "Within 4 hours",
+    summary:
+      "A high-volume team plan for applications that need broad project access, full analytics retention, exports, and assistant support without leaving the self-serve flow.",
+    details: [
+      "Includes 50 million standard RPC requests and 2 million priority relay requests each month.",
+      "Supports unlimited projects and unlimited API keys.",
+      "Includes full analytics with 90-day retention and CSV export, webhooks, team collaboration for up to 20 members, and the AI assistant with full context.",
+      "Overages are billed automatically.",
+    ],
+  },
+  {
+    slug: "pay-as-you-go",
+    name: "Pay per request",
+    segment: "payg",
+    monthlyPrice: "No subscription",
+    standardRequests: "Metered",
+    priorityRequests: "Metered",
+    projects: "Based on funded treasury",
+    apiKeys: "Based on workspace limits",
+    analyticsRetention: "Based on workspace tier",
+    webhooks: "Available when enabled on the workspace",
+    teamMembers: "Based on workspace tier",
+    sla: "Shared infrastructure",
+    supportResponse: "Standard support",
+    summary:
+      "A treasury-funded option for teams that prefer to meter usage directly on chain instead of precommitting to a monthly subscription plan.",
+    details: [
+      "Standard RPC costs 50,000 lamports or 0.5 USDC per request.",
+      "Priority relay costs 200,000 lamports or 2 USDC per request.",
+      "Volume discounts apply automatically at 10 million monthly requests for 10 percent off and at 100 million monthly requests for 20 percent off.",
+      "There is no free tier on mainnet.",
+    ],
+  },
+  {
+    slug: "growth",
+    name: "Growth",
+    segment: "enterprise",
+    monthlyPrice: "999 USDC / month",
+    standardRequests: "200 million",
+    priorityRequests: "10 million",
+    projects: "Unlimited",
+    apiKeys: "Unlimited",
+    analyticsRetention: "1 year",
+    webhooks: "Included",
+    teamMembers: "Custom RBAC",
+    sla: "99.9%",
+    supportResponse: "Dedicated support channel",
+    summary:
+      "A self-serve enterprise plan for production teams that need high-volume access, strict controls, and longer-lived operational data without a manual approval gate.",
+    details: [
+      "Includes 200 million standard RPC requests and 10 million priority relay requests.",
+      "Adds custom rate limits, full RBAC, 1-year data retention, and a dedicated account dashboard.",
+      "Activates automatically when the monthly USDC funding amount is confirmed on chain.",
+    ],
+  },
+  {
+    slug: "business",
+    name: "Business",
+    segment: "enterprise",
+    monthlyPrice: "2,999 USDC / month",
+    standardRequests: "1 billion",
+    priorityRequests: "50 million",
+    projects: "Unlimited",
+    apiKeys: "Unlimited",
+    analyticsRetention: "1 year+",
+    webhooks: "Included",
+    teamMembers: "Custom RBAC",
+    sla: "99.95%",
+    supportResponse: "Named account manager",
+    summary:
+      "A higher-throughput enterprise plan for teams that need dedicated relay capacity, stronger integrations, and a direct operating relationship without leaving the self-serve product flow.",
+    details: [
+      "Includes 1 billion standard RPC requests and 50 million priority relay requests.",
+      "Adds dedicated relay nodes, custom analytics integrations, and a named account manager.",
+      "Activates automatically when the monthly USDC funding amount is confirmed on chain.",
+    ],
+  },
+  {
+    slug: "network",
+    name: "Network",
+    segment: "enterprise",
+    monthlyPrice: "9,999 USDC / month",
+    standardRequests: "Unlimited",
+    priorityRequests: "Unlimited",
+    projects: "Unlimited",
+    apiKeys: "Unlimited",
+    analyticsRetention: "Custom",
+    webhooks: "Included",
+    teamMembers: "Custom RBAC",
+    sla: "99.99%",
+    supportResponse: "Direct protocol line",
+    summary:
+      "A top-tier enterprise plan for infrastructure-heavy teams that need dedicated capacity, commercial flexibility, and direct participation in the network economics.",
+    details: [
+      "Includes unlimited requests on dedicated infrastructure.",
+      "Adds custom contract terms, white-label options, operator revenue sharing, and direct protocol governance participation.",
+      "Activates automatically when the monthly USDC funding amount is confirmed on chain.",
+    ],
+  },
+] as const;
+
+export const mainnetRevenueSplit = {
+  operators: "80%",
+  treasury: "10%",
+  infrastructureFund: "10%",
+} as const;
 
 export const marketingMilestones: PublicUpdatePost[] = [
   {
@@ -213,11 +417,11 @@ export const marketingMilestones: PublicUpdatePost[] = [
   },
   {
     slug: "funded-relay-pricing-published",
-    title: "Funded relay pricing is published",
+    title: "Mainnet pricing is published",
     summary:
-      "Pricing is request-based in lamports instead of monthly SaaS plans or free-tier bundles.",
+      "Mainnet launch pricing combines self-serve subscriptions, self-serve enterprise plans, and treasury-funded pay-per-request billing.",
     content:
-      "The relay charges 5,000 lamports for standard RPC and 20,000 lamports for both the higher-cost 4x lane and priority relay requests. Projects can also fund in devnet USDC at 100, 300, and 500 base units across those same lanes. Volume discounts apply automatically at one million and ten million monthly requests. There is no free tier in the live devnet deployment.",
+      "The launch pricing model includes Starter, Builder, Scale, Growth, Business, and Network subscriptions alongside treasury-funded pay-per-request billing at 50,000 lamports or 0.5 USDC for standard traffic and 200,000 lamports or 2 USDC for priority traffic. Volume discounts apply automatically at 10 million and 100 million monthly requests, and there is no free tier on mainnet.",
     publishedAt: "2026-03-27T00:00:00.000Z",
   },
   {
