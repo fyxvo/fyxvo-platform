@@ -13,6 +13,8 @@ import type {
   JsonRpcPayload,
   ProjectAccessContext,
   ProjectBalanceResolver,
+  GatewayProjectSubscription,
+  GatewayProjectSubscriptionUsage,
   ProjectFundingState,
   RoutedRpcNode
 } from "../src/types.js";
@@ -50,6 +52,12 @@ function makeEnv(overrides: Partial<Record<string, string>> = {}) {
 }
 
 class MemoryGatewayRepository implements GatewayRepository {
+  public subscription: GatewayProjectSubscription | null = null;
+  public subscriptionUsage: GatewayProjectSubscriptionUsage = {
+    standardRequestsUsed: 0n,
+    priorityRequestsUsed: 0n
+  };
+
   constructor(
     private readonly apiKey: string,
     private readonly access: ProjectAccessContext,
@@ -84,6 +92,19 @@ class MemoryGatewayRepository implements GatewayRepository {
 
   async touchApiKeyUsage() {
     this.usageTouches += 1;
+  }
+
+  async getProjectSubscription(projectId: string) {
+    return this.access.project.id === projectId ? this.subscription : null;
+  }
+
+  async getProjectSubscriptionUsage(projectId: string) {
+    return this.access.project.id === projectId
+      ? this.subscriptionUsage
+      : {
+          standardRequestsUsed: 0n,
+          priorityRequestsUsed: 0n
+        };
   }
 
   async recordRequestLog(input: {
@@ -160,6 +181,7 @@ function createAccessContext(): ProjectAccessContext {
       monthlyBudgetLamports: null,
       budgetWarningThresholdPct: 80,
       budgetHardStop: false,
+      relayPaused: false,
     }
   };
 }
