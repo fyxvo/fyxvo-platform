@@ -19,6 +19,7 @@ import type {
   FeedbackInboxItem,
   FundingHistoryItem,
   FundingPreparation,
+  FundingWithdrawalPreparation,
   FundingVerification,
   IncidentItem,
   OnchainSnapshot,
@@ -256,6 +257,24 @@ export async function verifyFunding(params: {
       method: "POST",
       token,
       body: JSON.stringify({ fundingRequestId, signature }),
+    }
+  );
+  return response.item;
+}
+
+export async function prepareFundingWithdrawal(params: {
+  projectId: string;
+  token: string;
+  amount: string;
+  destinationWalletAddress: string;
+}): Promise<FundingWithdrawalPreparation> {
+  const { projectId, token, ...body } = params;
+  const response = await apiFetch<{ item: FundingWithdrawalPreparation }>(
+    `/v1/projects/${projectId}/funding/withdraw`,
+    {
+      method: "POST",
+      token,
+      body: JSON.stringify(body),
     }
   );
   return response.item;

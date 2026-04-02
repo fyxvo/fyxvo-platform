@@ -150,6 +150,16 @@ export interface FundingVerification {
   };
 }
 
+export interface FundingWithdrawalPreparation {
+  amount: string;
+  destinationWalletAddress: string;
+  transactionBase64: string;
+  recentBlockhash: string;
+  lastValidBlockHeight: number;
+  projectPda: string;
+  treasuryPda: string;
+}
+
 export interface CreateProjectResult {
   item: PortalProject;
   activation: ProjectActivation;

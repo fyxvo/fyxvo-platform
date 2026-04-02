@@ -352,6 +352,14 @@ const verifyFundingSchema = z.object({
   signature: z.string().trim().min(32)
 });
 
+const prepareWithdrawalSchema = z.object({
+  amount: z
+    .union([z.string(), z.number(), z.bigint()])
+    .transform((value) => BigInt(value))
+    .refine((value) => value > 0n, "Amount must be greater than zero."),
+  destinationWalletAddress: z.string().trim().min(32)
+});
+
 function walletMessage(walletAddress: string, nonce: string): string {
   return [
     "Fyxvo Authentication",
@@ -2923,7 +2931,7 @@ export async function buildApiApp(input: {
       throw new HttpError(
         409,
         "usdc_disabled",
-        "USDC funding is configuration-gated on devnet until FYXVO_ENABLE_USDC=true and the mint is verified."
+        "USDC funding is not enabled in this environment."
       );
     }
 
@@ -3045,6 +3053,69 @@ export async function buildApiApp(input: {
         ...verification
       }
     };
+  });
+
+  app.post("/v1/projects/:projectId/funding/withdraw", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const body = prepareWithdrawalSchema.parse(request.body);
+    ensureWalletAddress(body.destinationWalletAddress);
+
+    const project = await input.repository.findProjectById(params.projectId);
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const isProjectOwner = project.ownerId === user.id;
+    if (!isProjectOwner && user.role !== "ADMIN" && user.role !== "OWNER") {
+      throw new HttpError(
+        403,
+        "forbidden",
+        "Only the project owner or an admin can prepare a treasury withdrawal."
+      );
+    }
+
+    const onchain = await withBlockchainErrors(() =>
+      input.blockchain.readProjectOnChain({
+        ownerWalletAddress: project.owner.walletAddress,
+        chainProjectId: project.chainProjectId,
+        storedProjectPda: project.onChainProjectPda
+      })
+    );
+
+    if (!onchain.projectAccountExists) {
+      throw new HttpError(
+        409,
+        "project_not_active",
+        "The project must be activated on chain before any treasury withdrawal can be prepared."
+      );
+    }
+
+    const availableSolCredits = BigInt(onchain.balances?.availableSolCredits ?? "0");
+    if (availableSolCredits < body.amount) {
+      throw new HttpError(
+        402,
+        "insufficient_project_funds",
+        `The treasury only has ${availableSolCredits.toString()} lamports available for withdrawal.`,
+        {
+          availableSolCredits: availableSolCredits.toString(),
+          requestedAmount: body.amount.toString()
+        }
+      );
+    }
+
+    throw new HttpError(
+      501,
+      "withdraw_not_supported",
+      "Self-serve treasury withdrawals require a protocol withdrawal instruction, and that instruction is not enabled on the current devnet deployment.",
+      {
+        amount: body.amount.toString(),
+        destinationWalletAddress: body.destinationWalletAddress,
+        availableSolCredits: availableSolCredits.toString(),
+        projectPda: onchain.projectPda,
+        treasuryPda: onchain.treasuryPda
+      }
+    );
   });
 
   app.post("/v1/projects/:projectId/subscription", async (request, reply) => {

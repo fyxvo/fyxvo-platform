@@ -7,13 +7,24 @@ import {
   mainnetPayAsYouGo,
   mainnetPricingTiers,
   protocolAddresses,
-  requestPricingTiers,
 } from "../../lib/public-data";
 
-const USDC_PRICING_DETAILS = [
-  "0.5 USDC per request.",
-  "2 USDC per request.",
-  "2 USDC per request.",
+const LIVE_GATEWAY_PRICING_TIERS = [
+  {
+    name: "Standard RPC",
+    lamports: 5_000,
+    description: "Default JSON-RPC lane for reads, status checks, and routine application traffic.",
+  },
+  {
+    name: "Compute-heavy lane",
+    lamports: 20_000,
+    description: "Higher-cost lane for the 4x methods that put extra load on the relay path.",
+  },
+  {
+    name: "Priority relay",
+    lamports: 20_000,
+    description: "Time-sensitive relay traffic for requests that need the priority lane.",
+  },
 ] as const;
 
 const DOC_SECTIONS = [
@@ -333,8 +344,7 @@ export default function DocsPage() {
             <p className="text-base leading-7 text-[var(--fyxvo-text-soft)]">
               Creating a project returns an activation transaction. Funding then follows a prepare,
               sign, and verify sequence so the on-chain treasury and workspace balance stay in sync.
-              The live devnet rollout now accepts either SOL lamports or USDC base units, depending
-              on which treasury asset the project wants to hold.
+              USDC funding is live alongside SOL. Both assets are active.
             </p>
             <CodeBlock code={fundingFlowExample} />
             <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
@@ -351,10 +361,9 @@ export default function DocsPage() {
             <p className="text-base leading-7 text-[var(--fyxvo-text-soft)]">
               Use `rpc.fyxvo.com/rpc` for standard JSON-RPC traffic and `rpc.fyxvo.com/priority`
               for time-sensitive relay traffic. Both paths require an API key. The priority lane
-              also requires the `priority:relay` scope. The mainnet pricing contract publishes
-              `50,000` lamports for standard RPC, `200,000` lamports for the higher-cost 4x lane,
-              and `200,000` lamports for priority relay. Projects can also fund against USDC at
-              `0.5`, `2`, and `2` USDC across those same lanes.
+              also requires the `priority:relay` scope. The live gateway currently charges `5,000`
+              lamports for standard RPC, `20,000` lamports for the higher-cost 4x lane, and
+              `20,000` lamports for priority relay.
             </p>
             <CodeBlock code={gatewayExample} />
           </div>
@@ -393,7 +402,7 @@ export default function DocsPage() {
               Public pricing contract
             </h2>
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {requestPricingTiers.map((tier, index) => (
+              {LIVE_GATEWAY_PRICING_TIERS.map((tier) => (
                 <div
                   key={tier.name}
                   className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
@@ -403,7 +412,7 @@ export default function DocsPage() {
                     {tier.lamports.toLocaleString()} lamports
                   </p>
                   <p className="mt-2 text-sm text-[var(--fyxvo-text-soft)]">
-                    {USDC_PRICING_DETAILS[index]}
+                    USDC funding is live alongside SOL. Both assets are active.
                   </p>
                   <p className="mt-3 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
                     {tier.description}
@@ -412,11 +421,11 @@ export default function DocsPage() {
               ))}
             </div>
             <p className="mt-6 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
-              The mainnet billing contract publishes 50,000 lamports for standard RPC and 200,000
-              lamports for both priority relay and the higher-cost 4x lane. The same lanes can be
-              funded in USDC at 0.5, 2, and 2 USDC respectively. Discounts apply automatically at
-              10 million requests per month for 10 percent off and at 100 million requests per
-              month for 20 percent off. There is no free tier on mainnet.
+              The live gateway charges 5,000 lamports for standard RPC and 20,000 lamports for
+              both priority relay and the higher-cost 4x lane. Volume discounts apply
+              automatically. Once a project crosses 10 million monthly requests the rate drops by
+              10 percent, and at 100 million monthly requests the rate drops by 20 percent. No
+              action is needed.
             </p>
           </div>
 
@@ -471,6 +480,17 @@ export default function DocsPage() {
               matching monthly USDC funding amount on chain. Teams that prefer not to pre-commit
               to a monthly subscription can keep the same treasury-funded model and pay by request
               at the published standard and priority rates.
+            </p>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              Volume discounts apply automatically. Once a project crosses 10 million monthly
+              requests the rate drops by 10 percent. At 100 million monthly requests the rate
+              drops by 20 percent. No action is needed.
+            </p>
+            <p className="mt-4 text-base leading-7 text-[var(--fyxvo-text-soft)]">
+              Unused SOL is managed from the funding page in the dashboard. The current devnet
+              deployment now exposes the withdrawal entry point there, validates ownership and
+              available balance, and returns a clear response about whether the live protocol can
+              complete the withdrawal.
             </p>
           </div>
 

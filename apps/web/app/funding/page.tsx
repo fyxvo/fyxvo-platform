@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Notice } from "@fyxvo/ui";
 import { AddressLink } from "../../components/address-link";
 import { AuthGate } from "../../components/state-panels";
-import { verifyFunding } from "../../lib/api";
+import { prepareFundingWithdrawal, verifyFunding } from "../../lib/api";
 import { ENABLE_USDC } from "../../lib/env";
 import { usePortal } from "../../lib/portal-context";
 import { signAndSubmitVersionedTransaction, solToLamportsString } from "../../lib/solana-transactions";
@@ -71,8 +71,19 @@ export default function FundingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verification, setVerification] = useState<FundingVerification | null>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState("1000000");
+  const [destinationWallet, setDestinationWallet] = useState("");
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawStatus, setWithdrawStatus] = useState<string | null>(null);
 
   const visibleAssets = ENABLE_USDC ? FUNDING_ASSETS : FUNDING_ASSETS.filter((item) => item.key === "SOL");
+
+  useEffect(() => {
+    if (wallet.publicKey && destinationWallet.length === 0) {
+      setDestinationWallet(wallet.publicKey.toBase58());
+    }
+  }, [destinationWallet.length, wallet.publicKey]);
 
   const fundingPreview = useMemo(() => {
     try {
@@ -137,6 +148,38 @@ export default function FundingPage() {
     }
   }
 
+  async function handleWithdraw() {
+    if (!selectedProject || !token) {
+      setWithdrawError("Select a project and reconnect your wallet before preparing a withdrawal.");
+      return;
+    }
+
+    setWithdrawing(true);
+    setWithdrawError(null);
+    setWithdrawStatus(null);
+
+    try {
+      const prepared = await prepareFundingWithdrawal({
+        projectId: selectedProject.id,
+        token,
+        amount: withdrawAmount.trim(),
+        destinationWalletAddress: destinationWallet.trim(),
+      });
+
+      setWithdrawStatus(
+        `Withdrawal prepared for ${prepared.amount} lamports to ${prepared.destinationWalletAddress}. Sign and submit the transaction from your wallet.`
+      );
+    } catch (withdrawalError) {
+      setWithdrawError(
+        withdrawalError instanceof Error
+          ? withdrawalError.message
+          : "Unable to prepare the withdrawal flow."
+      );
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
       <AuthGate>
@@ -166,6 +209,8 @@ export default function FundingPage() {
               .
             </Notice>
           ) : null}
+          {withdrawError ? <Notice tone="danger">{withdrawError}</Notice> : null}
+          {withdrawStatus ? <Notice tone="neutral">{withdrawStatus}</Notice> : null}
 
           <Card>
             <CardHeader>
@@ -347,6 +392,66 @@ export default function FundingPage() {
                       </p>
                     )}
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Withdraw treasury SOL</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+                <div className="space-y-4">
+                  <p className="text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                    Start a treasury withdrawal from the same funding workspace. The control plane
+                    validates project ownership and available balance before preparing the next
+                    step.
+                  </p>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-[var(--fyxvo-text)]">
+                      Amount in lamports
+                    </span>
+                    <input
+                      value={withdrawAmount}
+                      onChange={(event) => setWithdrawAmount(event.target.value)}
+                      inputMode="numeric"
+                      className="mt-2 h-11 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 text-sm text-[var(--fyxvo-text)] outline-none focus:border-[var(--fyxvo-brand)]"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-medium text-[var(--fyxvo-text)]">
+                      Destination wallet
+                    </span>
+                    <input
+                      value={destinationWallet}
+                      onChange={(event) => setDestinationWallet(event.target.value)}
+                      className="mt-2 h-11 w-full rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-4 text-sm text-[var(--fyxvo-text)] outline-none focus:border-[var(--fyxvo-brand)]"
+                    />
+                  </label>
+
+                  <Button
+                    type="button"
+                    onClick={() => void handleWithdraw()}
+                    loading={withdrawing}
+                    disabled={withdrawing || !selectedProject}
+                    variant="secondary"
+                  >
+                    Prepare withdrawal
+                  </Button>
+                </div>
+
+                <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
+                  <p className="font-medium text-[var(--fyxvo-text)]">What happens next</p>
+                  <p className="mt-3">
+                    The API checks that the selected workspace owns the project and that the
+                    treasury still has enough unfunded SOL available for the request. If the live
+                    protocol deployment can complete the withdrawal, the next step is returned here
+                    for the connected wallet to sign.
+                  </p>
                 </div>
               </div>
             </CardContent>
