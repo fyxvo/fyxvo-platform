@@ -7,7 +7,7 @@ import { processNodeHealthMonitoring } from "./jobs/node-health.js";
 import { processRewardCalculation } from "./jobs/rewards.js";
 import { processWalletIndexing } from "./jobs/indexing.js";
 import { processServiceHealthCheck } from "./jobs/service-health.js";
-import { updateReputations, checkErrorRates, checkBudgetThresholds, generateWeeklyDigests } from "./jobs/maintenance.js";
+import { updateReputations, checkErrorRates, checkBudgetThresholds, generateWeeklyDigests, renewSubscriptions } from "./jobs/maintenance.js";
 import { PrismaWorkerRepository } from "./repository.js";
 import { JsonRpcNodeProbeClient, RpcSolanaIndexerClient } from "./solana.js";
 import type {
@@ -97,6 +97,7 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
   private errorRateInterval: NodeJS.Timeout | null = null;
   private budgetInterval: NodeJS.Timeout | null = null;
   private digestInterval: NodeJS.Timeout | null = null;
+  private subscriptionInterval: NodeJS.Timeout | null = null;
 
   constructor(private readonly dependencies: WorkerProcessorDependencies) {
     this.queueName = `${dependencies.env.WORKER_NAME}-jobs`;
@@ -198,6 +199,12 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
       this.digestInterval = setInterval(() => {
         void generateWeeklyDigests(prismaClient, this.dependencies.env, logger);
       }, 7 * 24 * 3_600_000);
+
+      // Subscription renewals — every hour
+      void renewSubscriptions(prismaClient, this.dependencies.env, logger);
+      this.subscriptionInterval = setInterval(() => {
+        void renewSubscriptions(prismaClient, this.dependencies.env, logger);
+      }, 3_600_000);
     }
 
     this.dependencies.logger.info(
@@ -231,6 +238,10 @@ export class BullMqWorkerRuntime implements WorkerRuntime {
     if (this.digestInterval) {
       clearInterval(this.digestInterval);
       this.digestInterval = null;
+    }
+    if (this.subscriptionInterval) {
+      clearInterval(this.subscriptionInterval);
+      this.subscriptionInterval = null;
     }
 
     await this.worker.close();

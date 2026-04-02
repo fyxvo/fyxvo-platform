@@ -10,8 +10,10 @@ import type {
   OperatorRegistration,
   Project,
   RequestLog,
+  Subscription,
   User
 } from "@fyxvo/database";
+import type { SubscriptionPlan, SubscriptionStatus } from "@fyxvo/config";
 
 type UserRole = User["role"];
 type UserStatus = User["status"];
@@ -24,6 +26,7 @@ export type AuthenticatedUser = Pick<
 export type ProjectWithOwner = Project & {
   owner: AuthenticatedUser;
   memberUserIds?: string[];
+  subscription?: Subscription | null;
   _count?: {
     apiKeys: number;
     requestLogs: number;
@@ -614,6 +617,28 @@ export interface FundingHistoryItem {
   readonly confirmedAt: string | null;
 }
 
+export type ProjectSubscriptionRecord = Subscription;
+
+export interface ProjectSubscriptionUsage {
+  readonly standardRequestsUsed: number;
+  readonly priorityRequestsUsed: number;
+}
+
+export interface ProjectSubscriptionSummary {
+  readonly id: string;
+  readonly projectId: string;
+  readonly plan: SubscriptionPlan;
+  readonly status: SubscriptionStatus;
+  readonly priceUsdc: string;
+  readonly requestsIncluded: string;
+  readonly priorityRequestsIncluded: string;
+  readonly currentPeriodStart: string;
+  readonly currentPeriodEnd: string;
+  readonly cancelledAt: string | null;
+  readonly createdAt: string;
+  readonly usage: ProjectSubscriptionUsage;
+}
+
 export interface NetworkStats {
   readonly totalRequests: number;
   readonly totalProjects: number;
@@ -915,6 +940,19 @@ export interface ApiRepository {
   createInterestSubmission(input: CreateInterestSubmissionInput): Promise<InterestSubmission>;
   createFeedbackSubmission(input: CreateFeedbackSubmissionInput): Promise<FeedbackSubmission>;
   createOperatorRegistration(input: CreateOperatorRegistrationInput): Promise<OperatorRegistrationRecord>;
+  upsertProjectSubscription(input: {
+    readonly projectId: string;
+    readonly plan: SubscriptionPlan;
+    readonly status: SubscriptionStatus;
+    readonly priceUsdc: bigint;
+    readonly requestsIncluded: bigint;
+    readonly priorityRequestsIncluded: bigint;
+    readonly currentPeriodStart: Date;
+    readonly currentPeriodEnd: Date;
+    readonly cancelledAt?: Date | null;
+  }): Promise<ProjectSubscriptionRecord>;
+  getProjectSubscription(projectId: string): Promise<ProjectSubscriptionRecord | null>;
+  getProjectSubscriptionUsage(projectId: string, periodStart: Date, periodEnd: Date): Promise<ProjectSubscriptionUsage>;
   listOperatorRegistrationsByWallet(walletAddress: string): Promise<OperatorRegistrationRecord[]>;
   listOperatorRegistrations(): Promise<OperatorRegistrationRecord[]>;
   getOperatorRegistrationById(id: string): Promise<OperatorRegistrationRecord | null>;

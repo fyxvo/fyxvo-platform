@@ -43,6 +43,7 @@ export type {
   ProjectUsageRollup,
   PrismaClient as PrismaClientType,
   RequestLog,
+  Subscription,
   TransactionLookup,
   User,
   WalletActivity,

@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@fyxvo/ui";
 import { LoadingSkeleton } from "../../components/loading-skeleton";
 import { RetryBanner } from "../../components/retry-banner";
+import { createProjectSubscription } from "../../lib/api";
+import { usePortal } from "../../lib/portal-context";
 import {
   mainnetPayAsYouGo,
   mainnetPricingTiers,
@@ -29,12 +30,20 @@ function PlanCard({
   price,
   summary,
   details,
+  actionLabel,
+  actionLoading = false,
+  onAction,
+  disabled = false,
   accent = "var(--fyxvo-brand)",
 }: {
   name: string;
   price: string;
   summary: string;
   details: readonly string[];
+  actionLabel: string;
+  actionLoading?: boolean;
+  onAction?: () => void;
+  disabled?: boolean;
   accent?: string;
 }) {
   return (
@@ -55,25 +64,82 @@ function PlanCard({
         ))}
       </div>
       <div className="mt-6">
-        <Button asChild>
-          <Link href="/dashboard">Open dashboard</Link>
+        <Button type="button" loading={actionLoading} disabled={disabled || !onAction} onClick={onAction}>
+          {actionLabel}
         </Button>
       </div>
     </div>
   );
 }
 
+function planSlugToApiPlan(slug: string) {
+  return (slug === "pay-as-you-go" ? "payperrequest" : slug) as
+    | "starter"
+    | "builder"
+    | "scale"
+    | "growth"
+    | "business"
+    | "network"
+    | "payperrequest";
+}
+
+function formatPlanName(value: string) {
+  if (value === "payperrequest") return "Pay per request";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default function PricingPage() {
+  const { token, projects, selectedProject, refreshProjects } = usePortal();
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [solPriceLoading, setSolPriceLoading] = useState(true);
   const [solPriceError, setSolPriceError] = useState<string | null>(null);
   const [monthlyRequests, setMonthlyRequests] = useState(10_000_000);
   const [priorityPct, setPriorityPct] = useState(20);
+  const [subscribingPlan, setSubscribingPlan] = useState<string | null>(null);
+  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
   const individualPlans = mainnetPricingTiers.filter((plan) => plan.segment === "individual");
   const teamPlans = mainnetPricingTiers.filter((plan) => plan.segment === "team");
   const enterprisePlans = mainnetPricingTiers.filter((plan) => plan.segment === "enterprise");
   const paygPlan = mainnetPricingTiers.find((plan) => plan.segment === "payg");
+
+  function subscriptionCtaLabel() {
+    if (!token) return "Connect wallet first";
+    if (projects.length === 0) return "Create a project first";
+    if (!selectedProject) return "Select a project first";
+    return "Subscribe";
+  }
+
+  async function handleSubscribe(planSlug: string) {
+    if (!token || !selectedProject) {
+      return;
+    }
+
+    setSubscriptionMessage(null);
+    setSubscriptionError(null);
+    setSubscribingPlan(planSlug);
+
+    try {
+      const subscription = await createProjectSubscription({
+        projectId: selectedProject.id,
+        token,
+        plan: planSlugToApiPlan(planSlug)
+      });
+      await refreshProjects();
+      setSubscriptionMessage(
+        `${formatPlanName(subscription.plan)} is active for ${selectedProject.name}. Next renewal: ${new Date(
+          subscription.currentPeriodEnd
+        ).toLocaleDateString()}.`
+      );
+    } catch (error) {
+      setSubscriptionError(
+        error instanceof Error ? error.message : "Unable to activate the selected plan."
+      );
+    } finally {
+      setSubscribingPlan(null);
+    }
+  }
 
   async function loadSolPrice() {
     setSolPriceLoading(true);
@@ -160,6 +226,22 @@ export default function PricingPage() {
               <RetryBanner message={solPriceError} onRetry={loadSolPrice} />
             </div>
           ) : null}
+          {subscriptionMessage ? (
+            <p className="mt-6 max-w-3xl rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              {subscriptionMessage}
+            </p>
+          ) : null}
+          {subscriptionError ? (
+            <div className="mt-6 max-w-3xl">
+              <RetryBanner
+                message={subscriptionError}
+                onRetry={() => {
+                  setSubscriptionError(null);
+                  setSubscriptionMessage(null);
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -185,6 +267,10 @@ export default function PricingPage() {
                 price={plan.monthlyPrice}
                 summary={plan.summary}
                 details={plan.details}
+                actionLabel={subscriptionCtaLabel()}
+                actionLoading={subscribingPlan === plan.slug}
+                onAction={() => void handleSubscribe(plan.slug)}
+                disabled={!token || !selectedProject || projects.length === 0}
               />
             ))}
           </div>
@@ -214,6 +300,10 @@ export default function PricingPage() {
                 price={plan.monthlyPrice}
                 summary={plan.summary}
                 details={plan.details}
+                actionLabel={subscriptionCtaLabel()}
+                actionLoading={subscribingPlan === plan.slug}
+                onAction={() => void handleSubscribe(plan.slug)}
+                disabled={!token || !selectedProject || projects.length === 0}
               />
             ))}
           </div>
@@ -243,6 +333,10 @@ export default function PricingPage() {
                 price={plan.monthlyPrice}
                 summary={plan.summary}
                 details={plan.details}
+                actionLabel={subscriptionCtaLabel()}
+                actionLoading={subscribingPlan === plan.slug}
+                onAction={() => void handleSubscribe(plan.slug)}
+                disabled={!token || !selectedProject || projects.length === 0}
                 accent="#f3c96a"
               />
             ))}

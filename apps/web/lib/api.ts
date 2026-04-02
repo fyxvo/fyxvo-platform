@@ -25,6 +25,7 @@ import type {
   PortalApiKey,
   PortalProject,
   ProjectDetail,
+  ProjectSubscriptionSummary,
   ProjectActivationVerification,
   ProjectAnalytics,
   ProjectBudgetStatus,
@@ -255,6 +256,47 @@ export async function verifyFunding(params: {
       method: "POST",
       token,
       body: JSON.stringify({ fundingRequestId, signature }),
+    }
+  );
+  return response.item;
+}
+
+export async function getProjectSubscription(params: {
+  projectId: string;
+  token: string;
+}): Promise<ProjectSubscriptionSummary | null> {
+  const response = await apiFetch<{ item: ProjectSubscriptionSummary | null }>(
+    `/v1/projects/${params.projectId}/subscription`,
+    { token: params.token }
+  );
+  return response.item;
+}
+
+export async function createProjectSubscription(params: {
+  projectId: string;
+  token: string;
+  plan: "starter" | "builder" | "scale" | "growth" | "business" | "network" | "payperrequest";
+}): Promise<ProjectSubscriptionSummary> {
+  const response = await apiFetch<{ item: ProjectSubscriptionSummary }>(
+    `/v1/projects/${params.projectId}/subscription`,
+    {
+      method: "POST",
+      token: params.token,
+      body: JSON.stringify({ plan: params.plan })
+    }
+  );
+  return response.item;
+}
+
+export async function cancelProjectSubscription(params: {
+  projectId: string;
+  token: string;
+}): Promise<ProjectSubscriptionSummary> {
+  const response = await apiFetch<{ item: ProjectSubscriptionSummary }>(
+    `/v1/projects/${params.projectId}/subscription`,
+    {
+      method: "DELETE",
+      token: params.token
     }
   );
   return response.item;

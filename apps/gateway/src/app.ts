@@ -3,13 +3,14 @@ import type { GatewayEnv } from "@fyxvo/config";
 import {
   gatewayRequiredApiKeyScopes,
   getMissingApiKeyScopes,
-  resolveAllowedCorsOrigins
+  resolveAllowedCorsOrigins,
+  subscriptionOveragePricing
 } from "@fyxvo/config";
 import { prisma, type PrismaClientType } from "@fyxvo/database";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import { OnChainProjectBalanceResolver } from "./balance.js";
-import { calculateRequestPrice, chooseFundingAsset } from "./pricing.js";
+import { calculateRequestPrice, chooseFundingAsset, chooseFundingAssetByAsset } from "./pricing.js";
 import { PrismaGatewayRepository } from "./repository.js";
 import { HttpUpstreamRouter } from "./router.js";
 import { RedisGatewayStateStore } from "./state.js";
@@ -320,6 +321,106 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
     }
   });
 
+  async function resolveRequestBilling(inputBilling: {
+    readonly mode: RoutingMode;
+    readonly payload: JsonRpcPayload;
+    readonly projectId: string;
+    readonly fundingState: {
+      readonly availableSolCredits: bigint;
+      readonly availableUsdcCredits: bigint;
+      readonly totalSolFunded: bigint;
+      readonly totalUsdcFunded: bigint;
+      readonly projectPda: string;
+    };
+    readonly spendState: {
+      readonly sol: bigint;
+      readonly usdc: bigint;
+    };
+  }) {
+    const requestPricing = calculateRequestPrice(inputBilling.payload, inputBilling.mode, input.env);
+    const subscription = await input.repository.getProjectSubscription(inputBilling.projectId);
+
+    if (
+      subscription &&
+      subscription.status === "active" &&
+      subscription.plan !== "payperrequest"
+    ) {
+      const usage = await input.repository.getProjectSubscriptionUsage(
+        inputBilling.projectId,
+        subscription.currentPeriodStart,
+        subscription.currentPeriodEnd
+      );
+
+      const currentRequestCount = requestPricing.requestCount;
+      const standardRemaining = subscription.requestsIncluded - BigInt(usage.standardRequestsUsed);
+      const priorityRemaining =
+        subscription.priorityRequestsIncluded - BigInt(usage.priorityRequestsUsed);
+
+      const coveredStandard =
+        inputBilling.mode === "standard"
+          ? standardRemaining > 0n
+            ? BigInt(currentRequestCount) <= standardRemaining
+            : false
+          : false;
+      const coveredPriority =
+        inputBilling.mode === "priority"
+          ? priorityRemaining > 0n
+            ? BigInt(currentRequestCount) <= priorityRemaining
+            : false
+          : false;
+
+      if (coveredStandard || coveredPriority) {
+        return {
+          pricing: requestPricing,
+          billingMode: "subscription_included" as const,
+          chargedAmount: 0n,
+          chargedAsset: null,
+          fundingDecision: null
+        };
+      }
+
+      const overageSolCredits =
+        inputBilling.mode === "priority"
+          ? subscriptionOveragePricing.priorityLamports * BigInt(currentRequestCount)
+          : subscriptionOveragePricing.standardLamports * BigInt(currentRequestCount);
+      const overageUsdcCredits =
+        inputBilling.mode === "priority"
+          ? subscriptionOveragePricing.priorityUsdcBaseUnits * BigInt(currentRequestCount)
+          : subscriptionOveragePricing.standardUsdcBaseUnits * BigInt(currentRequestCount);
+      const fundingDecision = chooseFundingAssetByAsset({
+        funding: inputBilling.fundingState,
+        spend: inputBilling.spendState,
+        requiredSolCredits: overageSolCredits,
+        requiredUsdcCredits: overageUsdcCredits,
+        minimumReserve: BigInt(input.env.GATEWAY_MIN_AVAILABLE_LAMPORTS)
+      });
+
+      return {
+        pricing: requestPricing,
+        billingMode: "subscription_overage" as const,
+        chargedAmount:
+          fundingDecision?.asset === "SOL" ? overageSolCredits : overageUsdcCredits,
+        chargedAsset: fundingDecision?.asset ?? null,
+        fundingDecision
+      };
+    }
+
+    const fundingDecision = chooseFundingAsset({
+      funding: inputBilling.fundingState,
+      spend: inputBilling.spendState,
+      requiredCredits: requestPricing.totalPrice,
+      minimumReserve: BigInt(input.env.GATEWAY_MIN_AVAILABLE_LAMPORTS)
+    });
+
+    return {
+      pricing: requestPricing,
+      billingMode: "payg" as const,
+      chargedAmount: requestPricing.totalPrice,
+      chargedAsset: fundingDecision?.asset ?? null,
+      fundingDecision
+    };
+  }
+
   async function handleRpcRequest(mode: RoutingMode, request: FastifyRequest, reply: FastifyReply) {
     const startedAt = Date.now();
     const requestPath = request.routeOptions.url ?? request.url;
@@ -517,7 +618,14 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
             return;
           }
 
-          const pricing = calculateRequestPrice(payload, mode, input.env);
+          if (projectAccess.project.relayPaused) {
+            throw new GatewayHttpError(
+              402,
+              "relay_paused",
+              "Relay access is paused for this project until billing is brought back into good standing."
+            );
+          }
+
           const [fundingState, spendState, fetchedNodes] = await Promise.all([
             input.balanceResolver.getProjectFundingState(projectAccess.project),
             input.stateStore.getProjectSpend(projectAccess.project.id),
@@ -525,16 +633,19 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           ]);
           upstreamNodes = fetchedNodes;
 
-          const fundingDecision = chooseFundingAsset({
-            funding: fundingState,
-            spend: spendState,
-            requiredCredits: pricing.totalPrice,
-            minimumReserve: BigInt(input.env.GATEWAY_MIN_AVAILABLE_LAMPORTS)
+          const billing = await resolveRequestBilling({
+            mode,
+            payload,
+            projectId: projectAccess.project.id,
+            fundingState,
+            spendState
           });
+          const pricing = billing.pricing;
+          const fundingDecision = billing.fundingDecision;
 
-          if (!fundingDecision) {
+          if (billing.chargedAmount > 0n && !fundingDecision) {
             throw new GatewayHttpError(402, "insufficient_project_funds", "Project balance is insufficient for this request.", {
-              requiredCredits: pricing.totalPrice.toString(),
+              requiredCredits: billing.chargedAmount.toString(),
               availableSolCredits: (fundingState.availableSolCredits - spendState.sol).toString(),
               availableUsdcCredits: (fundingState.availableUsdcCredits - spendState.usdc).toString()
             });
@@ -578,11 +689,15 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           if (success) {
             await Promise.all([
               input.repository.touchApiKeyUsage(projectAccess.apiKey.id),
-              input.stateStore.incrementProjectSpend(
-                projectAccess.project.id,
-                fundingDecision.asset,
-                pricing.totalPrice
-              )
+              ...(billing.chargedAmount > 0n && fundingDecision
+                ? [
+                    input.stateStore.incrementProjectSpend(
+                      projectAccess.project.id,
+                      fundingDecision.asset,
+                      billing.chargedAmount
+                    )
+                  ]
+                : [])
             ]);
             // Store in cache on success
             const responseBody = injectSolanaErrorHint(routed.body);
@@ -603,8 +718,9 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
               rpcMethods: pricing.methods,
               upstreamNodeId: routed.node.id,
               upstreamEndpoint: routed.node.endpoint,
-              chargedAsset: fundingDecision.asset,
-              priceCredits: pricing.totalPrice.toString(),
+              chargedAsset: billing.chargedAsset,
+              priceCredits: billing.chargedAmount.toString(),
+              billingMode: billing.billingMode,
               durationMs,
               statusCode: routed.statusCode,
               success
@@ -616,8 +732,11 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           reply.header("x-fyxvo-project-slug", projectAccess.project.slug);
           reply.header("x-fyxvo-upstream-node-id", routed.node.id);
           reply.header("x-fyxvo-routing-mode", mode);
-          reply.header("x-fyxvo-price-credits", pricing.totalPrice.toString());
-          reply.header("x-fyxvo-billed-asset", fundingDecision.asset);
+          reply.header("x-fyxvo-price-credits", billing.chargedAmount.toString());
+          reply.header("x-fyxvo-billing-mode", billing.billingMode);
+          if (billing.chargedAsset) {
+            reply.header("x-fyxvo-billed-asset", billing.chargedAsset);
+          }
           reply.header("x-fyxvo-cache", "miss");
 
           statusCode = routed.statusCode;
@@ -794,7 +913,14 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         return;
       }
 
-      const pricing = calculateRequestPrice(payload, mode, input.env);
+      if (projectAccess.project.relayPaused) {
+        throw new GatewayHttpError(
+          402,
+          "relay_paused",
+          "Relay access is paused for this project until billing is brought back into good standing."
+        );
+      }
+
       const [fundingState, spendState, fetchedNodes, budgetUsage] = await Promise.all([
         input.balanceResolver.getProjectFundingState(projectAccess.project),
         input.stateStore.getProjectSpend(projectAccess.project.id),
@@ -802,9 +928,17 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         input.repository.getProjectBudgetUsage(projectAccess.project.id),
       ]);
       upstreamNodes = fetchedNodes;
+      const billing = await resolveRequestBilling({
+        mode,
+        payload,
+        projectId: projectAccess.project.id,
+        fundingState,
+        spendState
+      });
+      const pricing = billing.pricing;
 
-      const nextDailySpend = budgetUsage.dailyLamports + pricing.totalPrice;
-      const nextMonthlySpend = budgetUsage.monthlyLamports + pricing.totalPrice;
+      const nextDailySpend = budgetUsage.dailyLamports + billing.chargedAmount;
+      const nextMonthlySpend = budgetUsage.monthlyLamports + billing.chargedAmount;
       const dailyBudgetExceeded =
         projectAccess.project.dailyBudgetLamports !== null &&
         nextDailySpend > projectAccess.project.dailyBudgetLamports;
@@ -822,7 +956,7 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
             dailySpendLamports: budgetUsage.dailyLamports.toString(),
             monthlyBudgetLamports: projectAccess.project.monthlyBudgetLamports?.toString() ?? null,
             monthlySpendLamports: budgetUsage.monthlyLamports.toString(),
-            attemptedRequestLamports: pricing.totalPrice.toString(),
+            attemptedRequestLamports: billing.chargedAmount.toString(),
             simulationStillAvailable: true,
           }
         );
@@ -838,16 +972,11 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
         projectAccess.project.monthlyBudgetLamports > 0n &&
         Number((nextMonthlySpend * 100n) / projectAccess.project.monthlyBudgetLamports) >= budgetWarningThresholdPct;
 
-      const fundingDecision = chooseFundingAsset({
-        funding: fundingState,
-        spend: spendState,
-        requiredCredits: pricing.totalPrice,
-        minimumReserve: BigInt(input.env.GATEWAY_MIN_AVAILABLE_LAMPORTS)
-      });
+      const fundingDecision = billing.fundingDecision;
 
-      if (!fundingDecision) {
+      if (billing.chargedAmount > 0n && !fundingDecision) {
         throw new GatewayHttpError(402, "insufficient_project_funds", "Project balance is insufficient for this request.", {
-          requiredCredits: pricing.totalPrice.toString(),
+          requiredCredits: billing.chargedAmount.toString(),
           availableSolCredits: (fundingState.availableSolCredits - spendState.sol).toString(),
           availableUsdcCredits: (fundingState.availableUsdcCredits - spendState.usdc).toString()
         });
@@ -893,11 +1022,15 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       if (success) {
         await Promise.all([
           input.repository.touchApiKeyUsage(projectAccess.apiKey.id),
-          input.stateStore.incrementProjectSpend(
-            projectAccess.project.id,
-            fundingDecision.asset,
-            pricing.totalPrice
-          )
+          ...(billing.chargedAmount > 0n && fundingDecision
+            ? [
+                input.stateStore.incrementProjectSpend(
+                  projectAccess.project.id,
+                  fundingDecision.asset,
+                  billing.chargedAmount
+                )
+              ]
+            : [])
         ]);
       }
 
@@ -911,8 +1044,9 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
           rpcMethods: pricing.methods,
           upstreamNodeId: routed.node.id,
           upstreamEndpoint: routed.node.endpoint,
-          chargedAsset: fundingDecision.asset,
-          priceCredits: pricing.totalPrice.toString(),
+          chargedAsset: billing.chargedAsset,
+          priceCredits: billing.chargedAmount.toString(),
+          billingMode: billing.billingMode,
           durationMs,
           statusCode: routed.statusCode,
           success
@@ -927,8 +1061,11 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
       reply.header("x-fyxvo-project-slug", projectAccess.project.slug);
       reply.header("x-fyxvo-upstream-node-id", routed.node.id);
       reply.header("x-fyxvo-routing-mode", mode);
-      reply.header("x-fyxvo-price-credits", pricing.totalPrice.toString());
-      reply.header("x-fyxvo-billed-asset", fundingDecision.asset);
+      reply.header("x-fyxvo-price-credits", billing.chargedAmount.toString());
+      reply.header("x-fyxvo-billing-mode", billing.billingMode);
+      if (billing.chargedAsset) {
+        reply.header("x-fyxvo-billed-asset", billing.chargedAsset);
+      }
       if (dailyBudgetWarning || monthlyBudgetWarning) {
         reply.header("x-fyxvo-budget-warning", "true");
       }

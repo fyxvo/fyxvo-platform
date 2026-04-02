@@ -62,19 +62,35 @@ export function chooseFundingAsset(input: {
   readonly requiredCredits: bigint;
   readonly minimumReserve: bigint;
 }): FundingDecision | null {
+  return chooseFundingAssetByAsset({
+    funding: input.funding,
+    spend: input.spend,
+    requiredSolCredits: input.requiredCredits,
+    requiredUsdcCredits: input.requiredCredits,
+    minimumReserve: input.minimumReserve
+  });
+}
+
+export function chooseFundingAssetByAsset(input: {
+  readonly funding: ProjectFundingState;
+  readonly spend: ProjectSpendState;
+  readonly requiredSolCredits: bigint;
+  readonly requiredUsdcCredits: bigint;
+  readonly minimumReserve: bigint;
+}): FundingDecision | null {
   const availableSol = input.funding.availableSolCredits - input.spend.sol;
-  if (availableSol >= input.requiredCredits + input.minimumReserve) {
+  if (availableSol >= input.requiredSolCredits + input.minimumReserve) {
     return {
       asset: "SOL",
-      remainingCredits: availableSol - input.requiredCredits
+      remainingCredits: availableSol - input.requiredSolCredits
     };
   }
 
   const availableUsdc = input.funding.availableUsdcCredits - input.spend.usdc;
-  if (availableUsdc >= input.requiredCredits + input.minimumReserve) {
+  if (availableUsdc >= input.requiredUsdcCredits + input.minimumReserve) {
     return {
       asset: "USDC",
-      remainingCredits: availableUsdc - input.requiredCredits
+      remainingCredits: availableUsdc - input.requiredUsdcCredits
     };
   }
 

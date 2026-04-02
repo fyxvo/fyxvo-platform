@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,12 +6,16 @@ import {
   COMPUTE_HEAVY_METHODS,
   PRICING_LAMPORTS,
   WRITE_METHODS,
+  decodeFyxvoProjectFundingState,
   isEmailDeliveryEnabled,
   sendTransactionalEmail,
   type WorkerEnv,
 } from "@fyxvo/config";
 import { UserRole, type PrismaClientType } from "@fyxvo/database";
+import { Redis } from "ioredis";
+import { Connection, PublicKey } from "@solana/web3.js";
 import type { WorkerLogger } from "../types.js";
+import type { Prisma as PrismaNamespace } from "@fyxvo/database";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -261,6 +266,285 @@ export async function checkBudgetThresholds(
       { event: "worker.budget_thresholds.failed", error: error instanceof Error ? error.message : "Unknown error" },
       "Failed to check budget thresholds"
     );
+  }
+}
+
+function gatewaySpendKey(prefix: string, projectId: string) {
+  return `${prefix}:spend:${projectId}`;
+}
+
+async function getAvailableUsdcCredits(input: {
+  readonly connection: Connection;
+  readonly projectPda: string;
+}): Promise<bigint> {
+  const accountInfo = await input.connection.getAccountInfo(new PublicKey(input.projectPda), "confirmed");
+  if (!accountInfo) {
+    throw new Error(`Project account ${input.projectPda} is not available on chain.`);
+  }
+
+  const decoded = decodeFyxvoProjectFundingState(Buffer.from(accountInfo.data));
+  return decoded.availableUsdcCredits;
+}
+
+function isWebhookSubscribed(events: unknown, eventName: string) {
+  return Array.isArray(events) && events.some((entry) => typeof entry === "string" && entry === eventName);
+}
+
+async function deliverBalanceLowWebhook(input: {
+  readonly prisma: PrismaClientType;
+  readonly webhook: { id: string; url: string; secret: string };
+  readonly payload: Record<string, unknown>;
+}) {
+  const body = JSON.stringify(input.payload);
+  const signature = createHash("sha256").update(input.webhook.secret + body).digest("hex");
+
+  try {
+    const response = await fetch(input.webhook.url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-fyxvo-signature": signature,
+      },
+      body,
+      signal: AbortSignal.timeout(10_000)
+    });
+    const responseBody = await response.text().catch(() => "");
+
+    await input.prisma.webhookDelivery.create({
+      data: {
+        webhookId: input.webhook.id,
+        eventType: "balance.low",
+        payload: input.payload as PrismaNamespace.InputJsonValue,
+        attemptNumber: 1,
+        status: response.ok ? "delivered" : "failed",
+        responseStatus: response.status,
+        responseBody: responseBody.slice(0, 1000),
+        deliveredAt: response.ok ? new Date() : null
+      }
+    });
+  } catch (error) {
+    await input.prisma.webhookDelivery.create({
+      data: {
+        webhookId: input.webhook.id,
+        eventType: "balance.low",
+        payload: input.payload as PrismaNamespace.InputJsonValue,
+        attemptNumber: 1,
+        status: "failed",
+        responseBody: (error instanceof Error ? error.message : "Unknown webhook delivery failure").slice(0, 1000)
+      }
+    });
+  }
+}
+
+function subscriptionWindowEnd(start: Date) {
+  return new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+}
+
+export async function renewSubscriptions(
+  prisma: PrismaClientType,
+  env: WorkerEnv,
+  logger: WorkerLogger
+): Promise<void> {
+  const redis = new Redis(env.REDIS_URL, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+  const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+
+  try {
+    const now = new Date();
+    const dueSubscriptions = await prisma.subscription.findMany({
+      where: {
+        status: "active",
+        currentPeriodEnd: { lte: now }
+      },
+      include: {
+        project: {
+          include: {
+            owner: {
+              select: { id: true, displayName: true }
+            },
+            webhooks: {
+              where: { active: true }
+            }
+          }
+        }
+      }
+    });
+
+    for (const subscription of dueSubscriptions) {
+      if (subscription.cancelledAt) {
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { status: "cancelled" }
+        });
+        await prisma.project.update({
+          where: { id: subscription.projectId },
+          data: { relayPaused: false }
+        });
+        continue;
+      }
+
+      if (subscription.plan === "payperrequest" || subscription.priceUsdc === 0n) {
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: {
+            currentPeriodStart: subscription.currentPeriodEnd,
+            currentPeriodEnd: subscriptionWindowEnd(subscription.currentPeriodEnd),
+            status: "active"
+          }
+        });
+        await prisma.project.update({
+          where: { id: subscription.projectId },
+          data: { relayPaused: false }
+        });
+        continue;
+      }
+
+      const availableUsdcCredits = await getAvailableUsdcCredits({
+        connection,
+        projectPda: subscription.project.onChainProjectPda
+      });
+      const currentSpendUsdc = BigInt(
+        (await redis.hget(gatewaySpendKey(env.GATEWAY_REDIS_PREFIX, subscription.projectId), "usdc")) ?? "0"
+      );
+      const netAvailableUsdc = availableUsdcCredits - currentSpendUsdc;
+
+      if (netAvailableUsdc >= subscription.priceUsdc) {
+        await redis.hincrby(
+          gatewaySpendKey(env.GATEWAY_REDIS_PREFIX, subscription.projectId),
+          "usdc",
+          Number(subscription.priceUsdc)
+        );
+
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: {
+            status: "active",
+            currentPeriodStart: subscription.currentPeriodEnd,
+            currentPeriodEnd: subscriptionWindowEnd(subscription.currentPeriodEnd),
+            cancelledAt: null
+          }
+        });
+        await prisma.project.update({
+          where: { id: subscription.projectId },
+          data: { relayPaused: false }
+        });
+        continue;
+      }
+
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { status: "overdue" }
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: subscription.project.ownerId,
+          projectId: subscription.projectId,
+          type: "alert",
+          title: "Subscription renewal overdue",
+          message: `${subscription.project.name} does not have enough USDC to renew the ${subscription.plan} plan. Fund the project treasury to avoid relay interruption.`
+        }
+      });
+
+      await prisma.alertState.upsert({
+        where: {
+          userId_alertKey: {
+            userId: subscription.project.ownerId,
+            alertKey: `balance.low:${subscription.projectId}:subscription`
+          }
+        },
+        create: {
+          userId: subscription.project.ownerId,
+          projectId: subscription.projectId,
+          alertKey: `balance.low:${subscription.projectId}:subscription`,
+          state: "new"
+        },
+        update: {
+          projectId: subscription.projectId,
+          state: "new"
+        }
+      });
+
+      const webhookPayload = {
+        event: "balance.low",
+        projectId: subscription.projectId,
+        timestamp: now.toISOString(),
+        data: {
+          subscriptionId: subscription.id,
+          plan: subscription.plan,
+          status: "overdue",
+          requiredUsdcBaseUnits: subscription.priceUsdc.toString(),
+          availableUsdcBaseUnits: netAvailableUsdc.toString()
+        }
+      };
+
+      for (const webhook of subscription.project.webhooks) {
+        if (!isWebhookSubscribed(webhook.events, "balance.low")) continue;
+        await deliverBalanceLowWebhook({
+          prisma,
+          webhook: { id: webhook.id, url: webhook.url, secret: webhook.secret },
+          payload: webhookPayload
+        });
+      }
+    }
+
+    const overdueCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const staleOverdue = await prisma.subscription.findMany({
+      where: {
+        status: "overdue",
+        currentPeriodEnd: { lte: overdueCutoff }
+      },
+      include: {
+        project: {
+          include: {
+            owner: {
+              select: { id: true }
+            }
+          }
+        }
+      }
+    });
+
+    for (const subscription of staleOverdue) {
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: "cancelled",
+          cancelledAt: subscription.cancelledAt ?? new Date()
+        }
+      });
+      await prisma.project.update({
+        where: { id: subscription.projectId },
+        data: { relayPaused: true }
+      });
+      await prisma.notification.create({
+        data: {
+          userId: subscription.project.ownerId,
+          projectId: subscription.projectId,
+          type: "alert",
+          title: "Relay access paused",
+          message: `${subscription.project.name} has been overdue for more than 7 days, so relay access is now paused until the treasury is funded and a plan is reactivated.`
+        }
+      });
+    }
+
+    logger.info(
+      {
+        event: "worker.subscriptions.renewed",
+        dueCount: dueSubscriptions.length,
+        overdueCancelledCount: staleOverdue.length
+      },
+      "Subscription renewal pass completed"
+    );
+  } catch (error) {
+    logger.error(
+      { event: "worker.subscriptions.failed", error: error instanceof Error ? error.message : "Unknown error" },
+      "Failed to process subscription renewals"
+    );
+  } finally {
+    await redis.quit().catch(() => undefined);
   }
 }
 

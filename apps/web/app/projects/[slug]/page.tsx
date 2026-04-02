@@ -8,11 +8,13 @@ import { LoadingSkeleton } from "../../../components/loading-skeleton";
 import { RetryBanner } from "../../../components/retry-banner";
 import { AuthGate } from "../../../components/state-panels";
 import {
+  cancelProjectSubscription,
   getOnchainSnapshot,
   getProject,
   getProjectAnalytics,
   getProjectRequestLogs,
   getProjectRequestTrace,
+  getProjectSubscription,
   listApiKeys,
   listProjects,
 } from "../../../lib/api";
@@ -25,6 +27,7 @@ import type {
   ProjectDetail,
   ProjectRequestLogList,
   ProjectRequestTrace,
+  ProjectSubscriptionSummary,
 } from "../../../lib/types";
 
 interface ProjectPageProps {
@@ -36,6 +39,7 @@ interface ProjectCoreState {
   onchain: OnchainSnapshot;
   analytics: ProjectAnalytics;
   apiKeys: PortalApiKey[];
+  subscription: ProjectSubscriptionSummary | null;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -93,6 +97,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const [traceOpen, setTraceOpen] = useState(false);
   const [traceLoading, setTraceLoading] = useState(false);
   const [traceError, setTraceError] = useState<string | null>(null);
+  const [subscriptionUpdating, setSubscriptionUpdating] = useState(false);
 
   const loadProject = useCallback(async () => {
     if (!token) {
@@ -114,11 +119,12 @@ export default function ProjectPage({ params }: ProjectPageProps) {
       setProjectId(match.id);
       setRequestsPage(1);
 
-      const [project, onchain, analytics, apiKeys] = await Promise.all([
+      const [project, onchain, analytics, apiKeys, subscription] = await Promise.all([
         getProject({ projectId: match.id, token }),
         getOnchainSnapshot({ projectId: match.id, token }),
         getProjectAnalytics({ projectId: match.id, token, range: "24h" }),
         listApiKeys({ projectId: match.id, token }),
+        getProjectSubscription({ projectId: match.id, token }),
       ]);
 
       setState({
@@ -126,6 +132,7 @@ export default function ProjectPage({ params }: ProjectPageProps) {
         onchain,
         analytics,
         apiKeys,
+        subscription,
       });
     } catch (loadError) {
       setState(null);
@@ -209,6 +216,25 @@ export default function ProjectPage({ params }: ProjectPageProps) {
     return JSON.stringify(trace.fyxvoHint, null, 2);
   }, [trace]);
 
+  const subscription = state?.subscription ?? null;
+
+  async function handleCancelSubscription() {
+    if (!token || !projectId) return;
+    setSubscriptionUpdating(true);
+    setError(null);
+
+    try {
+      const nextSubscription = await cancelProjectSubscription({ projectId, token });
+      setState((current) => (current ? { ...current, subscription: nextSubscription } : current));
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error ? cancelError.message : "Unable to cancel the subscription."
+      );
+    } finally {
+      setSubscriptionUpdating(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <AuthGate message="Project detail requires an authenticated wallet session.">
@@ -269,6 +295,62 @@ export default function ProjectPage({ params }: ProjectPageProps) {
                   value={successRate}
                   note={`Average latency ${state.analytics.latency.averageMs.toFixed(1)}ms`}
                 />
+              </div>
+
+              <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-[var(--fyxvo-text)]">Billing</h2>
+                    <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">
+                      Subscription status, in-period usage, and the next renewal window for this project.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild variant="secondary">
+                      <Link href="/pricing">Upgrade plan</Link>
+                    </Button>
+                    {subscription ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        loading={subscriptionUpdating}
+                        onClick={() => void handleCancelSubscription()}
+                      >
+                        Cancel plan
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {subscription ? (
+                  <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard label="Plan" value={subscription.plan} note={subscription.status} />
+                    <MetricCard
+                      label="Standard usage"
+                      value={`${subscription.usage.standardRequestsUsed.toLocaleString()} / ${Number(subscription.requestsIncluded).toLocaleString()}`}
+                      note="Requests used versus included in the current period."
+                    />
+                    <MetricCard
+                      label="Priority usage"
+                      value={`${subscription.usage.priorityRequestsUsed.toLocaleString()} / ${Number(subscription.priorityRequestsIncluded).toLocaleString()}`}
+                      note="Priority relay usage versus included capacity."
+                    />
+                    <MetricCard
+                      label="Next renewal"
+                      value={new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                      note={
+                        subscription.cancelledAt
+                          ? "Cancellation is scheduled for the end of the current period."
+                          : "Automatic renewal will charge the project treasury if sufficient USDC is available."
+                      }
+                    />
+                  </div>
+                ) : (
+                  <Notice tone="warning" className="mt-5">
+                    This project is on treasury-funded pay-per-request billing right now. Open pricing
+                    to activate a monthly plan.
+                  </Notice>
+                )}
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">

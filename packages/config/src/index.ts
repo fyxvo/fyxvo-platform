@@ -7,3 +7,4 @@ export * from "./fyxvo-program.js";
 export * from "./pricing.js";
 export * from "./protocol.js";
 export * from "./solana.js";
+export * from "./subscriptions.js";

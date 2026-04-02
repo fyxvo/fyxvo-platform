@@ -59,6 +59,15 @@ function ProjectSummary({ project }: { project: PortalProject }) {
         {project.status}
       </p>
       <h2 className="mt-2 text-lg font-semibold text-[var(--fyxvo-text)]">{project.name}</h2>
+      {project.subscription ? (
+        <div className="mt-3 inline-flex rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1 text-xs text-[var(--fyxvo-text-muted)]">
+          Billing: {project.subscription.plan} · {project.subscription.status}
+        </div>
+      ) : (
+        <div className="mt-3 inline-flex rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] px-3 py-1 text-xs text-[var(--fyxvo-text-muted)]">
+          Billing: pay per request
+        </div>
+      )}
       <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-soft)]">
         {project.description?.trim() || "No description has been recorded for this project yet."}
       </p>
@@ -405,6 +414,9 @@ export default function DashboardPage() {
                   >
                     <p className="text-sm font-medium text-[var(--fyxvo-text)]">{project.name}</p>
                     <p className="mt-1 text-sm text-[var(--fyxvo-text-muted)]">{project.slug}</p>
+                    <p className="mt-2 text-xs text-[var(--fyxvo-text-muted)]">
+                      Billing: {project.subscription ? `${project.subscription.plan} · ${project.subscription.status}` : "pay per request"}
+                    </p>
                   </button>
                   <div className="mt-3">
                     <Link

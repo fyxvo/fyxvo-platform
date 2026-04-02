@@ -30,11 +30,30 @@ export interface ProjectAccessContext {
     readonly ownerWalletAddress: string;
     readonly chainProjectId: bigint;
     readonly onChainProjectPda: string;
+    readonly relayPaused: boolean;
     readonly dailyBudgetLamports: bigint | null;
     readonly monthlyBudgetLamports: bigint | null;
     readonly budgetWarningThresholdPct: number | null;
     readonly budgetHardStop: boolean;
   };
+}
+
+export interface GatewayProjectSubscription {
+  readonly id: string;
+  readonly projectId: string;
+  readonly plan: string;
+  readonly status: string;
+  readonly priceUsdc: bigint;
+  readonly requestsIncluded: bigint;
+  readonly priorityRequestsIncluded: bigint;
+  readonly currentPeriodStart: Date;
+  readonly currentPeriodEnd: Date;
+  readonly cancelledAt: Date | null;
+}
+
+export interface GatewayProjectSubscriptionUsage {
+  readonly standardRequestsUsed: number;
+  readonly priorityRequestsUsed: number;
 }
 
 export interface RoutedRpcNode {
@@ -122,6 +141,8 @@ export interface GatewayStateStore {
 
 export interface GatewayRepository {
   findProjectAccessByApiKey(apiKey: string): Promise<ProjectAccessContext | null>;
+  getProjectSubscription(projectId: string): Promise<GatewayProjectSubscription | null>;
+  getProjectSubscriptionUsage(projectId: string, periodStart: Date, periodEnd: Date): Promise<GatewayProjectSubscriptionUsage>;
   getProjectBudgetUsage(projectId: string): Promise<{ readonly dailyLamports: bigint; readonly monthlyLamports: bigint }>;
   listUpstreamNodes(projectId?: string): Promise<RoutedRpcNode[]>;
   touchApiKeyUsage(apiKeyId: string): Promise<void>;

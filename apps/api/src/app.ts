@@ -11,9 +11,11 @@ import {
   PRICING_LAMPORTS,
   VOLUME_DISCOUNT,
   WRITE_METHODS,
+  getSubscriptionPlanConfig,
   normalizeApiKeyScopes,
   resolveAuthorityPlan,
   isEmailDeliveryEnabled,
+  subscriptionPlans,
   supportedApiKeyScopes,
   getSolanaNetworkConfig,
   resolveAllowedCorsOrigins,
@@ -35,6 +37,7 @@ import type {
   AuthenticatedUser,
   BlockchainClient,
   JwtClaims,
+  ProjectSubscriptionSummary,
   RequestLogInput,
   ProjectWithOwner
 } from "./types.js";
@@ -258,6 +261,10 @@ const createApiKeySchema = z.object({
   expiresAt: z.string().datetime().optional()
 });
 
+const subscriptionPlanSchema = z.object({
+  plan: z.enum(subscriptionPlans)
+});
+
 const interestAreaValues = [
   "rpc",
   "priority-relay",
@@ -430,6 +437,90 @@ function serializeForJson<T>(value: T): T {
       typeof candidate === "bigint" ? candidate.toString() : candidate
     )
   ) as T;
+}
+
+function gatewaySpendKey(prefix: string, projectId: string) {
+  return `${prefix}:spend:${projectId}`;
+}
+
+async function incrementProjectSpendLedger(input: {
+  readonly redis: RedisClientType | null;
+  readonly gatewayRedisPrefix: string;
+  readonly projectId: string;
+  readonly asset: "SOL" | "USDC";
+  readonly amount: bigint;
+}) {
+  if (!input.redis || input.amount <= 0n) {
+    return;
+  }
+
+  await input.redis.hIncrBy(
+    gatewaySpendKey(input.gatewayRedisPrefix, input.projectId),
+    input.asset === "SOL" ? "sol" : "usdc",
+    Number(input.amount)
+  );
+}
+
+function formatSubscriptionSummary(input: {
+  readonly subscription: {
+    id: string;
+    projectId: string;
+    plan: string;
+    status: string;
+    priceUsdc: bigint;
+    requestsIncluded: bigint;
+    priorityRequestsIncluded: bigint;
+    currentPeriodStart: Date;
+    currentPeriodEnd: Date;
+    cancelledAt: Date | null;
+    createdAt: Date;
+  };
+  readonly usage: {
+    standardRequestsUsed: number;
+    priorityRequestsUsed: number;
+  };
+}): ProjectSubscriptionSummary {
+  return {
+    id: input.subscription.id,
+    projectId: input.subscription.projectId,
+    plan: input.subscription.plan as ProjectSubscriptionSummary["plan"],
+    status: input.subscription.status as ProjectSubscriptionSummary["status"],
+    priceUsdc: input.subscription.priceUsdc.toString(),
+    requestsIncluded: input.subscription.requestsIncluded.toString(),
+    priorityRequestsIncluded: input.subscription.priorityRequestsIncluded.toString(),
+    currentPeriodStart: input.subscription.currentPeriodStart.toISOString(),
+    currentPeriodEnd: input.subscription.currentPeriodEnd.toISOString(),
+    cancelledAt: input.subscription.cancelledAt?.toISOString() ?? null,
+    createdAt: input.subscription.createdAt.toISOString(),
+    usage: input.usage
+  };
+}
+
+function formatProjectResponse(project: ProjectWithOwner) {
+  return serializeForJson({
+    ...project,
+    tags: (project as unknown as { tags?: string[] }).tags ?? [],
+    ownerReputationLevel: (project.owner as unknown as { reputationLevel?: string | null })?.reputationLevel ?? "Explorer",
+    subscription: project.subscription
+      ? {
+          id: project.subscription.id,
+          projectId: project.subscription.projectId,
+          plan: project.subscription.plan,
+          status: project.subscription.status,
+          priceUsdc: project.subscription.priceUsdc,
+          requestsIncluded: project.subscription.requestsIncluded,
+          priorityRequestsIncluded: project.subscription.priorityRequestsIncluded,
+          currentPeriodStart: project.subscription.currentPeriodStart,
+          currentPeriodEnd: project.subscription.currentPeriodEnd,
+          cancelledAt: project.subscription.cancelledAt,
+          createdAt: project.subscription.createdAt,
+          usage: {
+            standardRequestsUsed: 0,
+            priorityRequestsUsed: 0
+          }
+        }
+      : null
+  });
 }
 
 function normalizeBlockchainError(error: unknown): HttpError | null {
@@ -2447,8 +2538,7 @@ export async function buildApiApp(input: {
   app.get("/v1/projects", async (request) => {
     const user = requireUser(request);
     const projects = await input.repository.listProjects(user);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { items: projects.map((p) => ({ ...p, tags: (p as any).tags ?? [] })) };
+    return { items: projects.map((project) => formatProjectResponse(project)) };
   });
 
   app.post("/v1/projects", async (request, reply) => {
@@ -2533,13 +2623,7 @@ export async function buildApiApp(input: {
     }
 
     return {
-      item: {
-        ...project,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tags: (project as any).tags ?? [],
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ownerReputationLevel: (project.owner as any)?.reputationLevel ?? 'Explorer',
-      }
+      item: formatProjectResponse(project)
     };
   });
 
@@ -2960,6 +3044,210 @@ export async function buildApiApp(input: {
         fundingRequestId: fundingRecord.id,
         ...verification
       }
+    };
+  });
+
+  app.post("/v1/projects/:projectId/subscription", async (request, reply) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const body = subscriptionPlanSchema.parse(request.body);
+    const project = await input.repository.findProjectById(params.projectId);
+
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const plan = getSubscriptionPlanConfig(body.plan);
+    const existing = await input.repository.getProjectSubscription(project.id);
+    const onchain = await withBlockchainErrors(() =>
+      input.blockchain.readProjectOnChain({
+        ownerWalletAddress: project.owner.walletAddress,
+        chainProjectId: project.chainProjectId,
+        storedProjectPda: project.onChainProjectPda
+      })
+    );
+
+    if (!onchain.balances) {
+      throw new HttpError(
+        409,
+        "project_not_activated",
+        "This project must be activated on chain before a subscription can be applied."
+      );
+    }
+
+    const currentUsdcSpend = rateLimitRedis
+      ? BigInt(
+          (await rateLimitRedis.hGet(gatewaySpendKey(input.env.GATEWAY_REDIS_PREFIX, project.id), "usdc")) ?? "0"
+        )
+      : 0n;
+    const availableUsdcCredits = BigInt(onchain.balances.availableUsdcCredits) - currentUsdcSpend;
+
+    if (plan.priceUsdcBaseUnits > 0n && availableUsdcCredits < plan.priceUsdcBaseUnits) {
+      const missing = plan.priceUsdcBaseUnits - availableUsdcCredits;
+      return reply.status(402).send({
+        error: "insufficient_usdc_balance",
+        message: `Fund ${missing.toString()} more USDC base units before activating the ${plan.plan} plan.`,
+        details: {
+          plan: plan.plan,
+          requiredUsdcBaseUnits: plan.priceUsdcBaseUnits.toString(),
+          availableUsdcBaseUnits: availableUsdcCredits.toString(),
+          missingUsdcBaseUnits: missing.toString()
+        }
+      });
+    }
+
+    if (plan.priceUsdcBaseUnits > 0n) {
+      await incrementProjectSpendLedger({
+        redis: rateLimitRedis,
+        gatewayRedisPrefix: input.env.GATEWAY_REDIS_PREFIX,
+        projectId: project.id,
+        asset: "USDC",
+        amount: plan.priceUsdcBaseUnits
+      });
+    }
+
+    const currentPeriodStart = new Date();
+    const currentPeriodEnd = new Date(currentPeriodStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const subscription = await input.repository.upsertProjectSubscription({
+      projectId: project.id,
+      plan: plan.plan,
+      status: "active",
+      priceUsdc: plan.priceUsdcBaseUnits,
+      requestsIncluded: plan.requestsIncluded,
+      priorityRequestsIncluded: plan.priorityRequestsIncluded,
+      currentPeriodStart,
+      currentPeriodEnd,
+      cancelledAt: null
+    });
+
+    await db.project.update({
+      where: { id: project.id },
+      data: { relayPaused: false }
+    });
+
+    const usage = await input.repository.getProjectSubscriptionUsage(
+      project.id,
+      subscription.currentPeriodStart,
+      subscription.currentPeriodEnd
+    );
+
+    void input.repository.createNotification({
+      userId: user.id,
+      type: existing ? "subscription_updated" : "subscription_created",
+      title: existing ? "Subscription updated" : "Subscription activated",
+      message:
+        plan.plan === "payperrequest"
+          ? `Project "${project.name}" is now set to treasury-funded pay-per-request billing.`
+          : `${project.name} is now on the ${plan.plan} plan through ${currentPeriodEnd.toISOString().slice(0, 10)}.`,
+      projectId: project.id,
+      metadata: {
+        plan: plan.plan,
+        currentPeriodEnd: currentPeriodEnd.toISOString()
+      }
+    }).catch(() => undefined);
+
+    void input.repository.logActivity({
+      projectId: project.id,
+      userId: user.id,
+      action: existing ? "subscription.updated" : "subscription.created",
+      details: {
+        plan: plan.plan,
+        priceUsdcBaseUnits: plan.priceUsdcBaseUnits.toString(),
+        currentPeriodStart: currentPeriodStart.toISOString(),
+        currentPeriodEnd: currentPeriodEnd.toISOString()
+      }
+    }).catch(() => undefined);
+
+    return reply.status(existing ? 200 : 201).send({
+      item: formatSubscriptionSummary({
+        subscription,
+        usage
+      })
+    });
+  });
+
+  app.get("/v1/projects/:projectId/subscription", async (request) => {
+    const user = requireUser(request);
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(params.projectId);
+
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const subscription = await input.repository.getProjectSubscription(project.id);
+    if (!subscription) {
+      return { item: null };
+    }
+
+    const usage = await input.repository.getProjectSubscriptionUsage(
+      project.id,
+      subscription.currentPeriodStart,
+      subscription.currentPeriodEnd
+    );
+
+    return {
+      item: formatSubscriptionSummary({
+        subscription,
+        usage
+      })
+    };
+  });
+
+  app.delete("/v1/projects/:projectId/subscription", async (request) => {
+    const user = requireUser(request);
+    const db = requirePrisma();
+    const params = z.object({ projectId: z.string().uuid() }).parse(request.params);
+    const project = await input.repository.findProjectById(params.projectId);
+
+    if (!project || !canAccessProject(user, project)) {
+      throw new HttpError(404, "project_not_found", "The requested project could not be found.");
+    }
+
+    const existing = await input.repository.getProjectSubscription(project.id);
+    if (!existing) {
+      throw new HttpError(404, "subscription_not_found", "This project does not have an active subscription.");
+    }
+
+    const cancelledAt = new Date();
+    const subscription = await db.subscription.update({
+      where: { projectId: project.id },
+      data: {
+        cancelledAt,
+        status: existing.status === "overdue" ? "overdue" : "active"
+      }
+    });
+
+    const usage = await input.repository.getProjectSubscriptionUsage(
+      project.id,
+      subscription.currentPeriodStart,
+      subscription.currentPeriodEnd
+    );
+
+    void input.repository.createNotification({
+      userId: user.id,
+      type: "subscription_cancelled",
+      title: "Subscription will end at period close",
+      message: `${project.name} will return to treasury-funded metering after ${subscription.currentPeriodEnd.toISOString().slice(0, 10)}.`,
+      projectId: project.id
+    }).catch(() => undefined);
+
+    void input.repository.logActivity({
+      projectId: project.id,
+      userId: user.id,
+      action: "subscription.cancelled",
+      details: {
+        cancelledAt: cancelledAt.toISOString(),
+        currentPeriodEnd: subscription.currentPeriodEnd.toISOString()
+      }
+    }).catch(() => undefined);
+
+    return {
+      item: formatSubscriptionSummary({
+        subscription,
+        usage
+      })
     };
   });
 

@@ -120,11 +120,50 @@ export class PrismaGatewayRepository implements GatewayRepository {
         ownerWalletAddress: record.project.owner.walletAddress,
         chainProjectId: record.project.chainProjectId,
         onChainProjectPda: record.project.onChainProjectPda,
+        relayPaused: record.project.relayPaused,
         dailyBudgetLamports: record.project.dailyBudgetLamports,
         monthlyBudgetLamports: record.project.monthlyBudgetLamports,
         budgetWarningThresholdPct: record.project.budgetWarningThresholdPct,
         budgetHardStop: record.project.budgetHardStop,
       }
+    };
+  }
+
+  async getProjectSubscription(projectId: string) {
+    return this.prisma.subscription.findUnique({
+      where: { projectId }
+    });
+  }
+
+  async getProjectSubscriptionUsage(projectId: string, periodStart: Date, periodEnd: Date) {
+    const [standardRequestsUsed, priorityRequestsUsed] = await Promise.all([
+      this.prisma.requestLog.count({
+        where: {
+          projectId,
+          simulated: false,
+          createdAt: {
+            gte: periodStart,
+            lt: periodEnd
+          },
+          OR: [{ mode: "standard" }, { mode: null }]
+        }
+      }),
+      this.prisma.requestLog.count({
+        where: {
+          projectId,
+          simulated: false,
+          mode: "priority",
+          createdAt: {
+            gte: periodStart,
+            lt: periodEnd
+          }
+        }
+      })
+    ]);
+
+    return {
+      standardRequestsUsed,
+      priorityRequestsUsed
     };
   }
 

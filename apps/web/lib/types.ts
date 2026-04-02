@@ -36,6 +36,7 @@ export interface PortalProject {
   leaderboardVisible?: boolean;
   status: string;
   network: string;
+  subscription?: ProjectSubscriptionSummary | null;
   owner: PortalUser;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +52,26 @@ export interface ProjectDetail extends PortalProject {
   monthlyBudgetLamports?: string | null;
   budgetWarningThresholdPct?: number | null;
   budgetHardStop?: boolean;
+}
+
+export interface ProjectSubscriptionUsage {
+  standardRequestsUsed: number;
+  priorityRequestsUsed: number;
+}
+
+export interface ProjectSubscriptionSummary {
+  id: string;
+  projectId: string;
+  plan: "starter" | "builder" | "scale" | "growth" | "business" | "network" | "payperrequest";
+  status: "active" | "paused" | "cancelled" | "overdue" | string;
+  priceUsdc: string;
+  requestsIncluded: string;
+  priorityRequestsIncluded: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelledAt: string | null;
+  createdAt: string;
+  usage: ProjectSubscriptionUsage;
 }
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────

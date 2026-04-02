@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
+import type { SubscriptionPlan, SubscriptionStatus } from "@fyxvo/config";
 import {
   ApiKeyStatus,
   NodeNetwork,
@@ -6,6 +7,7 @@ import {
   NodeStatus,
   Prisma,
   UserRole,
+  type Project,
   type PrismaClientType,
   type PrismaNamespace
 } from "@fyxvo/database";
@@ -75,23 +77,42 @@ import type {
   SearchResults
 } from "./types.js";
 
-type PrismaProject = PrismaNamespace.ProjectGetPayload<{
-  include: {
-    owner: true;
-    members: {
-      select: {
-        userId: true;
-      };
-    };
-    _count: {
-      select: {
-        apiKeys: true;
-        requestLogs: true;
-        fundingRequests: true;
-      };
-    };
+type PrismaProject = {
+  owner: {
+    id: string;
+    walletAddress: string;
+    authNonce: string;
+    sessionVersion: number;
+    displayName: string;
+    email: string | null;
+    role: AuthenticatedUser["role"];
+    status: AuthenticatedUser["status"];
+    onboardingDismissed?: boolean;
+    createdAt?: Date;
+    tosAcceptedAt?: Date | null;
+    emailVerified?: boolean;
   };
-}>;
+  subscription?: {
+    id: string;
+    projectId: string;
+    plan: string;
+    status: string;
+    priceUsdc: bigint;
+    requestsIncluded: bigint;
+    priorityRequestsIncluded: bigint;
+    currentPeriodStart: Date;
+    currentPeriodEnd: Date;
+    cancelledAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+  members: Array<{ userId: string | null }>;
+  _count: {
+    apiKeys: number;
+    requestLogs: number;
+    fundingRequests: number;
+  };
+} & Project;
 
 function rangeToMs(range: ProjectRequestLogFilters["range"]) {
   switch (range) {
@@ -148,7 +169,7 @@ function mapProject(project: PrismaProject): ProjectWithOwner {
       .map((member) => member.userId)
       .filter((value): value is string => Boolean(value)),
     _count: project._count
-  };
+  } as ProjectWithOwner;
 }
 
 function shortWallet(walletAddress: string): string {
@@ -345,6 +366,7 @@ export class PrismaApiRepository implements ApiRepository {
           },
       include: {
         owner: true,
+        subscription: true,
         members: {
           select: { userId: true },
         },
@@ -370,6 +392,7 @@ export class PrismaApiRepository implements ApiRepository {
       where: { id: projectId },
       include: {
         owner: true,
+        subscription: true,
         members: {
           select: { userId: true },
         },
@@ -399,6 +422,7 @@ export class PrismaApiRepository implements ApiRepository {
       },
       include: {
         owner: true,
+        subscription: true,
         members: {
           select: { userId: true },
         },
@@ -447,6 +471,7 @@ export class PrismaApiRepository implements ApiRepository {
       },
       include: {
         owner: true,
+        subscription: true,
         members: {
           select: { userId: true },
         },
@@ -610,6 +635,81 @@ export class PrismaApiRepository implements ApiRepository {
         status: "pending"
       }
     });
+  }
+
+  async upsertProjectSubscription(input: {
+    readonly projectId: string;
+    readonly plan: SubscriptionPlan;
+    readonly status: SubscriptionStatus;
+    readonly priceUsdc: bigint;
+    readonly requestsIncluded: bigint;
+    readonly priorityRequestsIncluded: bigint;
+    readonly currentPeriodStart: Date;
+    readonly currentPeriodEnd: Date;
+    readonly cancelledAt?: Date | null;
+  }) {
+    return this.prisma.subscription.upsert({
+      where: { projectId: input.projectId },
+      create: {
+        projectId: input.projectId,
+        plan: input.plan,
+        status: input.status,
+        priceUsdc: input.priceUsdc,
+        requestsIncluded: input.requestsIncluded,
+        priorityRequestsIncluded: input.priorityRequestsIncluded,
+        currentPeriodStart: input.currentPeriodStart,
+        currentPeriodEnd: input.currentPeriodEnd,
+        cancelledAt: input.cancelledAt ?? null,
+      },
+      update: {
+        plan: input.plan,
+        status: input.status,
+        priceUsdc: input.priceUsdc,
+        requestsIncluded: input.requestsIncluded,
+        priorityRequestsIncluded: input.priorityRequestsIncluded,
+        currentPeriodStart: input.currentPeriodStart,
+        currentPeriodEnd: input.currentPeriodEnd,
+        cancelledAt: input.cancelledAt ?? null,
+      }
+    });
+  }
+
+  async getProjectSubscription(projectId: string) {
+    return this.prisma.subscription.findUnique({
+      where: { projectId }
+    });
+  }
+
+  async getProjectSubscriptionUsage(projectId: string, periodStart: Date, periodEnd: Date) {
+    const [standardRequestsUsed, priorityRequestsUsed] = await Promise.all([
+      this.prisma.requestLog.count({
+        where: {
+          projectId,
+          simulated: false,
+          createdAt: {
+            gte: periodStart,
+            lt: periodEnd
+          },
+          OR: [{ mode: "standard" }, { mode: null }]
+        }
+      }),
+      this.prisma.requestLog.count({
+        where: {
+          projectId,
+          simulated: false,
+          mode: "priority",
+          createdAt: {
+            gte: periodStart,
+            lt: periodEnd
+          }
+        }
+      })
+    ]);
+
+    return {
+      standardRequestsUsed,
+      priorityRequestsUsed
+    };
   }
 
   async listOperatorRegistrationsByWallet(walletAddress: string): Promise<OperatorRegistrationRecord[]> {
