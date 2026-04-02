@@ -85,7 +85,7 @@ async function ensureFirefoxBrowser() {
 }
 
 async function run() {
-  const build = spawnCommand(["--filter", "@fyxvo/web", "build"]);
+  const build = spawnCommand(["build"]);
   let buildOutput = "";
   build.stdout.on("data", (chunk) => {
     buildOutput += chunk.toString();
@@ -99,7 +99,7 @@ async function run() {
     throw new Error(`Browser regression build failed:\n${buildOutput}`);
   }
 
-  const server = spawnCommand(["--filter", "@fyxvo/web", "exec", "next", "start", "--hostname", HOST, "--port", String(PORT)]);
+  const server = spawnCommand(["exec", "next", "start", "--hostname", HOST, "--port", String(PORT)]);
   server.stdout.on("data", () => undefined);
   server.stderr.on("data", () => undefined);
 
@@ -170,4 +170,7 @@ async function run() {
   }
 }
 
-await run();
+run().catch((error) => {
+  process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});

@@ -130,41 +130,52 @@ export class PrismaGatewayRepository implements GatewayRepository {
   }
 
   async getProjectSubscription(projectId: string) {
-    return this.prisma.subscription.findUnique({
-      where: { projectId }
-    });
+    try {
+      return await this.prisma.subscription.findUnique({
+        where: { projectId }
+      });
+    } catch {
+      return null;
+    }
   }
 
   async getProjectSubscriptionUsage(projectId: string, periodStart: Date, periodEnd: Date) {
-    const [standardRequestsUsed, priorityRequestsUsed] = await Promise.all([
-      this.prisma.requestLog.count({
-        where: {
-          projectId,
-          simulated: false,
-          createdAt: {
-            gte: periodStart,
-            lt: periodEnd
-          },
-          OR: [{ mode: "standard" }, { mode: null }]
-        }
-      }),
-      this.prisma.requestLog.count({
-        where: {
-          projectId,
-          simulated: false,
-          mode: "priority",
-          createdAt: {
-            gte: periodStart,
-            lt: periodEnd
+    try {
+      const [standardRequestsUsed, priorityRequestsUsed] = await Promise.all([
+        this.prisma.requestLog.count({
+          where: {
+            projectId,
+            simulated: false,
+            createdAt: {
+              gte: periodStart,
+              lt: periodEnd
+            },
+            OR: [{ mode: "standard" }, { mode: null }]
           }
-        }
-      })
-    ]);
+        }),
+        this.prisma.requestLog.count({
+          where: {
+            projectId,
+            simulated: false,
+            mode: "priority",
+            createdAt: {
+              gte: periodStart,
+              lt: periodEnd
+            }
+          }
+        })
+      ]);
 
-    return {
-      standardRequestsUsed,
-      priorityRequestsUsed
-    };
+      return {
+        standardRequestsUsed,
+        priorityRequestsUsed
+      };
+    } catch {
+      return {
+        standardRequestsUsed: 0,
+        priorityRequestsUsed: 0
+      };
+    }
   }
 
   async getProjectBudgetUsage(projectId: string) {

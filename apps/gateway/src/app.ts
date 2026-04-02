@@ -117,6 +117,17 @@ function requestLogger(app: FastifyInstance, error: unknown) {
   );
 }
 
+function logSubscriptionLookupFailure(app: FastifyInstance, error: unknown, projectId: string) {
+  app.log.warn(
+    {
+      event: "gateway.subscription.lookup_failed",
+      projectId,
+      error: sanitizeErrorForLogs(error)
+    },
+    "Subscription lookup failed. Falling back to pay-per-request billing."
+  );
+}
+
 function normalizeGatewayRuntimeError(error: unknown) {
   if (!(error instanceof Error)) {
     return error;
@@ -338,18 +349,33 @@ export async function buildGatewayApp(input: GatewayAppDependencies) {
     };
   }) {
     const requestPricing = calculateRequestPrice(inputBilling.payload, inputBilling.mode, input.env);
-    const subscription = await input.repository.getProjectSubscription(inputBilling.projectId);
+    let subscription = null;
+    try {
+      subscription = await input.repository.getProjectSubscription(inputBilling.projectId);
+    } catch (error) {
+      logSubscriptionLookupFailure(app, error, inputBilling.projectId);
+      subscription = null;
+    }
 
     if (
       subscription &&
       subscription.status === "active" &&
       subscription.plan !== "payperrequest"
     ) {
-      const usage = await input.repository.getProjectSubscriptionUsage(
-        inputBilling.projectId,
-        subscription.currentPeriodStart,
-        subscription.currentPeriodEnd
-      );
+      let usage;
+      try {
+        usage = await input.repository.getProjectSubscriptionUsage(
+          inputBilling.projectId,
+          subscription.currentPeriodStart,
+          subscription.currentPeriodEnd
+        );
+      } catch (error) {
+        logSubscriptionLookupFailure(app, error, inputBilling.projectId);
+        usage = {
+          standardRequestsUsed: 0,
+          priorityRequestsUsed: 0
+        };
+      }
 
       const currentRequestCount = requestPricing.requestCount;
       const standardRemaining = subscription.requestsIncluded - BigInt(usage.standardRequestsUsed);
