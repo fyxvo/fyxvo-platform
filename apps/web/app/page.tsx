@@ -262,7 +262,7 @@ export default async function HomePage() {
               return (
                 <div
                   key={item.title}
-                  className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6"
+                  className="capability-card rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6"
                 >
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-brand)]">
                     <Icon size={20} />
@@ -282,6 +282,65 @@ export default async function HomePage() {
 
       <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          <div className="rounded-3xl border border-[var(--fyxvo-brand)]/20 bg-gradient-to-br from-[var(--fyxvo-panel)] to-[var(--fyxvo-panel-soft)] p-8 sm:p-10 lg:p-12">
+            <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--fyxvo-brand)]">
+                  Fyxvo Yield
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--fyxvo-text)] sm:text-4xl">
+                  Live Solana yield discovery
+                </h2>
+                <p className="mt-4 max-w-xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
+                  Compare APY and TVL across Kamino, MarginFi, and Orca in real time. Track wallet
+                  positions, set rebalance alerts by APY threshold, and review protocol risk — all
+                  powered by the same Fyxvo RPC network.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <a
+                    href="https://yield.fyxvo.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--fyxvo-brand)] px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    Open Yield Dashboard
+                    <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4" aria-hidden="true">
+                      <path
+                        d="M3 8h10M9 4l4 4-4 4"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+              <div className="grid gap-3">
+                {[
+                  { label: "Protocols covered", value: "Kamino · MarginFi · Orca" },
+                  { label: "Data source", value: "Live public RPC + protocol APIs" },
+                  { label: "Risk overlays", value: "Audit + TVL + age scoring" },
+                  { label: "Wallet tracking", value: "Positions + earnings estimates" },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)]/60 px-4 py-3"
+                  >
+                    <span className="text-sm text-[var(--fyxvo-text-muted)]">{item.label}</span>
+                    <span className="text-right text-sm font-medium text-[var(--fyxvo-text)]">
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
           <div className="max-w-2xl">
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
               End-to-end flow
@@ -294,7 +353,7 @@ export default async function HomePage() {
             {OPERATING_STEPS.map((item) => (
               <div
                 key={item.step}
-                className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
+                className="capability-card rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
                   {item.step}

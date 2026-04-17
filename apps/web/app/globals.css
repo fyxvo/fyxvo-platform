@@ -66,3 +66,58 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ── Animation system ─────────────────────────────────────── */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to { background-position: 200% center; }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animation-delay-75  { animation-delay: 75ms; }
+.animation-delay-150 { animation-delay: 150ms; }
+.animation-delay-225 { animation-delay: 225ms; }
+.animation-delay-300 { animation-delay: 300ms; }
+.animation-delay-450 { animation-delay: 450ms; }
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(249, 115, 22, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.capability-card {
+  transition: border-color 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+.capability-card:hover {
+  border-color: rgba(249, 115, 22, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+}
+.card-hover:hover {
+  transform: perspective(600px) rotateX(2deg) rotateY(-1.5deg) translateZ(6px);
+  box-shadow: 0 24px 60px rgba(249, 115, 22, 0.08), 0 8px 24px rgba(0, 0, 0, 0.35);
+}

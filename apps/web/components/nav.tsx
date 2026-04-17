@@ -18,7 +18,13 @@ function useMounted() {
   );
 }
 
-const NAV_LINKS = [
+type NavLink = {
+  href: string;
+  label: string;
+  external?: boolean;
+};
+
+const NAV_LINKS: NavLink[] = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/docs", label: "Docs" },
@@ -27,8 +33,51 @@ const NAV_LINKS = [
   { href: "/network", label: "Network" },
   { href: "/explore", label: "Explore" },
   { href: "/enterprise", label: "Enterprise" },
-  { href: "/contact", label: "Contact" },
+  { href: "https://yield.fyxvo.com", label: "Yield", external: true },
 ];
+
+function NavItem({ link, pathname }: { link: NavLink; pathname: string }) {
+  const isActive = !link.external && pathname === link.href;
+  const baseClass = cn(
+    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+    isActive
+      ? "bg-[var(--fyxvo-panel)] text-[var(--fyxvo-text)]"
+      : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]",
+  );
+
+  if (link.external) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noreferrer"
+        className={cn(baseClass, "flex items-center gap-1")}
+      >
+        {link.label}
+        <svg
+          viewBox="0 0 12 12"
+          fill="none"
+          className="h-2.5 w-2.5 opacity-50"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 2h8v8M10 2 5 7"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </a>
+    );
+  }
+
+  return (
+    <Link href={link.href} className={baseClass}>
+      {link.label}
+    </Link>
+  );
+}
 
 export function Nav() {
   const pathname = usePathname();
@@ -56,18 +105,7 @@ export function Nav() {
 
         <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
           {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                pathname === link.href
-                  ? "bg-[var(--fyxvo-panel)] text-[var(--fyxvo-text)]"
-                  : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
-              )}
-            >
-              {link.label}
-            </Link>
+            <NavItem key={link.href} link={link} pathname={pathname} />
           ))}
         </nav>
 
@@ -115,18 +153,7 @@ export function Nav() {
             <div className="absolute right-0 top-[calc(100%+0.75rem)] z-20 max-h-[calc(100vh-5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-bg)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
               <div className="flex flex-col gap-1">
                 {NAV_LINKS.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                      pathname === link.href
-                        ? "bg-[var(--fyxvo-panel)] text-[var(--fyxvo-text)]"
-                        : "text-[var(--fyxvo-text-muted)] hover:bg-[var(--fyxvo-panel-soft)] hover:text-[var(--fyxvo-text)]"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
+                  <NavItem key={link.href} link={link} pathname={pathname} />
                 ))}
               </div>
             </div>

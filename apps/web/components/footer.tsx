@@ -36,28 +36,29 @@ const FOOTER_GROUPS = [
   {
     heading: "Product",
     links: [
-      { href: "/docs", label: "Docs" },
-      { href: "/pricing", label: "Pricing" },
-      { href: "/playground", label: "Playground" },
-      { href: "/assistant", label: "Assistant" },
+      { href: "/docs", label: "Docs", external: false },
+      { href: "/pricing", label: "Pricing", external: false },
+      { href: "/playground", label: "Playground", external: false },
+      { href: "/assistant", label: "Assistant", external: false },
+      { href: "https://yield.fyxvo.com", label: "Yield Dashboard", external: true },
     ],
   },
   {
     heading: "Public surfaces",
     links: [
-      { href: "/status", label: "Status" },
-      { href: "/explore", label: "Explore" },
-      { href: "/leaderboard", label: "Leaderboard" },
-      { href: "/updates", label: "Updates" },
+      { href: "/status", label: "Status", external: false },
+      { href: "/explore", label: "Explore", external: false },
+      { href: "/leaderboard", label: "Leaderboard", external: false },
+      { href: "/updates", label: "Updates", external: false },
     ],
   },
   {
     heading: "Trust",
     links: [
-      { href: "/security", label: "Security" },
-      { href: "/reliability", label: "Reliability" },
-      { href: "/privacy", label: "Privacy" },
-      { href: "/terms", label: "Terms" },
+      { href: "/security", label: "Security", external: false },
+      { href: "/reliability", label: "Reliability", external: false },
+      { href: "/privacy", label: "Privacy", external: false },
+      { href: "/terms", label: "Terms", external: false },
     ],
   },
 ] as const;
@@ -97,36 +98,19 @@ export function Footer() {
             </div>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-[var(--fyxvo-text-muted)]">
-            <a
-              href="https://www.fyxvo.com"
-              className="transition-colors hover:text-[var(--fyxvo-text)]"
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a href="https://www.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
               www.fyxvo.com
             </a>
-            <a
-              href="https://api.fyxvo.com"
-              className="transition-colors hover:text-[var(--fyxvo-text)]"
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a href="https://yield.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
+              yield.fyxvo.com
+            </a>
+            <a href="https://api.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
               api.fyxvo.com
             </a>
-            <a
-              href="https://rpc.fyxvo.com"
-              className="transition-colors hover:text-[var(--fyxvo-text)]"
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a href="https://rpc.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
               rpc.fyxvo.com
             </a>
-            <a
-              href="https://status.fyxvo.com"
-              className="transition-colors hover:text-[var(--fyxvo-text)]"
-              rel="noreferrer"
-              target="_blank"
-            >
+            <a href="https://status.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
               status.fyxvo.com
             </a>
           </div>
@@ -158,15 +142,41 @@ export function Footer() {
                 {group.heading}
               </p>
               <div className="mt-4 flex flex-col gap-3 text-sm text-[var(--fyxvo-text-muted)]">
-                {group.links.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="transition-colors hover:text-[var(--fyxvo-text)]"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {group.links.map((link) =>
+                  link.external ? (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 transition-colors hover:text-[var(--fyxvo-text)]"
+                    >
+                      {link.label}
+                      <svg
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        className="h-2.5 w-2.5 opacity-40"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M2 2h8v8M10 2 5 7"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </a>
+                  ) : (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="transition-colors hover:text-[var(--fyxvo-text)]"
+                    >
+                      {link.label}
+                    </Link>
+                  ),
+                )}
               </div>
             </div>
           ))}
