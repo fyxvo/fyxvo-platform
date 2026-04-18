@@ -36,7 +36,8 @@
     "next": "^16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.8.0"
+    "recharts": "^3.8.0",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -45,6 +46,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "@types/three": "^0.184.0",
     "autoprefixer": "^10.4.21",
     "jsdom": "^27.2.0",
     "postcss": "^8.5.6",

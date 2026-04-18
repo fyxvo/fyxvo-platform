@@ -65,7 +65,7 @@ const FOOTER_GROUPS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--fyxvo-border)] px-4 py-12">
+    <footer className="footer-grid-bg relative overflow-hidden border-t border-[var(--fyxvo-border)] px-4 py-12">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.3fr_2fr]">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -81,6 +81,15 @@ export function Footer() {
             Fund projects on devnet, route traffic through the managed relay, inspect request
             history, and operate from one wallet-authenticated workspace.
           </p>
+
+          {/* "Powered by Fyxvo" badge */}
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand)]/8 px-3 py-1">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--fyxvo-brand)]" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--fyxvo-brand)]/80">
+              Powered by Fyxvo
+            </span>
+          </div>
+
           <div className="max-w-md rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
             <p className="text-sm font-medium text-[var(--fyxvo-text)]">Newsletter</p>
             <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
@@ -98,21 +107,23 @@ export function Footer() {
             </div>
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-[var(--fyxvo-text-muted)]">
-            <a href="https://www.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
-              www.fyxvo.com
-            </a>
-            <a href="https://yield.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
-              yield.fyxvo.com
-            </a>
-            <a href="https://api.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
-              api.fyxvo.com
-            </a>
-            <a href="https://rpc.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
-              rpc.fyxvo.com
-            </a>
-            <a href="https://status.fyxvo.com" className="transition-colors hover:text-[var(--fyxvo-text)]" rel="noreferrer" target="_blank">
-              status.fyxvo.com
-            </a>
+            {[
+              ["https://www.fyxvo.com", "www.fyxvo.com"],
+              ["https://yield.fyxvo.com", "yield.fyxvo.com"],
+              ["https://api.fyxvo.com", "api.fyxvo.com"],
+              ["https://rpc.fyxvo.com", "rpc.fyxvo.com"],
+              ["https://status.fyxvo.com", "status.fyxvo.com"],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                className="transition-colors hover:text-[var(--fyxvo-text)]"
+                rel="noreferrer"
+                target="_blank"
+              >
+                {label}
+              </a>
+            ))}
           </div>
           <div className="flex items-center justify-between gap-4 pt-1">
             <p className="text-xs text-[var(--fyxvo-text-muted)]">
@@ -126,7 +137,7 @@ export function Footer() {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={link.label}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] transition-colors hover:border-[var(--fyxvo-brand)] hover:text-[var(--fyxvo-text)]"
+                  className="footer-social-icon inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                 >
                   <span className="sr-only">{link.label}</span>
                   {link.icon}
