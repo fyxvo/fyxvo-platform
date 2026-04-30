@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cn } from "@fyxvo/ui";
 import { EmailSubscribeForm } from "./email-subscribe-form";
 
 const SOCIAL_LINKS = [
@@ -65,13 +66,19 @@ const FOOTER_GROUPS = [
 
 export function Footer() {
   return (
-    <footer className="footer-grid-bg relative overflow-hidden border-t border-[var(--fyxvo-border)] px-4 py-12">
-      <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.3fr_2fr]">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Image src="/brand/logo.png" width={36} height={36} alt="Fyxvo" />
+    <footer className="footer-grid-bg relative overflow-hidden border-t border-[var(--fyxvo-border)] px-4 py-16 sm:py-20">
+      {/* Decorative gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--fyxvo-brand)]/5 pointer-events-none" />
+      
+      <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.3fr_2fr]">
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 group">
+            <div className="relative">
+              <Image src="/brand/logo.png" width={40} height={40} alt="Fyxvo" className="relative z-10" />
+              <div className="absolute inset-0 bg-[var(--fyxvo-brand)]/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            </div>
             <div>
-              <p className="font-display text-lg font-bold text-[var(--fyxvo-brand)]">Fyxvo</p>
+              <p className="font-display text-xl font-bold text-[var(--fyxvo-brand)]">Fyxvo</p>
               <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
                 Solana devnet control plane
               </p>
@@ -90,9 +97,14 @@ export function Footer() {
             </span>
           </div>
 
-          <div className="max-w-md rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-4">
-            <p className="text-sm font-medium text-[var(--fyxvo-text)]">Newsletter</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--fyxvo-text-muted)]">
+          <div className="max-w-md rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 transition-all duration-300 hover:border-[var(--fyxvo-brand)]/20 hover:shadow-lg hover:shadow-[var(--fyxvo-brand)]/5">
+            <div className="flex items-center gap-2 mb-3">
+              <svg className="w-5 h-5 text-[var(--fyxvo-brand)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+              <p className="text-sm font-semibold text-[var(--fyxvo-text)]">Newsletter</p>
+            </div>
+            <p className="text-sm leading-6 text-[var(--fyxvo-text-muted)]">
               Subscribe for product updates, rollout notes, and changes to the devnet operating
               contract.
             </p>
@@ -106,7 +118,7 @@ export function Footer() {
               />
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-[var(--fyxvo-text-muted)]">
+          <div className="flex flex-wrap gap-2 text-xs">
             {[
               ["https://www.fyxvo.com", "www.fyxvo.com"],
               ["https://yield.fyxvo.com", "yield.fyxvo.com"],
@@ -117,19 +129,20 @@ export function Footer() {
               <a
                 key={href}
                 href={href}
-                className="transition-colors hover:text-[var(--fyxvo-text)]"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)] transition-all duration-200 hover:border-[var(--fyxvo-brand)]/30 hover:text-[var(--fyxvo-text)] hover:bg-[var(--fyxvo-panel)]"
                 rel="noreferrer"
                 target="_blank"
               >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 {label}
               </a>
             ))}
           </div>
-          <div className="flex items-center justify-between gap-4 pt-1">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-[var(--fyxvo-border)]/50">
             <p className="text-xs text-[var(--fyxvo-text-muted)]">
               © {new Date().getFullYear()} Fyxvo. Devnet private alpha.
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {SOCIAL_LINKS.map((link) => (
                 <a
                   key={link.href}
@@ -137,7 +150,7 @@ export function Footer() {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={link.label}
-                  className="footer-social-icon inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
+                  className="footer-social-icon inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] text-[var(--fyxvo-text-muted)]"
                 >
                   <span className="sr-only">{link.label}</span>
                   {link.icon}
@@ -149,10 +162,10 @@ export function Footer() {
         <div className="grid gap-8 sm:grid-cols-3">
           {FOOTER_GROUPS.map((group) => (
             <div key={group.heading}>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--fyxvo-text-muted)] mb-5">
                 {group.heading}
               </p>
-              <div className="mt-4 flex flex-col gap-3 text-sm text-[var(--fyxvo-text-muted)]">
+              <div className="flex flex-col gap-3 text-sm">
                 {group.links.map((link) =>
                   link.external ? (
                     <a
@@ -160,13 +173,13 @@ export function Footer() {
                       href={link.href}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 transition-colors hover:text-[var(--fyxvo-text)]"
+                      className="group flex items-center gap-1.5 text-[var(--fyxvo-text-muted)] transition-all duration-200 hover:text-[var(--fyxvo-text)] hover:translate-x-1"
                     >
                       {link.label}
                       <svg
                         viewBox="0 0 12 12"
                         fill="none"
-                        className="h-2.5 w-2.5 opacity-40"
+                        className="h-2.5 w-2.5 opacity-0 group-hover:opacity-60 transition-opacity"
                         aria-hidden="true"
                       >
                         <path
@@ -182,7 +195,7 @@ export function Footer() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="transition-colors hover:text-[var(--fyxvo-text)]"
+                      className="text-[var(--fyxvo-text-muted)] transition-all duration-200 hover:text-[var(--fyxvo-text)] hover:translate-x-1"
                     >
                       {link.label}
                     </Link>

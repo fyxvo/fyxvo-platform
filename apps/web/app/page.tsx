@@ -204,44 +204,50 @@ export default async function HomePage() {
 
       {/* ── NETWORK STATUS ────────────────────────────────────────────── */}
       <section
-        className="relative border-b px-4 py-20 sm:px-6 lg:px-8"
+        className="relative border-b px-4 py-24 sm:px-6 lg:px-8"
         style={{ borderColor: "var(--fyxvo-border)" }}
       >
         <DashboardParticles />
         <div className="relative z-10 mx-auto max-w-7xl">
-          <div className="rounded-3xl border p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] md:p-8"
+          <div className="glass-platform rounded-3xl border p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] md:p-8"
             style={{
               borderColor: "var(--fyxvo-border)",
               backgroundColor: "var(--fyxvo-panel)",
             }}
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <p
-                  className="text-xs uppercase tracking-[0.16em]"
-                  style={{ color: "var(--fyxvo-text-muted)" }}
-                >
-                  Live network
-                </p>
-                <h2 className="mt-2 text-xl font-semibold" style={{ color: "var(--fyxvo-text)" }}>
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                  </span>
+                  <p
+                    className="text-xs uppercase tracking-[0.16em]"
+                    style={{ color: "var(--fyxvo-text-muted)" }}
+                  >
+                    Live network
+                  </p>
+                </div>
+                <h2 className="mt-2 text-2xl font-semibold" style={{ color: "var(--fyxvo-text)" }}>
                   Current operating posture
                 </h2>
               </div>
               {commit ? (
                 <span
-                  className="rounded-full border px-3 py-1 text-xs"
+                  className="rounded-full border px-3 py-1.5 text-xs font-mono"
                   style={{
                     borderColor: "var(--fyxvo-border)",
                     backgroundColor: "var(--fyxvo-panel-soft)",
                     color: "var(--fyxvo-text-muted)",
                   }}
                 >
-                  {commit}
+                  v{commit}
                 </span>
               ) : null}
             </div>
 
-            <div className="mt-6 grid gap-3">
+            <div className="mt-8 grid gap-3">
               {[
                 {
                   label: "Control plane",
@@ -261,72 +267,103 @@ export default async function HomePage() {
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between rounded-2xl border px-4 py-3"
+                  className="group flex items-center justify-between rounded-2xl border px-5 py-4 transition-all duration-200 hover:border-[var(--fyxvo-brand)]/20"
                   style={{
                     borderColor: "var(--fyxvo-border)",
                     backgroundColor: "var(--fyxvo-panel-soft)",
                   }}
                 >
-                  <span className="text-sm" style={{ color: "var(--fyxvo-text-soft)" }}>
+                  <span className="text-sm font-medium" style={{ color: "var(--fyxvo-text-soft)" }}>
                     {item.label}
                   </span>
                   <span
-                    className="flex items-center gap-2 text-sm font-medium"
+                    className="flex items-center gap-2.5 text-sm font-semibold capitalize"
                     style={{ color: "var(--fyxvo-text)" }}
                   >
-                    <span
-                      className={`h-2.5 w-2.5 rounded-full ${
-                        item.ok === null
-                          ? "bg-[var(--fyxvo-text-muted)]"
-                          : item.ok
-                            ? "bg-emerald-500"
-                            : "bg-amber-500"
-                      }`}
-                    />
+                    <span className="relative">
+                      <span
+                        className={`block h-2.5 w-2.5 rounded-full ${
+                          item.ok === null
+                            ? "bg-[var(--fyxvo-text-muted)]"
+                            : item.ok
+                              ? "bg-emerald-500"
+                              : "bg-amber-500"
+                        }`}
+                      />
+                      {item.ok && (
+                        <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500 opacity-40" />
+                      )}
+                    </span>
                     {item.value}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-4">
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 {
                   label: "Requests observed",
                   value: totalRequests.toLocaleString(),
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                    </svg>
+                  ),
                 },
-                { label: "Connected projects", value: networkStats?.totalProjects ?? 0 },
+                { 
+                  label: "Connected projects", 
+                  value: networkStats?.totalProjects ?? 0,
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                  ),
+                },
                 {
                   label: "Standard latency",
                   value:
                     typeof standardLatency === "number"
                       ? `${standardLatency}ms`
-                      : "Awaiting traffic",
+                      : "Awaiting",
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ),
                 },
                 {
                   label: "Priority latency",
                   value:
                     typeof priorityLatency === "number"
                       ? `${priorityLatency}ms`
-                      : "Awaiting traffic",
+                      : "Awaiting",
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" />
+                    </svg>
+                  ),
                 },
               ].map((stat) => (
                 <div
                   key={stat.label}
-                  className="rounded-2xl border p-4"
+                  className="group rounded-2xl border p-5 transition-all duration-200 hover:border-[var(--fyxvo-brand)]/20 hover:shadow-lg hover:shadow-[var(--fyxvo-brand)]/5"
                   style={{
                     borderColor: "var(--fyxvo-border)",
                     backgroundColor: "var(--fyxvo-panel-soft)",
                   }}
                 >
+                  <div className="flex items-center gap-2 text-[var(--fyxvo-brand)] mb-3">
+                    {stat.icon}
+                    <p
+                      className="text-xs uppercase tracking-[0.14em]"
+                      style={{ color: "var(--fyxvo-text-muted)" }}
+                    >
+                      {stat.label}
+                    </p>
+                  </div>
                   <p
-                    className="text-xs uppercase tracking-[0.14em]"
-                    style={{ color: "var(--fyxvo-text-muted)" }}
-                  >
-                    {stat.label}
-                  </p>
-                  <p
-                    className="mt-2 text-2xl font-semibold"
+                    className="text-2xl sm:text-3xl font-bold tabular-nums"
                     style={{ color: "var(--fyxvo-text)" }}
                   >
                     {stat.value}
@@ -335,14 +372,18 @@ export default async function HomePage() {
               ))}
             </div>
 
-            <div className="mt-6">
+            <div className="mt-8 flex items-center justify-between">
               <Link
                 href="/status"
-                className="text-sm font-medium transition-colors hover:opacity-70"
+                className="group inline-flex items-center gap-2 text-sm font-medium transition-all hover:gap-3"
                 style={{ color: "var(--fyxvo-brand)" }}
               >
-                View full status →
+                View full status
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
               </Link>
+              <span className="text-xs text-[var(--fyxvo-text-muted)]">Updated live</span>
             </div>
           </div>
         </div>
@@ -350,31 +391,32 @@ export default async function HomePage() {
 
       {/* ── CAPABILITIES ──────────────────────────────────────────────── */}
       <section
-        className="border-b px-4 py-20 sm:px-6 lg:px-8"
+        className="border-b px-4 py-24 sm:px-6 lg:px-8"
         style={{ borderColor: "var(--fyxvo-border)" }}
       >
         <div className="mx-auto max-w-7xl">
           <div className="max-w-2xl">
             <p
-              className="text-xs uppercase tracking-[0.16em]"
+              className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] px-3 py-1 rounded-full border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand)]/5"
               style={{ color: "var(--fyxvo-brand)" }}
             >
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--fyxvo-brand)]" />
               What ships today
             </p>
             <h2
-              className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl"
+              className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl text-balance"
               style={{ color: "var(--fyxvo-text)" }}
             >
               Built around project-level control instead of anonymous endpoint access
             </h2>
           </div>
-          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((item, i) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.title}
-                  className="capability-card glass-platform rounded-3xl border p-6"
+                  className="group capability-card glass-platform rounded-3xl border p-6 sm:p-7"
                   style={{
                     borderColor: "var(--fyxvo-border)",
                     backgroundColor: "var(--fyxvo-panel)",
@@ -382,26 +424,27 @@ export default async function HomePage() {
                   }}
                 >
                   <div
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                    className="flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-[var(--fyxvo-brand)]/20"
                     style={{
                       backgroundColor: "var(--fyxvo-panel-soft)",
                       color: "var(--fyxvo-brand)",
                     }}
                   >
-                    <Icon size={20} />
+                    <Icon size={22} />
                   </div>
                   <h3
-                    className="mt-5 text-lg font-semibold"
+                    className="mt-6 text-lg font-semibold"
                     style={{ color: "var(--fyxvo-text)" }}
                   >
                     {item.title}
                   </h3>
                   <p
-                    className="mt-3 text-sm leading-6"
+                    className="mt-3 text-sm leading-relaxed"
                     style={{ color: "var(--fyxvo-text-soft)" }}
                   >
                     {item.description}
                   </p>
+                  <div className="mt-5 h-0.5 w-0 bg-gradient-to-r from-[var(--fyxvo-brand)] to-[var(--fyxvo-brand)]/0 transition-all duration-500 group-hover:w-full" />
                 </div>
               );
             })}

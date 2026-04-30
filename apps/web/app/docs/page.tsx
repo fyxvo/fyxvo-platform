@@ -142,19 +142,21 @@ const priority = await client.priorityRpc({
 export default function DocsPage() {
   return (
     <div>
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-24 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
+          <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] px-3 py-1.5 rounded-full border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand)]/5 text-[var(--fyxvo-brand)]">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+            </svg>
             Documentation
           </p>
-          <h1 className="mt-3 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
+          <h1 className="mt-5 max-w-4xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl lg:text-7xl text-balance">
             Start with the real Fyxvo flow
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
             Fyxvo is a decentralized Solana RPC and relay infrastructure network live on devnet
-            today. The managed network already supports wallet authentication, on-chain project
-            activation, funded relay usage, scoped API keys, analytics, alerts, and public trust
-            surfaces.
+            today. Wallet authentication, on-chain project activation, funded relay usage,
+            scoped API keys, analytics, and alerts are all ready to use.
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button asChild>
@@ -163,29 +165,38 @@ export default function DocsPage() {
             <Button asChild variant="secondary">
               <Link href="/pricing">See pricing</Link>
             </Button>
+            <Button asChild variant="secondary">
+              <Link href="/playground">Try playground</Link>
+            </Button>
           </div>
         </div>
       </section>
 
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-5 lg:grid-cols-5">
-          {[
-            "Connect a wallet and sign the auth challenge.",
-            "Create a project and sign the activation transaction.",
-            "Prepare and verify SOL funding for the treasury.",
-            "Issue an API key with the scopes you need.",
-            "Route traffic through /rpc or /priority and monitor it from the workspace.",
-          ].map((item, index) => (
-            <div
-              key={item}
-              className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5"
-            >
-              <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-                {String(index + 1).padStart(2, "0")}
-              </p>
-              <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{item}</p>
-            </div>
-          ))}
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8 bg-[var(--fyxvo-panel-soft)]/30">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-center text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)] mb-8">Quickstart in 5 steps</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {[
+              { title: "Connect wallet", desc: "Connect a wallet and sign the auth challenge." },
+              { title: "Create project", desc: "Create a project and sign the activation transaction." },
+              { title: "Fund treasury", desc: "Prepare and verify SOL or USDC funding for the treasury." },
+              { title: "Issue API key", desc: "Issue an API key with the scopes you need." },
+              { title: "Route traffic", desc: "Route traffic through /rpc or /priority and monitor it." },
+            ].map((item, index) => (
+              <div
+                key={item.title}
+                className="group rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-5 transition-all duration-300 hover:border-[var(--fyxvo-brand)]/20 hover:shadow-lg hover:shadow-[var(--fyxvo-brand)]/5"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--fyxvo-brand)]/10 text-sm font-semibold text-[var(--fyxvo-brand)]">
+                    {index + 1}
+                  </span>
+                </div>
+                <h3 className="text-sm font-semibold text-[var(--fyxvo-text)] mb-2">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-[var(--fyxvo-text-soft)]">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

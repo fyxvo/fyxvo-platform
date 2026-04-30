@@ -35,6 +35,7 @@ function PlanCard({
   onAction,
   disabled = false,
   accent = "var(--fyxvo-brand)",
+  featured = false,
 }: {
   name: string;
   price: string;
@@ -45,26 +46,50 @@ function PlanCard({
   onAction?: () => void;
   disabled?: boolean;
   accent?: string;
+  featured?: boolean;
 }) {
   return (
-    <div className="rounded-[2rem] border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
-      <p className="text-xs uppercase tracking-[0.16em]" style={{ color: accent }}>
-        {name}
-      </p>
-      <p className="mt-4 text-3xl font-semibold text-[var(--fyxvo-text)]">{price}</p>
-      <p className="mt-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]">{summary}</p>
-      <div className="mt-6 space-y-3">
-        {details.map((detail) => (
+    <div 
+      className={`group relative rounded-[2rem] border bg-[var(--fyxvo-panel)] p-6 sm:p-8 transition-all duration-300 hover:shadow-xl hover:shadow-[var(--fyxvo-brand)]/5 ${
+        featured 
+          ? "border-[var(--fyxvo-brand)]/40 ring-1 ring-[var(--fyxvo-brand)]/20" 
+          : "border-[var(--fyxvo-border)] hover:border-[var(--fyxvo-brand)]/20"
+      }`}
+    >
+      {featured && (
+        <div className="absolute -top-3 left-6 px-3 py-1 rounded-full bg-[var(--fyxvo-brand)] text-[10px] font-semibold uppercase tracking-wider text-white">
+          Most Popular
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <p className="text-xs uppercase tracking-[0.16em] font-semibold" style={{ color: accent }}>
+          {name}
+        </p>
+      </div>
+      <p className="mt-5 text-4xl font-bold text-[var(--fyxvo-text)]">{price}</p>
+      <p className="mt-4 text-sm leading-relaxed text-[var(--fyxvo-text-soft)]">{summary}</p>
+      <div className="mt-8 space-y-3">
+        {details.map((detail, index) => (
           <div
             key={detail}
-            className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 text-sm leading-6 text-[var(--fyxvo-text-soft)]"
+            className="flex items-start gap-3 rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 text-sm leading-relaxed text-[var(--fyxvo-text-soft)] transition-all duration-200 hover:border-[var(--fyxvo-brand)]/20"
           >
+            <svg 
+              className="w-5 h-5 shrink-0 mt-0.5" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              strokeWidth={2}
+              style={{ color: accent }}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
             {detail}
           </div>
         ))}
       </div>
-      <div className="mt-6">
-        <Button type="button" loading={actionLoading} disabled={disabled || !onAction} onClick={onAction}>
+      <div className="mt-8">
+        <Button type="button" loading={actionLoading} disabled={disabled || !onAction} onClick={onAction} className="w-full">
           {actionLabel}
         </Button>
       </div>
@@ -196,21 +221,20 @@ export default function PricingPage() {
 
   return (
     <div>
-      <section className="border-b border-[var(--fyxvo-border)] px-4 py-20 sm:px-6 lg:px-8">
+      <section className="border-b border-[var(--fyxvo-border)] px-4 py-24 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <p className="text-xs uppercase tracking-[0.16em] text-[var(--fyxvo-brand)]">
-            Pricing
+          <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] px-3 py-1.5 rounded-full border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand)]/5 text-[var(--fyxvo-brand)]">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+            </svg>
+            Pricing Plans
           </p>
-          <h1 className="mt-3 max-w-5xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl">
-            Self-serve plans for mainnet launch, plus treasury-funded pay per request
+          <h1 className="mt-5 max-w-5xl text-5xl font-bold tracking-tight text-[var(--fyxvo-text)] sm:text-6xl lg:text-7xl text-balance">
+            Self-serve plans for mainnet launch
           </h1>
           <p className="mt-6 max-w-4xl text-lg leading-8 text-[var(--fyxvo-text-soft)]">
-            Mainnet billing is fully automatic. Developers can choose a monthly subscription, move
-            up to a larger team or enterprise plan, or stay on a treasury-funded pay-per-request
-            model without waiting on approvals or contacting sales. Stripe checkout is not wired
-            into this deployment yet, so the launch path activates billing through confirmed USDC
-            funding on chain first and can add card checkout later without changing the plan
-            structure.
+            Mainnet billing is fully automatic. Choose a monthly subscription, upgrade to a team or enterprise plan,
+            or stay on treasury-funded pay-per-request with no approvals or sales calls required.
           </p>
           {solPriceLoading ? (
             <div className="mt-4 max-w-[16rem]">

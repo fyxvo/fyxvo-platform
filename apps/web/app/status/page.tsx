@@ -100,14 +100,17 @@ function CardStatus({
   error: string | null;
 }) {
   return (
-    <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
+    <div className="group rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6 transition-all duration-300 hover:border-[var(--fyxvo-brand)]/20 hover:shadow-lg hover:shadow-[var(--fyxvo-brand)]/5">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-[var(--fyxvo-text)]">{label}</p>
+        <p className="text-sm font-medium text-[var(--fyxvo-text-muted)]">{label}</p>
         <FetchIndicator error={error} />
       </div>
-      <div className="mt-4 flex items-center gap-3">
-        <span className={`h-2.5 w-2.5 rounded-full ${ok ? "bg-emerald-500" : "bg-amber-500"}`} />
-        <span className="text-lg font-semibold text-[var(--fyxvo-text)]">{value}</span>
+      <div className="mt-5 flex items-center gap-3">
+        <span className="relative flex h-3 w-3">
+          <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${ok ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
+          <span className={`relative inline-flex h-3 w-3 rounded-full ${ok ? "bg-emerald-500" : "bg-amber-500"}`} />
+        </span>
+        <span className="text-xl font-semibold text-[var(--fyxvo-text)] capitalize">{value}</span>
       </div>
     </div>
   );
@@ -279,11 +282,25 @@ export default function StatusPage() {
   const combinedError = Object.values(errors).find(Boolean) ?? null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16">
-      <h1 className="text-4xl font-bold tracking-tight text-[var(--fyxvo-text)]">Status</h1>
-      <p className="mt-4 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
+    <div className="mx-auto max-w-6xl px-4 py-20">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.16em] px-3 py-1 rounded-full border border-[var(--fyxvo-brand)]/20 bg-[var(--fyxvo-brand)]/5 text-[var(--fyxvo-brand)]">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            Live status
+          </p>
+          <h1 className="mt-4 text-4xl sm:text-5xl font-bold tracking-tight text-[var(--fyxvo-text)]">System Status</h1>
+        </div>
+        <div className="text-sm text-[var(--fyxvo-text-muted)]">
+          Auto-refreshes every 60s
+        </div>
+      </div>
+      <p className="mt-5 max-w-3xl text-base leading-7 text-[var(--fyxvo-text-soft)]">
         Live view of the Fyxvo control plane, relay gateway, protocol readiness, incident state,
-        and current network capacity. Each data source refreshes independently every 60 seconds.
+        and current network capacity. Each data source refreshes independently.
       </p>
 
       {!hasAnyData && loading ? (
@@ -332,35 +349,42 @@ export default function StatusPage() {
         />
       </div>
 
-      <div className="mt-10 grid gap-4 lg:grid-cols-2">
+      <div className="mt-12 grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel)] p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold text-[var(--fyxvo-text)]">Network capacity</h2>
             <FetchIndicator error={errors.capacity} />
           </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+          
+          {/* Utilization bar */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-[var(--fyxvo-text-muted)]">Utilization</span>
+              <span className="font-semibold text-[var(--fyxvo-text)]">{capacity?.utilizationPct ?? 0}%</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-[var(--fyxvo-panel-soft)]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[var(--fyxvo-brand)] to-amber-500 transition-all duration-700"
+                style={{ width: `${Math.max(4, Math.min(capacity?.utilizationPct ?? 0, 100))}%` }}
+              />
+            </div>
+          </div>
+          
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 transition-all duration-200 hover:border-[var(--fyxvo-brand)]/20">
               <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                 Requests/min
               </p>
-              <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+              <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--fyxvo-text)]">
                 {(capacity?.requestsPerMinute ?? 0).toLocaleString()}
               </p>
             </div>
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
+            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4 transition-all duration-200 hover:border-[var(--fyxvo-brand)]/20">
               <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
                 Capacity RPM
               </p>
-              <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
+              <p className="mt-2 text-2xl font-bold tabular-nums text-[var(--fyxvo-text)]">
                 {(capacity?.capacityRpm ?? 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-[var(--fyxvo-border)] bg-[var(--fyxvo-panel-soft)] p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-[var(--fyxvo-text-muted)]">
-                Utilization
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-[var(--fyxvo-text)]">
-                {capacity?.utilizationPct ?? 0}%
               </p>
             </div>
           </div>
